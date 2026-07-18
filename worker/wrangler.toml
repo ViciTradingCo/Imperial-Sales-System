@@ -9,9 +9,9 @@ compatibility_date = "2024-09-01"
 #                         e.g. "https://meretheec.github.io" (add
 #                         "http://localhost:5173" while developing)
 [vars]
-CORE_SPREADSHEET_ID = "REPLACE_WITH_YOUR_EEC_CORE_SPREADSHEET_ID"
-GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com"
-ALLOWED_ORIGIN = "http://localhost:5173"
+CORE_SPREADSHEET_ID = "1-T-R_5BJmaeHv3fkqGSI06xKc9yXgI3pVqXQ1DzgiGk"
+GOOGLE_CLIENT_ID = "987037150604-djt5q7a16kgs77jvc8lnhrk74p76u5oj.apps.googleusercontent.com"
+ALLOWED_ORIGIN = "https://meretheec.github.io,http://localhost:5173"
 
 # SECRET (never in this file) — set once with:
 #   wrangler secret put SA_KEY

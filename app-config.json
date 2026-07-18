@@ -1,5 +1,5 @@
 {
-  "googleClientId": "REPLACE_WITH_YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+  "googleClientId": "987037150604-djt5q7a16kgs77jvc8lnhrk74p76u5oj.apps.googleusercontent.com",
   "apiBaseUrl": "https://REPLACE_WITH_YOUR_WORKER_SUBDOMAIN.workers.dev",
-  "coreSpreadsheetId": "REPLACE_WITH_YOUR_EEC_CORE_SPREADSHEET_ID"
+  "coreSpreadsheetId": "1-T-R_5BJmaeHv3fkqGSI06xKc9yXgI3pVqXQ1DzgiGk"
 }
