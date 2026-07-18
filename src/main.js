@@ -1,105 +1,85 @@
 /**
- * App bootstrap for Phase 1 (Foundation).
+ * App bootstrap (Phase 2).
  *
- * Responsibilities right now:
- *   1. Load public config.
- *   2. Initialize Google Sign-In.
- *   3. On sign-in, call the API's /auth/me and show who the API says we are
- *      (UID / role / business), or route to registration when unknown.
+ *   1. Load public config, init Google Sign-In.
+ *   2. On sign-in, ask the API who we are (/auth/me).
+ *   3. Registered → role-scoped dashboard. Unknown → registration flow.
  *
- * Later phases add the router + the four role-scoped views. This file
- * deliberately stays thin — it proves the auth round-trip end to end.
+ * The router is set up for the per-role views that later phases add; for now it
+ * carries two screens (dashboard + register) chosen from the API's answer.
  */
 import { loadConfig } from './lib/config.js';
 import { initAuth, onAuthChange, getProfile, signOut } from './lib/auth.js';
 import { configureApi, api } from './lib/api.js';
+import { initRouter, route, navigate, render } from './lib/router.js';
+import { el, mount } from './lib/dom.js';
+import { renderRegister } from './views/register.js';
+import { renderDashboard } from './views/dashboard.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
 
+// Single source of truth for the signed-in session.
+const state = { profile: null, me: null };
+
 function fatal(err) {
-  appEl.innerHTML = '';
-  const card = document.createElement('div');
-  card.className = 'card';
-  card.innerHTML = '<h2>Setup needed</h2>';
-  const p = document.createElement('p');
-  p.className = 'error';
-  p.textContent = err.message || String(err);
-  card.appendChild(p);
-  appEl.appendChild(card);
+  mount(appEl, el('div.card', {}, [
+    el('h2', {}, 'Setup needed'),
+    el('p', { class: 'error' }, err.message || String(err)),
+  ]));
 }
 
 function renderSignIn() {
-  appEl.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'card signin-wrap';
-  wrap.innerHTML =
-    '<h2>Sign in</h2>' +
-    '<p>Sign in with the Google account you use for the East Empire network. ' +
-    'Your access is decided by the Company registry — new faces are asked to register.</p>';
-  const mount = document.createElement('div');
-  mount.style.display = 'inline-block';
-  mount.style.marginTop = '10px';
-  wrap.appendChild(mount);
-  appEl.appendChild(wrap);
-  return mount;
+  const mountPoint = el('div', { style: 'display:inline-block;margin-top:10px' });
+  mount(appEl, el('div.card.signin-wrap', {}, [
+    el('h2', {}, 'Sign in'),
+    el('p', {}, 'Sign in with the Google account you use for the East Empire network. ' +
+      'Your access is decided by the Company registry.'),
+    mountPoint,
+  ]));
+  return mountPoint;
 }
 
-function renderBadge(profile, me) {
+function renderBadge() {
+  if (!state.profile) { badgeEl.hidden = true; return; }
   badgeEl.hidden = false;
-  badgeEl.innerHTML = '';
-  const label = document.createElement('span');
-  const role = me && me.registered ? me.role : 'guest';
-  label.textContent = (profile.name || profile.email || 'Signed in') + ' · ';
-  const pill = document.createElement('span');
-  pill.className = 'role-pill';
-  pill.textContent = role;
-  const out = document.createElement('button');
-  out.textContent = 'Sign out';
-  out.onclick = () => { signOut(); location.reload(); };
-  badgeEl.appendChild(label);
-  badgeEl.appendChild(pill);
-  badgeEl.appendChild(out);
+  const role = state.me && state.me.registered ? state.me.role : 'guest';
+  mount(badgeEl,
+    el('span', {}, (state.profile.name || state.profile.email || 'Signed in') + ' · '),
+    el('span', { class: 'role-pill' }, role),
+    el('button', { onclick: () => { signOut(); location.reload(); } }, 'Sign out'),
+  );
 }
+
+// ---- routes -------------------------------------------------------------
+function showRoot(container) {
+  if (!state.me) { renderSignIn(); return; }
+  if (state.me.registered) renderDashboard(container, { me: state.me });
+  else navigate('/register');
+}
+route('/', showRoot);
+
+route('/register', (container) => {
+  if (!state.profile) { navigate('/'); return; }
+  if (state.me && state.me.registered) { navigate('/'); return; }
+  renderRegister(container, {
+    profile: state.profile,
+    onRegistered: (me) => { state.me = me; renderBadge(); navigate('/'); },
+  });
+});
 
 async function onSignedIn() {
-  const profile = getProfile();
-  appEl.innerHTML = '<p class="loading">Checking the registry…</p>';
-  let me;
+  state.profile = getProfile();
+  mount(appEl, el('p', { class: 'loading' }, 'Checking the registry…'));
   try {
-    me = await api.me();
+    state.me = await api.me();
   } catch (e) {
     fatal(e);
     return;
   }
-  renderBadge(profile, me);
-
-  if (me && me.registered) {
-    // Phase 1 stop-point: confirm the round-trip worked. Phase 2 replaces this
-    // with the registration flow + role-scoped router.
-    appEl.innerHTML =
-      '<div class="card">' +
-      '<h2>You\'re in the registry ✓</h2>' +
-      '<p><b>UID:</b> ' + esc(me.uid) + '<br>' +
-      '<b>Business:</b> ' + esc(me.business || '—') + '<br>' +
-      '<b>Role:</b> ' + esc(me.role) + '</p>' +
-      '<p class="ok">Auth round-trip verified. The role-scoped views land in the next phases.</p>' +
-      '</div>';
-  } else {
-    appEl.innerHTML =
-      '<div class="card">' +
-      '<h2>Welcome, new trader</h2>' +
-      '<p>Your Google account isn\'t in the East Empire registry yet. ' +
-      'Registration (disclose your business, or register a new business as its owner) ' +
-      'is built in Phase 2.</p>' +
-      '<p class="note">Signed in as ' + esc(profile.email || '') + '.</p>' +
-      '</div>';
-  }
-}
-
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  renderBadge();
+  navigate(state.me.registered ? '/' : '/register');
+  render(); // ensure the chosen route paints even if the hash was already set
 }
 
 async function main() {
@@ -111,10 +91,11 @@ async function main() {
     return;
   }
   configureApi(config.apiBaseUrl);
+  initRouter(appEl, showRoot); // unknown hashes fall back to the root screen
 
-  const mount = renderSignIn();
+  const mountPoint = renderSignIn();
   onAuthChange(({ idToken }) => { if (idToken) onSignedIn(); });
-  await initAuth(config.googleClientId, mount);
+  await initAuth(config.googleClientId, mountPoint);
 }
 
 main();

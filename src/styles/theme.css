@@ -128,3 +128,31 @@ input, select {
   background: var(--paper-raised);
   font: inherit;
 }
+
+.warn { color: var(--warn); font-weight: bold; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9em; }
+
+/* Registration role choice */
+.choice { margin: 4px 0; }
+label.inline {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: normal; margin: 6px 0;
+}
+label.inline input { width: auto; }
+
+/* Role feature stubs on the dashboard */
+.card.stub { opacity: 0.85; }
+.card.stub h3 { margin: 0 0 4px; color: var(--accent); }
+.pill-soon {
+  display: inline-block; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.04em; background: var(--note); color: var(--paper-raised);
+  padding: 2px 8px; border-radius: 20px; margin-top: 6px;
+}
+
+/* Employee management */
+.emp-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(122,74,31,0.2);
+}
+.emp-row:last-child { border-bottom: none; }
+button.primary.small { padding: 5px 10px; font-size: 12px; margin: 0; width: auto; }

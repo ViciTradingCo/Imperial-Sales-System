@@ -1,0 +1,32 @@
+/** Tiny DOM helpers so views stay readable without a framework. */
+
+/** HTML-escape untrusted text before interpolating into innerHTML. */
+export function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** el('button.primary', { onclick }, 'Save') → configured element. */
+export function el(spec, props, children) {
+  const [tag, ...classes] = spec.split('.');
+  const node = document.createElement(tag || 'div');
+  if (classes.length) node.className = classes.join(' ');
+  if (props) {
+    for (const k in props) {
+      if (k === 'onclick') node.addEventListener('click', props[k]);
+      else if (k === 'html') node.innerHTML = props[k];
+      else if (k in node) node[k] = props[k];
+      else node.setAttribute(k, props[k]);
+    }
+  }
+  (Array.isArray(children) ? children : children != null ? [children] : []).forEach((c) => {
+    node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  });
+  return node;
+}
+
+/** Replaces a container's children with the given node(s). */
+export function mount(container, ...nodes) {
+  container.innerHTML = '';
+  nodes.forEach((n) => container.appendChild(n));
+}

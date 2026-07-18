@@ -51,3 +51,24 @@ export async function updateRange(env, spreadsheetId, range, rows) {
     body: JSON.stringify({ values: rows }),
   });
 }
+
+/**
+ * Creates a new spreadsheet owned by the service account, with the named tabs
+ * (in order). Returns its spreadsheetId. Used to mint a shop's ledger when a
+ * business owner registers — the service account owns it, so the app reaches it
+ * without any human having to share anything.
+ */
+export async function createSpreadsheet(env, title, tabTitles) {
+  const body = {
+    properties: { title },
+    sheets: (tabTitles && tabTitles.length ? tabTitles : ['Sheet1']).map((t) => ({
+      properties: { title: t },
+    })),
+  };
+  const data = await authFetch(env, BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return data.spreadsheetId;
+}
