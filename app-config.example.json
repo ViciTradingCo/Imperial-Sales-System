@@ -1,0 +1,6 @@
+{
+  "//": "Copy this file to app-config.json and fill in your real values. These are all PUBLIC and safe to commit — none of them is a secret. The service-account KEY (which IS secret) never appears here; it lives only in the Worker's secret store. See docs/SETUP.md.",
+  "googleClientId": "REPLACE_WITH_YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+  "apiBaseUrl": "https://REPLACE_WITH_YOUR_WORKER_SUBDOMAIN.workers.dev",
+  "coreSpreadsheetId": "REPLACE_WITH_YOUR_EEC_CORE_SPREADSHEET_ID"
+}

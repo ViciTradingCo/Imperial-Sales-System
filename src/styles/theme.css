@@ -1,0 +1,130 @@
+/*
+ * The EEC parchment theme — carried over from the Apps Script sidebars so the
+ * web app reads as the same product. These are STATIC defaults; once the Core
+ * palette (_config / Master Settings) is wired in (later phase) the live colors
+ * will be injected as CSS custom properties by palette.js.
+ */
+:root {
+  --paper: #f5e6c8;
+  --paper-raised: #fffaf0;
+  --header-bg: #3d2f23;
+  --header-text: #f5e6c8;
+  --accent: #7a4a1f;
+  --ink: #2b2118;
+  --note: #7a6a4f;
+  --good: #2f5c3a;
+  --warn: #a05c1f;
+  --bad: #8c2f2f;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  background: var(--header-bg);
+  color: var(--header-text);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.topbar h1 { margin: 0; font-size: 20px; }
+
+.user-badge {
+  font-size: 13px;
+  background: var(--accent);
+  color: var(--header-text);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.user-badge button {
+  font: inherit;
+  font-size: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  border: none;
+  border-radius: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+#app {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.card h2 { margin-top: 0; color: var(--header-bg); }
+
+.signin-wrap {
+  text-align: center;
+  padding: 40px 20px;
+}
+.signin-wrap p { color: var(--note); max-width: 420px; margin: 12px auto; }
+
+.loading { color: var(--note); font-style: italic; }
+.error { color: var(--bad); font-weight: bold; white-space: pre-wrap; }
+.ok { color: var(--good); }
+
+.footer {
+  text-align: center;
+  padding: 14px;
+  font-size: 12px;
+  color: var(--note);
+  border-top: 1px solid rgba(122, 74, 31, 0.25);
+}
+
+.role-pill {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--header-bg);
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+
+button.primary {
+  font: inherit;
+  background: var(--accent);
+  color: var(--header-text);
+  border: none;
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: bold;
+}
+button.primary:disabled { opacity: 0.6; cursor: default; }
+
+label { display: block; font-weight: bold; margin: 12px 0 4px; }
+input, select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--paper-raised);
+  font: inherit;
+}

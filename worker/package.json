@@ -1,0 +1,14 @@
+{
+  "name": "eec-sales-system-api",
+  "version": "0.1.0",
+  "description": "Backend API (Cloudflare Worker) for the EEC Sales System — the trust boundary in front of Google Sheets.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.78.0"
+  }
+}

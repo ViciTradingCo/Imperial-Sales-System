@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EEC Sales System</title>
+  <link rel="stylesheet" href="./src/styles/theme.css" />
+  <!-- Google Identity Services: the sign-in button + ID-token flow -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>⭐ East Empire Trading Company</h1>
+    <div id="userBadge" class="user-badge" hidden></div>
+  </header>
+
+  <main id="app">
+    <p class="loading">Loading…</p>
+  </main>
+
+  <footer class="footer">
+    <span>EEC Sales System · a wheel-and-spoke sales network</span>
+  </footer>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

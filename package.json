@@ -1,0 +1,15 @@
+{
+  "name": "eec-sales-system",
+  "version": "0.1.0",
+  "description": "East Empire Trading Company sales network — static web frontend (GitHub Pages) backed by Google Sheets via a thin API.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

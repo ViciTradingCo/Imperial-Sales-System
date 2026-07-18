@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+worker/node_modules/
+
+# Build output
+dist/
+worker/dist/
+.wrangler/
+
+# Local env / secrets — NEVER commit the service-account key or any real secret
+.dev.vars
+*.local
+.env
+.env.*
+service-account*.json
+!service-account.example.json
+
+# Editor / OS
+.DS_Store
+*.log
