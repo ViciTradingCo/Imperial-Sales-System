@@ -10,6 +10,7 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { navigate } from '../lib/router.js';
 
 const ROLE_SECTIONS = {
   admin: [
@@ -48,7 +49,18 @@ export function renderDashboard(container, { me }) {
       el('span', { class: 'pill-soon' }, 'Arrives in ' + phase),
     ]));
 
-  const nodes = [idCard, ...sections];
+  const nodes = [idCard];
+
+  // Admins get a live entry to the network-wide Master Settings.
+  if (me.role === 'admin') {
+    nodes.push(el('div.card', {}, [
+      el('h3', {}, 'Network Settings'),
+      el('p', { class: 'note' }, 'Tune sync cadence and market anomaly thresholds for the whole network.'),
+      el('button.primary', { onclick: () => navigate('/admin/settings') }, 'Open Network Settings'),
+    ]));
+  }
+
+  nodes.push(...sections);
 
   if (me.role === 'owner' || me.role === 'admin') {
     nodes.push(renderEmployeePanel(me));

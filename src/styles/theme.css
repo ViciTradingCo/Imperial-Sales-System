@@ -156,3 +156,9 @@ label.inline input { width: auto; }
 }
 .emp-row:last-child { border-bottom: none; }
 button.primary.small { padding: 5px 10px; font-size: 12px; margin: 0; width: auto; }
+
+button.link-back {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font: inherit; padding: 0; margin: 0 0 8px; width: auto;
+}
+button.link-back:hover { text-decoration: underline; }

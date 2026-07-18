@@ -49,6 +49,10 @@ export const api = {
   listEmployees: () => request('GET', '/business/employees'),
   /** Owner/admin: activate a pending employee. */
   activateEmployee: (uid) => request('POST', '/business/employees/activate', { uid }),
+  /** Admin: read the network's Master Settings. */
+  getSettings: () => request('GET', '/admin/settings'),
+  /** Admin: save Master Settings updates ([{label, value}]). */
+  saveSettings: (updates) => request('POST', '/admin/settings', { updates }),
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body || {}),
 };

@@ -22,6 +22,7 @@ import { verifyIdToken } from './verify.js';
 import { findUserByEmail, listUsersByBusiness, setUserStatus, touchLastSeen, USERS_SHEET } from './users.js';
 import { registerUser } from './registry.js';
 import { readRange } from './sheets.js';
+import { readSettings, writeSettings } from './settings.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -134,6 +135,27 @@ async function handleListEmployees(request, env, url) {
   };
 }
 
+/** Requires the caller to be a registered admin. */
+async function requireAdmin(request, env) {
+  const caller = await requireRegistered(request, env);
+  if (caller.role !== 'admin') {
+    const e = new Error('Admins only.');
+    e.forbidden = true;
+    throw e;
+  }
+  return caller;
+}
+
+async function handleGetSettings(request, env) {
+  await requireAdmin(request, env);
+  return { settings: await readSettings(env) };
+}
+
+async function handleSaveSettings(request, env, body) {
+  await requireAdmin(request, env);
+  return { settings: await writeSettings(env, body.updates || []) };
+}
+
 /** Owners/admins only: activate a pending employee of their own business. */
 async function handleActivateEmployee(request, env, body) {
   const caller = await requireRegistered(request, env);
@@ -211,6 +233,15 @@ export default {
       if (request.method === 'POST' && path === '/business/employees/activate') {
         const body = await readJsonBody(request);
         return json(await handleActivateEmployee(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/admin/settings') {
+        return json(await handleGetSettings(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/settings') {
+        const body = await readJsonBody(request);
+        return json(await handleSaveSettings(request, env, body), 200, cors);
       }
 
       return json({ error: 'Not found: ' + path }, 404, cors);

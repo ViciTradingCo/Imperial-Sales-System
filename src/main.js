@@ -15,6 +15,7 @@ import { initRouter, route, navigate, render } from './lib/router.js';
 import { el, mount } from './lib/dom.js';
 import { renderRegister } from './views/register.js';
 import { renderDashboard } from './views/dashboard.js';
+import { renderAdminSettings } from './views/admin-settings.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
@@ -69,6 +70,12 @@ route('/register', (container) => {
     profile: state.profile,
     onRegistered: (me) => { state.me = me; renderBadge(); navigate('/'); },
   });
+});
+
+route('/admin/settings', (container) => {
+  // The API is the real gate; this just avoids showing the page to non-admins.
+  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+  renderAdminSettings(container);
 });
 
 async function onSignedIn() {
