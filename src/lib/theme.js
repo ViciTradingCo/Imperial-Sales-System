@@ -34,7 +34,7 @@ export const THEMES = {
   },
 };
 
-export const DEFAULT_PREFS = { theme: 'parchment', accent: '' };
+export const DEFAULT_PREFS = { theme: 'parchment' };
 
 export function loadPrefs() {
   try {
@@ -57,7 +57,5 @@ export function applyPrefs(prefs) {
   const theme = THEMES[p.theme] || THEMES.parchment;
   const root = document.documentElement;
   Object.keys(theme.vars).forEach((k) => root.style.setProperty(k, theme.vars[k]));
-  // A custom accent overrides the theme's accent when set.
-  if (p.accent) root.style.setProperty('--accent', p.accent);
   root.setAttribute('data-theme', p.theme);
 }

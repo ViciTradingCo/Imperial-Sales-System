@@ -189,8 +189,6 @@ button.badge-chip {
 .fact { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14px; }
 .fact-label { color: var(--note); font-weight: bold; }
 .fact-value { text-align: right; overflow-wrap: anywhere; }
-.accent-row { display: flex; align-items: center; gap: 10px; }
-.accent-row input[type=color] { width: 46px; height: 34px; padding: 2px; flex: none; }
 
 /* ================= Responsive / mobile ================= */
 img, table { max-width: 100%; }

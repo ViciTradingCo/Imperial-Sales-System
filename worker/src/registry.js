@@ -80,7 +80,7 @@ export async function registerUser(env, { email, name, character, businessName, 
     // they own and its document ID replaces this placeholder in the User ID
     // column. Until then the business is keyed by this generated id.
     const businessId = genUid('biz');
-    // Point of Contact is the owner's character (the in-fiction name).
+    // Point of Contact is the owner's character (the in-character name).
     await appendBusiness(env, { ledgerId: businessId, businessName: biz, pointOfContact: char });
     const uid = genUid('usr');
     return appendUser(env, { uid, email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active' });

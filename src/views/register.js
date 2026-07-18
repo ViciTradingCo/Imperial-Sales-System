@@ -51,7 +51,7 @@ export function renderRegister(container, { profile, onRegistered }) {
 
     el('label', {}, 'Character name'),
     charInput,
-    el('p', { class: 'note' }, 'Your in-fiction name — this is what the Company and your shop see, not your email.'),
+    el('p', { class: 'note' }, 'Your in-character name — this is what the Company and your shop see, not your email.'),
 
     el('label', {}, 'Business name'),
     bizInput,

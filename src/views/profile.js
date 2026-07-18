@@ -48,7 +48,7 @@ function profileCard(me, onProfileUpdated) {
     el('h2', {}, 'Profile'),
     el('label', {}, 'Character name'),
     charInput,
-    el('p', { class: 'note' }, 'Your in-fiction name — shown to the Company and your shop.'),
+    el('p', { class: 'note' }, 'Your in-character name — shown to the Company and your shop.'),
     save,
     status,
     el('div', { class: 'readonly-facts' }, [
@@ -79,30 +79,12 @@ function appearanceCard() {
   });
   themeSel.addEventListener('change', () => savePrefs({ theme: themeSel.value }));
 
-  const accent = el('input', { type: 'color', value: cssAccent() });
-  accent.addEventListener('input', () => savePrefs({ accent: accent.value }));
-
-  const reset = el('button', { class: 'secondary-btn', onclick: () => {
-    savePrefs({ theme: 'parchment', accent: '' });
-    themeSel.value = 'parchment';
-    accent.value = cssAccent();
-  } }, 'Reset appearance');
-
   return el('div.card', {}, [
     el('h2', {}, 'Appearance'),
-    el('p', { class: 'note' }, 'Customize how the app looks on this device.'),
+    el('p', { class: 'note' }, 'Choose a theme for this device.'),
     el('label', {}, 'Theme'),
     themeSel,
-    el('label', {}, 'Accent colour'),
-    el('div', { class: 'accent-row' }, [accent, el('span', { class: 'note' }, 'Overrides the theme accent.')]),
-    reset,
   ]);
-}
-
-/** Reads the current computed accent so the colour input starts in sync. */
-function cssAccent() {
-  const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-  return /^#[0-9a-fA-F]{6}$/.test(v) ? v : '#7a4a1f';
 }
 
 function signOutCard() {

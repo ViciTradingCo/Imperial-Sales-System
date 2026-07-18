@@ -49,7 +49,7 @@ function renderBadge() {
   badgeEl.hidden = false;
   const registered = state.me && state.me.registered;
   const role = registered ? state.me.role : 'guest';
-  // Prefer the in-fiction character name; fall back to the Google identity.
+  // Prefer the in-character name; fall back to the Google identity.
   const who = (registered && state.me.character) || state.profile.name || state.profile.email || 'Signed in';
 
   if (registered) {
