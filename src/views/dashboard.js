@@ -20,7 +20,7 @@ const ROLE_SECTIONS = {
   ],
   owner: [
     ['Register (POS)', 'Ring up sales for your shop.', 'Phase 3'],
-    ['Shop Ledger & Settings', 'Inventory, discounts, employees, style, Coffers.', 'Phase 4'],
+    ['Shop Ledger', 'Inventory, discounts, style, Coffers.', 'Phase 4'],
   ],
   employee: [
     ['Register (POS)', 'Ring up sales for your shop.', 'Phase 3'],
@@ -57,6 +57,15 @@ export function renderDashboard(container, { me }) {
       el('h3', {}, 'Network Settings'),
       el('p', { class: 'note' }, 'Tune sync cadence and market anomaly thresholds for the whole network.'),
       el('button.primary', { onclick: () => navigate('/admin/settings') }, 'Open Network Settings'),
+    ]));
+  }
+
+  // Owners get a live entry to their own shop's ledger settings.
+  if (me.role === 'owner') {
+    nodes.push(el('div.card', {}, [
+      el('h3', {}, 'Ledger Settings'),
+      el('p', { class: 'note' }, 'Per-shop settings for your business, like the pricing-flag threshold.'),
+      el('button.primary', { onclick: () => navigate('/ledger/settings') }, 'Open Ledger Settings'),
     ]));
   }
 

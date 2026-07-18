@@ -16,6 +16,7 @@ import { el, mount } from './lib/dom.js';
 import { renderRegister } from './views/register.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderAdminSettings } from './views/admin-settings.js';
+import { renderLedgerSettings } from './views/ledger-settings.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
@@ -76,6 +77,12 @@ route('/admin/settings', (container) => {
   // The API is the real gate; this just avoids showing the page to non-admins.
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
   renderAdminSettings(container);
+});
+
+route('/ledger/settings', (container) => {
+  const m = state.me;
+  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  renderLedgerSettings(container, { me: m });
 });
 
 async function onSignedIn() {

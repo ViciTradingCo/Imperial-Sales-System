@@ -23,6 +23,7 @@ import { findUserByEmail, listUsersByBusiness, setUserStatus, touchLastSeen, USE
 import { registerUser } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
+import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -156,6 +157,27 @@ async function handleSaveSettings(request, env, body) {
   return { settings: await writeSettings(env, body.updates || []) };
 }
 
+/** Which business a ledger-settings request targets: the caller's, or (admin) any. */
+async function ledgerSettingsBusiness(request, env, override) {
+  const caller = await requireRegistered(request, env);
+  if (caller.role !== 'owner' && caller.role !== 'admin') {
+    const e = new Error('Only a shop owner or an admin can manage ledger settings.');
+    e.forbidden = true;
+    throw e;
+  }
+  return caller.role === 'admin' && override ? override : caller.business;
+}
+
+async function handleGetLedgerSettings(request, env, url) {
+  const business = await ledgerSettingsBusiness(request, env, url.searchParams.get('business'));
+  return readBusinessSettings(env, business);
+}
+
+async function handleSaveLedgerSettings(request, env, body) {
+  const business = await ledgerSettingsBusiness(request, env, body.business);
+  return writeBusinessSettings(env, business, body.updates || []);
+}
+
 /** Owners/admins only: activate a pending employee of their own business. */
 async function handleActivateEmployee(request, env, body) {
   const caller = await requireRegistered(request, env);
@@ -242,6 +264,15 @@ export default {
       if (request.method === 'POST' && path === '/admin/settings') {
         const body = await readJsonBody(request);
         return json(await handleSaveSettings(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/business/settings') {
+        return json(await handleGetLedgerSettings(request, env, url), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/business/settings') {
+        const body = await readJsonBody(request);
+        return json(await handleSaveLedgerSettings(request, env, body), 200, cors);
       }
 
       return json({ error: 'Not found: ' + path }, 404, cors);

@@ -22,8 +22,8 @@ export const SETTINGS_SCHEMA = [
     notes: 'At or above this multiple of an item’s network average → OVERPRICED. Must be above 1.' },
   { label: 'Undercutting threshold (x item average)', def: 0.5, kind: 'float', min: 0.01, max: 0.99,
     notes: 'At or below this multiple → UNDERCUT (possible dumping). Between 0 and 1.' },
-  { label: 'Minimum priced units before flagging', def: 3, kind: 'int', min: 1,
-    notes: 'Ignore items with fewer priced units, to avoid false alarms.' },
+  // NOTE: "Minimum priced units before flagging" is a PER-SHOP setting — it
+  // lives in Business Settings (the owner's Ledger Settings page), not here.
 ];
 
 /** Creates the tab (if missing) and seeds every setting the first time. */
