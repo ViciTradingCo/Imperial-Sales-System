@@ -78,7 +78,8 @@ body {
   margin-bottom: 18px;
 }
 
-.card h2 { margin-top: 0; color: var(--header-bg); }
+.card h2 { margin-top: 0; color: var(--accent); }
+.card h3 { color: var(--accent); }
 
 .signin-wrap {
   text-align: center;
@@ -103,6 +104,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   background: var(--header-bg);
+  color: var(--header-text);
   padding: 2px 7px;
   border-radius: 20px;
 }
@@ -120,14 +122,17 @@ button.primary {
 button.primary:disabled { opacity: 0.6; cursor: default; }
 
 label { display: block; font-weight: bold; margin: 12px 0 4px; }
-input, select {
+input, select, textarea {
   width: 100%;
   padding: 8px;
   border: 1px solid var(--accent);
   border-radius: 6px;
   background: var(--paper-raised);
+  color: var(--ink);
   font: inherit;
 }
+/* The dropdown list is OS-rendered; set colors so it's readable on dark themes. */
+select option { background: var(--paper-raised); color: var(--ink); }
 
 .warn { color: var(--warn); font-weight: bold; }
 code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9em; }
