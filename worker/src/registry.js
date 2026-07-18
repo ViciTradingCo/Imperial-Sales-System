@@ -10,9 +10,8 @@
  * Business NAME is the human key that links a Users row to its business, so we
  * enforce name uniqueness at registration.
  */
-import { readRange, appendRows } from './sheets.js';
-import { appendUser, findUserByEmail } from './users.js';
-import { createLedger } from './ledger.js';
+import { readRange, appendRows, ensureSheet } from './sheets.js';
+import { appendUser, findUserByEmail, USERS_SHEET, USERS_HEADERS } from './users.js';
 
 export const CERT_SHEET = 'Certified Users';
 export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe'];
@@ -57,6 +56,10 @@ async function appendBusiness(env, { ledgerId, businessName, pointOfContact }) {
  *                   employee awaiting owner/admin activation.
  */
 export async function registerUser(env, { email, name, businessName, asOwner }) {
+  // Self-heal the registry tabs so a fresh Core needs nothing hand-created
+  // beyond the Users tab (which seeds the first admin).
+  await ensureSheet(env, env.CORE_SPREADSHEET_ID, USERS_SHEET, USERS_HEADERS);
+
   const existing = await findUserByEmail(env, email);
   if (existing) return { ...existing, alreadyRegistered: true };
 
@@ -69,8 +72,12 @@ export async function registerUser(env, { email, name, businessName, asOwner }) 
     if (found) {
       throw new Error('A business named "' + biz + '" is already registered. If you own it, ask an admin to link your account; otherwise choose a different name.');
     }
-    const ledgerId = await createLedger(env, { businessName: biz, pointOfContact: name || email });
-    await appendBusiness(env, { ledgerId, businessName: biz, pointOfContact: name || email });
+    await ensureSheet(env, env.CORE_SPREADSHEET_ID, CERT_SHEET, CERT_HEADERS);
+    // The business's ledger is LINKED later (Phase 3): the owner shares a Sheet
+    // they own and its document ID replaces this placeholder in the User ID
+    // column. Until then the business is keyed by this generated id.
+    const businessId = genUid('biz');
+    await appendBusiness(env, { ledgerId: businessId, businessName: biz, pointOfContact: name || email });
     const uid = genUid('usr');
     return appendUser(env, { uid, email, business: biz, role: 'owner', isOwner: true, status: 'active' });
   }

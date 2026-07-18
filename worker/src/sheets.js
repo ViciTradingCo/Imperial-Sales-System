@@ -53,10 +53,10 @@ export async function updateRange(env, spreadsheetId, range, rows) {
 }
 
 /**
- * Creates a new spreadsheet owned by the service account, with the named tabs
- * (in order). Returns its spreadsheetId. Used to mint a shop's ledger when a
- * business owner registers — the service account owns it, so the app reaches it
- * without any human having to share anything.
+ * Creates a new spreadsheet owned by the service account, with the named tabs.
+ * NOTE: on a personal Google project a service account usually CANNOT create
+ * Drive files (no backing storage) — so ledgers are LINKED, not minted (an
+ * owner shares a Sheet they own). Kept for use inside a Shared Drive setup.
  */
 export async function createSpreadsheet(env, title, tabTitles) {
   const body = {
@@ -71,4 +71,29 @@ export async function createSpreadsheet(env, title, tabTitles) {
     body: JSON.stringify(body),
   });
   return data.spreadsheetId;
+}
+
+/** Titles of every tab in a spreadsheet. */
+export async function getSheetTitles(env, spreadsheetId) {
+  const data = await authFetch(env, `${BASE}/${spreadsheetId}?fields=sheets.properties.title`);
+  return (data.sheets || []).map((s) => s.properties.title);
+}
+
+/**
+ * Ensures a tab exists (creating it with the given header row if missing).
+ * Self-healing, like the original Apps Script `ensure*Tab` helpers — so the
+ * Core doesn't need every tab hand-created before the app can use it.
+ */
+export async function ensureSheet(env, spreadsheetId, title, headers) {
+  const titles = await getSheetTitles(env, spreadsheetId);
+  if (titles.includes(title)) return false;
+  await authFetch(env, `${BASE}/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title } } }] }),
+  });
+  if (headers && headers.length) {
+    await updateRange(env, spreadsheetId, `${title}!A1`, [headers]);
+  }
+  return true;
 }
