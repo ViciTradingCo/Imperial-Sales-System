@@ -62,13 +62,50 @@ body {
   cursor: pointer;
 }
 
-#app {
+.layout {
   flex: 1;
   width: 100%;
-  max-width: 960px;
+  max-width: 1080px;
   margin: 0 auto;
+  display: flex;
+  align-items: flex-start;
+}
+#app {
+  flex: 1;
+  min-width: 0; /* allow the content column to shrink instead of overflowing */
   padding: 24px 20px;
 }
+
+/* ---- side navigation (desktop) ---- */
+.nav-toggle {
+  display: none;
+  background: none; border: none; color: var(--header-text);
+  font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px;
+}
+.sidenav {
+  display: none;
+  flex: none;
+  width: 210px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 12px;
+}
+body.has-nav .sidenav { display: flex; }
+.sidenav button {
+  display: block; width: 100%; text-align: left;
+  font: inherit; font-size: 15px;
+  background: none; border: none; color: var(--ink); cursor: pointer;
+  padding: 10px 12px; border-radius: var(--radius);
+}
+.sidenav button:hover { background: var(--paper-raised); }
+.sidenav button.active { background: var(--accent); color: var(--header-text); font-weight: bold; }
+
+.backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 40; }
+
+/* ---- landing / about ---- */
+.card.hero h2 { font-size: 22px; }
+.feature-list { margin: 0; padding-left: 20px; }
+.feature-list li { margin: 6px 0; }
 
 .card {
   background: var(--paper-raised);
@@ -192,6 +229,23 @@ button.badge-chip {
 
 /* ================= Responsive / mobile ================= */
 img, table { max-width: 100%; }
+
+/* Below this width the sidebar becomes a left-side drawer opened by ☰. */
+@media (max-width: 720px) {
+  .layout { display: block; }
+  body.has-nav .nav-toggle { display: inline-block; }
+  body.has-nav .sidenav {
+    display: flex;
+    position: fixed; top: 0; left: 0; bottom: 0; width: 250px; z-index: 50;
+    background: var(--paper-raised);
+    border-right: 1px solid rgba(122, 74, 31, 0.3);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    padding-top: 16px;
+    overflow-y: auto;
+  }
+  body.has-nav .sidenav.open { transform: translateX(0); }
+}
 /* Wide content scrolls inside itself rather than the page. */
 .scroll-x { overflow-x: auto; }
 

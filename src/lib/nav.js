@@ -1,0 +1,42 @@
+/**
+ * Sidebar / drawer navigation. One list of role-scoped destinations, rendered
+ * as buttons into the sidenav (a fixed side panel on desktop, an off-canvas
+ * left drawer on mobile). Access is still enforced by the API and the route
+ * guards — this only decides which buttons to show.
+ */
+import { navigate, currentPath } from './router.js';
+
+/** The nav destinations available to a given user, in order. */
+export function navItems(me) {
+  const items = [{ path: '/', label: 'Home' }];
+  if (me.role === 'owner' || me.role === 'admin') items.push({ path: '/employees', label: 'Employees' });
+  if (me.role === 'admin') items.push({ path: '/admin/settings', label: 'Network Settings' });
+  if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });
+  items.push({ path: '/profile', label: 'Profile' });
+  items.push({ path: '/about', label: 'About' });
+  return items;
+}
+
+/** Renders the nav buttons into `navEl`. `onNavigate` runs after each click. */
+export function renderNav(navEl, me, onNavigate) {
+  navEl.innerHTML = '';
+  navItems(me).forEach((it) => {
+    const b = document.createElement('button');
+    b.textContent = it.label;
+    b.dataset.path = it.path;
+    b.addEventListener('click', () => {
+      navigate(it.path);
+      if (onNavigate) onNavigate();
+    });
+    navEl.appendChild(b);
+  });
+  highlightNav(navEl);
+}
+
+/** Marks the button matching the current route as active. */
+export function highlightNav(navEl) {
+  const path = currentPath();
+  navEl.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.path === path);
+  });
+}

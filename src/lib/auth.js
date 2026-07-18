@@ -32,8 +32,10 @@ function emit() { listeners.forEach((fn) => fn({ idToken, profile })); }
 export function getIdToken() { return idToken; }
 export function getProfile() { return profile; }
 
-/** Initializes GIS and renders the sign-in button into `mountEl`. */
-export function initAuth(clientId, mountEl) {
+let initialized = false;
+
+/** Initializes GIS. Resolves once the library is ready and configured. */
+export function initAuth(clientId) {
   return new Promise((resolve) => {
     const ready = () => {
       if (!window.google || !window.google.accounts || !window.google.accounts.id) {
@@ -49,19 +51,23 @@ export function initAuth(clientId, mountEl) {
         },
         auto_select: false,
       });
-      if (mountEl) {
-        window.google.accounts.id.renderButton(mountEl, {
-          theme: 'filled_black',
-          size: 'large',
-          text: 'signin_with',
-          shape: 'pill',
-        });
-        window.google.accounts.id.prompt(); // one-tap, if eligible
-      }
+      initialized = true;
       resolve();
     };
     ready();
   });
+}
+
+/** Renders the Google sign-in button into `mountEl` (call after initAuth). */
+export function renderSignInButton(mountEl) {
+  if (!initialized || !mountEl) return;
+  window.google.accounts.id.renderButton(mountEl, {
+    theme: 'filled_black',
+    size: 'large',
+    text: 'signin_with',
+    shape: 'pill',
+  });
+  window.google.accounts.id.prompt(); // one-tap, if eligible
 }
 
 export function signOut() {

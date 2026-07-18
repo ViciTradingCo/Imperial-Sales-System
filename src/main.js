@@ -1,59 +1,61 @@
 /**
- * App bootstrap (Phase 2).
- *
- *   1. Load public config, init Google Sign-In.
- *   2. On sign-in, ask the API who we are (/auth/me).
- *   3. Registered → role-scoped dashboard. Unknown → registration flow.
- *
- * The router is set up for the per-role views that later phases add; for now it
- * carries two screens (dashboard + register) chosen from the API's answer.
+ * App bootstrap + shell: navigation (sidebar / mobile drawer), routing, and the
+ * signed-out landing. Each panel is its own route/page, selected from the nav.
  */
 import { loadConfig } from './lib/config.js';
-import { initAuth, onAuthChange, getProfile, signOut } from './lib/auth.js';
+import { initAuth, renderSignInButton, onAuthChange, getProfile, signOut } from './lib/auth.js';
 import { configureApi, api } from './lib/api.js';
 import { initRouter, route, navigate, render } from './lib/router.js';
 import { el, mount } from './lib/dom.js';
+import { renderNav, highlightNav } from './lib/nav.js';
+import { applyPrefs } from './lib/theme.js';
+import { renderLanding } from './views/landing.js';
+import { renderHome } from './views/home.js';
 import { renderRegister } from './views/register.js';
-import { renderDashboard } from './views/dashboard.js';
+import { renderProfile } from './views/profile.js';
+import { renderEmployees } from './views/employees.js';
 import { renderAdminSettings } from './views/admin-settings.js';
 import { renderLedgerSettings } from './views/ledger-settings.js';
-import { renderProfile } from './views/profile.js';
-import { applyPrefs } from './lib/theme.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
+const navEl = document.getElementById('sidenav');
+const navToggle = document.getElementById('navToggle');
+const backdrop = document.getElementById('backdrop');
 
-// Single source of truth for the signed-in session.
 const state = { profile: null, me: null };
 
-function fatal(err) {
-  mount(appEl, el('div.card', {}, [
-    el('h2', {}, 'Setup needed'),
-    el('p', { class: 'error' }, err.message || String(err)),
-  ]));
+// ---- mobile drawer -------------------------------------------------------
+function openDrawer() {
+  navEl.classList.add('open');
+  backdrop.hidden = false;
+  navToggle.setAttribute('aria-expanded', 'true');
 }
+function closeDrawer() {
+  navEl.classList.remove('open');
+  backdrop.hidden = true;
+  navToggle.setAttribute('aria-expanded', 'false');
+}
+navToggle.addEventListener('click', () => {
+  if (navEl.classList.contains('open')) closeDrawer(); else openDrawer();
+});
+backdrop.addEventListener('click', closeDrawer);
 
-function renderSignIn() {
-  const mountPoint = el('div', { style: 'display:inline-block;margin-top:10px' });
-  mount(appEl, el('div.card.signin-wrap', {}, [
-    el('h2', {}, 'Sign in'),
-    el('p', {}, 'Sign in with the Google account you use for the East Empire network. ' +
-      'Your access is decided by the Company registry.'),
-    mountPoint,
-  ]));
-  return mountPoint;
+// ---- nav / badge ---------------------------------------------------------
+function showNav(on) {
+  document.body.classList.toggle('has-nav', on);
+  if (on) renderNav(navEl, state.me, closeDrawer);
+  else { navEl.innerHTML = ''; closeDrawer(); }
 }
+window.addEventListener('hashchange', () => highlightNav(navEl));
 
 function renderBadge() {
   if (!state.profile) { badgeEl.hidden = true; return; }
   badgeEl.hidden = false;
   const registered = state.me && state.me.registered;
   const role = registered ? state.me.role : 'guest';
-  // Prefer the in-character name; fall back to the Google identity.
   const who = (registered && state.me.character) || state.profile.name || state.profile.email || 'Signed in';
-
   if (registered) {
-    // The badge is now the entry to the editable Profile page.
     mount(badgeEl, el('button', { class: 'badge-chip', onclick: () => navigate('/profile') }, [
       el('span', {}, who + ' · '),
       el('span', { class: 'role-pill' }, role),
@@ -67,33 +69,40 @@ function renderBadge() {
   }
 }
 
-// ---- routes -------------------------------------------------------------
+function fatal(err) {
+  mount(appEl, el('div.card', {}, [
+    el('h2', {}, 'Setup needed'),
+    el('p', { class: 'error' }, err.message || String(err)),
+  ]));
+}
+
+/** Signed-out landing with a fresh Google sign-in button. */
+function renderSignedOutLanding(container) {
+  const signInMount = el('div', { style: 'display:inline-block;margin-top:10px' });
+  renderLanding(container, { signInMount });
+  renderSignInButton(signInMount); // no-op until GIS is initialized
+}
+
+// ---- routes --------------------------------------------------------------
 function showRoot(container) {
-  if (!state.me) { renderSignIn(); return; }
-  if (state.me.registered) renderDashboard(container, { me: state.me });
+  if (!state.me) { renderSignedOutLanding(container); return; }
+  if (state.me.registered) renderHome(container, { me: state.me });
   else navigate('/register');
 }
 route('/', showRoot);
+
+route('/about', (container) => {
+  if (state.me && state.me.registered) renderLanding(container, {});
+  else renderSignedOutLanding(container);
+});
 
 route('/register', (container) => {
   if (!state.profile) { navigate('/'); return; }
   if (state.me && state.me.registered) { navigate('/'); return; }
   renderRegister(container, {
     profile: state.profile,
-    onRegistered: (me) => { state.me = me; renderBadge(); navigate('/'); },
+    onRegistered: (me) => { state.me = me; renderBadge(); showNav(true); navigate('/'); },
   });
-});
-
-route('/admin/settings', (container) => {
-  // The API is the real gate; this just avoids showing the page to non-admins.
-  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderAdminSettings(container);
-});
-
-route('/ledger/settings', (container) => {
-  const m = state.me;
-  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
-  renderLedgerSettings(container, { me: m });
 });
 
 route('/profile', (container) => {
@@ -104,6 +113,24 @@ route('/profile', (container) => {
   });
 });
 
+route('/employees', (container) => {
+  const m = state.me;
+  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  renderEmployees(container, { me: m });
+});
+
+route('/admin/settings', (container) => {
+  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+  renderAdminSettings(container);
+});
+
+route('/ledger/settings', (container) => {
+  const m = state.me;
+  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  renderLedgerSettings(container, { me: m });
+});
+
+// ---- boot ----------------------------------------------------------------
 async function onSignedIn() {
   state.profile = getProfile();
   mount(appEl, el('p', { class: 'loading' }, 'Checking the registry…'));
@@ -114,8 +141,9 @@ async function onSignedIn() {
     return;
   }
   renderBadge();
+  showNav(!!(state.me && state.me.registered));
   navigate(state.me.registered ? '/' : '/register');
-  render(); // ensure the chosen route paints even if the hash was already set
+  render(); // paint even if the hash was already the target
 }
 
 async function main() {
@@ -129,11 +157,14 @@ async function main() {
     return;
   }
   configureApi(config.apiBaseUrl);
-  initRouter(appEl, showRoot); // unknown hashes fall back to the root screen
+  initRouter(appEl, showRoot);
 
-  const mountPoint = renderSignIn();
+  renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
   onAuthChange(({ idToken }) => { if (idToken) onSignedIn(); });
-  await initAuth(config.googleClientId, mountPoint);
+  await initAuth(config.googleClientId);
+  // GIS is ready now — re-render so the sign-in button paints (unless one-tap
+  // already signed the user in).
+  if (!state.profile) renderSignedOutLanding(appEl);
 }
 
 main();

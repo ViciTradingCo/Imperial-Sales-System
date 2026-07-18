@@ -10,16 +10,22 @@
 </head>
 <body>
   <header class="topbar">
+    <button id="navToggle" class="nav-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
     <h1>⭐ East Empire Trading Company</h1>
     <div id="userBadge" class="user-badge" hidden></div>
   </header>
 
-  <main id="app">
-    <p class="loading">Loading…</p>
-  </main>
+  <div id="backdrop" class="backdrop" hidden></div>
+
+  <div class="layout">
+    <nav id="sidenav" class="sidenav" aria-label="Main"></nav>
+    <main id="app">
+      <p class="loading">Loading…</p>
+    </main>
+  </div>
 
   <footer class="footer">
-    <span>EEC Sales System · a wheel-and-spoke sales network</span>
+    <span>EEC Sales System · a wheel-and-spoke sales network · created by SmileDaemon</span>
   </footer>
 
   <script type="module" src="./src/main.js"></script>
