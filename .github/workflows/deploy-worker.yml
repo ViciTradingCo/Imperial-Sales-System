@@ -1,0 +1,38 @@
+name: Deploy Worker API
+
+# Deploys the Cloudflare Worker (the backend API) from GitHub — no local
+# terminal needed. It also uploads the SA_KEY secret to the Worker on each run.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN  — a Cloudflare token with the "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID — your Cloudflare account ID (dashboard → Workers & Pages, right sidebar)
+#   SA_KEY                — the full service-account JSON key (the one real secret)
+#
+# Trigger it from the Actions tab (Run workflow) or by pushing changes under worker/.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          # Uploads the Worker secret from the env var below, alongside the deploy.
+          secrets: |
+            SA_KEY
+        env:
+          SA_KEY: ${{ secrets.SA_KEY }}

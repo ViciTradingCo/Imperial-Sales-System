@@ -72,31 +72,31 @@ From the Core's URL: `https://docs.google.com/spreadsheets/d/`**`THIS_LONG_ID`**
 
 ## Part 3 — Cloudflare Worker (the API)
 
+The `[vars]` in `worker/wrangler.toml` (Core ID, client ID, allowed origin) are
+already filled in and committed. You only need to give GitHub the credentials to
+deploy on your behalf, then run the deploy workflow.
+
+### Option A — deploy from GitHub Actions (browser only, recommended)
 1. Create a free account at <https://dash.cloudflare.com/>.
-2. Install the CLI and log in:
-   ```bash
-   npm install
-   cd worker && npm install
-   npx wrangler login
-   ```
-3. Edit `worker/wrangler.toml` `[vars]`:
-   - `CORE_SPREADSHEET_ID` = the ID from step 2b
-   - `GOOGLE_CLIENT_ID` = the client ID from step 1d
-   - `ALLOWED_ORIGIN` = `https://<your-username>.github.io` (add `,http://localhost:5173` while developing)
-4. Load the service-account key as a secret (paste the entire JSON when prompted):
-   ```bash
-   npx wrangler secret put SA_KEY
-   ```
-5. Deploy:
-   ```bash
-   npx wrangler deploy
-   ```
-   Copy the printed URL (`https://eec-sales-system-api.<subdomain>.workers.dev`).
-6. Smoke test:
-   ```bash
-   curl https://eec-sales-system-api.<subdomain>.workers.dev/health
-   ```
+2. **Account ID:** dashboard → **Workers & Pages** → copy the **Account ID** from the right sidebar.
+3. **API token:** profile menu → **My Profile → API Tokens → Create Token** → use the **"Edit Cloudflare Workers"** template → Continue → Create → copy the token (shown once).
+4. In the GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**, add three:
+   - `CLOUDFLARE_API_TOKEN` = the token from step 3
+   - `CLOUDFLARE_ACCOUNT_ID` = the ID from step 2
+   - `SA_KEY` = the **entire** service-account JSON key (open the downloaded file, copy all of it)
+5. **Actions** tab → **Deploy Worker API** → **Run workflow**. It deploys the Worker and loads `SA_KEY` into it.
+6. Find the Worker URL: Cloudflare dashboard → **Workers & Pages → eec-sales-system-api** → its `*.workers.dev` URL (or read it from the Action log).
+7. Smoke test in your browser — visit `https://eec-sales-system-api.<subdomain>.workers.dev/health`.
    Expect `{"ok":true,...,"configured":{"coreId":true,"clientId":true,"saKey":true}}`.
+
+### Option B — deploy from a local terminal (if you have Node)
+```bash
+npm install && cd worker && npm install
+npx wrangler login
+npx wrangler secret put SA_KEY      # paste the full JSON when prompted
+npx wrangler deploy                 # copy the printed *.workers.dev URL
+```
+The `[vars]` are already set in `wrangler.toml`; adjust `ALLOWED_ORIGIN` if your site origin differs.
 
 ---
 
