@@ -162,3 +162,62 @@ button.link-back {
   font: inherit; padding: 0; margin: 0 0 8px; width: auto;
 }
 button.link-back:hover { text-decoration: underline; }
+
+/* Secondary (outline) button */
+button.secondary-btn {
+  font: inherit; background: transparent; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: var(--radius);
+  padding: 9px 14px; cursor: pointer; margin-top: 10px; width: auto;
+}
+
+/* Top-bar badge is now a button that opens the Profile page */
+button.badge-chip {
+  font: inherit; font-size: 13px; cursor: pointer;
+  background: var(--accent); color: var(--header-text);
+  border: none; border-radius: 20px; padding: 6px 12px;
+  display: inline-flex; align-items: center; gap: 8px; max-width: 60vw;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+
+/* Profile page */
+.readonly-facts { margin-top: 16px; border-top: 1px solid rgba(122,74,31,0.2); padding-top: 10px; }
+.fact { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14px; }
+.fact-label { color: var(--note); font-weight: bold; }
+.fact-value { text-align: right; overflow-wrap: anywhere; }
+.accent-row { display: flex; align-items: center; gap: 10px; }
+.accent-row input[type=color] { width: 46px; height: 34px; padding: 2px; flex: none; }
+
+/* ================= Responsive / mobile ================= */
+img, table { max-width: 100%; }
+/* Wide content scrolls inside itself rather than the page. */
+.scroll-x { overflow-x: auto; }
+
+@media (max-width: 600px) {
+  .topbar {
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .topbar h1 { font-size: 16px; }
+  button.badge-chip { max-width: 100%; }
+
+  #app { padding: 16px 14px; }
+  .card { padding: 16px; }
+  .card h2 { font-size: 18px; }
+
+  /* Comfortable touch targets */
+  button.primary, button.secondary-btn, input, select { min-height: 44px; }
+  button.primary { width: 100%; }
+
+  /* Employee rows stack instead of squeezing */
+  .emp-row { flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+  .emp-row button { width: auto; }
+
+  .fact { flex-direction: column; gap: 0; }
+  .fact-value { text-align: left; }
+}
+
+@media (max-width: 380px) {
+  .topbar h1 { font-size: 15px; }
+  .role-pill { display: none; } /* keep the chip compact on very small screens */
+}

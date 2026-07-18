@@ -45,6 +45,8 @@ export const api = {
   /** Registers the signed-in user against a business (as owner or employee). */
   register: (businessName, asOwner, character) =>
     request('POST', '/auth/register', { businessName, asOwner: !!asOwner, character }),
+  /** Updates the signed-in user's own profile (character name). */
+  updateProfile: (character) => request('POST', '/me/profile', { character }),
   /** Owner/admin: the roster for the caller's business. */
   listEmployees: () => request('GET', '/business/employees'),
   /** Owner/admin: activate a pending employee. */

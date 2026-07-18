@@ -89,6 +89,11 @@ export async function setUserStatus(env, row, status) {
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!F${row}`, [[status]]);
 }
 
+/** Sets a user's Character cell (column I) by sheet row. */
+export async function setUserCharacter(env, row, character) {
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!I${row}`, [[character]]);
+}
+
 /** Best-effort Last Seen stamp (column H). Never throws into the caller. */
 export async function touchLastSeen(env, row) {
   try {

@@ -19,7 +19,7 @@
  *   GOOGLE_CLIENT_ID, ALLOWED_ORIGIN.
  */
 import { verifyIdToken } from './verify.js';
-import { findUserByEmail, listUsersByBusiness, setUserStatus, touchLastSeen, USERS_SHEET } from './users.js';
+import { findUserByEmail, listUsersByBusiness, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
 import { registerUser } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
@@ -101,6 +101,16 @@ async function handleMe(request, env) {
     return { registered: false, email: payload.email, name: payload.name || '' };
   }
   touchLastSeen(env, user.row); // fire-and-forget
+  return publicUser(user);
+}
+
+/** Lets a signed-in user edit their own profile (currently the character name). */
+async function handleUpdateProfile(request, env, body) {
+  const user = await requireRegistered(request, env);
+  const character = String(body.character || '').trim();
+  if (!character) throw new Error("Your character name can't be empty.");
+  await setUserCharacter(env, user.row, character);
+  user.character = character;
   return publicUser(user);
 }
 
@@ -246,6 +256,11 @@ export default {
       if (request.method === 'POST' && path === '/auth/register') {
         const body = await readJsonBody(request);
         return json(await handleRegister(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/me/profile') {
+        const body = await readJsonBody(request);
+        return json(await handleUpdateProfile(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/business/employees') {

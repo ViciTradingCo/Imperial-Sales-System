@@ -33,13 +33,12 @@ export function renderDashboard(container, { me }) {
     el('p', { html:
       '<b>Character:</b> ' + esc(me.character || '—') + '<br>' +
       '<b>Business:</b> ' + esc(me.business || '—') + '<br>' +
-      '<b>Role:</b> ' + esc(me.role) + '<br>' +
-      '<b>Status:</b> ' + statusBadge(me.status) + '<br>' +
-      '<b>UID:</b> <code>' + esc(me.uid) + '</code>' }),
+      '<b>Status:</b> ' + statusBadge(me.status) }),
     me.status === 'pending'
       ? el('p', { class: 'warn', html:
           'Your account is <b>pending</b> — an owner or admin must activate it before you can ring up sales.' })
       : el('p', { class: 'ok' }, 'Your account is active.'),
+    el('button', { class: 'secondary-btn', onclick: () => navigate('/profile') }, 'Edit profile & appearance'),
   ]);
 
   const sections = (ROLE_SECTIONS[me.role] || []).map(([title, desc, phase]) =>

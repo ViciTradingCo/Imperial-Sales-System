@@ -17,6 +17,8 @@ import { renderRegister } from './views/register.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderAdminSettings } from './views/admin-settings.js';
 import { renderLedgerSettings } from './views/ledger-settings.js';
+import { renderProfile } from './views/profile.js';
+import { applyPrefs } from './lib/theme.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
@@ -49,11 +51,20 @@ function renderBadge() {
   const role = registered ? state.me.role : 'guest';
   // Prefer the in-fiction character name; fall back to the Google identity.
   const who = (registered && state.me.character) || state.profile.name || state.profile.email || 'Signed in';
-  mount(badgeEl,
-    el('span', {}, who + ' · '),
-    el('span', { class: 'role-pill' }, role),
-    el('button', { onclick: () => { signOut(); location.reload(); } }, 'Sign out'),
-  );
+
+  if (registered) {
+    // The badge is now the entry to the editable Profile page.
+    mount(badgeEl, el('button', { class: 'badge-chip', onclick: () => navigate('/profile') }, [
+      el('span', {}, who + ' · '),
+      el('span', { class: 'role-pill' }, role),
+    ]));
+  } else {
+    mount(badgeEl,
+      el('span', {}, who + ' · '),
+      el('span', { class: 'role-pill' }, role),
+      el('button', { onclick: () => { signOut(); location.reload(); } }, 'Sign out'),
+    );
+  }
 }
 
 // ---- routes -------------------------------------------------------------
@@ -85,6 +96,14 @@ route('/ledger/settings', (container) => {
   renderLedgerSettings(container, { me: m });
 });
 
+route('/profile', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  renderProfile(container, {
+    me: state.me,
+    onProfileUpdated: (me) => { state.me = me; renderBadge(); },
+  });
+});
+
 async function onSignedIn() {
   state.profile = getProfile();
   mount(appEl, el('p', { class: 'loading' }, 'Checking the registry…'));
@@ -100,6 +119,8 @@ async function onSignedIn() {
 }
 
 async function main() {
+  applyPrefs(); // apply saved GUI theme before anything paints
+
   let config;
   try {
     config = await loadConfig();

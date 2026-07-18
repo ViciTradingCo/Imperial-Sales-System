@@ -1,0 +1,112 @@
+/**
+ * Profile page — replaces the static identity card with something editable.
+ * Two sections:
+ *   • Profile   — the user's character name (saved to the server) plus their
+ *                 read-only registry facts (business, role, status, UID, email).
+ *   • Appearance — GUI theme + accent colour, stored client-side and applied live.
+ *   • Sign out.
+ */
+import { el, mount, esc } from '../lib/dom.js';
+import { api } from '../lib/api.js';
+import { navigate } from '../lib/router.js';
+import { signOut } from '../lib/auth.js';
+import { THEMES, loadPrefs, savePrefs } from '../lib/theme.js';
+
+export function renderProfile(container, { me, onProfileUpdated }) {
+  mount(container, el('div', {}, [
+    el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
+    profileCard(me, onProfileUpdated),
+    appearanceCard(),
+    signOutCard(),
+  ]));
+}
+
+function profileCard(me, onProfileUpdated) {
+  const status = el('p', {});
+  const charInput = el('input', { type: 'text', value: me.character || '', placeholder: 'Your character name' });
+  const save = el('button.primary', { onclick: doSave }, 'Save profile');
+
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  async function doSave() {
+    const character = charInput.value.trim();
+    if (!character) { setStatus("Your character name can't be empty.", 'error'); return; }
+    save.disabled = true;
+    setStatus('Saving…', '');
+    try {
+      const updated = await api.updateProfile(character);
+      setStatus('Saved ✓', 'ok');
+      save.disabled = false;
+      if (onProfileUpdated) onProfileUpdated(updated);
+    } catch (e) {
+      save.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  return el('div.card', {}, [
+    el('h2', {}, 'Profile'),
+    el('label', {}, 'Character name'),
+    charInput,
+    el('p', { class: 'note' }, 'Your in-fiction name — shown to the Company and your shop.'),
+    save,
+    status,
+    el('div', { class: 'readonly-facts' }, [
+      factRow('Business', me.business || '—'),
+      factRow('Role', me.role),
+      factRow('Status', me.status),
+      factRow('Email', me.email || '—'),
+      factRow('UID', me.uid),
+    ]),
+  ]);
+}
+
+function factRow(label, value) {
+  return el('div.fact', {}, [
+    el('span', { class: 'fact-label' }, label),
+    el('span', { class: 'fact-value', html: '<code>' + esc(value) + '</code>' }),
+  ]);
+}
+
+function appearanceCard() {
+  const prefs = loadPrefs();
+
+  const themeSel = el('select', {});
+  Object.keys(THEMES).forEach((key) => {
+    const opt = el('option', { value: key }, THEMES[key].label);
+    if (key === prefs.theme) opt.selected = true;
+    themeSel.appendChild(opt);
+  });
+  themeSel.addEventListener('change', () => savePrefs({ theme: themeSel.value }));
+
+  const accent = el('input', { type: 'color', value: cssAccent() });
+  accent.addEventListener('input', () => savePrefs({ accent: accent.value }));
+
+  const reset = el('button', { class: 'secondary-btn', onclick: () => {
+    savePrefs({ theme: 'parchment', accent: '' });
+    themeSel.value = 'parchment';
+    accent.value = cssAccent();
+  } }, 'Reset appearance');
+
+  return el('div.card', {}, [
+    el('h2', {}, 'Appearance'),
+    el('p', { class: 'note' }, 'Customize how the app looks on this device.'),
+    el('label', {}, 'Theme'),
+    themeSel,
+    el('label', {}, 'Accent colour'),
+    el('div', { class: 'accent-row' }, [accent, el('span', { class: 'note' }, 'Overrides the theme accent.')]),
+    reset,
+  ]);
+}
+
+/** Reads the current computed accent so the colour input starts in sync. */
+function cssAccent() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(v) ? v : '#7a4a1f';
+}
+
+function signOutCard() {
+  return el('div.card', {}, [
+    el('button.primary', { onclick: () => { signOut(); location.reload(); } }, 'Sign out'),
+  ]);
+}
