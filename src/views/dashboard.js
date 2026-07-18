@@ -30,6 +30,7 @@ export function renderDashboard(container, { me }) {
   const idCard = el('div.card', {}, [
     el('h2', {}, 'East Empire — ' + roleTitle(me.role)),
     el('p', { html:
+      '<b>Character:</b> ' + esc(me.character || '—') + '<br>' +
       '<b>Business:</b> ' + esc(me.business || '—') + '<br>' +
       '<b>Role:</b> ' + esc(me.role) + '<br>' +
       '<b>Status:</b> ' + statusBadge(me.status) + '<br>' +
@@ -71,8 +72,9 @@ function renderEmployeePanel(me) {
       const rows = res.employees || [];
       if (!rows.length) { mount(list, el('p', { class: 'note' }, 'No one registered yet.')); return; }
       const items = rows.map((u) => {
+        const who = u.character || u.email; // character name is the display identity
         const label = el('span', { html:
-          esc(u.email) + ' · <span class="role-pill">' + esc(u.role) + '</span> · ' + statusBadge(u.status) });
+          '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(u.role) + '</span> · ' + statusBadge(u.status) });
         const row = el('div.emp-row', {}, [label]);
         if (u.status === 'pending') {
           const btn = el('button.primary.small', {

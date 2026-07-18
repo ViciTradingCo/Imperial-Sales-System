@@ -13,6 +13,7 @@ import { api } from '../lib/api.js';
 export function renderRegister(container, { profile, onRegistered }) {
   const status = el('p', { id: 'regStatus' });
 
+  const charInput = el('input', { type: 'text', id: 'charName', placeholder: 'e.g. Brynja Iron-Song' });
   const bizInput = el('input', { type: 'text', id: 'bizName', placeholder: 'e.g. Riverwood Trader' });
 
   const ownerRadio = el('input', { type: 'radio', name: 'role', value: 'owner', id: 'roleOwner' });
@@ -26,13 +27,15 @@ export function renderRegister(container, { profile, onRegistered }) {
   }
 
   async function doRegister() {
+    const character = charInput.value.trim();
+    if (!character) { setStatus("Enter your character's name.", 'error'); return; }
     const businessName = bizInput.value.trim();
     if (!businessName) { setStatus('Enter your business name.', 'error'); return; }
     const asOwner = ownerRadio.checked;
     submit.disabled = true;
     setStatus('Registering…', '');
     try {
-      const me = await api.register(businessName, asOwner);
+      const me = await api.register(businessName, asOwner, character);
       onRegistered(me);
     } catch (e) {
       submit.disabled = false;
@@ -44,7 +47,11 @@ export function renderRegister(container, { profile, onRegistered }) {
     el('h2', {}, 'Welcome, new trader'),
     el('p', { class: 'note', html:
       'Signed in as <b>' + esc(profile.email || '') + '</b>. ' +
-      'Tell the Company who you trade for.' }),
+      'Tell the Company who you trade as, and who you trade for.' }),
+
+    el('label', {}, 'Character name'),
+    charInput,
+    el('p', { class: 'note' }, 'Your in-fiction name — this is what the Company and your shop see, not your email.'),
 
     el('label', {}, 'Business name'),
     bizInput,

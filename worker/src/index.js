@@ -70,6 +70,7 @@ function publicUser(user, extra) {
     registered: true,
     uid: user.uid,
     email: user.email,
+    character: user.character || '',
     business: user.business,
     role: user.role,
     isOwner: user.isOwner,
@@ -108,6 +109,7 @@ async function handleRegister(request, env, body) {
   const user = await registerUser(env, {
     email: payload.email,
     name: payload.name || '',
+    character: body.character,
     businessName: body.businessName,
     asOwner: !!body.asOwner,
   });
@@ -128,7 +130,7 @@ async function handleListEmployees(request, env, url) {
   const users = await listUsersByBusiness(env, business);
   return {
     business,
-    employees: users.map((u) => ({ uid: u.uid, email: u.email, role: u.role, isOwner: u.isOwner, status: u.status })),
+    employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status })),
   };
 }
 
@@ -160,7 +162,7 @@ async function handleActivateEmployee(request, env, body) {
 /** Admin-only helper: locate any user by uid across all businesses. */
 async function findUserByUid(env, uid) {
   // Small scale — a linear scan of the Users sheet is fine.
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:H`);
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
   for (let i = 0; i < rows.length; i++) {
     if (String(rows[i][0] || '').trim() === uid) {
       return { uid, business: String(rows[i][2] || '').trim(), row: i + 2 };

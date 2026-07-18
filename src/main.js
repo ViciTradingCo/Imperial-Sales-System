@@ -43,9 +43,12 @@ function renderSignIn() {
 function renderBadge() {
   if (!state.profile) { badgeEl.hidden = true; return; }
   badgeEl.hidden = false;
-  const role = state.me && state.me.registered ? state.me.role : 'guest';
+  const registered = state.me && state.me.registered;
+  const role = registered ? state.me.role : 'guest';
+  // Prefer the in-fiction character name; fall back to the Google identity.
+  const who = (registered && state.me.character) || state.profile.name || state.profile.email || 'Signed in';
   mount(badgeEl,
-    el('span', {}, (state.profile.name || state.profile.email || 'Signed in') + ' · '),
+    el('span', {}, who + ' · '),
     el('span', { class: 'role-pill' }, role),
     el('button', { onclick: () => { signOut(); location.reload(); } }, 'Sign out'),
   );

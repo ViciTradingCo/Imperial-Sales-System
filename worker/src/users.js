@@ -4,7 +4,7 @@
  * source of truth for authorization; every request resolves the caller here.
  *
  *   Users sheet columns:
- *   UID | Email | Business | Role | Is Owner | Status | Created | Last Seen
+ *   UID | Email | Business | Role | Is Owner | Status | Created | Last Seen | Character
  *
  * Roles: 'admin' | 'owner' | 'employee'. Status: 'active' | 'pending'.
  * The first admin is seeded by hand (see docs/SETUP.md); registration (Phase 2)
@@ -13,7 +13,8 @@
 import { readRange, appendRows, updateRange } from './sheets.js';
 
 export const USERS_SHEET = 'Users';
-export const USERS_HEADERS = ['UID', 'Email', 'Business', 'Role', 'Is Owner', 'Status', 'Created', 'Last Seen'];
+// Character is appended at the end so existing rows/headers never shift.
+export const USERS_HEADERS = ['UID', 'Email', 'Business', 'Role', 'Is Owner', 'Status', 'Created', 'Last Seen', 'Character'];
 
 function normalizeRow(r) {
   return {
@@ -23,6 +24,7 @@ function normalizeRow(r) {
     role: String(r[3] || '').trim().toLowerCase() || 'employee',
     isOwner: String(r[4]).trim().toUpperCase() === 'TRUE',
     status: String(r[5] || '').trim().toLowerCase() || 'active',
+    character: String(r[8] || '').trim(),
   };
 }
 
@@ -35,7 +37,7 @@ export async function findUserByEmail(env, email) {
   if (!target) return null;
   let rows;
   try {
-    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:H`);
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
   } catch (e) {
     // A missing Users tab is an expected pre-registration state, not a crash.
     if (/Unable to parse range|not found/i.test(e.message)) return null;
@@ -55,7 +57,7 @@ export async function findUserByEmail(env, email) {
 export async function listUsersByBusiness(env, business) {
   const target = String(business || '').trim().toLowerCase();
   if (!target) return [];
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:H`);
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
   const out = [];
   rows.forEach((r, i) => {
     if (String(r[2] || '').trim().toLowerCase() === target) {
@@ -68,12 +70,18 @@ export async function listUsersByBusiness(env, business) {
 }
 
 /** Appends a new user row. Returns the written record. */
-export async function appendUser(env, { uid, email, business, role, isOwner, status }) {
+export async function appendUser(env, { uid, email, business, role, isOwner, status, character }) {
   const now = new Date().toISOString();
   await appendRows(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A1`, [[
-    uid, email, business, role, isOwner ? 'TRUE' : 'FALSE', status, now, now,
+    uid, email, business, role, isOwner ? 'TRUE' : 'FALSE', status, now, now, character || '',
   ]]);
-  return { uid, email, business, role, isOwner: !!isOwner, status };
+  return { uid, email, business, role, isOwner: !!isOwner, status, character: character || '' };
+}
+
+/** Ensures the Users header row carries every current column (adds Character to
+ *  a tab created before that column existed). Idempotent; safe on every run. */
+export async function reconcileUsersHeader(env) {
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A1`, [USERS_HEADERS]);
 }
 
 /** Sets a user's Status cell (column F) by sheet row. */

@@ -11,7 +11,7 @@
  * enforce name uniqueness at registration.
  */
 import { readRange, appendRows, ensureSheet } from './sheets.js';
-import { appendUser, findUserByEmail, USERS_SHEET, USERS_HEADERS } from './users.js';
+import { appendUser, findUserByEmail, reconcileUsersHeader, USERS_SHEET, USERS_HEADERS } from './users.js';
 
 export const CERT_SHEET = 'Certified Users';
 export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe'];
@@ -55,14 +55,17 @@ async function appendBusiness(env, { ledgerId, businessName, pointOfContact }) {
  *   asOwner=false → the business name must ALREADY EXIST; we create a pending
  *                   employee awaiting owner/admin activation.
  */
-export async function registerUser(env, { email, name, businessName, asOwner }) {
+export async function registerUser(env, { email, name, character, businessName, asOwner }) {
   // Self-heal the registry tabs so a fresh Core needs nothing hand-created
   // beyond the Users tab (which seeds the first admin).
   await ensureSheet(env, env.CORE_SPREADSHEET_ID, USERS_SHEET, USERS_HEADERS);
+  await reconcileUsersHeader(env); // adds the Character column to a pre-existing tab
 
   const existing = await findUserByEmail(env, email);
   if (existing) return { ...existing, alreadyRegistered: true };
 
+  const char = String(character || '').trim();
+  if (!char) throw new Error('Enter your character\'s name.');
   const biz = String(businessName || '').trim();
   if (!biz) throw new Error('A business name is required to register.');
 
@@ -77,9 +80,10 @@ export async function registerUser(env, { email, name, businessName, asOwner }) 
     // they own and its document ID replaces this placeholder in the User ID
     // column. Until then the business is keyed by this generated id.
     const businessId = genUid('biz');
-    await appendBusiness(env, { ledgerId: businessId, businessName: biz, pointOfContact: name || email });
+    // Point of Contact is the owner's character (the in-fiction name).
+    await appendBusiness(env, { ledgerId: businessId, businessName: biz, pointOfContact: char });
     const uid = genUid('usr');
-    return appendUser(env, { uid, email, business: biz, role: 'owner', isOwner: true, status: 'active' });
+    return appendUser(env, { uid, email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active' });
   }
 
   // Employee path
@@ -87,5 +91,5 @@ export async function registerUser(env, { email, name, businessName, asOwner }) 
     throw new Error('No business named "' + biz + '" is registered yet. Ask its owner to register it first, or register as its owner if it\'s yours.');
   }
   const uid = genUid('usr');
-  return appendUser(env, { uid, email, business: found.businessName, role: 'employee', isOwner: false, status: 'pending' });
+  return appendUser(env, { uid, email, character: char, business: found.businessName, role: 'employee', isOwner: false, status: 'pending' });
 }
