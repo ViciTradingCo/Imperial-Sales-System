@@ -4,12 +4,10 @@
  * employees, profile, etc. are reached from the nav, not here.
  */
 import { el, mount, esc } from '../lib/dom.js';
-import { navigate } from '../lib/router.js';
 
 const ROLE_SECTIONS = {
   admin: [
     ['Core Dashboard', 'Registry, connect shops, sync pipeline, MOTD.', 'Phase 5'],
-    ['Market Analysis', 'Network overviews, performance, pricing alerts.', 'Phase 6'],
     ['Register (POS)', 'Ring up sales for any shop.', 'Phase 3'],
   ],
   owner: [
@@ -32,7 +30,6 @@ export function renderHome(container, { me }) {
       ? el('p', { class: 'warn', html:
           'Your account is <b>pending</b> — an owner or admin must activate it before you can ring up sales.' })
       : el('p', { class: 'ok' }, 'Your account is active.'),
-    el('button', { class: 'secondary-btn', onclick: () => navigate('/profile') }, 'Edit profile & appearance'),
   ]);
 
   const sections = (ROLE_SECTIONS[me.role] || []).map(([title, desc, phase]) =>

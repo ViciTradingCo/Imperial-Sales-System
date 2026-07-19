@@ -20,7 +20,7 @@
  */
 import { verifyIdToken } from './verify.js';
 import { findUserByEmail, listUsersByBusiness, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
-import { registerUser } from './registry.js';
+import { registerUser, renameBusiness } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
@@ -188,6 +188,21 @@ async function handleSaveLedgerSettings(request, env, body) {
   return writeBusinessSettings(env, business, body.updates || []);
 }
 
+/** Owner/admin: rename their company everywhere it's referenced. */
+async function handleRenameBusiness(request, env, body) {
+  const caller = await requireRegistered(request, env);
+  if (caller.role !== 'owner' && caller.role !== 'admin') {
+    const e = new Error('Only a shop owner or an admin can rename the company.');
+    e.forbidden = true;
+    throw e;
+  }
+  const newName = String(body.name || '').trim();
+  if (!newName) throw new Error('Enter a company name.');
+  await renameBusiness(env, caller.business, newName);
+  caller.business = newName;
+  return publicUser(caller);
+}
+
 /** Owners/admins only: activate a pending employee of their own business. */
 async function handleActivateEmployee(request, env, body) {
   const caller = await requireRegistered(request, env);
@@ -288,6 +303,11 @@ export default {
       if (request.method === 'POST' && path === '/business/settings') {
         const body = await readJsonBody(request);
         return json(await handleSaveLedgerSettings(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/business/rename') {
+        const body = await readJsonBody(request);
+        return json(await handleRenameBusiness(request, env, body), 200, cors);
       }
 
       return json({ error: 'Not found: ' + path }, 404, cors);

@@ -10,8 +10,9 @@
  * Business NAME is the human key that links a Users row to its business, so we
  * enforce name uniqueness at registration.
  */
-import { readRange, appendRows, ensureSheet } from './sheets.js';
+import { readRange, appendRows, updateRange, ensureSheet } from './sheets.js';
 import { appendUser, findUserByEmail, reconcileUsersHeader, USERS_SHEET, USERS_HEADERS } from './users.js';
+import { renameBusinessKey } from './business-settings.js';
 
 export const CERT_SHEET = 'Certified Users';
 export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe'];
@@ -92,4 +93,40 @@ export async function registerUser(env, { email, name, character, businessName, 
   }
   const uid = genUid('usr');
   return appendUser(env, { uid, email, character: char, business: found.businessName, role: 'employee', isOwner: false, status: 'pending' });
+}
+
+/**
+ * Renames a business everywhere it's referenced (the business name is the key
+ * linking the registry, users, and per-business settings): the Certified Users
+ * row, every Users row in that business, and the Business Settings key.
+ */
+export async function renameBusiness(env, oldName, newName) {
+  const old = String(oldName || '').trim();
+  const nw = String(newName || '').trim();
+  if (!nw) throw new Error('Enter a company name.');
+
+  // Uniqueness — allow a case-only change of the SAME business, block colliding
+  // with a different one.
+  const clash = await findBusinessByName(env, nw);
+  if (clash && clash.businessName.trim().toLowerCase() !== old.toLowerCase()) {
+    throw new Error('A business named "' + nw + '" already exists.');
+  }
+  const lc = old.toLowerCase();
+
+  const certRows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:C`);
+  for (let i = 0; i < certRows.length; i++) {
+    if (String(certRows[i][2] || '').trim().toLowerCase() === lc) {
+      await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!C${i + 2}`, [[nw]]);
+    }
+  }
+
+  const userRows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
+  for (let i = 0; i < userRows.length; i++) {
+    if (String(userRows[i][2] || '').trim().toLowerCase() === lc) {
+      await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!C${i + 2}`, [[nw]]);
+    }
+  }
+
+  await renameBusinessKey(env, old, nw);
+  return nw;
 }

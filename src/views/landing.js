@@ -9,11 +9,11 @@ export function renderLanding(container, { signInMount } = {}) {
   const nodes = [];
 
   nodes.push(el('div.card.hero', {}, [
-    el('h2', {}, 'The East Empire Trading Company Sales Network'),
+    el('h2', {}, 'The EEC Automated Ledger'),
     el('p', {}, 'A sales system for the Mereth Skyrim RP server. Shops across the ' +
       'holds record their sales and restocks, owners manage their own inventory ' +
-      'and staff, and the Company keeps the whole trade network — certification, ' +
-      'pooled records, and market watch — in one place.'),
+      'and staff, and the Company keeps the whole trade network — certification ' +
+      'and pooled records — in one place.'),
   ]));
 
   if (signInMount) {
@@ -30,7 +30,7 @@ export function renderLanding(container, { signInMount } = {}) {
     el('ul', { class: 'feature-list' }, [
       el('li', {}, 'Employees ring up sales at their shop’s register.'),
       el('li', {}, 'Owners manage their shop: inventory, staff, and pricing.'),
-      el('li', {}, 'Admins oversee the network, its settings, and market analysis.'),
+      el('li', {}, 'Admins keep the network and its settings in order.'),
       el('li', {}, 'Your view only ever shows the business you belong to.'),
     ]),
   ]));

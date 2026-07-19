@@ -9,6 +9,7 @@ import { initRouter, route, navigate, render } from './lib/router.js';
 import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
+import { renderPatchNotes } from './lib/patch-notes.js';
 import { renderLanding } from './views/landing.js';
 import { renderHome } from './views/home.js';
 import { renderRegister } from './views/register.js';
@@ -22,6 +23,7 @@ const badgeEl = document.getElementById('userBadge');
 const navEl = document.getElementById('sidenav');
 const navToggle = document.getElementById('navToggle');
 const backdrop = document.getElementById('backdrop');
+const patchEl = document.getElementById('patchnotes');
 
 const state = { profile: null, me: null };
 
@@ -44,8 +46,14 @@ backdrop.addEventListener('click', closeDrawer);
 // ---- nav / badge ---------------------------------------------------------
 function showNav(on) {
   document.body.classList.toggle('has-nav', on);
-  if (on) renderNav(navEl, state.me, closeDrawer);
-  else { navEl.innerHTML = ''; closeDrawer(); }
+  if (on) {
+    renderNav(navEl, state.me, closeDrawer);
+    renderPatchNotes(patchEl);
+  } else {
+    navEl.innerHTML = '';
+    patchEl.innerHTML = '';
+    closeDrawer();
+  }
 }
 window.addEventListener('hashchange', () => highlightNav(navEl));
 
@@ -127,7 +135,10 @@ route('/admin/settings', (container) => {
 route('/ledger/settings', (container) => {
   const m = state.me;
   if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
-  renderLedgerSettings(container, { me: m });
+  renderLedgerSettings(container, {
+    me: m,
+    onBusinessRenamed: (me) => { state.me = me; renderBadge(); render(); },
+  });
 });
 
 // ---- boot ----------------------------------------------------------------

@@ -65,7 +65,7 @@ body {
 .layout {
   flex: 1;
   width: 100%;
-  max-width: 1080px;
+  max-width: 1240px;
   margin: 0 auto;
   display: flex;
   align-items: flex-start;
@@ -101,6 +101,22 @@ body.has-nav .sidenav { display: flex; }
 .sidenav button.active { background: var(--accent); color: var(--header-text); font-weight: bold; }
 
 .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 40; }
+
+/* ---- patch notes column (right) ---- */
+.patchnotes {
+  display: none;
+  flex: none;
+  width: 250px;
+  padding: 20px 14px;
+  font-size: 13px;
+  color: var(--ink);
+}
+body.has-nav .patchnotes { display: block; }
+.patchnotes h3 { margin-top: 0; color: var(--accent); }
+.patch-entry { margin-bottom: 14px; }
+.patch-ver { font-weight: bold; color: var(--note); margin-bottom: 2px; }
+.patchnotes ul { margin: 0; padding-left: 18px; }
+.patchnotes li { margin: 3px 0; }
 
 /* ---- landing / about ---- */
 .card.hero h2 { font-size: 22px; }
@@ -245,6 +261,11 @@ img, table { max-width: 100%; }
     overflow-y: auto;
   }
   body.has-nav .sidenav.open { transform: translateX(0); }
+}
+
+/* Not enough room for the right-hand patch-notes column below this width. */
+@media (max-width: 900px) {
+  body.has-nav .patchnotes { display: none; }
 }
 /* Wide content scrolls inside itself rather than the page. */
 .scroll-x { overflow-x: auto; }

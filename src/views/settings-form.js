@@ -9,16 +9,13 @@
 import { el, mount } from '../lib/dom.js';
 import { navigate } from '../lib/router.js';
 
-export function renderSettingsForm(container, { title, subtitle, load, save }) {
+export function renderSettingsForm(container, { title, subtitle, load, save, back = true }) {
   const status = el('p', {});
   const fields = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
-  mount(container, el('div.card', {}, [
-    el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
-    el('h2', {}, title),
-    el('p', { class: 'note' }, subtitle),
-    fields,
-    status,
-  ]));
+  const children = [];
+  if (back) children.push(el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'));
+  children.push(el('h2', {}, title), el('p', { class: 'note' }, subtitle), fields, status);
+  mount(container, el('div.card', {}, children));
 
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
   let SETTINGS = [];

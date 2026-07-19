@@ -70,3 +70,19 @@ export async function writeBusinessSettings(env, business, updates) {
   const fresh = await readBusinessSettings(env, business);
   return { business: fresh.business, settings: fresh.settings };
 }
+
+/** Renames a business's settings row key (part of a full business rename). */
+export async function renameBusinessKey(env, oldName, newName) {
+  let rows;
+  try {
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${BUSINESS_SETTINGS_SHEET}!A2:A`);
+  } catch (e) {
+    return; // tab may not exist yet — nothing to rename
+  }
+  const lc = String(oldName || '').trim().toLowerCase();
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][0] || '').trim().toLowerCase() === lc) {
+      await updateRange(env, env.CORE_SPREADSHEET_ID, `${BUSINESS_SETTINGS_SHEET}!A${i + 2}`, [[newName]]);
+    }
+  }
+}

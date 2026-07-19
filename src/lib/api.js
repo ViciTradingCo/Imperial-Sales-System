@@ -59,6 +59,8 @@ export const api = {
   getLedgerSettings: () => request('GET', '/business/settings'),
   /** Owner/admin: save per-business (ledger) settings ([{label, value}]). */
   saveLedgerSettings: (updates) => request('POST', '/business/settings', { updates }),
+  /** Owner/admin: rename the company. */
+  renameBusiness: (name) => request('POST', '/business/rename', { name }),
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body || {}),
 };
