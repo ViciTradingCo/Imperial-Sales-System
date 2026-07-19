@@ -3,6 +3,11 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.3', notes: [
+    'Floating, centered header; action bar tucks beneath it.',
+    'Admins can edit a member’s name, company, and role.',
+    'Patch Notes as a menu page on mobile; steadier mobile sign-in.',
+  ] },
   { version: '1.2', notes: [
     'Currency shown in gold pieces (gp).',
     'Stay signed in across reloads; Sign Out on the top bar / menu.',

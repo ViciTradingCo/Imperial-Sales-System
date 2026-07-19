@@ -67,6 +67,10 @@ export function initAuth(clientId) {
         // token for a returning user on reload (Google tokens last ~1h; this
         // re-auths without a click).
         auto_select: getRemember(),
+        // FedCM is required for one-tap / auto-select to work on mobile and in
+        // browsers that block third-party cookies; without it the silent
+        // re-auth is suppressed on phones.
+        use_fedcm_for_prompt: true,
       });
       initialized = true;
       resolve();

@@ -137,6 +137,15 @@ route('/register', (container) => {
   });
 });
 
+route('/patch-notes', (container) => {
+  const host = el('div', {});
+  mount(container, el('div.card', {}, [
+    el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
+    host,
+  ]));
+  renderPatchNotes(host);
+});
+
 route('/profile', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
   renderProfile(container, {

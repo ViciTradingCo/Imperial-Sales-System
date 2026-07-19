@@ -86,10 +86,14 @@ function openSubscriptionModal(company, onSaved) {
   const picker = el('input', { type: 'date', value: company.until || '', class: 'date-picker' });
   const manual = el('input', { type: 'text', placeholder: 'YYYY-MM-DD', value: company.until || '' });
 
-  // Clicking (or focusing) the field pops the native calendar out.
-  const pop = () => { try { picker.showPicker(); } catch (e) { /* older browsers */ } };
-  picker.addEventListener('click', pop);
-  picker.addEventListener('focus', pop);
+  // On desktop the native calendar only opens from the tiny icon, so make a
+  // click anywhere on the field pop it. On touch devices the OS already opens
+  // the calendar on tap — calling showPicker() there fights the native picker,
+  // so we leave mobile to its built-in behaviour.
+  const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  if (!isTouch) {
+    picker.addEventListener('click', () => { try { picker.showPicker(); } catch (e) { /* older browsers */ } });
+  }
 
   // Keep the calendar picker and the manual field in sync.
   picker.addEventListener('input', () => { manual.value = picker.value; });

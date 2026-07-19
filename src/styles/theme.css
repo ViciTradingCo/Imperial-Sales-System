@@ -183,6 +183,11 @@ body.has-nav .sidenav { display: flex; }
   color: var(--ink);
 }
 body.has-nav .patchnotes { display: block; }
+/* The Patch Notes menu item is only useful where the right-hand column is
+   hidden. It disappears below 900px, so show the nav button from there down
+   (covers both the tablet sidebar and the mobile drawer). */
+.nav-mobile-only { display: none; }
+@media (max-width: 900px) { .nav-mobile-only { display: block; } }
 .patchnotes h3 { margin-top: 0; color: var(--accent); }
 .patch-entry { margin-bottom: 14px; }
 .patch-ver { font-weight: bold; color: var(--note); margin-bottom: 2px; }

@@ -33,6 +33,8 @@ export function renderMembers(container) {
       el('button.primary.small', { onclick: () => openEditModal(m, load) }, 'Edit'),
     ])));
   }
+
+  load();
 }
 
 function openEditModal(member, onSaved) {
