@@ -73,6 +73,14 @@ export const api = {
   getIntake: () => request('GET', '/intake'),
   /** Owner/admin: record a stock intake (purchase). */
   recordIntake: (intake) => request('POST', '/intake', intake),
+  /** This business's certification status. */
+  getCert: () => request('GET', '/cert'),
+  /** Ring up a sale. */
+  checkout: (sale) => request('POST', '/sale', sale),
+  /** Order lookup — recent sales, optionally filtered by q (order/customer/employee). */
+  getSales: (q) => request('GET', '/sales' + (q ? '?q=' + encodeURIComponent(q) : '')),
+  /** Void a sale by order number. */
+  voidSale: (orderNo) => request('POST', '/sales/void', { orderNo }),
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body || {}),
 };

@@ -17,6 +17,7 @@ import { renderRegister } from './views/register.js';
 import { renderProfile } from './views/profile.js';
 import { renderEmployees } from './views/employees.js';
 import { renderInventory } from './views/inventory.js';
+import { renderPos } from './views/pos.js';
 import { renderAdminSettings } from './views/admin-settings.js';
 import { renderLedgerSettings } from './views/ledger-settings.js';
 
@@ -133,6 +134,11 @@ route('/employees', (container) => {
 route('/inventory', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
   renderInventory(container, { me: state.me });
+});
+
+route('/pos', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  renderPos(container, { me: state.me });
 });
 
 route('/admin/settings', (container) => {

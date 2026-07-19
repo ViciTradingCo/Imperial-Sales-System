@@ -9,6 +9,7 @@ import { navigate, currentPath } from './router.js';
 /** The nav destinations available to a given user, in order. */
 export function navItems(me) {
   const items = [{ path: '/', label: 'Home' }];
+  items.push({ path: '/pos', label: 'Register' });
   items.push({ path: '/inventory', label: 'Inventory' });
   if (me.role === 'owner' || me.role === 'admin') items.push({ path: '/employees', label: 'Employees' });
   if (me.role === 'admin') items.push({ path: '/admin/settings', label: 'Network Settings' });

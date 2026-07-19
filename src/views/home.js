@@ -8,15 +8,11 @@ import { el, mount, esc } from '../lib/dom.js';
 const ROLE_SECTIONS = {
   admin: [
     ['Core Dashboard', 'Registry, connect shops, sync pipeline, MOTD.', 'Phase 5'],
-    ['Register (POS)', 'Ring up sales for any shop.', 'Phase 3'],
   ],
   owner: [
-    ['Register (POS)', 'Ring up sales for your shop.', 'Phase 3'],
-    ['Shop Ledger', 'Inventory, discounts, style, Coffers.', 'Phase 4'],
+    ['Shop Ledger', 'Discounts, style, Coffers, and more.', 'Phase 4'],
   ],
-  employee: [
-    ['Register (POS)', 'Ring up sales for your shop.', 'Phase 3'],
-  ],
+  employee: [],
 };
 
 export function renderHome(container, { me }) {

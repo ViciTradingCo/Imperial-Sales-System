@@ -27,6 +27,8 @@ import { readBusinessSettings, writeBusinessSettings } from './business-settings
 import { listInventory, upsertItem, deleteItem } from './inventory.js';
 import { recordIntake, listIntake } from './intake.js';
 import { readHolds } from './holds.js';
+import { checkCertification } from './cert.js';
+import { checkout, listSales, voidSale } from './sales.js';
 import { renameBusinessData, ensureSchema } from './db.js';
 
 function corsHeaders(env, request) {
@@ -236,6 +238,37 @@ async function handleDeleteItem(request, env, body) {
   return { inventory: await deleteItem(env, caller.business, body.item) };
 }
 
+/** Requires a registered user whose account is active (can operate the register). */
+async function requireActive(request, env) {
+  const user = await requireRegistered(request, env);
+  if (user.status !== 'active') {
+    const e = new Error('Your account is pending — an owner or admin must activate you before you can use the register.');
+    e.forbidden = true;
+    throw e;
+  }
+  return user;
+}
+
+async function handleGetCert(request, env) {
+  const caller = await requireRegistered(request, env);
+  return await checkCertification(env, caller.business);
+}
+
+async function handleCheckout(request, env, body) {
+  const caller = await requireActive(request, env);
+  return await checkout(env, caller.business, caller, body);
+}
+
+async function handleListSales(request, env, url) {
+  const caller = await requireActive(request, env);
+  return { sales: await listSales(env, caller.business, url.searchParams.get('q'), 25) };
+}
+
+async function handleVoidSale(request, env, body) {
+  const caller = await requireActive(request, env);
+  return await voidSale(env, caller.business, body.orderNo);
+}
+
 /** Any registered user: the network hold list (for intake / sales dropdowns). */
 async function handleGetHolds(request, env) {
   await requireRegistered(request, env);
@@ -400,6 +433,24 @@ export default {
       if (request.method === 'POST' && path === '/intake') {
         const body = await readJsonBody(request);
         return json(await handleRecordIntake(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/cert') {
+        return json(await handleGetCert(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/sale') {
+        const body = await readJsonBody(request);
+        return json(await handleCheckout(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/sales') {
+        return json(await handleListSales(request, env, url), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/sales/void') {
+        const body = await readJsonBody(request);
+        return json(await handleVoidSale(request, env, body), 200, cors);
       }
 
       return json({ error: 'Not found: ' + path }, 404, cors);

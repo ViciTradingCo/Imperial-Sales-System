@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.0', notes: [
+    'The Register (POS): ring up sales, order lookup, and void.',
+    'Certification gate — expired shops can’t sell.',
+  ] },
   { version: '0.9', notes: [
     'Top action bar for contextual buttons.',
     'Record Intake and item edits are now focus windows.',
