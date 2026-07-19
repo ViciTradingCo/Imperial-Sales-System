@@ -40,9 +40,23 @@ export function renderCompanies(container) {
         el('span', { class: 'row-actions' }, [
           el('button.primary.small', { onclick: () => openNameModal(c, load) }, 'Edit'),
           el('button.secondary-btn.small', { onclick: () => openSubscriptionModal(c, load) }, 'Subscription'),
+          el('button.danger.small', { onclick: () => remove(c) }, 'Delete'),
         ]),
       ]);
     }));
+  }
+
+  async function remove(c) {
+    if (!window.confirm('Delete "' + (c.business || 'this company') + '"?\n\n' +
+      'Its market data is kept for analysis but archived — the name is freed and ' +
+      'the archived records can never be pulled back if the company is remade.')) return;
+    mount(listHost, el('p', { class: 'note' }, 'Archiving…'));
+    try {
+      const res = await api.deleteCompany(c.id);
+      renderList(res.companies || []);
+    } catch (e) {
+      mount(listHost, el('p', { class: 'error' }, e.message || String(e)));
+    }
   }
 
   load();

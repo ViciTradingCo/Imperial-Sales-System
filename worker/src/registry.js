@@ -165,7 +165,8 @@ export async function listCompanies(env) {
     return [];
   }
   return rows
-    .filter((r) => String(r[2] || '').trim() || String(r[0] || '').trim())
+    .filter((r) => (String(r[2] || '').trim() || String(r[0] || '').trim())
+      && String(r[5] || '').trim().toUpperCase() !== 'ARCHIVED')
     .map((r) => ({
       id: String(r[0] || '').trim(),
       business: String(r[2] || '').trim(),
@@ -210,6 +211,39 @@ export async function updateCompany(env, { id, name, until, perpetual, hold, cou
   const courtBool = court === undefined ? String(current[11]).trim().toUpperCase() === 'TRUE' : !!court;
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!K${rowIdx}:L${rowIdx}`,
     [[holdStr, courtBool ? 'TRUE' : 'FALSE']]);
+
+  return listCompanies(env);
+}
+
+/**
+ * Archives (the delete action) a company. Its market data is RETAINED for
+ * analysis but moved out of reach of any future company: we rename the business
+ * — and all its records — to a unique archived key, mark the registry row
+ * ARCHIVED, and free the original name for re-use. Because the name is freed and
+ * the archived row is filtered out of the company list, a remade company starts
+ * clean and can never pull the archived company's history.
+ */
+export async function archiveCompany(env, id) {
+  const targetId = String(id || '').trim();
+  if (!targetId) throw new Error('Missing company id.');
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
+  let rowIdx = null;
+  let current = null;
+  rows.forEach((r, i) => { if (String(r[0] || '').trim() === targetId) { rowIdx = i + 2; current = r; } });
+  if (!rowIdx) throw new Error('Company not found.');
+
+  const oldName = String(current[2] || '').trim();
+  if (String(current[5] || '').trim().toUpperCase() === 'ARCHIVED') return listCompanies(env);
+  const archivedName = oldName + ' [archived ' + Date.now().toString(36) + ']';
+
+  // Move the name everywhere (registry row, Users rows, settings key) and in D1
+  // (inventory/sales/intake), so the data survives under the archived key.
+  await renameBusiness(env, oldName, archivedName);
+  await renameBusinessData(env, oldName, archivedName);
+
+  // Flag the (now renamed) row ARCHIVED and stop it syncing.
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!F${rowIdx}`, [['ARCHIVED']]);
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!I${rowIdx}`, [['FALSE']]);
 
   return listCompanies(env);
 }

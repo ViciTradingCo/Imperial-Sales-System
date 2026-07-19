@@ -59,10 +59,14 @@ export const api = {
   getMembers: () => request('GET', '/admin/members'),
   /** Admin: edit a member (character, company, role). */
   updateMember: (member) => request('POST', '/admin/members/update', member),
+  /** Admin: remove a member from the network. */
+  deleteMember: (uid) => request('POST', '/admin/members/delete', { uid }),
   /** Admin: every registered company. */
   getCompanies: () => request('GET', '/admin/companies'),
   /** Admin: edit a company (name + subscription). */
   updateCompany: (company) => request('POST', '/admin/companies/update', company),
+  /** Admin: archive (delete) a company — data retained, name freed. */
+  deleteCompany: (id) => request('POST', '/admin/companies/delete', { id }),
   /** Owner/admin: read this shop's per-business (ledger) settings. */
   getLedgerSettings: () => request('GET', '/business/settings'),
   /** Owner/admin: save per-business (ledger) settings ([{label, value}]). */

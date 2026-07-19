@@ -19,8 +19,8 @@
  *   GOOGLE_CLIENT_ID, ALLOWED_ORIGIN.
  */
 import { verifyIdToken } from './verify.js';
-import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
-import { registerUser, renameBusiness, listCompanies, updateCompany } from './registry.js';
+import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, deleteMember, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
+import { registerUser, renameBusiness, listCompanies, updateCompany, archiveCompany } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
@@ -180,6 +180,12 @@ async function handleUpdateMember(request, env, body) {
   return { members: await listAllUsers(env) };
 }
 
+async function handleDeleteMember(request, env, body) {
+  await requireAdmin(request, env);
+  await deleteMember(env, body.uid);
+  return { members: await listAllUsers(env) };
+}
+
 async function handleListCompanies(request, env) {
   await requireAdmin(request, env);
   return { companies: await listCompanies(env) };
@@ -188,6 +194,11 @@ async function handleListCompanies(request, env) {
 async function handleUpdateCompany(request, env, body) {
   await requireAdmin(request, env);
   return { companies: await updateCompany(env, body) };
+}
+
+async function handleDeleteCompany(request, env, body) {
+  await requireAdmin(request, env);
+  return { companies: await archiveCompany(env, body.id) };
 }
 
 async function handleSaveSettings(request, env, body) {
@@ -426,6 +437,11 @@ export default {
         return json(await handleUpdateMember(request, env, body), 200, cors);
       }
 
+      if (request.method === 'POST' && path === '/admin/members/delete') {
+        const body = await readJsonBody(request);
+        return json(await handleDeleteMember(request, env, body), 200, cors);
+      }
+
       if (request.method === 'GET' && path === '/admin/companies') {
         return json(await handleListCompanies(request, env), 200, cors);
       }
@@ -433,6 +449,11 @@ export default {
       if (request.method === 'POST' && path === '/admin/companies/update') {
         const body = await readJsonBody(request);
         return json(await handleUpdateCompany(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/companies/delete') {
+        const body = await readJsonBody(request);
+        return json(await handleDeleteCompany(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/business/settings') {

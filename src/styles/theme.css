@@ -291,7 +291,14 @@ label.inline input { width: auto; }
 .emp-row:last-child { border-bottom: none; }
 button.primary.small { padding: 5px 10px; font-size: 12px; margin: 0; width: auto; }
 button.secondary-btn.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto; }
-.row-actions { display: flex; gap: 6px; flex: none; }
+button.danger {
+  font: inherit; cursor: pointer; border: 1px solid var(--bad);
+  background: transparent; color: var(--bad); border-radius: var(--radius);
+  padding: 8px 14px; font-weight: bold;
+}
+button.danger:hover { background: var(--bad); color: var(--paper); }
+button.danger.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto; }
+.row-actions { display: flex; gap: 6px; flex: none; flex-wrap: wrap; }
 
 .inv-editor { margin-top: 18px; border-top: 1px solid rgba(122, 74, 31, 0.25); padding-top: 12px; }
 .inv-editor h3 { margin: 0 0 4px; color: var(--accent); }

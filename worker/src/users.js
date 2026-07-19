@@ -124,6 +124,22 @@ export async function updateMember(env, { uid, character, business, role }) {
     [[String(character || '').trim()]]);
 }
 
+/**
+ * Admin delete of a member (by UID). Clears the row's cells rather than
+ * removing the row (no sheet-structure edit needed); listAllUsers/findUserByEmail
+ * skip blank rows, so the member disappears and can register again fresh.
+ */
+export async function deleteMember(env, uid) {
+  const target = String(uid || '').trim();
+  if (!target) throw new Error('Missing member uid.');
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
+  let rowIdx = null;
+  rows.forEach((row, i) => { if (String(row[0] || '').trim() === target) rowIdx = i + 2; });
+  if (!rowIdx) throw new Error('Member not found.');
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A${rowIdx}:I${rowIdx}`,
+    [['', '', '', '', '', '', '', '', '']]);
+}
+
 /** Best-effort Last Seen stamp (column H). Never throws into the caller. */
 export async function touchLastSeen(env, row) {
   try {

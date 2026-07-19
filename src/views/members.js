@@ -30,8 +30,23 @@ export function renderMembers(container) {
         (m.status === 'pending' ? '<span class="warn">pending</span>' : '') + '<br>' +
         '<span class="note">' + esc(m.business || '—') + ' · ' + esc(m.email || '') + '</span><br>' +
         '<span class="note">UID: <code>' + esc(m.uid) + '</code></span>' }),
-      el('button.primary.small', { onclick: () => openEditModal(m, load) }, 'Edit'),
+      el('span', { class: 'row-actions' }, [
+        el('button.primary.small', { onclick: () => openEditModal(m, load) }, 'Edit'),
+        el('button.danger.small', { onclick: () => remove(m) }, 'Delete'),
+      ]),
     ])));
+  }
+
+  async function remove(m) {
+    const who = m.character || m.email || m.uid;
+    if (!window.confirm('Remove ' + who + ' from the network? They can register again afterwards.')) return;
+    mount(listHost, el('p', { class: 'note' }, 'Removing…'));
+    try {
+      const res = await api.deleteMember(m.uid);
+      renderList(res.members || []);
+    } catch (e) {
+      mount(listHost, el('p', { class: 'error' }, e.message || String(e)));
+    }
   }
 
   load();

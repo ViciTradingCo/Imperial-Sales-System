@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.6', notes: [
+    'Admins can delete members and companies from the admin lists.',
+    'Deleting a company archives it — market data kept, name freed, records sealed.',
+  ] },
   { version: '1.5', notes: [
     'Businesses are associated with a Hold at registration.',
     'Admins can flag a company as a Court.',
