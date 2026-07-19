@@ -67,6 +67,12 @@ export const api = {
   saveItem: (item) => request('POST', '/inventory', item),
   /** Owner/admin: delete an inventory item. */
   deleteItem: (item) => request('POST', '/inventory/delete', { item }),
+  /** The network hold list. */
+  getHolds: () => request('GET', '/holds'),
+  /** Recent intake transactions for the caller's business. */
+  getIntake: () => request('GET', '/intake'),
+  /** Owner/admin: record a stock intake (purchase). */
+  recordIntake: (intake) => request('POST', '/intake', intake),
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body || {}),
 };

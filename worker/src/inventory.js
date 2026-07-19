@@ -27,25 +27,27 @@ export async function listInventory(env, business) {
   }));
 }
 
-/** Adds or updates one item (keyed by business + item name). */
-export async function upsertItem(env, business, { item, price, stock, lowStock }) {
+/**
+ * Adds or updates an item's DETAILS (sale price + low-stock threshold). Stock is
+ * NOT set here — it's driven by intake (in) and sales (out). A brand-new item
+ * starts at 0 stock; record an intake to stock it.
+ */
+export async function upsertItem(env, business, { item, price, lowStock }) {
   const db = await getDb(env);
   const name = String(item || '').trim();
   if (!name) throw new Error('Item name is required.');
   const p = Number(price);
-  const s = Math.floor(Number(stock));
   const l = Math.floor(Number(lowStock));
   if (!isFinite(p) || p < 0) throw new Error('Price must be a number ≥ 0.');
-  if (!isFinite(s) || s < 0) throw new Error('Stock must be a whole number ≥ 0.');
   const low = isFinite(l) && l > 0 ? l : 0;
   await db
     .prepare(
       `INSERT INTO inventory (business, item, price, stock, low_stock)
-       VALUES (?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, 0, ?)
        ON CONFLICT (business, item)
-       DO UPDATE SET price = excluded.price, stock = excluded.stock, low_stock = excluded.low_stock`
+       DO UPDATE SET price = excluded.price, low_stock = excluded.low_stock`
     )
-    .bind(business, name, p, s, low)
+    .bind(business, name, p, low)
     .run();
   return listInventory(env, business);
 }

@@ -25,6 +25,8 @@ import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
 import { listInventory, upsertItem, deleteItem } from './inventory.js';
+import { recordIntake, listIntake } from './intake.js';
+import { readHolds } from './holds.js';
 import { renameBusinessData, ensureSchema } from './db.js';
 
 function corsHeaders(env, request) {
@@ -234,6 +236,30 @@ async function handleDeleteItem(request, env, body) {
   return { inventory: await deleteItem(env, caller.business, body.item) };
 }
 
+/** Any registered user: the network hold list (for intake / sales dropdowns). */
+async function handleGetHolds(request, env) {
+  await requireRegistered(request, env);
+  return { holds: await readHolds(env) };
+}
+
+/** Any registered user: recent intake transactions for their business. */
+async function handleGetIntake(request, env) {
+  const caller = await requireRegistered(request, env);
+  return { intake: await listIntake(env, caller.business, 20) };
+}
+
+/** Owner/admin: record a stock intake (purchase) — logs it and adds stock. */
+async function handleRecordIntake(request, env, body) {
+  const caller = await requireRegistered(request, env);
+  if (caller.role !== 'owner' && caller.role !== 'admin') {
+    const e = new Error('Only a shop owner or an admin can record intake.');
+    e.forbidden = true;
+    throw e;
+  }
+  const intake = await recordIntake(env, caller.business, body);
+  return { intake, inventory: await listInventory(env, caller.business) };
+}
+
 /** Owners/admins only: activate a pending employee of their own business. */
 async function handleActivateEmployee(request, env, body) {
   const caller = await requireRegistered(request, env);
@@ -361,6 +387,19 @@ export default {
       if (request.method === 'POST' && path === '/inventory/delete') {
         const body = await readJsonBody(request);
         return json(await handleDeleteItem(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/holds') {
+        return json(await handleGetHolds(request, env), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/intake') {
+        return json(await handleGetIntake(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/intake') {
+        const body = await readJsonBody(request);
+        return json(await handleRecordIntake(request, env, body), 200, cors);
       }
 
       return json({ error: 'Not found: ' + path }, 404, cors);

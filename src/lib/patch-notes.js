@@ -5,6 +5,7 @@
 export const PATCH_NOTES = [
   { version: '0.8', notes: [
     'Inventory management (Cloudflare D1).',
+    'Intake as a transaction — tracks cost paid and source hold.',
   ] },
   { version: '0.7', notes: [
     'Editable company name in Ledger Settings.',
