@@ -39,11 +39,12 @@ export function renderHome(container, { me }) {
 
   mount(container, idCard, ...sections);
 
-  // Admin gets quick links to the network-wide lists on the action bar.
+  // Admin gets quick links to the network-wide tools on the action bar.
   if (me.role === 'admin') {
     setActions([
       { label: 'Member List', onClick: () => navigate('/admin/members') },
       { label: 'Company List', onClick: () => navigate('/admin/companies') },
+      { label: 'Network Settings', onClick: () => navigate('/admin/settings') },
     ]);
   }
 }

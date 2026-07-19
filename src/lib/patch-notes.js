@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.4', notes: [
+    'New Business Operations page — Register, Inventory, and Employees moved to its action bar.',
+    'Network Settings moved to the admin Home action bar.',
+  ] },
   { version: '1.3', notes: [
     'Floating, centered header; action bar tucks beneath it.',
     'Admins can edit a member’s name, company, and role.',

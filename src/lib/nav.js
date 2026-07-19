@@ -9,10 +9,9 @@ import { navigate, currentPath } from './router.js';
 /** The nav destinations available to a given user, in order. */
 export function navItems(me) {
   const items = [{ path: '/', label: 'Home' }];
-  items.push({ path: '/pos', label: 'Register' });
-  items.push({ path: '/inventory', label: 'Inventory' });
-  if (me.role === 'owner' || me.role === 'admin') items.push({ path: '/employees', label: 'Employees' });
-  if (me.role === 'admin') items.push({ path: '/admin/settings', label: 'Network Settings' });
+  // Register / Inventory / Employees now live on the Business Operations page's
+  // action bar; Network Settings on the admin Home action bar.
+  items.push({ path: '/operations', label: 'Business Operations' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });
   items.push({ path: '/profile', label: 'Profile' });
   // Patch notes have their own right-hand column on desktop; on mobile that
