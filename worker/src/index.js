@@ -283,6 +283,13 @@ export default {
 
     try {
       if (request.method === 'GET' && (path === '/health' || path === '/')) {
+        // Probe D1: 'ok' means bound + migrated; 'error' means bound but the
+        // tables aren't there; 'unbound' means no binding yet.
+        let db = 'unbound';
+        if (env.DB) {
+          try { await env.DB.prepare('SELECT COUNT(*) AS n FROM inventory').first(); db = 'ok'; }
+          catch (e) { db = 'error'; }
+        }
         return json({
           ok: true,
           service: 'eec-sales-system-api',
@@ -290,6 +297,7 @@ export default {
             coreId: !!env.CORE_SPREADSHEET_ID,
             clientId: !!env.GOOGLE_CLIENT_ID,
             saKey: !!env.SA_KEY,
+            db,
           },
           time: new Date().toISOString(),
         }, 200, cors);
