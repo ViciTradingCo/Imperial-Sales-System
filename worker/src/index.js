@@ -130,6 +130,7 @@ async function handleRegister(request, env, body) {
     character: body.character,
     businessName: body.businessName,
     asOwner: !!body.asOwner,
+    hold: body.hold,
   });
   return publicUser(user);
 }
@@ -290,9 +291,10 @@ async function handleVoidSale(request, env, body) {
   return await voidSale(env, caller.business, body.orderNo);
 }
 
-/** Any registered user: the network hold list (for intake / sales dropdowns). */
+/** Any signed-in user: the network hold list (for intake / sales dropdowns and
+ *  the registration form, where the caller isn't registered yet). */
 async function handleGetHolds(request, env) {
-  await requireRegistered(request, env);
+  await requireUser(request, env);
   return { holds: await readHolds(env) };
 }
 

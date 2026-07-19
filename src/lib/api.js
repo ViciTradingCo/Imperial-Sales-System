@@ -43,8 +43,8 @@ export const api = {
   /** Verifies the signed-in user and returns their profile, or {registered:false}. */
   me: () => request('POST', '/auth/me', {}),
   /** Registers the signed-in user against a business (as owner or employee). */
-  register: (businessName, asOwner, character) =>
-    request('POST', '/auth/register', { businessName, asOwner: !!asOwner, character }),
+  register: (businessName, asOwner, character, hold) =>
+    request('POST', '/auth/register', { businessName, asOwner: !!asOwner, character, hold }),
   /** Updates the signed-in user's own profile (character name). */
   updateProfile: (character) => request('POST', '/me/profile', { character }),
   /** Owner/admin: the roster for the caller's business. */

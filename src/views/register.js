@@ -10,14 +10,36 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 
+const DEFAULT_HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
+
 export function renderRegister(container, { profile, onRegistered }) {
   const status = el('p', { id: 'regStatus' });
 
   const charInput = el('input', { type: 'text', id: 'charName', placeholder: 'e.g. Brynja Iron-Song' });
   const bizInput = el('input', { type: 'text', id: 'bizName', placeholder: 'e.g. Riverwood Trader' });
 
+  const holdSelect = el('select', { id: 'bizHold' });
+  DEFAULT_HOLDS.forEach((h) => holdSelect.appendChild(el('option', { value: h }, h)));
+  // Refresh from the Core's authoritative hold list if it's reachable.
+  api.getHolds().then((res) => {
+    const holds = (res && res.holds) || [];
+    if (!holds.length) return;
+    const prev = holdSelect.value;
+    holdSelect.innerHTML = '';
+    holds.forEach((h) => holdSelect.appendChild(el('option', { value: h }, h)));
+    if (holds.includes(prev)) holdSelect.value = prev;
+  }).catch(() => { /* keep the defaults */ });
+  // The Hold is a property of the BUSINESS, so it's only asked of owners (who
+  // create it); employees join a business that already has one.
+  const holdWrap = el('div', {}, [el('label', {}, 'Hold'), holdSelect,
+    el('p', { class: 'note' }, 'The Skyrim hold your business trades in.')]);
+  holdWrap.hidden = true;
+
   const ownerRadio = el('input', { type: 'radio', name: 'role', value: 'owner', id: 'roleOwner' });
   const empRadio = el('input', { type: 'radio', name: 'role', value: 'employee', id: 'roleEmp', checked: true });
+  const syncHold = () => { holdWrap.hidden = !ownerRadio.checked; };
+  ownerRadio.addEventListener('change', syncHold);
+  empRadio.addEventListener('change', syncHold);
 
   const submit = el('button.primary', { onclick: doRegister }, 'Register');
 
@@ -32,10 +54,11 @@ export function renderRegister(container, { profile, onRegistered }) {
     const businessName = bizInput.value.trim();
     if (!businessName) { setStatus('Enter your business name.', 'error'); return; }
     const asOwner = ownerRadio.checked;
+    const hold = asOwner ? holdSelect.value : '';
     submit.disabled = true;
     setStatus('Registering…', '');
     try {
-      const me = await api.register(businessName, asOwner, character);
+      const me = await api.register(businessName, asOwner, character, hold);
       onRegistered(me);
     } catch (e) {
       submit.disabled = false;
@@ -64,6 +87,8 @@ export function renderRegister(container, { profile, onRegistered }) {
     el('p', { class: 'note', html:
       'Owners create the business (the name must be free). Employees join an ' +
       'existing business and are activated by its owner or an admin.' }),
+
+    holdWrap,
 
     submit,
     status,

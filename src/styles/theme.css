@@ -382,6 +382,15 @@ img, table { max-width: 100%; }
   button.primary, button.secondary-btn, input, select { min-height: 44px; }
   button.primary { width: 100%; }
 
+  /* Action bar buttons grow to fill the row so they scale to the screen
+     instead of clustering at their natural width. */
+  .actionbar { padding: 8px 14px; }
+  .action-btn { flex: 1 1 auto; text-align: center; min-height: 44px; font-size: 14px; }
+
+  /* "Remember me" isn't reliable on mobile (silent re-auth is blocked), so
+     hide the option there to avoid a promise the phone can't keep. */
+  .remember-row { display: none; }
+
   /* Employee rows stack instead of squeezing */
   .emp-row { flex-wrap: wrap; align-items: flex-start; gap: 8px; }
   .emp-row button { width: auto; }

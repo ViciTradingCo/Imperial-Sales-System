@@ -9,6 +9,8 @@ import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 
+const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
+
 export function renderCompanies(container) {
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading companies…'));
   mount(container, el('div.card', {}, [
@@ -29,10 +31,12 @@ export function renderCompanies(container) {
     mount(listHost, ...companies.map((c) => {
       const sub = c.perpetual ? 'Perpetual' : (c.until ? 'until ' + c.until : 'no subscription');
       const statusCls = String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';
+      const court = c.court ? ' <span class="role-pill">Court</span>' : '';
+      const holdLine = c.hold ? '<br><span class="note">Hold: ' + esc(c.hold) + '</span>' : '';
       return el('div', { class: 'member-row' }, [
         el('p', { html:
-          '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(c.status || '—') + '</span><br>' +
-          '<span class="note">' + esc(sub) + (c.pointOfContact ? ' · ' + esc(c.pointOfContact) : '') + '</span>' }),
+          '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(c.status || '—') + '</span>' + court + '<br>' +
+          '<span class="note">' + esc(sub) + (c.pointOfContact ? ' · ' + esc(c.pointOfContact) : '') + '</span>' + holdLine }),
         el('span', { class: 'row-actions' }, [
           el('button.primary.small', { onclick: () => openNameModal(c, load) }, 'Edit'),
           el('button.secondary-btn.small', { onclick: () => openSubscriptionModal(c, load) }, 'Subscription'),
@@ -44,9 +48,22 @@ export function renderCompanies(container) {
   load();
 }
 
-/** Rename modal. */
+/** Edit modal — name, associated Hold, and the admin-only Court flag. */
 function openNameModal(company, onSaved) {
   const name = el('input', { type: 'text', value: company.business || '' });
+
+  const hold = el('select', {});
+  hold.appendChild(el('option', { value: '' }, '— none —'));
+  const holds = HOLDS.includes(company.hold) || !company.hold ? HOLDS : [company.hold, ...HOLDS];
+  holds.forEach((h) => {
+    const opt = el('option', { value: h }, h);
+    if (h === company.hold) opt.selected = true;
+    hold.appendChild(opt);
+  });
+
+  const court = el('input', { type: 'checkbox' });
+  court.checked = !!company.court;
+
   const status = el('p', {});
   const save = el('button.primary', { onclick: doSave }, 'Save');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
@@ -58,8 +75,11 @@ function openNameModal(company, onSaved) {
     save.disabled = true;
     setStatus('Saving…', '');
     try {
-      // Preserve the current subscription while renaming.
-      await api.updateCompany({ id: company.id, name: newName, until: company.until, perpetual: company.perpetual });
+      // Preserve the current subscription while editing name / hold / court.
+      await api.updateCompany({
+        id: company.id, name: newName, until: company.until, perpetual: company.perpetual,
+        hold: hold.value, court: court.checked,
+      });
       onSaved();
       modal.close();
     } catch (e) {
@@ -73,6 +93,9 @@ function openNameModal(company, onSaved) {
     el('label', {}, 'Company name'),
     name,
     el('p', { class: 'note' }, 'Renaming updates the company everywhere — its shop, staff, and records.'),
+    el('label', {}, 'Hold'),
+    hold,
+    el('label', { class: 'inline' }, [court, document.createTextNode(' Court (admin-only flag)')]),
     save,
     status,
   ]);

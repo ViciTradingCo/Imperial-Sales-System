@@ -3,6 +3,11 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.5', notes: [
+    'Businesses are associated with a Hold at registration.',
+    'Admins can flag a company as a Court.',
+    'Action bar buttons scale to fit on mobile.',
+  ] },
   { version: '1.4', notes: [
     'New Business Operations page — Register, Inventory, and Employees moved to its action bar.',
     'Network Settings moved to the admin Home action bar.',

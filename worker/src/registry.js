@@ -16,7 +16,15 @@ import { renameBusinessKey } from './business-settings.js';
 import { renameBusinessData } from './db.js';
 
 export const CERT_SHEET = 'Certified Users';
-export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe'];
+// Hold (K) and Court (L) are appended after the classic Apps Script columns so
+// existing rows never shift. Court is an admin-only flag; Hold is the Skyrim
+// hold the business trades in, chosen at registration.
+export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe', 'Hold', 'Court'];
+
+/** Rewrites the Certified Users header row so a pre-existing tab gains the Hold/Court labels. */
+export async function reconcileCertHeader(env) {
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A1`, [CERT_HEADERS]);
+}
 
 /** Short, collision-resistant application id. */
 export function genUid(prefix) {
@@ -43,9 +51,9 @@ export async function findBusinessByName(env, name) {
 }
 
 /** Appends a business row to Certified Users (subscription/sync columns left for the admin + sync to fill). */
-async function appendBusiness(env, { ledgerId, businessName, pointOfContact }) {
+async function appendBusiness(env, { ledgerId, businessName, pointOfContact, hold }) {
   await appendRows(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A1`, [[
-    ledgerId, pointOfContact || '', businessName, '', 'FALSE', '', '', '', 'FALSE', '',
+    ledgerId, pointOfContact || '', businessName, '', 'FALSE', '', '', '', 'FALSE', '', hold || '', 'FALSE',
   ]]);
 }
 
@@ -57,7 +65,7 @@ async function appendBusiness(env, { ledgerId, businessName, pointOfContact }) {
  *   asOwner=false → the business name must ALREADY EXIST; we create a pending
  *                   employee awaiting owner/admin activation.
  */
-export async function registerUser(env, { email, name, character, businessName, asOwner }) {
+export async function registerUser(env, { email, name, character, businessName, asOwner, hold }) {
   // Self-heal the registry tabs so a fresh Core needs nothing hand-created
   // beyond the Users tab (which seeds the first admin).
   await ensureSheet(env, env.CORE_SPREADSHEET_ID, USERS_SHEET, USERS_HEADERS);
@@ -78,12 +86,13 @@ export async function registerUser(env, { email, name, character, businessName, 
       throw new Error('A business named "' + biz + '" is already registered. If you own it, ask an admin to link your account; otherwise choose a different name.');
     }
     await ensureSheet(env, env.CORE_SPREADSHEET_ID, CERT_SHEET, CERT_HEADERS);
+    await reconcileCertHeader(env); // add the Hold/Court columns to a pre-existing tab
     // The business's ledger is LINKED later (Phase 3): the owner shares a Sheet
     // they own and its document ID replaces this placeholder in the User ID
     // column. Until then the business is keyed by this generated id.
     const businessId = genUid('biz');
     // Point of Contact is the owner's character (the in-character name).
-    await appendBusiness(env, { ledgerId: businessId, businessName: biz, pointOfContact: char });
+    await appendBusiness(env, { ledgerId: businessId, businessName: biz, pointOfContact: char, hold: String(hold || '').trim() });
     const uid = genUid('usr');
     return appendUser(env, { uid, email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active' });
   }
@@ -151,7 +160,7 @@ function statusFromDate(untilStr) {
 export async function listCompanies(env) {
   let rows;
   try {
-    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:F`);
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
   } catch (e) {
     return [];
   }
@@ -164,6 +173,8 @@ export async function listCompanies(env) {
       until: toDateStr(r[3]),
       perpetual: String(r[4]).trim().toUpperCase() === 'TRUE',
       status: String(r[5] || '').trim(),
+      hold: String(r[10] || '').trim(),
+      court: String(r[11]).trim().toUpperCase() === 'TRUE',
     }));
 }
 
@@ -171,10 +182,10 @@ export async function listCompanies(env) {
  * Admin edit of a company (targeted by its stable id = User ID / ledger id):
  * rename (propagated everywhere) and/or set the subscription expiry + Perpetual.
  */
-export async function updateCompany(env, { id, name, until, perpetual }) {
+export async function updateCompany(env, { id, name, until, perpetual, hold, court }) {
   const targetId = String(id || '').trim();
   if (!targetId) throw new Error('Missing company id.');
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:F`);
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
   let rowIdx = null;
   let current = null;
   rows.forEach((r, i) => { if (String(r[0] || '').trim() === targetId) { rowIdx = i + 2; current = r; } });
@@ -193,6 +204,12 @@ export async function updateCompany(env, { id, name, until, perpetual }) {
   const status = perp ? 'VALID' : statusFromDate(untilStr);
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!D${rowIdx}:F${rowIdx}`,
     [[untilStr, perp ? 'TRUE' : 'FALSE', status]]);
+
+  // Hold (K) and the admin-only Court flag (L). Preserve either if not supplied.
+  const holdStr = hold === undefined ? String(current[10] || '').trim() : String(hold || '').trim();
+  const courtBool = court === undefined ? String(current[11]).trim().toUpperCase() === 'TRUE' : !!court;
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!K${rowIdx}:L${rowIdx}`,
+    [[holdStr, courtBool ? 'TRUE' : 'FALSE']]);
 
   return listCompanies(env);
 }
