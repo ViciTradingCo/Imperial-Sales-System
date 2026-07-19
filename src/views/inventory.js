@@ -3,11 +3,14 @@
  *   • Everyone in the business: view items (price / stock / status).
  *   • Owner/admin: record intake (a purchase transaction — vendor, hold,
  *     quantity, $ per item — which logs the buy and adds stock), edit an item's
- *     sale price + low-stock threshold, and remove items. Recent intake is
- *     listed for reference.
+ *     sale price + low-stock threshold (via a focus modal opened from Edit), and
+ *     remove items. Recent intake is listed for reference.
+ * New items are created by recording intake; the edit modal only adjusts an
+ * existing item's details.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { openModal } from '../lib/modal.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
@@ -20,15 +23,13 @@ export function renderInventory(container, { me }) {
     listHost,
   ])];
 
-  let editor = null;
   let intakeForm = null;
   let intakeHost = null;
 
   if (canEdit) {
     intakeForm = intakeCard(refreshAll);
-    editor = itemEditorCard(refreshInventory);
     intakeHost = el('div', {}, '');
-    nodes.push(intakeForm.card, editor.card, el('div.card', {}, [
+    nodes.push(intakeForm.card, el('div.card', {}, [
       el('h3', {}, 'Recent intake'),
       intakeHost,
     ]));
@@ -44,7 +45,7 @@ export function renderInventory(container, { me }) {
         ' · ' + it.stock + ' in stock · ' + statusTag(it.status) });
       const row = el('div.emp-row', {}, [meta]);
       if (canEdit) {
-        const edit = el('button.primary.small', { onclick: () => editor.fill(it) }, 'Edit');
+        const edit = el('button.primary.small', { onclick: () => openItemModal(it, refreshInventory) }, 'Edit');
         const del = el('button.secondary-btn.small', {
           onclick: async () => {
             if (!confirm('Remove "' + it.item + '"?')) return;
@@ -93,6 +94,39 @@ function statusTag(s) {
 function shortDate(ts) {
   const d = new Date(ts);
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+}
+
+/** Focus modal to edit an existing item's sale price + low-stock threshold. */
+function openItemModal(it, onSaved) {
+  const price = el('input', { type: 'number', step: '0.01', min: '0', value: String(it.price) });
+  const low = el('input', { type: 'number', step: '1', min: '0', value: String(it.lowStock || 0) });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save');
+
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  let modal;
+  async function doSave() {
+    save.disabled = true;
+    setStatus('Saving…', '');
+    try {
+      await api.saveItem({ item: it.item, price: price.value, lowStock: low.value || 0 });
+      onSaved();
+      modal.close();
+    } catch (e) {
+      save.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  modal = openModal([
+    el('h3', {}, 'Edit ' + it.item),
+    el('p', { class: 'note' }, 'Stock (' + it.stock + ') is set by intake and sales, not here.'),
+    el('label', {}, 'Sale price'), price,
+    el('label', {}, 'Low stock threshold'), low,
+    save,
+    status,
+  ]);
 }
 
 /** Intake (restock) transaction form. */
@@ -147,45 +181,4 @@ function intakeCard(onRecorded) {
     status,
   ]);
   return { card, loadHolds };
-}
-
-/** Item details editor (sale price + low-stock threshold). Stock is not set here. */
-function itemEditorCard(onSaved) {
-  const name = el('input', { type: 'text', placeholder: 'Item name' });
-  const price = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Sale price' });
-  const low = el('input', { type: 'number', step: '1', min: '0', placeholder: 'Low stock (0 = never)' });
-  const status = el('p', {});
-  const save = el('button.primary', { onclick: doSave }, 'Save item');
-
-  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
-
-  async function doSave() {
-    save.disabled = true;
-    setStatus('Saving…', '');
-    try {
-      await api.saveItem({ item: name.value.trim(), price: price.value, lowStock: low.value || 0 });
-      name.value = ''; price.value = ''; low.value = '';
-      setStatus('Saved ✓', 'ok');
-      save.disabled = false;
-      onSaved();
-    } catch (e) {
-      save.disabled = false;
-      setStatus(e.message || String(e), 'error');
-    }
-  }
-
-  const card = el('div.card', {}, [
-    el('h3', {}, 'Item details (sale price)'),
-    el('p', { class: 'note' }, 'Set an item’s sale price and low-stock warning level. Stock comes from intake and sales, not here.'),
-    el('label', {}, 'Item'), name,
-    el('label', {}, 'Sale price'), price,
-    el('label', {}, 'Low stock threshold'), low,
-    save,
-    status,
-  ]);
-  card.fill = (it) => {
-    name.value = it.item; price.value = it.price; low.value = it.lowStock || 0;
-    name.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-  return { card, fill: (it) => card.fill(it) };
 }
