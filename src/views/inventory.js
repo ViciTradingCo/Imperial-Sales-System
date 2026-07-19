@@ -11,6 +11,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
+import { setActions } from '../lib/actions.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
@@ -23,16 +24,16 @@ export function renderInventory(container, { me }) {
     listHost,
   ])];
 
-  let intakeForm = null;
   let intakeHost = null;
 
   if (canEdit) {
-    intakeForm = intakeCard(refreshAll);
     intakeHost = el('div', {}, '');
-    nodes.push(intakeForm.card, el('div.card', {}, [
+    nodes.push(el('div.card', {}, [
       el('h3', {}, 'Recent intake'),
       intakeHost,
     ]));
+    // First action-bar button: open the intake transaction as a focus modal.
+    setActions([{ label: 'Record Intake', onClick: () => openIntakeModal(refreshAll) }]);
   }
 
   mount(container, ...nodes);
@@ -84,7 +85,6 @@ export function renderInventory(container, { me }) {
 
   refreshInventory();
   refreshIntake();
-  if (intakeForm) intakeForm.loadHolds();
 }
 
 function statusTag(s) {
@@ -129,8 +129,8 @@ function openItemModal(it, onSaved) {
   ]);
 }
 
-/** Intake (restock) transaction form. */
-function intakeCard(onRecorded) {
+/** Intake (restock) transaction as a focus modal. */
+function openIntakeModal(onRecorded) {
   const item = el('input', { type: 'text', placeholder: 'Item name' });
   const vendor = el('input', { type: 'text', placeholder: 'Vendor (who you bought from)' });
   const hold = el('select', {}, el('option', { value: '' }, 'Select a hold…'));
@@ -141,13 +141,12 @@ function intakeCard(onRecorded) {
 
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
-  async function loadHolds() {
-    try {
-      const res = await api.getHolds();
-      (res.holds || []).forEach((h) => hold.appendChild(el('option', { value: h }, h)));
-    } catch (e) { /* leave the placeholder; hold is optional */ }
-  }
+  // Fill the hold dropdown.
+  api.getHolds()
+    .then((res) => (res.holds || []).forEach((h) => hold.appendChild(el('option', { value: h }, h))))
+    .catch(() => { /* hold is optional */ });
 
+  let modal;
   async function doRecord() {
     save.disabled = true;
     setStatus('Recording…', '');
@@ -159,17 +158,15 @@ function intakeCard(onRecorded) {
         numItems: qty.value,
         pricePer: per.value,
       });
-      item.value = ''; vendor.value = ''; qty.value = ''; per.value = ''; hold.value = '';
-      setStatus('Recorded ✓ — stock updated.', 'ok');
-      save.disabled = false;
       onRecorded();
+      modal.close();
     } catch (e) {
       save.disabled = false;
       setStatus(e.message || String(e), 'error');
     }
   }
 
-  const card = el('div.card', {}, [
+  modal = openModal([
     el('h3', {}, 'Record intake (restock)'),
     el('p', { class: 'note' }, 'Log a purchase — this adds the stock and records what you paid and where. A new item name is created automatically.'),
     el('label', {}, 'Item'), item,
@@ -180,5 +177,4 @@ function intakeCard(onRecorded) {
     save,
     status,
   ]);
-  return { card, loadHolds };
 }

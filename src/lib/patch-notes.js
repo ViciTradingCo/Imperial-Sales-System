@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '0.9', notes: [
+    'Top action bar for contextual buttons.',
+    'Record Intake and item edits are now focus windows.',
+  ] },
   { version: '0.8', notes: [
     'Inventory management (Cloudflare D1).',
     'Intake as a transaction — tracks cost paid and source hold.',

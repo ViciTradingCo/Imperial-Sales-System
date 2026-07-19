@@ -41,6 +41,23 @@ body {
 }
 .topbar h1 { margin: 0; font-size: 20px; }
 
+/* Action bar — contextual buttons for the current view (hidden when empty). */
+.actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 20px;
+  background: var(--paper-raised);
+  border-bottom: 1px solid rgba(122, 74, 31, 0.25);
+}
+.action-btn {
+  font: inherit; font-size: 13px; cursor: pointer;
+  background: var(--accent); color: var(--header-text);
+  border: none; border-radius: var(--radius); padding: 8px 14px;
+}
+.action-btn:hover { opacity: 0.92; }
+
 .user-badge {
   font-size: 13px;
   background: var(--accent);

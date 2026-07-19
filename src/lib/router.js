@@ -11,12 +11,16 @@
 const routes = new Map();
 let notFound = null;
 let container = null;
+let beforeRender = null;
 
 export function initRouter(appEl, fallbackRender) {
   container = appEl;
   notFound = fallbackRender;
   window.addEventListener('hashchange', render);
 }
+
+/** Runs before every render (e.g. to clear per-view action buttons). */
+export function onBeforeRender(fn) { beforeRender = fn; }
 
 export function route(path, render) { routes.set(path, render); }
 
@@ -30,6 +34,7 @@ export function currentPath() {
 }
 
 export function render() {
+  if (beforeRender) beforeRender();
   const path = currentPath();
   const handler = routes.get(path) || notFound;
   if (handler) handler(container, path);

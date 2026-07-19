@@ -5,11 +5,12 @@
 import { loadConfig } from './lib/config.js';
 import { initAuth, renderSignInButton, onAuthChange, getProfile, signOut } from './lib/auth.js';
 import { configureApi, api } from './lib/api.js';
-import { initRouter, route, navigate, render } from './lib/router.js';
+import { initRouter, route, navigate, render, onBeforeRender } from './lib/router.js';
 import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
+import { initActions, clearActions } from './lib/actions.js';
 import { renderLanding } from './views/landing.js';
 import { renderHome } from './views/home.js';
 import { renderRegister } from './views/register.js';
@@ -25,6 +26,7 @@ const navEl = document.getElementById('sidenav');
 const navToggle = document.getElementById('navToggle');
 const backdrop = document.getElementById('backdrop');
 const patchEl = document.getElementById('patchnotes');
+initActions(document.getElementById('actionbar'));
 
 const state = { profile: null, me: null };
 
@@ -175,6 +177,7 @@ async function main() {
   }
   configureApi(config.apiBaseUrl);
   initRouter(appEl, showRoot);
+  onBeforeRender(clearActions); // reset per-view action buttons before each render
 
   renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
   onAuthChange(({ idToken }) => { if (idToken) onSignedIn(); });
