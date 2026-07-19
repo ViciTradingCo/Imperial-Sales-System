@@ -4,6 +4,7 @@
  * the app and credits SmileDaemon, with a note on how to reach them.
  */
 import { el, mount } from '../lib/dom.js';
+import { getRemember, setRemember } from '../lib/auth.js';
 
 export function renderLanding(container, { signInMount } = {}) {
   const nodes = [];
@@ -12,16 +13,20 @@ export function renderLanding(container, { signInMount } = {}) {
     el('h2', {}, 'The EEC Automated Ledger'),
     el('p', {}, 'A sales system for the Mereth Skyrim RP server. Shops across the ' +
       'holds record their sales and restocks, owners manage their own inventory ' +
-      'and staff, and the Company keeps the whole trade network — certification ' +
+      'and staff, and the EEC keeps the whole trade network — certification ' +
       'and pooled records — in one place.'),
   ]));
 
   if (signInMount) {
+    const remember = el('input', { type: 'checkbox' });
+    remember.checked = getRemember();
+    remember.addEventListener('change', () => setRemember(remember.checked));
     nodes.push(el('div.card.signin-wrap', {}, [
       el('h3', {}, 'Sign in to begin'),
       el('p', { class: 'note' }, 'Use the Google account you trade under. ' +
         'New faces are asked to register a character and a business.'),
       signInMount,
+      el('label', { class: 'inline remember-row' }, [remember, document.createTextNode(' Remember me — stay signed in on this device')]),
     ]));
   }
 

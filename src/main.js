@@ -33,6 +33,17 @@ initActions(document.getElementById('actionbar'));
 
 const state = { profile: null, me: null };
 
+// The header floats (sticky); the action bar sticks just below it. Measure the
+// real header height into --topbar-h so the bar never hides under the header.
+const topbarEl = document.querySelector('.topbar');
+function measureTopbar() {
+  if (!topbarEl) return;
+  document.documentElement.style.setProperty('--topbar-h', topbarEl.offsetHeight + 'px');
+}
+window.addEventListener('resize', measureTopbar);
+window.addEventListener('load', measureTopbar);
+measureTopbar();
+
 // ---- mobile drawer -------------------------------------------------------
 function openDrawer() {
   navEl.classList.add('open');
@@ -66,7 +77,7 @@ function showNav(on) {
 window.addEventListener('hashchange', () => highlightNav(navEl));
 
 function renderBadge() {
-  if (!state.profile) { badgeEl.hidden = true; return; }
+  if (!state.profile) { badgeEl.hidden = true; measureTopbar(); return; }
   badgeEl.hidden = false;
   const registered = state.me && state.me.registered;
   const role = registered ? state.me.role : 'guest';
@@ -87,6 +98,7 @@ function renderBadge() {
       el('button', { onclick: () => { signOut(); location.reload(); } }, 'Sign out'),
     );
   }
+  measureTopbar(); // badge changes the header height
 }
 
 function fatal(err) {

@@ -34,6 +34,20 @@ export function getProfile() { return profile; }
 
 let initialized = false;
 
+// "Remember me": whether to silently re-authenticate a returning user. Stored
+// on the device; defaults to on.
+const REMEMBER_KEY = 'eec.rememberMe';
+export function getRemember() {
+  try { return localStorage.getItem(REMEMBER_KEY) !== 'false'; } catch (e) { return true; }
+}
+export function setRemember(on) {
+  try { localStorage.setItem(REMEMBER_KEY, on ? 'true' : 'false'); } catch (e) { /* private mode */ }
+  // Turning it off should stop the next silent auto sign-in immediately.
+  if (!on && window.google && window.google.accounts && window.google.accounts.id) {
+    window.google.accounts.id.disableAutoSelect();
+  }
+}
+
 /** Initializes GIS. Resolves once the library is ready and configured. */
 export function initAuth(clientId) {
   return new Promise((resolve) => {
@@ -49,10 +63,10 @@ export function initAuth(clientId) {
           profile = decodePayload(idToken);
           emit();
         },
-        // Persistent session: silently re-issue a token for a returning user on
-        // reload (Google tokens last ~1h; this re-auths without a click). An
-        // explicit Sign Out calls disableAutoSelect so it stays signed out.
-        auto_select: true,
+        // Persistent session when "Remember me" is on: silently re-issue a
+        // token for a returning user on reload (Google tokens last ~1h; this
+        // re-auths without a click).
+        auto_select: getRemember(),
       });
       initialized = true;
       resolve();

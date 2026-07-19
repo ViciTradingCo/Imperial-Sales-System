@@ -105,6 +105,25 @@ export async function setUserCharacter(env, row, character) {
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!I${row}`, [[character]]);
 }
 
+/** Admin edit of a member (by UID): character, company, and role. */
+export async function updateMember(env, { uid, character, business, role }) {
+  const target = String(uid || '').trim();
+  if (!target) throw new Error('Missing member uid.');
+  const r = String(role || '').trim().toLowerCase();
+  if (!['admin', 'owner', 'employee'].includes(r)) throw new Error('Role must be admin, owner, or employee.');
+
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
+  let rowIdx = null;
+  rows.forEach((row, i) => { if (String(row[0] || '').trim() === target) rowIdx = i + 2; });
+  if (!rowIdx) throw new Error('Member not found.');
+
+  // Business | Role | Is Owner  (C,D,E), then Character (I) — leave status/dates alone.
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!C${rowIdx}:E${rowIdx}`,
+    [[String(business || '').trim(), r, r === 'owner' ? 'TRUE' : 'FALSE']]);
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!I${rowIdx}`,
+    [[String(character || '').trim()]]);
+}
+
 /** Best-effort Last Seen stamp (column H). Never throws into the caller. */
 export async function touchLastSeen(env, row) {
   try {

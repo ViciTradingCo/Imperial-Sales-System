@@ -1,10 +1,11 @@
 /**
- * Member List (admin) — every user in the system with their character name,
- * company, UID, and role. Read-only.
+ * Member List (admin) — every user with character, company, UID, and role.
+ * Each has an Edit focus modal to change character name, company, and role.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
+import { openModal } from '../lib/modal.js';
 
 export function renderMembers(container) {
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading members…'));
@@ -15,9 +16,11 @@ export function renderMembers(container) {
     listHost,
   ]));
 
-  api.getMembers()
-    .then((res) => renderList(res.members || []))
-    .catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
+  function load() {
+    api.getMembers()
+      .then((res) => renderList(res.members || []))
+      .catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
+  }
 
   function renderList(members) {
     if (!members.length) { mount(listHost, el('p', { class: 'note' }, 'No members yet.')); return; }
@@ -27,6 +30,50 @@ export function renderMembers(container) {
         (m.status === 'pending' ? '<span class="warn">pending</span>' : '') + '<br>' +
         '<span class="note">' + esc(m.business || '—') + ' · ' + esc(m.email || '') + '</span><br>' +
         '<span class="note">UID: <code>' + esc(m.uid) + '</code></span>' }),
+      el('button.primary.small', { onclick: () => openEditModal(m, load) }, 'Edit'),
     ])));
   }
+}
+
+function openEditModal(member, onSaved) {
+  const character = el('input', { type: 'text', value: member.character || '' });
+  const business = el('input', { type: 'text', value: member.business || '' });
+  const role = el('select', {});
+  ['employee', 'owner', 'admin'].forEach((r) => {
+    const opt = el('option', { value: r }, r);
+    if (r === member.role) opt.selected = true;
+    role.appendChild(opt);
+  });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save');
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  let modal;
+  async function doSave() {
+    save.disabled = true;
+    setStatus('Saving…', '');
+    try {
+      await api.updateMember({
+        uid: member.uid,
+        character: character.value.trim(),
+        business: business.value.trim(),
+        role: role.value,
+      });
+      onSaved();
+      modal.close();
+    } catch (e) {
+      save.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  modal = openModal([
+    el('h3', {}, 'Edit member'),
+    el('label', {}, 'Character name'), character,
+    el('label', {}, 'Company'), business,
+    el('label', {}, 'Role'), role,
+    el('p', { class: 'note', html: 'UID: <code>' + esc(member.uid) + '</code> · ' + esc(member.email || '') }),
+    save,
+    status,
+  ]);
 }

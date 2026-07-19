@@ -19,7 +19,7 @@
  *   GOOGLE_CLIENT_ID, ALLOWED_ORIGIN.
  */
 import { verifyIdToken } from './verify.js';
-import { findUserByEmail, listUsersByBusiness, listAllUsers, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
+import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
 import { registerUser, renameBusiness, listCompanies, updateCompany } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
@@ -170,6 +170,12 @@ async function handleGetSettings(request, env) {
 
 async function handleListMembers(request, env) {
   await requireAdmin(request, env);
+  return { members: await listAllUsers(env) };
+}
+
+async function handleUpdateMember(request, env, body) {
+  await requireAdmin(request, env);
+  await updateMember(env, body);
   return { members: await listAllUsers(env) };
 }
 
@@ -411,6 +417,11 @@ export default {
 
       if (request.method === 'GET' && path === '/admin/members') {
         return json(await handleListMembers(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/members/update') {
+        const body = await readJsonBody(request);
+        return json(await handleUpdateMember(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/admin/companies') {

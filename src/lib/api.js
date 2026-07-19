@@ -57,6 +57,8 @@ export const api = {
   saveSettings: (updates) => request('POST', '/admin/settings', { updates }),
   /** Admin: every user in the system. */
   getMembers: () => request('GET', '/admin/members'),
+  /** Admin: edit a member (character, company, role). */
+  updateMember: (member) => request('POST', '/admin/members/update', member),
   /** Admin: every registered company. */
   getCompanies: () => request('GET', '/admin/companies'),
   /** Admin: edit a company (name + subscription). */
