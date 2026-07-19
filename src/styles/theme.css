@@ -41,8 +41,12 @@ body {
 }
 .topbar h1 { margin: 0; font-size: 20px; }
 
-/* Action bar — contextual buttons for the current view (hidden when empty). */
+/* Action bar — contextual buttons for the current view (hidden when empty).
+   Sticks to the top so it floats above the page content while scrolling. */
 .actionbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -50,6 +54,7 @@ body {
   padding: 8px 20px;
   background: var(--paper-raised);
   border-bottom: 1px solid rgba(122, 74, 31, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 .action-btn {
   font: inherit; font-size: 13px; cursor: pointer;
