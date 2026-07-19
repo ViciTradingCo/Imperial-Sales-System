@@ -3,7 +3,7 @@
  * "Status" (In Stock / Low / Out of Stock) is derived from the per-item manual
  * Low Stock threshold, matching the original ledger's behavior.
  */
-import { requireDb } from './db.js';
+import { getDb } from './db.js';
 
 function statusFor(stock, low) {
   if (stock <= 0) return 'Out of Stock';
@@ -13,7 +13,7 @@ function statusFor(stock, low) {
 
 /** Every item for a business, ordered by name. */
 export async function listInventory(env, business) {
-  const db = requireDb(env);
+  const db = await getDb(env);
   const { results } = await db
     .prepare('SELECT item, price, stock, low_stock FROM inventory WHERE business = ? ORDER BY item COLLATE NOCASE')
     .bind(business)
@@ -29,7 +29,7 @@ export async function listInventory(env, business) {
 
 /** Adds or updates one item (keyed by business + item name). */
 export async function upsertItem(env, business, { item, price, stock, lowStock }) {
-  const db = requireDb(env);
+  const db = await getDb(env);
   const name = String(item || '').trim();
   if (!name) throw new Error('Item name is required.');
   const p = Number(price);
@@ -52,7 +52,7 @@ export async function upsertItem(env, business, { item, price, stock, lowStock }
 
 /** Removes an item from a business's inventory. */
 export async function deleteItem(env, business, item) {
-  const db = requireDb(env);
+  const db = await getDb(env);
   await db
     .prepare('DELETE FROM inventory WHERE business = ? AND item = ?')
     .bind(business, String(item || '').trim())

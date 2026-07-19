@@ -25,7 +25,7 @@ import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
 import { listInventory, upsertItem, deleteItem } from './inventory.js';
-import { renameBusinessData } from './db.js';
+import { renameBusinessData, ensureSchema } from './db.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -287,7 +287,7 @@ export default {
         // tables aren't there; 'unbound' means no binding yet.
         let db = 'unbound';
         if (env.DB) {
-          try { await env.DB.prepare('SELECT COUNT(*) AS n FROM inventory').first(); db = 'ok'; }
+          try { await ensureSchema(env); await env.DB.prepare('SELECT COUNT(*) AS n FROM inventory').first(); db = 'ok'; }
           catch (e) { db = 'error'; }
         }
         return json({
