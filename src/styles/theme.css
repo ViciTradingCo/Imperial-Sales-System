@@ -214,6 +214,11 @@ label.inline input { width: auto; }
 }
 .emp-row:last-child { border-bottom: none; }
 button.primary.small { padding: 5px 10px; font-size: 12px; margin: 0; width: auto; }
+button.secondary-btn.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto; }
+.row-actions { display: flex; gap: 6px; flex: none; }
+
+.inv-editor { margin-top: 18px; border-top: 1px solid rgba(122, 74, 31, 0.25); padding-top: 12px; }
+.inv-editor h3 { margin: 0 0 4px; color: var(--accent); }
 
 button.link-back {
   background: none; border: none; color: var(--accent); cursor: pointer;

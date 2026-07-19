@@ -3,6 +3,9 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '0.8', notes: [
+    'Inventory management (Cloudflare D1).',
+  ] },
   { version: '0.7', notes: [
     'Editable company name in Ledger Settings.',
     'Patch notes panel.',

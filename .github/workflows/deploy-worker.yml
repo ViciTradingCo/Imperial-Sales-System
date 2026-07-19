@@ -25,6 +25,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # Applies pending D1 migrations. No-ops (and is allowed to fail) until the
+      # D1 database + binding are configured — see docs/SETUP.md Part 5.
+      - name: Apply D1 migrations
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: d1 migrations apply eec-ledger --remote
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:

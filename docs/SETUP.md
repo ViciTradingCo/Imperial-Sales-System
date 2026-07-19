@@ -118,6 +118,28 @@ The `[vars]` are already set in `wrangler.toml`; adjust `ALLOWED_ORIGIN` if your
 
 ---
 
+## Part 5 — Cloudflare D1 (the live shop database)
+
+Phase 3+ stores inventory, sales, and intake in **Cloudflare D1** (a serverless
+SQLite database). Google Sheets stays as the registry/config + a periodic
+backup. Until D1 is connected, inventory/register features show a "not connected
+yet" message; everything else works.
+
+1. **Create the database** — Cloudflare dashboard → **Workers & Pages → D1** →
+   **Create database** → name it exactly **`eec-ledger`** → Create.
+2. Copy the **Database ID** shown on its page.
+3. **Give it to your developer / add the binding:** in `worker/wrangler.toml`,
+   uncomment the `[[d1_databases]]` block and set `database_id` to the ID from
+   step 2 (or send the ID to whoever manages the repo). Commit/push.
+4. On the next Worker deploy, the `Apply D1 migrations` step creates the tables
+   automatically. (It safely no-ops until the binding exists.)
+5. Sign in as an **owner** → **Inventory** → add an item. If it saves, D1 is live.
+
+### Backup sheet (optional but recommended)
+Create a separate Google Sheet, paste `EEC_Backup_Manager.gs` into its Apps
+Script, run its setup, and share it with the service account. A scheduled export
+(added in a later slice) mirrors D1 into it as a backup you control.
+
 ## What lives where (security summary)
 
 | Thing | Secret? | Where it lives |

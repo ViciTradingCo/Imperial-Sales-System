@@ -24,6 +24,8 @@ import { registerUser, renameBusiness } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
+import { listInventory, upsertItem, deleteItem } from './inventory.js';
+import { renameBusinessData } from './db.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -199,8 +201,37 @@ async function handleRenameBusiness(request, env, body) {
   const newName = String(body.name || '').trim();
   if (!newName) throw new Error('Enter a company name.');
   await renameBusiness(env, caller.business, newName);
+  await renameBusinessData(env, caller.business, newName); // keep D1 rows aligned
   caller.business = newName;
   return publicUser(caller);
+}
+
+/** Any registered user may read their own business's inventory. */
+async function handleGetInventory(request, env) {
+  const caller = await requireRegistered(request, env);
+  return { inventory: await listInventory(env, caller.business) };
+}
+
+/** Owner/admin: add or update an inventory item. */
+async function handleSaveItem(request, env, body) {
+  const caller = await requireRegistered(request, env);
+  if (caller.role !== 'owner' && caller.role !== 'admin') {
+    const e = new Error('Only a shop owner or an admin can edit inventory.');
+    e.forbidden = true;
+    throw e;
+  }
+  return { inventory: await upsertItem(env, caller.business, body) };
+}
+
+/** Owner/admin: remove an inventory item. */
+async function handleDeleteItem(request, env, body) {
+  const caller = await requireRegistered(request, env);
+  if (caller.role !== 'owner' && caller.role !== 'admin') {
+    const e = new Error('Only a shop owner or an admin can edit inventory.');
+    e.forbidden = true;
+    throw e;
+  }
+  return { inventory: await deleteItem(env, caller.business, body.item) };
 }
 
 /** Owners/admins only: activate a pending employee of their own business. */
@@ -308,6 +339,20 @@ export default {
       if (request.method === 'POST' && path === '/business/rename') {
         const body = await readJsonBody(request);
         return json(await handleRenameBusiness(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/inventory') {
+        return json(await handleGetInventory(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/inventory') {
+        const body = await readJsonBody(request);
+        return json(await handleSaveItem(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/inventory/delete') {
+        const body = await readJsonBody(request);
+        return json(await handleDeleteItem(request, env, body), 200, cors);
       }
 
       return json({ error: 'Not found: ' + path }, 404, cors);

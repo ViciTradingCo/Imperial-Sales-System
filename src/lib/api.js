@@ -61,6 +61,12 @@ export const api = {
   saveLedgerSettings: (updates) => request('POST', '/business/settings', { updates }),
   /** Owner/admin: rename the company. */
   renameBusiness: (name) => request('POST', '/business/rename', { name }),
+  /** Any registered user: read their business's inventory. */
+  getInventory: () => request('GET', '/inventory'),
+  /** Owner/admin: add or update an inventory item. */
+  saveItem: (item) => request('POST', '/inventory', item),
+  /** Owner/admin: delete an inventory item. */
+  deleteItem: (item) => request('POST', '/inventory/delete', { item }),
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body || {}),
 };
