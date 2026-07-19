@@ -55,6 +55,12 @@ export const api = {
   getSettings: () => request('GET', '/admin/settings'),
   /** Admin: save Master Settings updates ([{label, value}]). */
   saveSettings: (updates) => request('POST', '/admin/settings', { updates }),
+  /** Admin: every user in the system. */
+  getMembers: () => request('GET', '/admin/members'),
+  /** Admin: every registered company. */
+  getCompanies: () => request('GET', '/admin/companies'),
+  /** Admin: edit a company (name + subscription). */
+  updateCompany: (company) => request('POST', '/admin/companies/update', company),
   /** Owner/admin: read this shop's per-business (ledger) settings. */
   getLedgerSettings: () => request('GET', '/business/settings'),
   /** Owner/admin: save per-business (ledger) settings ([{label, value}]). */

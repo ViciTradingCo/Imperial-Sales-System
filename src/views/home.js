@@ -4,6 +4,8 @@
  * employees, profile, etc. are reached from the nav, not here.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { navigate } from '../lib/router.js';
+import { setActions } from '../lib/actions.js';
 
 const ROLE_SECTIONS = {
   admin: [
@@ -36,6 +38,14 @@ export function renderHome(container, { me }) {
     ]));
 
   mount(container, idCard, ...sections);
+
+  // Admin gets quick links to the network-wide lists on the action bar.
+  if (me.role === 'admin') {
+    setActions([
+      { label: 'Member List', onClick: () => navigate('/admin/members') },
+      { label: 'Company List', onClick: () => navigate('/admin/companies') },
+    ]);
+  }
 }
 
 function roleTitle(role) {

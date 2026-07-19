@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.1', notes: [
+    'Admin: Member List and Company List pages.',
+    'Admin can edit a company’s name and subscription.',
+  ] },
   { version: '1.0', notes: [
     'The Register (POS): ring up sales, order lookup, and void.',
     'Certification gate — expired shops can’t sell.',

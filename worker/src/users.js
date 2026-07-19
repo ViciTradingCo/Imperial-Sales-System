@@ -53,6 +53,17 @@ export async function findUserByEmail(env, email) {
   return null;
 }
 
+/** Every user in the system (admin member list). */
+export async function listAllUsers(env) {
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
+  return rows
+    .filter((r) => String(r[0] || '').trim() || String(r[1] || '').trim())
+    .map((r) => {
+      const u = normalizeRow(r);
+      return { uid: u.uid, email: u.email, character: u.character, business: u.business, role: u.role, isOwner: u.isOwner, status: u.status };
+    });
+}
+
 /** Every user belonging to a business (case-insensitive match on the name). */
 export async function listUsersByBusiness(env, business) {
   const target = String(business || '').trim().toLowerCase();

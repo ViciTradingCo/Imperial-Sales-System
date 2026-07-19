@@ -13,6 +13,7 @@
 import { readRange, appendRows, updateRange, ensureSheet } from './sheets.js';
 import { appendUser, findUserByEmail, reconcileUsersHeader, USERS_SHEET, USERS_HEADERS } from './users.js';
 import { renameBusinessKey } from './business-settings.js';
+import { renameBusinessData } from './db.js';
 
 export const CERT_SHEET = 'Certified Users';
 export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe'];
@@ -129,4 +130,69 @@ export async function renameBusiness(env, oldName, newName) {
 
   await renameBusinessKey(env, old, nw);
   return nw;
+}
+
+function toDateStr(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+}
+
+function statusFromDate(untilStr) {
+  const d = new Date(untilStr);
+  if (isNaN(d.getTime())) return 'EXPIRED';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return d >= today ? 'VALID' : 'EXPIRED';
+}
+
+/** All registered companies (admin company list). */
+export async function listCompanies(env) {
+  let rows;
+  try {
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:F`);
+  } catch (e) {
+    return [];
+  }
+  return rows
+    .filter((r) => String(r[2] || '').trim() || String(r[0] || '').trim())
+    .map((r) => ({
+      id: String(r[0] || '').trim(),
+      business: String(r[2] || '').trim(),
+      pointOfContact: String(r[1] || '').trim(),
+      until: toDateStr(r[3]),
+      perpetual: String(r[4]).trim().toUpperCase() === 'TRUE',
+      status: String(r[5] || '').trim(),
+    }));
+}
+
+/**
+ * Admin edit of a company (targeted by its stable id = User ID / ledger id):
+ * rename (propagated everywhere) and/or set the subscription expiry + Perpetual.
+ */
+export async function updateCompany(env, { id, name, until, perpetual }) {
+  const targetId = String(id || '').trim();
+  if (!targetId) throw new Error('Missing company id.');
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:F`);
+  let rowIdx = null;
+  let current = null;
+  rows.forEach((r, i) => { if (String(r[0] || '').trim() === targetId) { rowIdx = i + 2; current = r; } });
+  if (!rowIdx) throw new Error('Company not found.');
+
+  const oldName = String(current[2] || '').trim();
+  const newName = String(name || '').trim();
+  if (!newName) throw new Error('Company name is required.');
+  if (newName !== oldName) {
+    await renameBusiness(env, oldName, newName);
+    await renameBusinessData(env, oldName, newName);
+  }
+
+  const perp = !!perpetual;
+  const untilStr = perp ? '' : String(until || '').trim();
+  const status = perp ? 'VALID' : statusFromDate(untilStr);
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!D${rowIdx}:F${rowIdx}`,
+    [[untilStr, perp ? 'TRUE' : 'FALSE', status]]);
+
+  return listCompanies(env);
 }

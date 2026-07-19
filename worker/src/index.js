@@ -19,8 +19,8 @@
  *   GOOGLE_CLIENT_ID, ALLOWED_ORIGIN.
  */
 import { verifyIdToken } from './verify.js';
-import { findUserByEmail, listUsersByBusiness, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
-import { registerUser, renameBusiness } from './registry.js';
+import { findUserByEmail, listUsersByBusiness, listAllUsers, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
+import { registerUser, renameBusiness, listCompanies, updateCompany } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
@@ -166,6 +166,21 @@ async function requireAdmin(request, env) {
 async function handleGetSettings(request, env) {
   await requireAdmin(request, env);
   return { settings: await readSettings(env) };
+}
+
+async function handleListMembers(request, env) {
+  await requireAdmin(request, env);
+  return { members: await listAllUsers(env) };
+}
+
+async function handleListCompanies(request, env) {
+  await requireAdmin(request, env);
+  return { companies: await listCompanies(env) };
+}
+
+async function handleUpdateCompany(request, env, body) {
+  await requireAdmin(request, env);
+  return { companies: await updateCompany(env, body) };
 }
 
 async function handleSaveSettings(request, env, body) {
@@ -392,6 +407,19 @@ export default {
       if (request.method === 'POST' && path === '/admin/settings') {
         const body = await readJsonBody(request);
         return json(await handleSaveSettings(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/admin/members') {
+        return json(await handleListMembers(request, env), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/admin/companies') {
+        return json(await handleListCompanies(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/companies/update') {
+        const body = await readJsonBody(request);
+        return json(await handleUpdateCompany(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/business/settings') {

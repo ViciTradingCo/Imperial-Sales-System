@@ -19,6 +19,8 @@ import { renderEmployees } from './views/employees.js';
 import { renderInventory } from './views/inventory.js';
 import { renderPos } from './views/pos.js';
 import { renderAdminSettings } from './views/admin-settings.js';
+import { renderMembers } from './views/members.js';
+import { renderCompanies } from './views/companies.js';
 import { renderLedgerSettings } from './views/ledger-settings.js';
 
 const appEl = document.getElementById('app');
@@ -144,6 +146,16 @@ route('/pos', (container) => {
 route('/admin/settings', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
   renderAdminSettings(container);
+});
+
+route('/admin/members', (container) => {
+  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+  renderMembers(container);
+});
+
+route('/admin/companies', (container) => {
+  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+  renderCompanies(container);
 });
 
 route('/ledger/settings', (container) => {
