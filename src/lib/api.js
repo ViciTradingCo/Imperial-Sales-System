@@ -67,6 +67,8 @@ export const api = {
   updateCompany: (company) => request('POST', '/admin/companies/update', company),
   /** Admin: archive (delete) a company — data retained, name freed. */
   deleteCompany: (id) => request('POST', '/admin/companies/delete', { id }),
+  /** Admin: run the D1 → Sheets backup on demand. */
+  runBackup: () => request('POST', '/admin/backup', {}),
   /** Owner/admin: read this shop's per-business (ledger) settings. */
   getLedgerSettings: () => request('GET', '/business/settings'),
   /** Owner/admin: save per-business (ledger) settings ([{label, value}]). */

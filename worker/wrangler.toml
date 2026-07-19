@@ -12,6 +12,16 @@ compatibility_date = "2024-09-01"
 CORE_SPREADSHEET_ID = "1-T-R_5BJmaeHv3fkqGSI06xKc9yXgI3pVqXQ1DzgiGk"
 GOOGLE_CLIENT_ID = "987037150604-djt5q7a16kgs77jvc8lnhrk74p76u5oj.apps.googleusercontent.com"
 ALLOWED_ORIGIN = "https://meretheec.github.io,http://localhost:5173"
+# Operator-owned backup Sheet for the scheduled D1 mirror. Leave blank to
+# disable the backup. It must be a DIFFERENT Sheet, shared with EDIT access to
+# the service-account email. See docs/SETUP.md → "Data backup".
+BACKUP_SPREADSHEET_ID = ""
+
+# Cron Trigger — the slow backup cadence (D1 → the backup Sheet). Daily at
+# 06:00 UTC; adjust to taste (this is deliberately far less frequent than the
+# live app writes). Requires BACKUP_SPREADSHEET_ID to be set to do anything.
+[triggers]
+crons = ["0 6 * * *"]
 
 # SECRET (never in this file) — set once with:
 #   wrangler secret put SA_KEY

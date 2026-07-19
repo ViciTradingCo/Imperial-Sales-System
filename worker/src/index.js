@@ -30,6 +30,7 @@ import { readHolds } from './holds.js';
 import { checkCertification } from './cert.js';
 import { checkout, listSales, voidSale } from './sales.js';
 import { renameBusinessData, ensureSchema } from './db.js';
+import { runBackup } from './backup.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -199,6 +200,12 @@ async function handleUpdateCompany(request, env, body) {
 async function handleDeleteCompany(request, env, body) {
   await requireAdmin(request, env);
   return { companies: await archiveCompany(env, body.id) };
+}
+
+/** Admin-only: run the D1 → Sheets backup on demand (the cron does it on a schedule). */
+async function handleRunBackup(request, env) {
+  await requireAdmin(request, env);
+  return await runBackup(env);
 }
 
 async function handleSaveSettings(request, env, body) {
@@ -391,6 +398,7 @@ export default {
             clientId: !!env.GOOGLE_CLIENT_ID,
             saKey: !!env.SA_KEY,
             db,
+            backup: !!(env.BACKUP_SPREADSHEET_ID && String(env.BACKUP_SPREADSHEET_ID).trim()),
           },
           time: new Date().toISOString(),
         }, 200, cors);
@@ -454,6 +462,10 @@ export default {
       if (request.method === 'POST' && path === '/admin/companies/delete') {
         const body = await readJsonBody(request);
         return json(await handleDeleteCompany(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/backup') {
+        return json(await handleRunBackup(request, env), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/business/settings') {
@@ -526,5 +538,17 @@ export default {
       else if (/token|bearer|verified|audience|expired|issuer/i.test(msg)) status = 401;
       return json({ error: msg }, status, cors);
     }
+  },
+
+  /**
+   * Cron Trigger (wrangler.toml [triggers]) — the slow, operator-owned backup.
+   * Runs off the request path; errors are logged, not surfaced (no client).
+   */
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(
+      runBackup(env)
+        .then((r) => console.log('Scheduled backup:', JSON.stringify(r)))
+        .catch((e) => console.error('Scheduled backup failed:', e && e.message ? e.message : String(e)))
+    );
   },
 };

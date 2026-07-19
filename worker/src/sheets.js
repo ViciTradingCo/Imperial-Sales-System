@@ -52,6 +52,16 @@ export async function updateRange(env, spreadsheetId, range, rows) {
   });
 }
 
+/** Clears the values in a range (leaves formatting/tab intact). */
+export async function clearRange(env, spreadsheetId, range) {
+  const url = `${BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:clear`;
+  return authFetch(env, url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+}
+
 /**
  * Creates a new spreadsheet owned by the service account, with the named tabs.
  * NOTE: on a personal Google project a service account usually CANNOT create

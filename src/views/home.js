@@ -6,6 +6,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { navigate } from '../lib/router.js';
 import { setActions } from '../lib/actions.js';
+import { api } from '../lib/api.js';
 
 const ROLE_SECTIONS = {
   admin: [
@@ -45,7 +46,29 @@ export function renderHome(container, { me }) {
       { label: 'Member List', onClick: () => navigate('/admin/members') },
       { label: 'Company List', onClick: () => navigate('/admin/companies') },
       { label: 'Network Settings', onClick: () => navigate('/admin/settings') },
+      { label: 'Back up now', onClick: backupNow },
     ]);
+  }
+}
+
+/** Runs the D1 → Sheets backup on demand and reports the result. */
+async function backupNow(e) {
+  const btn = e && e.currentTarget;
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Backing up…'; }
+  try {
+    const r = await api.runBackup();
+    if (r && r.ok) {
+      window.alert('Backup complete (' + r.at + ')\n\n' +
+        'Sales: ' + r.sales + '\nIntake: ' + r.intake + '\nInventory: ' + r.inventory);
+    } else {
+      window.alert('Backup not run: ' + ((r && r.skipped) || 'unknown reason') +
+        '\n\nSet BACKUP_SPREADSHEET_ID (see docs/SETUP.md) to enable it.');
+    }
+  } catch (err) {
+    window.alert('Backup failed: ' + (err.message || String(err)));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
   }
 }
 

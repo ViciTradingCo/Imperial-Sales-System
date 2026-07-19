@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.7', notes: [
+    'Scheduled backup mirrors the live data into a Google Sheet you control.',
+    'Admins can run a backup on demand from Home.',
+  ] },
   { version: '1.6', notes: [
     'Admins can delete members and companies from the admin lists.',
     'Deleting a company archives it — market data kept, name freed, records sealed.',

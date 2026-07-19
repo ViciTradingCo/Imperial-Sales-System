@@ -135,10 +135,27 @@ yet" message; everything else works.
    automatically. (It safely no-ops until the binding exists.)
 5. Sign in as an **owner** → **Inventory** → add an item. If it saves, D1 is live.
 
-### Backup sheet (optional but recommended)
-Create a separate Google Sheet, paste `EEC_Backup_Manager.gs` into its Apps
-Script, run its setup, and share it with the service account. A scheduled export
-(added in a later slice) mirrors D1 into it as a backup you control.
+### Data backup (optional but recommended)
+
+The Worker mirrors the live D1 store (sales, intake, inventory) into a Google
+Sheet **you** own, on a slow schedule (a Cloudflare Cron Trigger — daily at
+06:00 UTC by default; change `crons` in `worker/wrangler.toml`). D1 stays the
+source of truth; this is an operator-controlled copy for safekeeping and
+off-platform analysis. Each run is a full mirror, so the Sheet never drifts.
+
+To enable it:
+
+1. **Create a separate Google Sheet** (not the Core) — this is your backup.
+2. **Share** it with the service account's `client_email`, **Editor** access.
+3. Copy its **spreadsheet ID** (the long id in its URL, between `/d/` and `/edit`).
+4. Set it as `BACKUP_SPREADSHEET_ID` in `worker/wrangler.toml` `[vars]` and
+   redeploy the Worker. Leaving it blank disables the backup (the app still runs).
+5. The Worker creates the tabs itself: `Backup_Sales`, `Backup_Intake`,
+   `Backup_Inventory`, and a `Backup_Meta` tab with the last-run time + row counts.
+
+Verify without waiting for the cron: sign in as an **admin** → **Home** →
+**Back up now**. It reports the rows written (or tells you it's not configured).
+`GET /health` also shows `configured.backup: true` once the ID is set.
 
 ## What lives where (security summary)
 
