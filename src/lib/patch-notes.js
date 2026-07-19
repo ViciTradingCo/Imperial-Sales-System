@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.2', notes: [
+    'Currency shown in gold pieces (gp).',
+    'Stay signed in across reloads; Sign Out on the top bar / menu.',
+  ] },
   { version: '1.1', notes: [
     'Admin: Member List and Company List pages.',
     'Admin can edit a company’s name and subscription.',

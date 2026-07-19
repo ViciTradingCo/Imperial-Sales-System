@@ -49,7 +49,10 @@ export function initAuth(clientId) {
           profile = decodePayload(idToken);
           emit();
         },
-        auto_select: false,
+        // Persistent session: silently re-issue a token for a returning user on
+        // reload (Google tokens last ~1h; this re-auths without a click). An
+        // explicit Sign Out calls disableAutoSelect so it stays signed out.
+        auto_select: true,
       });
       initialized = true;
       resolve();

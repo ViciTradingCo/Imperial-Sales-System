@@ -9,6 +9,7 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
 import { setActions } from '../lib/actions.js';
+import { money } from '../lib/format.js';
 
 export function renderPos(container, { me }) {
   setActions([{ label: 'Order Lookup', onClick: () => openLookupModal() }]);
@@ -36,9 +37,9 @@ export function renderPos(container, { me }) {
   function renderSale(canSell) {
     const itemSel = el('select', {}, el('option', { value: '' }, 'Pick an item…'));
     inventory.forEach((it) => itemSel.appendChild(
-      el('option', { value: it.item }, it.item + ' ($' + Number(it.price).toFixed(2) + ', ' + it.stock + ' in stock)')));
+      el('option', { value: it.item }, it.item + ' (' + money(it.price) + ', ' + it.stock + ' in stock)')));
     const qty = el('input', { type: 'number', min: '1', step: '1', value: '1' });
-    const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: 'Sold for (per item)' });
+    const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: 'Sold for per item (gp)' });
     itemSel.addEventListener('change', () => {
       const it = inventory.find((x) => x.item === itemSel.value);
       if (it) price.value = String(it.price);
@@ -62,12 +63,12 @@ export function renderPos(container, { me }) {
     function renderCart() {
       if (!cart.length) { mount(cartHost, el('p', { class: 'note' }, 'Cart is empty.')); return; }
       const rows = cart.map((line, i) => el('div.emp-row', {}, [
-        el('span', { html: '<b>' + esc(line.item) + '</b> ×' + line.qty + ' @ $' + Number(line.price).toFixed(2) +
-          ' = $' + (line.qty * line.price).toFixed(2) }),
+        el('span', { html: '<b>' + esc(line.item) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
+          ' = ' + money(line.qty * line.price) }),
         el('button.secondary-btn.small', { onclick: () => { cart.splice(i, 1); renderCart(); } }, 'Remove'),
       ]));
       const total = cart.reduce((s, l) => s + l.qty * l.price, 0);
-      rows.push(el('p', { html: '<b>Subtotal: $' + total.toFixed(2) + '</b>' }));
+      rows.push(el('p', { html: '<b>Subtotal: ' + money(total) + '</b>' }));
       mount(cartHost, ...rows);
     }
 
@@ -98,7 +99,7 @@ export function renderPos(container, { me }) {
         renderCart();
         customer.value = ''; discName.value = ''; discPct.value = '';
         // Keep the hold selected for quick back-to-back sales.
-        setStatus('Sale complete ✓ — ' + res.orderNo + ' · $' + Number(res.total).toFixed(2), 'ok');
+        setStatus('Sale complete ✓ — ' + res.orderNo + ' · ' + money(res.total), 'ok');
         complete.disabled = false;
         // Refresh stock counts in the item dropdown.
         api.getInventory().then((inv) => {
@@ -107,7 +108,7 @@ export function renderPos(container, { me }) {
           itemSel.innerHTML = '';
           itemSel.appendChild(el('option', { value: '' }, 'Pick an item…'));
           inventory.forEach((it) => itemSel.appendChild(
-            el('option', { value: it.item }, it.item + ' ($' + Number(it.price).toFixed(2) + ', ' + it.stock + ' in stock)')));
+            el('option', { value: it.item }, it.item + ' (' + money(it.price) + ', ' + it.stock + ' in stock)')));
           itemSel.value = keep;
         }).catch(() => {});
       } catch (e) {
@@ -121,7 +122,7 @@ export function renderPos(container, { me }) {
         el('h3', {}, 'Add to order'),
         el('label', {}, 'Item'), itemSel,
         el('label', {}, 'Quantity'), qty,
-        el('label', {}, 'Sold for (per item)'), price,
+        el('label', {}, 'Sold for per item (gp)'), price,
         addBtn,
       ]),
       el('div.card', {}, [el('h3', {}, 'Order'), cartHost]),
@@ -162,7 +163,7 @@ function openLookupModal() {
       const card = el('div', { class: 'lookup-card' }, [
         el('p', { html:
           '<b>' + esc(s.orderNo) + '</b>' + (voided ? ' <span class="bad">VOIDED</span>' : '') + '<br>' +
-          '$' + Number(s.total).toFixed(2) + ' · ' + esc(s.customer || 'Walk-in') + ' · ' + esc(s.hold || '') + '<br>' +
+          money(s.total) + ' · ' + esc(s.customer || 'Walk-in') + ' · ' + esc(s.hold || '') + '<br>' +
           '<span class="note">' + esc(s.items || '') + '</span><br>' +
           '<span class="note">by ' + esc(s.employee || '') + (s.discount ? ' · ' + esc(s.discount) : '') + '</span>' }),
       ]);

@@ -129,6 +129,19 @@ body.has-nav .sidenav { display: flex; }
 .sidenav button:hover { background: var(--paper-raised); }
 .sidenav button.active { background: var(--accent); color: var(--header-text); font-weight: bold; }
 
+/* Sign Out: by the nameplate on desktop, in the drawer on mobile. */
+.nav-signout { display: none; }
+@media (max-width: 720px) {
+  .topbar-signout { display: none; }
+  body.has-nav .nav-signout {
+    display: block; width: 100%; text-align: left;
+    font: inherit; font-size: 15px; background: none; border: none;
+    color: var(--bad); cursor: pointer; padding: 10px 12px;
+    border-radius: var(--radius); margin-top: 8px;
+    border-top: 1px solid rgba(122, 74, 31, 0.2);
+  }
+}
+
 .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 40; }
 
 /* ---- modal (focus window) ---- */

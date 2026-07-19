@@ -12,6 +12,7 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
 import { setActions } from '../lib/actions.js';
+import { money } from '../lib/format.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
@@ -42,7 +43,7 @@ export function renderInventory(container, { me }) {
     if (!items.length) { mount(listHost, el('p', { class: 'note' }, 'No items yet.')); return; }
     const rows = items.map((it) => {
       const meta = el('span', { html:
-        '<b>' + esc(it.item) + '</b> · $' + Number(it.price).toFixed(2) +
+        '<b>' + esc(it.item) + '</b> · ' + money(it.price) +
         ' · ' + it.stock + ' in stock · ' + statusTag(it.status) });
       const row = el('div.emp-row', {}, [meta]);
       if (canEdit) {
@@ -66,7 +67,7 @@ export function renderInventory(container, { me }) {
     if (!list.length) { mount(intakeHost, el('p', { class: 'note' }, 'No intake recorded yet.')); return; }
     mount(intakeHost, ...list.map((r) => el('div.emp-row', {}, [
       el('span', { html:
-        '<b>' + esc(r.item) + '</b> ×' + r.numItems + ' @ $' + Number(r.pricePer).toFixed(2) +
+        '<b>' + esc(r.item) + '</b> ×' + r.numItems + ' @ ' + money(r.pricePer) +
         (r.hold ? ' · ' + esc(r.hold) : '') + (r.vendor ? ' · ' + esc(r.vendor) : '') +
         ' <span class="note">' + esc(shortDate(r.ts)) + '</span>' }),
     ])));
@@ -135,7 +136,7 @@ function openIntakeModal(onRecorded) {
   const vendor = el('input', { type: 'text', placeholder: 'Vendor (who you bought from)' });
   const hold = el('select', {}, el('option', { value: '' }, 'Select a hold…'));
   const qty = el('input', { type: 'number', step: '1', min: '1', placeholder: '# of items' });
-  const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: '$ per item' });
+  const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'gp per item' });
   const status = el('p', {});
   const save = el('button.primary', { onclick: doRecord }, 'Record intake');
 
@@ -173,7 +174,7 @@ function openIntakeModal(onRecorded) {
     el('label', {}, 'Vendor'), vendor,
     el('label', {}, 'Hold purchased in'), hold,
     el('label', {}, '# of items'), qty,
-    el('label', {}, '$ per item'), per,
+    el('label', {}, 'Price per item (gp)'), per,
     save,
     status,
   ]);

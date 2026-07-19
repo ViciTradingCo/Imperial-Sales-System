@@ -50,10 +50,12 @@ navToggle.addEventListener('click', () => {
 backdrop.addEventListener('click', closeDrawer);
 
 // ---- nav / badge ---------------------------------------------------------
+function doSignOut() { signOut(); location.reload(); }
+
 function showNav(on) {
   document.body.classList.toggle('has-nav', on);
   if (on) {
-    renderNav(navEl, state.me, closeDrawer);
+    renderNav(navEl, state.me, closeDrawer, doSignOut);
     renderPatchNotes(patchEl);
   } else {
     navEl.innerHTML = '';
@@ -70,10 +72,14 @@ function renderBadge() {
   const role = registered ? state.me.role : 'guest';
   const who = (registered && state.me.character) || state.profile.name || state.profile.email || 'Signed in';
   if (registered) {
-    mount(badgeEl, el('button', { class: 'badge-chip', onclick: () => navigate('/profile') }, [
-      el('span', {}, who + ' · '),
-      el('span', { class: 'role-pill' }, role),
-    ]));
+    mount(badgeEl,
+      el('button', { class: 'badge-chip', onclick: () => navigate('/profile') }, [
+        el('span', {}, who + ' · '),
+        el('span', { class: 'role-pill' }, role),
+      ]),
+      // Desktop sign-out sits by the nameplate; on mobile it's in the drawer.
+      el('button', { class: 'topbar-signout', onclick: doSignOut }, 'Sign Out'),
+    );
   } else {
     mount(badgeEl,
       el('span', {}, who + ' · '),

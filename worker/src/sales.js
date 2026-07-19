@@ -10,13 +10,16 @@
 import { getDb } from './db.js';
 import { checkCertification } from './cert.js';
 
-/** "Name x2 @ $30, Other x1 @ $5" -> [{name, qty, price}], counting failures. */
+/**
+ * "Name x2 @ 30gp, Other x1 @ 5gp" -> [{name, qty, price}], counting failures.
+ * Tolerant of the legacy "@ $30" form too, so older rows still void correctly.
+ */
 export function parseSaleItems(field) {
   const out = { lines: [], unparsed: 0 };
   String(field || '').split(',').forEach((seg) => {
     seg = seg.trim();
     if (!seg) return;
-    const m = seg.match(/^(.*) x(\d+) @ \$([0-9]+(?:\.[0-9]+)?)$/);
+    const m = seg.match(/^(.*) x(\d+) @ \$?([0-9]+(?:\.[0-9]+)?)(?:gp)?$/);
     if (m) { out.lines.push({ name: m[1].trim(), qty: Number(m[2]), price: Number(m[3]) }); return; }
     out.unparsed++;
   });
@@ -85,7 +88,7 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     : '';
 
   const orderNo = 'ORD-' + stamp(new Date());
-  const itemSummary = lines.map((l) => l.name + ' x' + l.qty + ' @ $' + l.price).join(', ');
+  const itemSummary = lines.map((l) => l.name + ' x' + l.qty + ' @ ' + l.price + 'gp').join(', ');
   const ts = new Date().toISOString();
   const employee = caller.character || caller.email;
 

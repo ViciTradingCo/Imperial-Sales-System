@@ -19,8 +19,10 @@ export function navItems(me) {
   return items;
 }
 
-/** Renders the nav buttons into `navEl`. `onNavigate` runs after each click. */
-export function renderNav(navEl, me, onNavigate) {
+/** Renders the nav buttons into `navEl`. `onNavigate` runs after each click.
+ *  `onSignOut`, when given, adds a Sign Out entry (shown only in the mobile
+ *  drawer — desktop has sign-out by the nameplate). */
+export function renderNav(navEl, me, onNavigate, onSignOut) {
   navEl.innerHTML = '';
   navItems(me).forEach((it) => {
     const b = document.createElement('button');
@@ -32,6 +34,13 @@ export function renderNav(navEl, me, onNavigate) {
     });
     navEl.appendChild(b);
   });
+  if (onSignOut) {
+    const out = document.createElement('button');
+    out.className = 'nav-signout';
+    out.textContent = 'Sign Out';
+    out.addEventListener('click', onSignOut);
+    navEl.appendChild(out);
+  }
   highlightNav(navEl);
 }
 
