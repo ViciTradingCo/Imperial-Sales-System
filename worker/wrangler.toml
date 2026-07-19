@@ -17,10 +17,8 @@ ALLOWED_ORIGIN = "https://meretheec.github.io,http://localhost:5173"
 #   wrangler secret put SA_KEY
 # Paste the entire service-account JSON key when prompted.
 
-# D1 (the live transactional store for inventory/sales/intake). Uncomment and
-# fill in database_id after creating the D1 database (see docs/SETUP.md Part 5).
-# Leaving it commented keeps deploys working until D1 is set up.
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "eec-ledger"
-# database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+# D1 (the live transactional store for inventory/sales/intake).
+[[d1_databases]]
+binding = "DB"
+database_name = "eec-ledger"
+database_id = "6749b2d0-e59f-4fb2-8d92-d1e2c5716b6b"
