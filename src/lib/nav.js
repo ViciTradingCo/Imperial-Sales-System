@@ -8,7 +8,7 @@ import { navigate, currentPath } from './router.js';
 
 /** The nav destinations available to a given user, in order. */
 export function navItems(me) {
-  const items = [{ path: '/', label: 'Home' }];
+  const items = [{ path: '/', label: me.role === 'admin' ? 'Admin Panel' : 'Home' }];
   // Register / Inventory / Employees live on an action bar: on Home for
   // owners/employees, and on the Business Operations page for admins.
   if (me.role === 'admin') items.push({ path: '/operations', label: 'Business Operations' });
