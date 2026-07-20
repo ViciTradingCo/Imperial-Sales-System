@@ -12,6 +12,9 @@ export function navItems(me) {
   // Register / Inventory / Employees live on an action bar: on Home for
   // owners/employees, and on the Business Operations page for admins.
   if (me.role === 'admin') items.push({ path: '/operations', label: 'Business Operations' });
+  if (me.role === 'admin') items.push({ path: '/admin/market', label: 'Market Analysis' });
+  // Court businesses get a report for their own hold.
+  if (me.court && me.role !== 'admin') items.push({ path: '/hold-report', label: 'Hold Report' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });
   items.push({ path: '/profile', label: 'Profile' });
   items.push({ path: '/patch-notes', label: 'Patch Notes' });

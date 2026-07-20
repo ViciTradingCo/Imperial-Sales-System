@@ -24,6 +24,7 @@ import { renderAdminSettings } from './views/admin-settings.js';
 import { renderMembers } from './views/members.js';
 import { renderCompanies } from './views/companies.js';
 import { renderMarket } from './views/market.js';
+import { renderHoldReport } from './views/hold-report.js';
 import { renderLedgerSettings } from './views/ledger-settings.js';
 
 const appEl = document.getElementById('app');
@@ -192,9 +193,21 @@ route('/admin/companies', (container) => {
   renderCompanies(container);
 });
 
-route('/admin/market', (container) => {
-  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderMarket(container);
+function adminMarket(tab) {
+  return (container) => {
+    if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+    renderMarket(container, { tab });
+  };
+}
+route('/admin/market', adminMarket('overview'));
+route('/admin/market/items', adminMarket('items'));
+route('/admin/market/holds', adminMarket('holds'));
+route('/admin/market/companies', adminMarket('companies'));
+
+route('/hold-report', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  if (!state.me.court) { navigate('/'); return; }
+  renderHoldReport(container);
 });
 
 route('/ledger/settings', (container) => {

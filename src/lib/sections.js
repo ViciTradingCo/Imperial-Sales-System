@@ -35,9 +35,18 @@ export function setAdminActions() {
   setActions(mark([
     { label: 'Member List', path: '/admin/members', onClick: () => navigate('/admin/members') },
     { label: 'Company List', path: '/admin/companies', onClick: () => navigate('/admin/companies') },
-    { label: 'Market Analysis', path: '/admin/market', onClick: () => navigate('/admin/market') },
     { label: 'Network Settings', path: '/admin/settings', onClick: () => navigate('/admin/settings') },
     { label: 'Back up now', onClick: backupNow },
+  ]));
+}
+
+/** Market Analysis sub-page bar (Overview / Item / Hold / Company performance). */
+export function setMarketActions() {
+  setActions(mark([
+    { label: 'Overview', path: '/admin/market', onClick: () => navigate('/admin/market') },
+    { label: 'Item Performance', path: '/admin/market/items', onClick: () => navigate('/admin/market/items') },
+    { label: 'Hold Performance', path: '/admin/market/holds', onClick: () => navigate('/admin/market/holds') },
+    { label: 'Company Performance', path: '/admin/market/companies', onClick: () => navigate('/admin/market/companies') },
   ]));
 }
 

@@ -52,6 +52,24 @@ export async function findBusinessByName(env, name) {
   return null;
 }
 
+/** Returns a business's Hold and Court flag from the registry ({ hold, court }). */
+export async function findBusinessMeta(env, name) {
+  const target = String(name || '').trim().toLowerCase();
+  if (!target) return { hold: '', court: false };
+  let rows;
+  try {
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
+  } catch (e) {
+    return { hold: '', court: false };
+  }
+  for (const r of rows) {
+    if (String(r[2] || '').trim().toLowerCase() === target) {
+      return { hold: String(r[10] || '').trim(), court: String(r[11]).trim().toUpperCase() === 'TRUE' };
+    }
+  }
+  return { hold: '', court: false };
+}
+
 /** Appends a business row to Certified Users (subscription/sync columns left for the admin + sync to fill). */
 async function appendBusiness(env, { ledgerId, businessName, pointOfContact, hold }) {
   await appendRows(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A1`, [[

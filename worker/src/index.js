@@ -20,7 +20,7 @@
  */
 import { verifyIdToken } from './verify.js';
 import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, deleteMember, setUserStatus, setUserCharacter, setUserNote, touchLastSeen, USERS_SHEET } from './users.js';
-import { registerUser, renameBusiness, listCompanies, updateCompany, archiveCompany } from './registry.js';
+import { registerUser, renameBusiness, listCompanies, updateCompany, archiveCompany, findBusinessMeta } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
@@ -29,9 +29,9 @@ import { recordIntake, listIntake } from './intake.js';
 import { readHolds } from './holds.js';
 import { checkCertification } from './cert.js';
 import { checkout, listSales, voidSale } from './sales.js';
-import { renameBusinessData, ensureSchema } from './db.js';
+import { renameBusinessData, ensureSchema, clearLogs } from './db.js';
 import { runBackup } from './backup.js';
-import { marketAnalysis } from './market.js';
+import { marketAnalysis, holdReport } from './market.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -109,7 +109,8 @@ async function handleMe(request, env) {
     return { registered: false, email: payload.email, name: payload.name || '' };
   }
   touchLastSeen(env, user.row); // fire-and-forget
-  return publicUser(user);
+  const meta = await findBusinessMeta(env, user.business);
+  return publicUser(user, { court: meta.court, hold: meta.hold });
 }
 
 /** Lets a signed-in user edit their own profile (currently the character name). */
@@ -237,6 +238,24 @@ async function handleRunBackup(request, env) {
 async function handleMarket(request, env) {
   await requireAdmin(request, env);
   return await marketAnalysis(env);
+}
+
+/** Admin-only: wipe the sales + intake logs across the whole network. */
+async function handleClearLogs(request, env) {
+  await requireAdmin(request, env);
+  return await clearLogs(env);
+}
+
+/** Court businesses only: the market report for their own hold. */
+async function handleHoldReport(request, env) {
+  const caller = await requireRegistered(request, env);
+  const meta = await findBusinessMeta(env, caller.business);
+  if (!meta.court) {
+    const e = new Error('This report is available to Court businesses only.');
+    e.forbidden = true;
+    throw e;
+  }
+  return await holdReport(env, meta.hold);
 }
 
 async function handleSaveSettings(request, env, body) {
@@ -506,6 +525,14 @@ export default {
 
       if (request.method === 'GET' && path === '/admin/market') {
         return json(await handleMarket(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/logs/clear') {
+        return json(await handleClearLogs(request, env), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/market/hold') {
+        return json(await handleHoldReport(request, env), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/business/settings') {

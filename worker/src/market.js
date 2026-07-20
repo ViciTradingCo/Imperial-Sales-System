@@ -12,6 +12,21 @@
  *   • lowStock    — items at or below their own low-stock threshold.
  */
 import { getDb } from './db.js';
+import { parseSaleItems } from './sales.js';
+
+/** Aggregates per-item sales from the stored item summaries ({item, qty, revenue, orders}). */
+function itemStats(saleRows) {
+  const map = {};
+  (saleRows || []).forEach((r) => {
+    parseSaleItems(r.items).lines.forEach((l) => {
+      const m = map[l.name] || (map[l.name] = { item: l.name, qty: 0, revenue: 0, orders: 0 });
+      m.qty += l.qty;
+      m.revenue += l.qty * l.price;
+      m.orders += 1;
+    });
+  });
+  return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+}
 
 export async function marketAnalysis(env) {
   const db = await getDb(env);
@@ -62,5 +77,35 @@ export async function marketAnalysis(env) {
       ORDER BY (low_stock - stock) DESC
       LIMIT 50`).all()).results) || [];
 
-  return { overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, holds, underpriced, lowStock };
+  const saleRows = ((await db.prepare(
+    `SELECT items FROM sales WHERE status != 'VOIDED'`).all()).results) || [];
+  const items = itemStats(saleRows);
+
+  return { overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, holds, items, underpriced, lowStock };
+}
+
+/**
+ * A single hold's report — the slice a Court oversees. Scoped to sales made in
+ * that hold: overview, the shops trading there, and the items moving there.
+ */
+export async function holdReport(env, hold) {
+  const db = await getDb(env);
+  const h = String(hold || '').trim();
+  if (!h) return { hold: '', overview: { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses: [], items: [] };
+
+  const overview = await db.prepare(
+    `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
+            COALESCE(SUM(qty_total), 0) AS itemsSold, COUNT(DISTINCT business) AS activeShops
+       FROM sales WHERE status != 'VOIDED' AND hold = ?`).bind(h).first();
+
+  const businesses = ((await db.prepare(
+    `SELECT business, COUNT(*) AS orders,
+            COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
+       FROM sales WHERE status != 'VOIDED' AND hold = ?
+      GROUP BY business ORDER BY revenue DESC LIMIT 200`).bind(h).all()).results) || [];
+
+  const saleRows = ((await db.prepare(
+    `SELECT items FROM sales WHERE status != 'VOIDED' AND hold = ?`).bind(h).all()).results) || [];
+
+  return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: itemStats(saleRows) };
 }

@@ -53,6 +53,19 @@ export async function getDb(env) {
   return env.DB;
 }
 
+/**
+ * Clears the transactional LOGS (sales + intake) across the whole network. The
+ * inventory catalog is kept (it's current state, not a log). Returns the counts
+ * that were cleared.
+ */
+export async function clearLogs(env) {
+  const db = await getDb(env);
+  const sales = (await db.prepare('SELECT COUNT(*) AS n FROM sales').first()).n;
+  const intake = (await db.prepare('SELECT COUNT(*) AS n FROM intake').first()).n;
+  await db.batch([db.prepare('DELETE FROM sales'), db.prepare('DELETE FROM intake')]);
+  return { sales, intake };
+}
+
 /** Renames a business across the D1 tables (part of a full company rename). */
 export async function renameBusinessData(env, oldName, newName) {
   if (!env.DB) return;

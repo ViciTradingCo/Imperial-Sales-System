@@ -1,57 +1,100 @@
 /**
- * Market Analysis (admin) — network-wide performance and anomaly alerts over the
- * D1 store. Read-only. The API enforces admin-only access.
+ * Market Analysis (admin) — network-wide analytics, split into sub-pages reached
+ * from the action bar: Overview, Item Performance, Hold Performance, Company
+ * Performance. Read-only; the API enforces admin-only access.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { money } from '../lib/format.js';
-import { setAdminActions } from '../lib/sections.js';
+import { setMarketActions } from '../lib/sections.js';
 
-export function renderMarket(container) {
-  setAdminActions(); // keep the admin tools on the bar across sub-pages
+export function renderMarket(container, { tab } = {}) {
+  setMarketActions();
   const host = el('div', {}, el('p', { class: 'note' }, 'Crunching the numbers…'));
   mount(container, el('div.card', {}, [
-    el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Market Analysis'),
     el('p', { class: 'note' }, 'Network-wide performance across every shop. Voided sales are excluded.'),
     host,
   ]));
 
   api.getMarket()
-    .then(render)
+    .then((d) => renderTab(host, tab || 'overview', d))
     .catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
-
-  function render(d) {
-    const o = d.overview || {};
-    mount(host,
-      statTiles([
-        ['Revenue', money(o.revenue)],
-        ['Orders', String(o.orders || 0)],
-        ['Items sold', String(o.itemsSold || 0)],
-        ['Active shops', String(o.activeShops || 0)],
-      ]),
-      tableCard('Performance by business', ['Business', 'Orders', 'Items', 'Revenue'],
-        (d.businesses || []).map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
-        'No sales recorded yet.'),
-      tableCard('By hold', ['Hold', 'Orders', 'Items', 'Revenue'],
-        (d.holds || []).map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
-        'No sales with a hold recorded yet.'),
-      alertsCard('⚠ Priced below cost', 'bad',
-        (d.underpriced || []).map((u) =>
-          '<b>' + esc(u.business) + '</b> · ' + esc(u.item) + ' — selling at ' +
-          money(u.salePrice) + ' vs. avg cost ' + money(u.avgCost)),
-        'No items are priced below their purchase cost.'),
-      alertsCard('Low stock', 'warn',
-        (d.lowStock || []).map((s) =>
-          '<b>' + esc(s.business) + '</b> · ' + esc(s.item) + ' — ' + s.stock +
-          ' left (threshold ' + s.lowStock + ')'),
-        'No items are low on stock.'),
-    );
-  }
 }
 
-function statTiles(pairs) {
+function renderTab(host, tab, d) {
+  if (tab === 'items') return mount(host, itemPerformance(d.items || []));
+  if (tab === 'holds') return mount(host, holdPerformance(d.holds || []));
+  if (tab === 'companies') return mount(host, companyPerformance(d.businesses || []));
+  return mount(host, ...overview(d));
+}
+
+/* ---- Overview: top 5 of each category + alerts ---- */
+function overview(d) {
+  const o = d.overview || {};
+  return [
+    statTiles([
+      ['Revenue', money(o.revenue)],
+      ['Orders', String(o.orders || 0)],
+      ['Items sold', String(o.itemsSold || 0)],
+      ['Active shops', String(o.activeShops || 0)],
+    ]),
+    tableCard('Top 5 companies', ['Company', 'Orders', 'Items', 'Revenue'],
+      (d.businesses || []).slice(0, 5).map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
+      'No sales recorded yet.'),
+    tableCard('Top 5 holds', ['Hold', 'Orders', 'Items', 'Revenue'],
+      (d.holds || []).slice(0, 5).map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
+      'No sales with a hold recorded yet.'),
+    tableCard('Top 5 items', ['Item', 'Qty sold', 'Revenue'],
+      (d.items || []).slice(0, 5).map((i) => [i.item, i.qty, money(i.revenue)]),
+      'No items sold yet.'),
+    alertsCard('⚠ Priced below cost', 'bad',
+      (d.underpriced || []).map((u) =>
+        '<b>' + esc(u.business) + '</b> · ' + esc(u.item) + ' — selling at ' +
+        money(u.salePrice) + ' vs. avg cost ' + money(u.avgCost)),
+      'No items are priced below their purchase cost.'),
+    alertsCard('Low stock', 'warn',
+      (d.lowStock || []).map((s) =>
+        '<b>' + esc(s.business) + '</b> · ' + esc(s.item) + ' — ' + s.stock +
+        ' left (threshold ' + s.lowStock + ')'),
+      'No items are low on stock.'),
+  ];
+}
+
+/* ---- Item Performance: searchable ---- */
+function itemPerformance(items) {
+  const search = el('input', { type: 'text', placeholder: 'Search items…' });
+  const tableHost = el('div', {});
+  function draw() {
+    const q = search.value.trim().toLowerCase();
+    const rows = items.filter((i) => !q || i.item.toLowerCase().includes(q));
+    mount(tableHost, rows.length
+      ? el('div', { class: 'table-scroll' }, tableEl(['Item', 'Qty sold', 'Orders', 'Revenue'],
+          rows.map((i) => [i.item, i.qty, i.orders, money(i.revenue)])))
+      : el('p', { class: 'note' }, items.length ? 'No items match your search.' : 'No items sold yet.'));
+  }
+  search.addEventListener('input', draw);
+  draw();
+  return el('div.card', {}, [el('h3', {}, 'Item Performance'), search, tableHost]);
+}
+
+/* ---- Hold Performance ---- */
+function holdPerformance(holds) {
+  return tableCard('Hold Performance', ['Hold', 'Orders', 'Items', 'Revenue'],
+    holds.map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
+    'No sales with a hold recorded yet.');
+}
+
+/* ---- Company Performance ---- */
+function companyPerformance(businesses) {
+  return tableCard('Company Performance', ['Company', 'Orders', 'Items', 'Revenue'],
+    businesses.map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
+    'No sales recorded yet.');
+}
+
+/* ---- shared bits ---- */
+export function statTiles(pairs) {
   return el('div', { class: 'stat-row' }, pairs.map(([label, value]) =>
     el('div', { class: 'stat-tile' }, [
       el('div', { class: 'stat-value' }, value),
@@ -59,14 +102,14 @@ function statTiles(pairs) {
     ])));
 }
 
-function tableCard(title, headers, rows, emptyMsg) {
+export function tableCard(title, headers, rows, emptyMsg) {
   const body = rows.length
     ? el('div', { class: 'table-scroll' }, tableEl(headers, rows))
     : el('p', { class: 'note' }, emptyMsg);
   return el('div.card', {}, [el('h3', {}, title), body]);
 }
 
-function tableEl(headers, rows) {
+export function tableEl(headers, rows) {
   const thead = el('tr', {}, headers.map((h) => el('th', {}, h)));
   const trs = rows.map((r) => el('tr', {}, r.map((c) => el('td', {}, String(c)))));
   return el('table', { class: 'data-table' }, [el('thead', {}, thead), el('tbody', {}, trs)]);

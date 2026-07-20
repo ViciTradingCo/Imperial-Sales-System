@@ -73,6 +73,10 @@ export const api = {
   runBackup: () => request('POST', '/admin/backup', {}),
   /** Admin: network-wide market analytics. */
   getMarket: () => request('GET', '/admin/market'),
+  /** Admin: wipe all sales + intake logs across the network. */
+  clearLogs: () => request('POST', '/admin/logs/clear', {}),
+  /** Court businesses: the market report for their own hold. */
+  getHoldReport: () => request('GET', '/market/hold'),
   /** Owner/admin: read this shop's per-business (ledger) settings. */
   getLedgerSettings: () => request('GET', '/business/settings'),
   /** Owner/admin: save per-business (ledger) settings ([{label, value}]). */
