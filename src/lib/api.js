@@ -111,6 +111,10 @@ export const api = {
   createTransfer: (t) => request('POST', '/transfers', t),
   /** Owner/admin: accept an incoming transfer into your inventory. */
   acceptTransfer: (id) => request('POST', '/transfers/accept', { id }),
+  /** Owner/admin (sender): cancel an outgoing transfer — goods return to you. */
+  cancelTransfer: (id) => request('POST', '/transfers/cancel', { id }),
+  /** Owner/admin (receiver): decline an incoming transfer — goods return to sender. */
+  declineTransfer: (id) => request('POST', '/transfers/decline', { id }),
   /** The network hold list. */
   getHolds: () => request('GET', '/holds'),
   /** Recent intake transactions for the caller's business. */

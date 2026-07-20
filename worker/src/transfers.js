@@ -69,6 +69,43 @@ export async function acceptTransfer(env, business, id) {
   return { ok: true };
 }
 
+/**
+ * Returns a pending transfer's goods to the SENDER and closes it. Used by both
+ * the sender cancelling an outgoing transfer and the receiver declining an
+ * incoming one — the stock always goes back where it came from.
+ */
+async function returnTransfer(env, id, { fromBusiness, toBusiness, status }) {
+  const db = await getDb(env);
+  const { results } = await db.prepare('SELECT * FROM transfers WHERE id = ?').bind(Number(id)).all();
+  const t = results && results[0];
+  if (!t) throw new Error('Transfer not found.');
+  if (String(t.status) !== 'pending') throw new Error('That transfer is no longer pending.');
+  if (fromBusiness && String(t.from_business).trim().toLowerCase() !== fromBusiness.trim().toLowerCase()) {
+    throw new Error('That transfer isn’t yours to cancel.');
+  }
+  if (toBusiness && String(t.to_business).trim().toLowerCase() !== toBusiness.trim().toLowerCase()) {
+    throw new Error('That transfer isn’t addressed to your company.');
+  }
+  await db.batch([
+    db.prepare(
+      `INSERT INTO inventory (business, item, price, stock, low_stock) VALUES (?, ?, ?, ?, 0)
+       ON CONFLICT(business, item) DO UPDATE SET stock = stock + excluded.stock`)
+      .bind(t.from_business, t.item, t.price, t.qty),
+    db.prepare('UPDATE transfers SET status = ? WHERE id = ?').bind(status, Number(id)),
+  ]);
+  return { ok: true };
+}
+
+/** Sender owner/admin: cancel an outgoing pending transfer (goods return to you). */
+export async function cancelTransfer(env, business, id) {
+  return returnTransfer(env, id, { fromBusiness: business, status: 'cancelled' });
+}
+
+/** Receiver owner/admin: decline an incoming pending transfer (goods return to sender). */
+export async function declineTransfer(env, business, id) {
+  return returnTransfer(env, id, { toBusiness: business, status: 'declined' });
+}
+
 /** How many transfers are waiting for this business to accept. */
 export async function countIncomingPending(env, business) {
   const db = await getDb(env);

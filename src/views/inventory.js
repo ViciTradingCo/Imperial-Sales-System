@@ -218,12 +218,16 @@ function openTransferModal(me, onChanged) {
     if (!inc.length) nodes.push(el('p', { class: 'note' }, 'No transfers waiting for you.'));
     else inc.forEach((x) => nodes.push(el('div.emp-row', {}, [
       el('span', { html: '<b>' + esc(x.item) + '</b> ×' + x.qty + ' <span class="note">from ' + esc(x.other) + '</span>' }),
-      el('button.primary.small', { onclick: () => accept(x.id) }, 'Accept'),
+      el('span', { class: 'row-actions' }, [
+        el('button.primary.small', { onclick: () => act(() => api.acceptTransfer(x.id)) }, 'Accept'),
+        el('button.danger.small', { onclick: () => act(() => api.declineTransfer(x.id)) }, 'Decline'),
+      ]),
     ])));
     nodes.push(el('h3', {}, 'Outgoing (awaiting acceptance)'));
     if (!out.length) nodes.push(el('p', { class: 'note' }, 'None pending.'));
     else out.forEach((x) => nodes.push(el('div.emp-row', {}, [
       el('span', { html: '<b>' + esc(x.item) + '</b> ×' + x.qty + ' <span class="note">to ' + esc(x.other) + '</span>' }),
+      el('button.danger.small', { onclick: () => act(() => api.cancelTransfer(x.id)) }, 'Cancel'),
     ])));
     mount(pendingHost, ...nodes);
   }
@@ -251,11 +255,12 @@ function openTransferModal(me, onChanged) {
     }
   }
 
-  async function accept(id) {
+  // Accept / decline / cancel all move stock and refresh the same way.
+  async function act(fn) {
     try {
-      renderPending(await api.acceptTransfer(id));
-      onChanged(); // goods arrived in our inventory
-      window.dispatchEvent(new Event('eec:banners')); // clear the pending banner if empty
+      renderPending(await fn());
+      onChanged(); // inventory changed (goods arrived, or returned to sender)
+      window.dispatchEvent(new Event('eec:banners')); // refresh the pending banner
     } catch (e) {
       setStatus(e.message || String(e), 'error');
     }

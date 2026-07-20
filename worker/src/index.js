@@ -21,7 +21,7 @@
 import { verifyIdToken } from './verify.js';
 import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, deleteMember, setUserStatus, setUserCharacter, setUserNote, touchLastSeen, USERS_SHEET } from './users.js';
 import { registerUser, renameBusiness, listCompanies, updateCompany, archiveCompany, findBusinessMeta, listBusinessNames } from './registry.js';
-import { createTransfer, listTransfers, acceptTransfer, countIncomingPending } from './transfers.js';
+import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending } from './transfers.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
@@ -353,6 +353,16 @@ async function handleListTransfers(request, env) {
 async function handleAcceptTransfer(request, env, body) {
   const caller = await requireOwnerOrAdmin(request, env);
   await acceptTransfer(env, caller.business, body.id);
+  return await listTransfers(env, caller.business);
+}
+async function handleCancelTransfer(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  await cancelTransfer(env, caller.business, body.id);
+  return await listTransfers(env, caller.business);
+}
+async function handleDeclineTransfer(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  await declineTransfer(env, caller.business, body.id);
   return await listTransfers(env, caller.business);
 }
 
@@ -722,6 +732,16 @@ export default {
       if (request.method === 'POST' && path === '/transfers/accept') {
         const body = await readJsonBody(request);
         return json(await handleAcceptTransfer(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/transfers/cancel') {
+        const body = await readJsonBody(request);
+        return json(await handleCancelTransfer(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/transfers/decline') {
+        const body = await readJsonBody(request);
+        return json(await handleDeclineTransfer(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/holds') {
