@@ -21,7 +21,7 @@ export function renderMotdAdmin(container) {
   mount(container,
     el('div.card', {}, [
       el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
-      el('h2', {}, 'Messages of the Day'),
+      el('h2', {}, 'MOTD'),
       el('p', { class: 'note' }, 'Post a notice for everyone, schedule per-business messages, and tune the subscription-expiry warning.'),
     ]),
     globalHost,

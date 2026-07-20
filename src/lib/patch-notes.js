@@ -4,7 +4,7 @@
  */
 export const PATCH_NOTES = [
   { version: '2.3', date: '2026-07-20', notes: [
-    'Messages of the Day is its own admin page (Messages button).',
+    'MOTD is its own admin page (MOTD button).',
     'Schedule per-business notices with a start/end window.',
     'Automatic subscription-expiry warning banner (adjustable lead time) that persists on every page.',
   ] },
