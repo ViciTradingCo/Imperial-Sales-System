@@ -32,6 +32,7 @@ import { checkout, listSales, voidSale } from './sales.js';
 import { renameBusinessData, ensureSchema, clearLogs } from './db.js';
 import { runBackup } from './backup.js';
 import { marketAnalysis, holdReport } from './market.js';
+import { readMotd, writeMotd } from './motd.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -244,6 +245,18 @@ async function handleMarket(request, env) {
 async function handleClearLogs(request, env) {
   await requireAdmin(request, env);
   return await clearLogs(env);
+}
+
+/** Any registered user: the current message of the day (for the banner). */
+async function handleGetMotd(request, env) {
+  await requireRegistered(request, env);
+  return { motd: await readMotd(env) };
+}
+
+/** Admin-only: set the message of the day (blank clears it). */
+async function handleSetMotd(request, env, body) {
+  await requireAdmin(request, env);
+  return { motd: await writeMotd(env, body.motd) };
 }
 
 /** Court businesses only: the market report for their own hold. */
@@ -533,6 +546,15 @@ export default {
 
       if (request.method === 'GET' && path === '/market/hold') {
         return json(await handleHoldReport(request, env), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/motd') {
+        return json(await handleGetMotd(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/motd') {
+        const body = await readJsonBody(request);
+        return json(await handleSetMotd(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/business/settings') {

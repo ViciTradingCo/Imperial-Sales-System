@@ -11,8 +11,9 @@ import { setAdminActions } from '../lib/sections.js';
 export function renderAdminSettings(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const formHost = el('div', {});
+  const motdHost = el('div', {});
   const dangerHost = el('div', {});
-  mount(container, formHost, dangerHost);
+  mount(container, formHost, motdHost, dangerHost);
 
   renderSettingsForm(formHost, {
     title: 'Network Settings',
@@ -22,7 +23,40 @@ export function renderAdminSettings(container) {
     save: async (updates) => (await api.saveSettings(updates)).settings,
   });
 
+  mount(motdHost, motdCard());
   mount(dangerHost, clearLogsCard());
+}
+
+/** Editor for the message of the day (shown to everyone on Home). */
+function motdCard() {
+  const box = el('textarea', { rows: '3', placeholder: 'A notice shown to everyone on their Home page…' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save message');
+  const clear = el('button.secondary-btn', { onclick: () => { box.value = ''; doSave(); } }, 'Clear');
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  api.getMotd().then((r) => { box.value = (r && r.motd) || ''; }).catch(() => {});
+
+  async function doSave() {
+    save.disabled = true;
+    setStatus('Saving…', '');
+    try {
+      await api.setMotd(box.value.trim());
+      setStatus('Saved ✓', 'ok');
+    } catch (e) {
+      setStatus(e.message || String(e), 'error');
+    } finally {
+      save.disabled = false;
+    }
+  }
+
+  return el('div.card', {}, [
+    el('h3', {}, 'Message of the day'),
+    el('p', { class: 'note' }, 'Shown as a notice on everyone’s Home page. Leave blank (or Clear) to hide it.'),
+    box,
+    el('div', { class: 'row-actions' }, [save, clear]),
+    status,
+  ]);
 }
 
 /** Danger-zone card: wipe the sales + intake logs across the whole network. */

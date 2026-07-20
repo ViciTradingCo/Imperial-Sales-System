@@ -77,6 +77,10 @@ export const api = {
   clearLogs: () => request('POST', '/admin/logs/clear', {}),
   /** Court businesses: the market report for their own hold. */
   getHoldReport: () => request('GET', '/market/hold'),
+  /** The current message of the day (banner). */
+  getMotd: () => request('GET', '/motd'),
+  /** Admin: set the message of the day (blank clears it). */
+  setMotd: (motd) => request('POST', '/admin/motd', { motd }),
   /** Owner/admin: read this shop's per-business (ledger) settings. */
   getLedgerSettings: () => request('GET', '/business/settings'),
   /** Owner/admin: save per-business (ledger) settings ([{label, value}]). */

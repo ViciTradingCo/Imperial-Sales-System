@@ -3,6 +3,9 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.2', date: '2026-07-20', notes: [
+    'Message of the day — admins can post a notice shown on everyone’s Home.',
+  ] },
   { version: '2.1', date: '2026-07-20', notes: [
     'Market Analysis is its own admin page with Overview, Item, Hold, and Company sub-pages (Item search included).',
     'Court businesses get a Hold Report for their own hold.',
