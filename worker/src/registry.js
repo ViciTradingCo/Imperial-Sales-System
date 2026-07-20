@@ -52,6 +52,19 @@ export async function findBusinessByName(env, name) {
   return null;
 }
 
+/** All active (non-archived) business names — for pickers like transfer targets. */
+export async function listBusinessNames(env) {
+  let rows;
+  try {
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:F`);
+  } catch (e) {
+    return [];
+  }
+  return rows
+    .filter((r) => String(r[2] || '').trim() && String(r[5] || '').trim().toUpperCase() !== 'ARCHIVED')
+    .map((r) => String(r[2]).trim());
+}
+
 /** Returns a business's Hold and Court flag from the registry ({ hold, court }). */
 export async function findBusinessMeta(env, name) {
   const target = String(name || '').trim().toLowerCase();

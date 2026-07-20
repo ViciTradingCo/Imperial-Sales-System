@@ -26,7 +26,10 @@ export function renderInventory(container, { me }) {
       ' — items, prices, and stock. "Low" means at or below an item’s own Low Stock number.'),
   ];
   if (canEdit) {
-    firstCard.push(el('button.primary', { onclick: () => openIntakeModal(refreshAll) }, 'Record Intake'));
+    firstCard.push(el('div', { class: 'row-actions' }, [
+      el('button.primary', { onclick: () => openIntakeModal(refreshAll) }, 'Record Intake'),
+      el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshAll) }, 'Transfer'),
+    ]));
   }
   firstCard.push(listHost);
   const nodes = [el('div.card', {}, firstCard)];
@@ -180,5 +183,94 @@ function openIntakeModal(onRecorded) {
     el('label', {}, 'Price per item (gp)'), per,
     save,
     status,
+  ]);
+}
+
+/**
+ * Transfer goods to another company. Sending debits your stock immediately; the
+ * goods only appear in the receiver's inventory once they accept (from the
+ * incoming list here). Shows pending incoming (with Accept) and outgoing.
+ */
+function openTransferModal(me, onChanged) {
+  const item = el('select', {}, el('option', { value: '' }, 'Pick an item…'));
+  const qty = el('input', { type: 'number', min: '1', step: '1', placeholder: 'Amount' });
+  const toSel = el('select', {}, el('option', { value: '' }, 'Receiving company…'));
+  const status = el('p', {});
+  const send = el('button.primary', { onclick: doSend }, 'Confirm transfer');
+  const pendingHost = el('div', {}, el('p', { class: 'note' }, 'Loading transfers…'));
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  // Populate the item dropdown from current stock, and the company dropdown.
+  api.getInventory().then((inv) => {
+    (inv.inventory || []).filter((it) => it.stock > 0).forEach((it) =>
+      item.appendChild(el('option', { value: it.item }, it.item + ' (' + it.stock + ' in stock)')));
+  }).catch(() => {});
+  api.getBusinesses().then((res) => {
+    (res.businesses || []).filter((b) => b.toLowerCase() !== String(me.business || '').toLowerCase())
+      .forEach((b) => toSel.appendChild(el('option', { value: b }, b)));
+  }).catch(() => {});
+
+  function renderPending(t) {
+    const inc = t.incoming || [];
+    const out = t.outgoing || [];
+    const nodes = [];
+    nodes.push(el('h3', {}, 'Incoming'));
+    if (!inc.length) nodes.push(el('p', { class: 'note' }, 'No transfers waiting for you.'));
+    else inc.forEach((x) => nodes.push(el('div.emp-row', {}, [
+      el('span', { html: '<b>' + esc(x.item) + '</b> ×' + x.qty + ' <span class="note">from ' + esc(x.other) + '</span>' }),
+      el('button.primary.small', { onclick: () => accept(x.id) }, 'Accept'),
+    ])));
+    nodes.push(el('h3', {}, 'Outgoing (awaiting acceptance)'));
+    if (!out.length) nodes.push(el('p', { class: 'note' }, 'None pending.'));
+    else out.forEach((x) => nodes.push(el('div.emp-row', {}, [
+      el('span', { html: '<b>' + esc(x.item) + '</b> ×' + x.qty + ' <span class="note">to ' + esc(x.other) + '</span>' }),
+    ])));
+    mount(pendingHost, ...nodes);
+  }
+
+  function loadPending() {
+    api.getTransfers().then(renderPending).catch((e) => mount(pendingHost, el('p', { class: 'error' }, e.message || String(e))));
+  }
+
+  async function doSend() {
+    if (!item.value) { setStatus('Pick an item.', 'error'); return; }
+    if (!toSel.value) { setStatus('Pick a receiving company.', 'error'); return; }
+    const n = Math.floor(Number(qty.value));
+    if (!n || n < 1) { setStatus('Enter an amount.', 'error'); return; }
+    send.disabled = true;
+    setStatus('Sending…', '');
+    try {
+      renderPending(await api.createTransfer({ toBusiness: toSel.value, item: item.value, qty: n }));
+      setStatus('Transfer sent — awaiting acceptance.', 'ok');
+      qty.value = '';
+      onChanged(); // stock left our inventory
+    } catch (e) {
+      setStatus(e.message || String(e), 'error');
+    } finally {
+      send.disabled = false;
+    }
+  }
+
+  async function accept(id) {
+    try {
+      renderPending(await api.acceptTransfer(id));
+      onChanged(); // goods arrived in our inventory
+      window.dispatchEvent(new Event('eec:banners')); // clear the pending banner if empty
+    } catch (e) {
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  loadPending();
+  openModal([
+    el('h3', {}, 'Transfer goods'),
+    el('p', { class: 'note' }, 'Send stock to another company. It leaves your inventory now and appears in theirs once they accept.'),
+    el('label', {}, 'Item'), item,
+    el('label', {}, 'Amount'), qty,
+    el('label', {}, 'Receiving company'), toSel,
+    send,
+    status,
+    el('hr', {}),
+    pendingHost,
   ]);
 }

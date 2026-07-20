@@ -48,14 +48,20 @@ appEl.parentNode.insertBefore(globalBanner, appEl);
 function refreshGlobalBanner() {
   if (!(state.me && state.me.registered)) { globalBanner.hidden = true; globalBanner.innerHTML = ''; return; }
   api.getMotd().then((r) => {
-    if (r && r.banner) {
-      mount(globalBanner, el('div', { class: 'global-banner' }, r.banner));
-      globalBanner.hidden = false;
-    } else {
-      globalBanner.hidden = true; globalBanner.innerHTML = '';
-    }
+    const banners = (r && r.banners) || (r && r.banner ? [{ text: r.banner }] : []);
+    if (!banners.length) { globalBanner.hidden = true; globalBanner.innerHTML = ''; return; }
+    mount(globalBanner, ...banners.map((b) => {
+      const row = el('div', { class: 'global-banner' }, [el('span', {}, b.text)]);
+      if (b.action && b.action.route) {
+        row.appendChild(el('button', { class: 'banner-btn', onclick: () => navigate(b.action.route) }, b.action.label || 'Open'));
+      }
+      return row;
+    }));
+    globalBanner.hidden = false;
   }).catch(() => { globalBanner.hidden = true; });
 }
+// Views can ask the shell to re-check banners (e.g. after accepting a transfer).
+window.addEventListener('eec:banners', refreshGlobalBanner);
 
 // The header floats (sticky); the action bar sticks just below it. Measure the
 // real header height into --topbar-h so the bar never hides under the header.

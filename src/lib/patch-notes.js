@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.4', date: '2026-07-20', notes: [
+    'Transfer goods between companies — leaves your stock now, arrives once the receiver accepts.',
+    'Pending-transfer banner (with a jump to Inventory) that persists on every page.',
+  ] },
   { version: '2.3', date: '2026-07-20', notes: [
     'MOTD is its own admin page (MOTD button).',
     'Schedule per-business notices with a start/end window.',

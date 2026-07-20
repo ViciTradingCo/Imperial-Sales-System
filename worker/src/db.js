@@ -27,6 +27,14 @@ const SCHEMA = [
      source_hold TEXT, num_items INTEGER NOT NULL DEFAULT 0,
      price_per REAL NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS idx_intake_business ON intake (business)`,
+  `CREATE TABLE IF NOT EXISTS transfers (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     from_business TEXT NOT NULL, to_business TEXT NOT NULL,
+     item TEXT NOT NULL, qty INTEGER NOT NULL DEFAULT 0,
+     price REAL NOT NULL DEFAULT 0,
+     status TEXT NOT NULL DEFAULT 'pending', ts TEXT NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS idx_transfers_to ON transfers (to_business)`,
+  `CREATE INDEX IF NOT EXISTS idx_transfers_from ON transfers (from_business)`,
 ];
 
 let schemaReady = false;
@@ -75,5 +83,7 @@ export async function renameBusinessData(env, oldName, newName) {
     db.prepare('UPDATE inventory SET business = ? WHERE business = ?').bind(newName, oldName),
     db.prepare('UPDATE sales SET business = ? WHERE business = ?').bind(newName, oldName),
     db.prepare('UPDATE intake SET business = ? WHERE business = ?').bind(newName, oldName),
+    db.prepare('UPDATE transfers SET from_business = ? WHERE from_business = ?').bind(newName, oldName),
+    db.prepare('UPDATE transfers SET to_business = ? WHERE to_business = ?').bind(newName, oldName),
   ]);
 }

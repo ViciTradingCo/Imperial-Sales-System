@@ -103,6 +103,14 @@ export const api = {
   saveItem: (item) => request('POST', '/inventory', item),
   /** Owner/admin: delete an inventory item. */
   deleteItem: (item) => request('POST', '/inventory/delete', { item }),
+  /** Any registered user: active business names (transfer targets). */
+  getBusinesses: () => request('GET', '/businesses'),
+  /** Owner/admin: pending transfers ({ incoming, outgoing }). */
+  getTransfers: () => request('GET', '/transfers'),
+  /** Owner/admin: send goods to another company (debits your stock now). */
+  createTransfer: (t) => request('POST', '/transfers', t),
+  /** Owner/admin: accept an incoming transfer into your inventory. */
+  acceptTransfer: (id) => request('POST', '/transfers/accept', { id }),
   /** The network hold list. */
   getHolds: () => request('GET', '/holds'),
   /** Recent intake transactions for the caller's business. */

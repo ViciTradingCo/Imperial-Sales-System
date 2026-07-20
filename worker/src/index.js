@@ -20,7 +20,8 @@
  */
 import { verifyIdToken } from './verify.js';
 import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, deleteMember, setUserStatus, setUserCharacter, setUserNote, touchLastSeen, USERS_SHEET } from './users.js';
-import { registerUser, renameBusiness, listCompanies, updateCompany, archiveCompany, findBusinessMeta } from './registry.js';
+import { registerUser, renameBusiness, listCompanies, updateCompany, archiveCompany, findBusinessMeta, listBusinessNames } from './registry.js';
+import { createTransfer, listTransfers, acceptTransfer, countIncomingPending } from './transfers.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
@@ -266,23 +267,35 @@ async function handleGetMotd(request, env) {
   if (global) notices.push(global);
   notices.push(...(await activeNoticesForBusiness(env, caller.business)));
 
-  let banner = null;
+  const banners = [];
   if (caller.role === 'owner' || caller.role === 'employee') {
     const cert = await checkCertification(env, caller.business);
     if (!cert.perpetual) {
       if (cert.status === 'EXPIRED') {
-        banner = '⚠ ' + caller.business + '’s East Empire certification has EXPIRED — renew with an admin to keep selling.';
+        banners.push({ text: '⚠ ' + caller.business + '’s East Empire certification has EXPIRED — renew with an admin to keep selling.' });
       } else if (cert.until) {
         const warnDays = await readWarnDays(env);
         const left = daysUntil(cert.until);
         if (left != null && left <= warnDays) {
-          banner = '⚠ ' + caller.business + '’s certification expires in ' + left + ' day' +
-            (left === 1 ? '' : 's') + ' (' + cert.until + '). Renew with an admin.';
+          banners.push({ text: '⚠ ' + caller.business + '’s certification expires in ' + left + ' day' +
+            (left === 1 ? '' : 's') + ' (' + cert.until + '). Renew with an admin.' });
         }
       }
     }
   }
-  return { notices, banner };
+  // Pending inbound transfers → a banner the receiver's owner/admin can act on.
+  if (caller.role === 'owner' || caller.role === 'admin') {
+    try {
+      const n = await countIncomingPending(env, caller.business);
+      if (n > 0) {
+        banners.push({
+          text: '📦 You have ' + n + ' pending transfer' + (n === 1 ? '' : 's') + ' to accept.',
+          action: { label: 'Go to Inventory', route: '/inventory' },
+        });
+      }
+    } catch (e) { /* D1 optional */ }
+  }
+  return { notices, banner: banners[0] ? banners[0].text : null, banners };
 }
 
 /* ---- Admin MOTD management ---- */
@@ -309,6 +322,38 @@ async function handleUpdateIndividual(request, env, body) {
 async function handleDeleteIndividual(request, env, body) {
   await requireAdmin(request, env);
   return { individual: await deleteIndividualMotd(env, body.id) };
+}
+
+/** Any registered user: active business names (e.g. for the transfer picker). */
+async function handleListBusinesses(request, env) {
+  await requireRegistered(request, env);
+  return { businesses: await listBusinessNames(env) };
+}
+
+/** Requires the caller to be an owner or admin; returns the caller record. */
+async function requireOwnerOrAdmin(request, env) {
+  const caller = await requireRegistered(request, env);
+  if (caller.role !== 'owner' && caller.role !== 'admin') {
+    const e = new Error('Only a business owner or an admin can do that.');
+    e.forbidden = true;
+    throw e;
+  }
+  return caller;
+}
+
+async function handleCreateTransfer(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  await createTransfer(env, caller.business, body);
+  return await listTransfers(env, caller.business);
+}
+async function handleListTransfers(request, env) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return await listTransfers(env, caller.business);
+}
+async function handleAcceptTransfer(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  await acceptTransfer(env, caller.business, body.id);
+  return await listTransfers(env, caller.business);
 }
 
 /** Court businesses only: the market report for their own hold. */
@@ -659,6 +704,24 @@ export default {
       if (request.method === 'POST' && path === '/inventory/delete') {
         const body = await readJsonBody(request);
         return json(await handleDeleteItem(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/businesses') {
+        return json(await handleListBusinesses(request, env), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/transfers') {
+        return json(await handleListTransfers(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/transfers') {
+        const body = await readJsonBody(request);
+        return json(await handleCreateTransfer(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/transfers/accept') {
+        const body = await readJsonBody(request);
+        return json(await handleAcceptTransfer(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/holds') {
