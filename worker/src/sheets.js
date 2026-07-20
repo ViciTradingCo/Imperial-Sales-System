@@ -84,27 +84,6 @@ export async function clearRange(env, spreadsheetId, range) {
   });
 }
 
-/**
- * Creates a new spreadsheet owned by the service account, with the named tabs.
- * NOTE: on a personal Google project a service account usually CANNOT create
- * Drive files (no backing storage) — so ledgers are LINKED, not minted (an
- * owner shares a Sheet they own). Kept for use inside a Shared Drive setup.
- */
-export async function createSpreadsheet(env, title, tabTitles) {
-  const body = {
-    properties: { title },
-    sheets: (tabTitles && tabTitles.length ? tabTitles : ['Sheet1']).map((t) => ({
-      properties: { title: t },
-    })),
-  };
-  const data = await authFetch(env, BASE, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  return data.spreadsheetId;
-}
-
 /** Titles of every tab in a spreadsheet. */
 export async function getSheetTitles(env, spreadsheetId) {
   const data = await authFetch(env, `${BASE}/${spreadsheetId}?fields=sheets.properties.title`);

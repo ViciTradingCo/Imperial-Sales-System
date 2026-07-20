@@ -15,21 +15,32 @@ const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 
 export function renderCompanies(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading companies…'));
+  const search = el('input', { type: 'search', placeholder: 'Search business, contact, hold, status…' });
+  search.addEventListener('input', () => draw());
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Company List'),
     el('p', { class: 'note' }, 'Every registered business. Edit renames a company; Subscription sets its certification.'),
+    search,
     listHost,
   ]));
 
+  let all = [];
   function load() {
     api.getCompanies()
-      .then((res) => renderList(res.companies || []))
+      .then((res) => { all = res.companies || []; draw(); })
       .catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
   }
 
+  function draw() {
+    const q = search.value.trim().toLowerCase();
+    const companies = !q ? all : all.filter((c) =>
+      [c.business, c.pointOfContact, c.hold, c.status, c.court ? 'court' : ''].some((v) => String(v || '').toLowerCase().includes(q)));
+    renderList(companies);
+  }
+
   function renderList(companies) {
-    if (!companies.length) { mount(listHost, el('p', { class: 'note' }, 'No companies yet.')); return; }
+    if (!companies.length) { mount(listHost, el('p', { class: 'note' }, all.length ? 'No matches.' : 'No companies yet.')); return; }
     mount(listHost, ...companies.map((c) => {
       const sub = c.perpetual ? 'Perpetual' : (c.until ? 'until ' + c.until : 'no subscription');
       const statusCls = String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';
@@ -55,7 +66,8 @@ export function renderCompanies(container) {
     mount(listHost, el('p', { class: 'note' }, 'Archiving…'));
     try {
       const res = await api.deleteCompany(c.id);
-      renderList(res.companies || []);
+      all = res.companies || [];
+      draw();
     } catch (e) {
       mount(listHost, el('p', { class: 'error' }, e.message || String(e)));
     }

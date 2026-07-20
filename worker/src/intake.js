@@ -29,6 +29,10 @@ export async function recordIntake(env, business, { item, vendor, hold, numItems
        VALUES (?, ?, ?, ?, 0)
        ON CONFLICT (business, item) DO UPDATE SET stock = stock + excluded.stock`
     ).bind(business, name, per, qty),
+    // Debit the shop's coffers for what was paid.
+    db.prepare(
+      `INSERT INTO coffer_entries (business, ts, kind, amount, note) VALUES (?, ?, 'intake', ?, ?)`
+    ).bind(business, ts, -(qty * per), name),
   ]);
 
   return listIntake(env, business, 20);

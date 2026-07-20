@@ -3,6 +3,11 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.5', date: '2026-07-20', notes: [
+    'Shop Ledger: Coffers (treasury with sales/intake/void tracking + manual adjustments), reusable Discounts on the register, and a shop Style (tagline + accent).',
+    'Audit Log (admin), transfer history, and searchable Member/Company lists.',
+    'Scheduled MOTDs are timezone-correct; cleanup of orphaned code.',
+  ] },
   { version: '2.4', date: '2026-07-20', notes: [
     'Transfer goods between companies — leaves your stock now, arrives once the receiver accepts.',
     'Pending-transfer banner (with a jump to Inventory) that persists on every page.',

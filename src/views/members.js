@@ -11,21 +11,32 @@ import { setAdminActions } from '../lib/sections.js';
 export function renderMembers(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading members…'));
+  const search = el('input', { type: 'search', placeholder: 'Search name, business, email, role…' });
+  search.addEventListener('input', () => draw());
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Member List'),
     el('p', { class: 'note' }, 'Everyone registered in the East Empire network.'),
+    search,
     listHost,
   ]));
 
+  let all = [];
   function load() {
     api.getMembers()
-      .then((res) => renderList(res.members || []))
+      .then((res) => { all = res.members || []; draw(); })
       .catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
   }
 
+  function draw() {
+    const q = search.value.trim().toLowerCase();
+    const members = !q ? all : all.filter((m) =>
+      [m.character, m.email, m.business, m.role, m.uid].some((v) => String(v || '').toLowerCase().includes(q)));
+    renderList(members);
+  }
+
   function renderList(members) {
-    if (!members.length) { mount(listHost, el('p', { class: 'note' }, 'No members yet.')); return; }
+    if (!members.length) { mount(listHost, el('p', { class: 'note' }, all.length ? 'No matches.' : 'No members yet.')); return; }
     mount(listHost, ...members.map((m) => el('div', { class: 'member-row' }, [
       el('p', { html:
         '<b>' + esc(m.character || m.email || '—') + '</b> · <span class="role-pill">' + esc(m.role) + '</span> ' +
@@ -45,7 +56,8 @@ export function renderMembers(container) {
     mount(listHost, el('p', { class: 'note' }, 'Removing…'));
     try {
       const res = await api.deleteMember(m.uid);
-      renderList(res.members || []);
+      all = res.members || [];
+      draw();
     } catch (e) {
       mount(listHost, el('p', { class: 'error' }, e.message || String(e)));
     }

@@ -5,7 +5,6 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { navigate } from '../lib/router.js';
 import { money } from '../lib/format.js';
 import { setMarketActions } from '../lib/sections.js';
 

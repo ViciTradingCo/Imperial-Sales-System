@@ -90,6 +90,13 @@ body {
 }
 @media (max-width: 600px) { #globalBanner { padding: 0 14px; } }
 
+/* ---- Shop Ledger ---- */
+.coffer-balance { font-size: 20px; font-weight: bold; color: var(--accent); margin: 4px 0; }
+.shop-tagline {
+  font-style: italic; font-weight: bold; margin: 6px 0 0;
+  border-left: 3px solid var(--accent); padding-left: 10px;
+}
+
 /* ---- Market Analysis ---- */
 .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 4px; }
 .stat-tile {

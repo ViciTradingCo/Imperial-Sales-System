@@ -236,6 +236,19 @@ function openTransferModal(me, onChanged) {
     api.getTransfers().then(renderPending).catch((e) => mount(pendingHost, el('p', { class: 'error' }, e.message || String(e))));
   }
 
+  const historyHost = el('div', {}, el('p', { class: 'note' }, 'Loading history…'));
+  function loadHistory() {
+    api.getTransferHistory().then((r) => {
+      const h = r.history || [];
+      if (!h.length) { mount(historyHost, el('p', { class: 'note' }, 'No transfer history yet.')); return; }
+      mount(historyHost, ...h.map((x) => el('div.emp-row', {}, [
+        el('span', { html: (x.dir === 'out' ? '→ ' : '← ') + '<b>' + esc(x.item) + '</b> ×' + x.qty +
+          ' <span class="note">' + (x.dir === 'out' ? 'to ' + esc(x.to) : 'from ' + esc(x.from)) +
+          ' · ' + esc(x.status) + '</span>' }),
+      ])));
+    }).catch((e) => mount(historyHost, el('p', { class: 'error' }, e.message || String(e))));
+  }
+
   async function doSend() {
     if (!item.value) { setStatus('Pick an item.', 'error'); return; }
     if (!toSel.value) { setStatus('Pick a receiving company.', 'error'); return; }
@@ -247,6 +260,7 @@ function openTransferModal(me, onChanged) {
       renderPending(await api.createTransfer({ toBusiness: toSel.value, item: item.value, qty: n }));
       setStatus('Transfer sent — awaiting acceptance.', 'ok');
       qty.value = '';
+      loadHistory();
       onChanged(); // stock left our inventory
     } catch (e) {
       setStatus(e.message || String(e), 'error');
@@ -259,6 +273,7 @@ function openTransferModal(me, onChanged) {
   async function act(fn) {
     try {
       renderPending(await fn());
+      loadHistory();
       onChanged(); // inventory changed (goods arrived, or returned to sender)
       window.dispatchEvent(new Event('eec:banners')); // refresh the pending banner
     } catch (e) {
@@ -267,6 +282,7 @@ function openTransferModal(me, onChanged) {
   }
 
   loadPending();
+  loadHistory();
   openModal([
     el('h3', {}, 'Transfer goods'),
     el('p', { class: 'note' }, 'Send stock to another company. It leaves your inventory now and appears in theirs once they accept.'),
@@ -277,5 +293,8 @@ function openTransferModal(me, onChanged) {
     status,
     el('hr', {}),
     pendingHost,
+    el('hr', {}),
+    el('h3', {}, 'Recent transfers'),
+    historyHost,
   ]);
 }

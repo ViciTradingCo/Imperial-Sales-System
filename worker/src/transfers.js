@@ -106,6 +106,20 @@ export async function declineTransfer(env, business, id) {
   return returnTransfer(env, id, { toBusiness: business, status: 'declined' });
 }
 
+/** Recent transfers touching a business, any status (for the history view). */
+export async function listTransferHistory(env, business, limit = 30) {
+  const db = await getDb(env);
+  const { results } = await db.prepare(
+    `SELECT id, from_business, to_business, item, qty, status, ts FROM transfers
+      WHERE from_business = ? OR to_business = ? ORDER BY id DESC LIMIT ?`)
+    .bind(business, business, limit).all();
+  return (results || []).map((r) => ({
+    id: r.id, from: r.from_business, to: r.to_business,
+    item: r.item, qty: r.qty, status: r.status, ts: r.ts,
+    dir: String(r.from_business).trim().toLowerCase() === String(business).trim().toLowerCase() ? 'out' : 'in',
+  }));
+}
+
 /** How many transfers are waiting for this business to accept. */
 export async function countIncomingPending(env, business) {
   const db = await getDb(env);

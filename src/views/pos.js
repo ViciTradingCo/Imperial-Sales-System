@@ -20,14 +20,28 @@ export function renderPos(container, { me }) {
 
   let inventory = [];
   let holds = [];
+  let discounts = [];
+  let style = {};
   const cart = []; // [{ item, qty, price }]
 
-  Promise.all([api.getCert(), api.getInventory(), api.getHolds()])
-    .then(([cert, inv, hs]) => {
+  Promise.all([
+    api.getCert(), api.getInventory(), api.getHolds(),
+    api.getDiscounts().catch(() => ({ discounts: [] })),
+    api.getStyle().catch(() => ({})),
+  ])
+    .then(([cert, inv, hs, dc, st]) => {
       inventory = inv.inventory || [];
       holds = hs.holds || [];
+      discounts = dc.discounts || [];
+      style = st || {};
+      // Shop style: a tagline strip (coloured by the shop's accent) on the header.
+      if (style.tagline) {
+        const strip = el('p', { class: 'shop-tagline' }, style.tagline);
+        if (style.accent) { strip.style.borderColor = style.accent; strip.style.color = style.accent; }
+        banner.appendChild(strip);
+      }
       if (cert.status === 'EXPIRED') {
-        mount(banner, el('p', { class: 'warn', html:
+        banner.appendChild(el('p', { class: 'warn', html:
           '⚠ This shop’s East Empire certification is <b>EXPIRED</b> — sales are blocked until an admin renews it.' }));
       }
       renderSale(cert.status !== 'EXPIRED');
@@ -53,6 +67,14 @@ export function renderPos(container, { me }) {
     holds.forEach((h) => holdSel.appendChild(el('option', { value: h }, h)));
     const discName = el('input', { type: 'text', placeholder: 'Discount name (optional)' });
     const discPct = el('input', { type: 'number', min: '0', max: '100', step: '1', placeholder: 'Discount % (optional)' });
+    // Pick a saved discount to fill the fields (or leave blank for none / custom).
+    const discSel = el('select', {}, el('option', { value: '' }, 'No discount / custom'));
+    discounts.forEach((d) => discSel.appendChild(el('option', { value: d.id }, d.name + ' (' + d.percent + '%)')));
+    discSel.addEventListener('change', () => {
+      const d = discounts.find((x) => String(x.id) === discSel.value);
+      discName.value = d ? d.name : '';
+      discPct.value = d ? String(d.percent) : '';
+    });
 
     const status = el('p', {});
     const complete = el('button.primary', { onclick: doCheckout }, 'Complete sale');
@@ -132,6 +154,7 @@ export function renderPos(container, { me }) {
         el('h3', {}, 'Customer Details'),
         el('label', {}, 'Customer'), customer,
         el('label', {}, 'Hold'), holdSel,
+        el('label', {}, 'Discount'), discSel,
         el('label', {}, 'Discount name'), discName,
         el('label', {}, 'Discount %'), discPct,
       ]),

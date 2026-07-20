@@ -35,6 +35,27 @@ const SCHEMA = [
      status TEXT NOT NULL DEFAULT 'pending', ts TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS idx_transfers_to ON transfers (to_business)`,
   `CREATE INDEX IF NOT EXISTS idx_transfers_from ON transfers (from_business)`,
+  // Coffers — a shop's treasury ledger. Balance = SUM(amount); credits are
+  // positive (sales), debits negative (intake, withdrawals).
+  `CREATE TABLE IF NOT EXISTS coffer_entries (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     business TEXT NOT NULL, ts TEXT NOT NULL,
+     kind TEXT NOT NULL, amount REAL NOT NULL DEFAULT 0, note TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_coffer_business ON coffer_entries (business)`,
+  // Reusable named discounts per shop.
+  `CREATE TABLE IF NOT EXISTS discounts (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     business TEXT NOT NULL, name TEXT NOT NULL, percent REAL NOT NULL DEFAULT 0,
+     UNIQUE (business, name))`,
+  `CREATE INDEX IF NOT EXISTS idx_discounts_business ON discounts (business)`,
+  // Per-shop style (tagline + accent colour), one row per business.
+  `CREATE TABLE IF NOT EXISTS shop_style (
+     business TEXT PRIMARY KEY, tagline TEXT, accent TEXT)`,
+  // Audit trail of significant admin/owner actions.
+  `CREATE TABLE IF NOT EXISTS audit (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     ts TEXT NOT NULL, actor TEXT, actor_business TEXT, action TEXT NOT NULL, detail TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit (id DESC)`,
 ];
 
 let schemaReady = false;
@@ -85,5 +106,8 @@ export async function renameBusinessData(env, oldName, newName) {
     db.prepare('UPDATE intake SET business = ? WHERE business = ?').bind(newName, oldName),
     db.prepare('UPDATE transfers SET from_business = ? WHERE from_business = ?').bind(newName, oldName),
     db.prepare('UPDATE transfers SET to_business = ? WHERE to_business = ?').bind(newName, oldName),
+    db.prepare('UPDATE coffer_entries SET business = ? WHERE business = ?').bind(newName, oldName),
+    db.prepare('UPDATE discounts SET business = ? WHERE business = ?').bind(newName, oldName),
+    db.prepare('UPDATE shop_style SET business = ? WHERE business = ?').bind(newName, oldName),
   ]);
 }

@@ -100,6 +100,10 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     `INSERT INTO sales (business, ts, order_no, customer, hold, items, qty_total, total, employee, discount, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')`
   ).bind(business, ts, orderNo, String(customer || '').trim() || 'Walk-in', holdName, itemSummary, qtyTotal, finalTotal, employee, discountLabel));
+  // Credit the shop's coffers with the sale proceeds.
+  stmts.push(db.prepare(
+    `INSERT INTO coffer_entries (business, ts, kind, amount, note) VALUES (?, ?, 'sale', ?, ?)`
+  ).bind(business, ts, finalTotal, orderNo));
   await db.batch(stmts);
 
   return { ok: true, orderNo, total: finalTotal, hold: holdName, discount: discountLabel };
@@ -137,6 +141,10 @@ export async function voidSale(env, business, orderNo) {
     db.prepare('UPDATE inventory SET stock = stock + ? WHERE business = ? AND item = ?').bind(l.qty, business, l.name)
   );
   stmts.push(db.prepare("UPDATE sales SET status = 'VOIDED' WHERE business = ? AND order_no = ?").bind(business, order));
+  // Reverse the coffer credit from the original sale.
+  stmts.push(db.prepare(
+    `INSERT INTO coffer_entries (business, ts, kind, amount, note) VALUES (?, ?, 'void', ?, ?)`
+  ).bind(business, new Date().toISOString(), -Number(sale.total || 0), 'Void ' + order));
   await db.batch(stmts);
   return { ok: true, orderNo: order };
 }

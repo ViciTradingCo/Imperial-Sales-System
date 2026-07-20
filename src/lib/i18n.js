@@ -74,7 +74,6 @@ const T = {
   'Void this sale': { es: 'Anular esta venta', fr: 'Annuler cette vente', de: 'Verkauf stornieren', it: 'Annulla vendita' },
 
   // Headings
-  'Subscription': { es: 'Suscripción', fr: 'Abonnement', de: 'Abonnement', it: 'Abbonamento' },
   'Appearance': { es: 'Apariencia', fr: 'Apparence', de: 'Darstellung', it: 'Aspetto' },
   'Language': { es: 'Idioma', fr: 'Langue', de: 'Sprache', it: 'Lingua' },
   'Order': { es: 'Pedido', fr: 'Commande', de: 'Bestellung', it: 'Ordine' },

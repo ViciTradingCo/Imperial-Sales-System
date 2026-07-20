@@ -75,8 +75,10 @@ export function renderMotdAdmin(container) {
     });
     const message = el('textarea', { rows: '3', placeholder: 'Message for this business…' });
     message.value = entry ? entry.message : '';
-    const start = el('input', { type: 'datetime-local', value: entry ? entry.start : '' });
-    const end = el('input', { type: 'datetime-local', value: entry ? entry.end : '' });
+    // Stored as ISO (UTC); the datetime-local input works in the admin's local
+    // time, so convert both ways to keep the schedule correct across zones.
+    const start = el('input', { type: 'datetime-local', value: entry ? toLocalInput(entry.start) : '' });
+    const end = el('input', { type: 'datetime-local', value: entry ? toLocalInput(entry.end) : '' });
     const status = el('p', {});
     const submit = el('button.primary', { onclick: doSubmit }, isEdit ? 'Save changes' : 'Submit');
     function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
@@ -87,7 +89,7 @@ export function renderMotdAdmin(container) {
       if (!message.value.trim()) { setStatus('Enter a message.', 'error'); return; }
       submit.disabled = true;
       setStatus('Saving…', '');
-      const payload = { business: biz.value, message: message.value.trim(), start: start.value, end: end.value };
+      const payload = { business: biz.value, message: message.value.trim(), start: toIso(start.value), end: toIso(end.value) };
       try {
         const res = isEdit
           ? await api.updateIndividualMotd({ id: entry.id, ...payload })
@@ -122,6 +124,20 @@ function fmt(s) {
   if (!s) return '';
   const d = new Date(s);
   return isNaN(d.getTime()) ? s : d.toLocaleString();
+}
+/** ISO (UTC) → the local value a datetime-local input expects. */
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+/** A datetime-local value (local time) → ISO (UTC) for storage. */
+function toIso(local) {
+  if (!local) return '';
+  const d = new Date(local);
+  return isNaN(d.getTime()) ? '' : d.toISOString();
 }
 
 /* ---- global + warn cards ---- */

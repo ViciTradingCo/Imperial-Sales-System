@@ -115,6 +115,24 @@ export const api = {
   cancelTransfer: (id) => request('POST', '/transfers/cancel', { id }),
   /** Owner/admin (receiver): decline an incoming transfer — goods return to sender. */
   declineTransfer: (id) => request('POST', '/transfers/decline', { id }),
+  /** Owner/admin: recent transfer history (any status). */
+  getTransferHistory: () => request('GET', '/transfers/history'),
+  /** Owner/admin: coffer balance + recent ledger. */
+  getCoffer: () => request('GET', '/business/coffer'),
+  /** Owner/admin: manual coffer adjustment (negative to withdraw). */
+  adjustCoffer: (amount, note) => request('POST', '/business/coffer/adjust', { amount, note }),
+  /** Any registered user: this shop's named discounts. */
+  getDiscounts: () => request('GET', '/business/discounts'),
+  /** Owner/admin: add a named discount. */
+  addDiscount: (name, percent) => request('POST', '/business/discounts', { name, percent }),
+  /** Owner/admin: delete a named discount. */
+  deleteDiscount: (id) => request('POST', '/business/discounts/delete', { id }),
+  /** Any registered user: this shop's style (tagline + accent). */
+  getStyle: () => request('GET', '/business/style'),
+  /** Owner/admin: set this shop's style. */
+  setStyle: (tagline, accent) => request('POST', '/business/style', { tagline, accent }),
+  /** Admin: the audit trail. */
+  getAudit: () => request('GET', '/admin/audit'),
   /** The network hold list. */
   getHolds: () => request('GET', '/holds'),
   /** Recent intake transactions for the caller's business. */

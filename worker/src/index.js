@@ -21,7 +21,11 @@
 import { verifyIdToken } from './verify.js';
 import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, deleteMember, setUserStatus, setUserCharacter, setUserNote, touchLastSeen, USERS_SHEET } from './users.js';
 import { registerUser, renameBusiness, listCompanies, updateCompany, archiveCompany, findBusinessMeta, listBusinessNames } from './registry.js';
-import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending } from './transfers.js';
+import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory } from './transfers.js';
+import { cofferSummary, adjustCoffer } from './coffers.js';
+import { listDiscounts, addDiscount, deleteDiscount } from './discounts.js';
+import { getShopStyle, setShopStyle } from './shop-style.js';
+import { logAudit, listAudit } from './audit.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
@@ -122,7 +126,8 @@ async function handleUpdateProfile(request, env, body) {
   if (!character) throw new Error("Your character name can't be empty.");
   await setUserCharacter(env, user.row, character);
   user.character = character;
-  return publicUser(user);
+  const meta = await findBusinessMeta(env, user.business);
+  return publicUser(user, { court: meta.court, hold: meta.hold });
 }
 
 async function handleRegister(request, env, body) {
@@ -204,14 +209,16 @@ async function handleListMembers(request, env) {
 }
 
 async function handleUpdateMember(request, env, body) {
-  await requireAdmin(request, env);
+  const caller = await requireAdmin(request, env);
   await updateMember(env, body);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.update', detail: 'uid ' + body.uid + ' → ' + body.role + ', ' + (body.business || '') });
   return { members: await listAllUsers(env) };
 }
 
 async function handleDeleteMember(request, env, body) {
-  await requireAdmin(request, env);
+  const caller = await requireAdmin(request, env);
   await deleteMember(env, body.uid);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.delete', detail: 'uid ' + body.uid });
   return { members: await listAllUsers(env) };
 }
 
@@ -221,13 +228,17 @@ async function handleListCompanies(request, env) {
 }
 
 async function handleUpdateCompany(request, env, body) {
-  await requireAdmin(request, env);
-  return { companies: await updateCompany(env, body) };
+  const caller = await requireAdmin(request, env);
+  const companies = await updateCompany(env, body);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.update', detail: (body.name || '') + (body.court ? ' [Court]' : '') });
+  return { companies };
 }
 
 async function handleDeleteCompany(request, env, body) {
-  await requireAdmin(request, env);
-  return { companies: await archiveCompany(env, body.id) };
+  const caller = await requireAdmin(request, env);
+  const companies = await archiveCompany(env, body.id);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.archive', detail: 'id ' + body.id });
+  return { companies };
 }
 
 /** Admin-only: run the D1 → Sheets backup on demand (the cron does it on a schedule). */
@@ -244,8 +255,10 @@ async function handleMarket(request, env) {
 
 /** Admin-only: wipe the sales + intake logs across the whole network. */
 async function handleClearLogs(request, env) {
-  await requireAdmin(request, env);
-  return await clearLogs(env);
+  const caller = await requireAdmin(request, env);
+  const res = await clearLogs(env);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'logs.clear', detail: (res.sales || 0) + ' sales, ' + (res.intake || 0) + ' intake' });
+  return res;
 }
 
 function daysUntil(untilStr) {
@@ -344,6 +357,7 @@ async function requireOwnerOrAdmin(request, env) {
 async function handleCreateTransfer(request, env, body) {
   const caller = await requireOwnerOrAdmin(request, env);
   await createTransfer(env, caller.business, body);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.send', detail: (body.item || '') + ' ×' + (body.qty || '') + ' → ' + (body.toBusiness || '') });
   return await listTransfers(env, caller.business);
 }
 async function handleListTransfers(request, env) {
@@ -353,17 +367,67 @@ async function handleListTransfers(request, env) {
 async function handleAcceptTransfer(request, env, body) {
   const caller = await requireOwnerOrAdmin(request, env);
   await acceptTransfer(env, caller.business, body.id);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.accept', detail: 'id ' + body.id });
   return await listTransfers(env, caller.business);
 }
 async function handleCancelTransfer(request, env, body) {
   const caller = await requireOwnerOrAdmin(request, env);
   await cancelTransfer(env, caller.business, body.id);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.cancel', detail: 'id ' + body.id });
   return await listTransfers(env, caller.business);
 }
 async function handleDeclineTransfer(request, env, body) {
   const caller = await requireOwnerOrAdmin(request, env);
   await declineTransfer(env, caller.business, body.id);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.decline', detail: 'id ' + body.id });
   return await listTransfers(env, caller.business);
+}
+async function handleTransferHistory(request, env) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return { history: await listTransferHistory(env, caller.business) };
+}
+
+/* ---- Shop Ledger: coffers, discounts, style ---- */
+async function handleGetCoffer(request, env) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return await cofferSummary(env, caller.business);
+}
+async function handleAdjustCoffer(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const res = await adjustCoffer(env, caller.business, body);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'coffer.adjust', detail: (Number(body.amount) || 0) + 'gp ' + (body.note || '') });
+  return res;
+}
+async function handleGetDiscounts(request, env) {
+  const caller = await requireRegistered(request, env);
+  return { discounts: await listDiscounts(env, caller.business) };
+}
+async function handleAddDiscount(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return { discounts: await addDiscount(env, caller.business, body) };
+}
+async function handleDeleteDiscount(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return { discounts: await deleteDiscount(env, caller.business, body.id) };
+}
+async function handleGetStyle(request, env) {
+  const caller = await requireRegistered(request, env);
+  return await getShopStyle(env, caller.business);
+}
+async function handleSetStyle(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return await setShopStyle(env, caller.business, body);
+}
+
+/** Admin-only: the audit trail. */
+async function handleAudit(request, env) {
+  await requireAdmin(request, env);
+  return { audit: await listAudit(env) };
+}
+
+/** A short actor label for the audit trail. */
+function actorName(caller) {
+  return (caller.character || caller.email || caller.uid) + (caller.business ? ' (' + caller.business + ')' : '');
 }
 
 /** Court businesses only: the market report for their own hold. */
@@ -742,6 +806,39 @@ export default {
       if (request.method === 'POST' && path === '/transfers/decline') {
         const body = await readJsonBody(request);
         return json(await handleDeclineTransfer(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/transfers/history') {
+        return json(await handleTransferHistory(request, env), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/business/coffer') {
+        return json(await handleGetCoffer(request, env), 200, cors);
+      }
+      if (request.method === 'POST' && path === '/business/coffer/adjust') {
+        const body = await readJsonBody(request);
+        return json(await handleAdjustCoffer(request, env, body), 200, cors);
+      }
+      if (request.method === 'GET' && path === '/business/discounts') {
+        return json(await handleGetDiscounts(request, env), 200, cors);
+      }
+      if (request.method === 'POST' && path === '/business/discounts') {
+        const body = await readJsonBody(request);
+        return json(await handleAddDiscount(request, env, body), 200, cors);
+      }
+      if (request.method === 'POST' && path === '/business/discounts/delete') {
+        const body = await readJsonBody(request);
+        return json(await handleDeleteDiscount(request, env, body), 200, cors);
+      }
+      if (request.method === 'GET' && path === '/business/style') {
+        return json(await handleGetStyle(request, env), 200, cors);
+      }
+      if (request.method === 'POST' && path === '/business/style') {
+        const body = await readJsonBody(request);
+        return json(await handleSetStyle(request, env, body), 200, cors);
+      }
+      if (request.method === 'GET' && path === '/admin/audit') {
+        return json(await handleAudit(request, env), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/holds') {
