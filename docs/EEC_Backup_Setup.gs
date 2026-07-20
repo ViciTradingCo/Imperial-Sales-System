@@ -1,9 +1,8 @@
 /**
  * EEC Automated Ledger — Core one-time setup.
  *
- * Run this ONCE in the EEC Core spreadsheet (Extensions → Apps Script → paste →
- * run `setupCore`). It prepares the Core so the Worker's scheduled backup and
- * company editing work cleanly:
+ * Prepares the Core so the Worker's scheduled backup and company editing work
+ * cleanly:
  *
  *   1. Widens "Certified Users" to include the Hold (K) and Court (L) columns
  *      and writes their headers. (This fixes the "exceeds grid limits" error
@@ -11,9 +10,25 @@
  *   2. Creates the backup tabs the Worker writes to — Backup_Sales,
  *      Backup_Intake, Backup_Inventory, Backup_Meta — each with its header row.
  *
- * It is safe to re-run: existing tabs/columns are left in place; only missing
- * pieces are added. It never deletes data.
+ * HOW TO RUN — either way works:
+ *   • Menu: paste this in the Core (Extensions → Apps Script), Save, then
+ *     RELOAD the spreadsheet tab. A new "EEC Setup" menu appears at the top →
+ *     click "Run Core setup". (Approve the permission prompt the first time.)
+ *   • Editor: in the Apps Script editor, pick `setupCore` in the function
+ *     dropdown and click Run.
+ *
+ * Safe to re-run: existing tabs/columns are left in place; only missing pieces
+ * are added. It never deletes data.
  */
+
+/** Adds the "EEC Setup" menu when the spreadsheet opens. */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('EEC Setup')
+    .addItem('Run Core setup', 'setupCore')
+    .addToUi();
+}
+
 function setupCore() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureCertColumns_(ss);
