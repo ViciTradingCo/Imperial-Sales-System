@@ -3,6 +3,9 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.0', date: '2026-07-20', notes: [
+    'Market Analysis (admin): network revenue, per-shop and per-hold performance, below-cost and low-stock alerts.',
+  ] },
   { version: '1.9', date: '2026-07-20', notes: [
     'Language picker in Profile — translate the interface (Español, Français, Deutsch, Italiano).',
     'Admin nav labeled “Admin Panel”.',

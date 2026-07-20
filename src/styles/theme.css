@@ -70,6 +70,23 @@ body {
 .action-btn:hover { opacity: 0.92; }
 .action-btn.active { box-shadow: inset 0 0 0 2px var(--header-text); font-weight: bold; }
 
+/* ---- Market Analysis ---- */
+.stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 4px; }
+.stat-tile {
+  flex: 1 1 140px; background: var(--paper-raised);
+  border: 1px solid var(--accent); border-radius: var(--radius); padding: 14px 16px;
+}
+.stat-value { font-size: 22px; font-weight: bold; color: var(--accent); }
+.stat-label { font-size: 12px; color: var(--note); text-transform: uppercase; letter-spacing: 0.04em; }
+.table-scroll { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th, .data-table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid rgba(122,74,31,0.2); white-space: nowrap; }
+.data-table th { color: var(--accent); }
+.alert-list { margin: 0; padding-left: 18px; }
+.alert-list li { margin: 4px 0; }
+.alert-list li.bad { color: var(--bad); }
+.alert-list li.warn { color: var(--warn); }
+
 .user-badge {
   font-size: 13px;
   background: var(--accent);

@@ -23,6 +23,7 @@ import { renderPos } from './views/pos.js';
 import { renderAdminSettings } from './views/admin-settings.js';
 import { renderMembers } from './views/members.js';
 import { renderCompanies } from './views/companies.js';
+import { renderMarket } from './views/market.js';
 import { renderLedgerSettings } from './views/ledger-settings.js';
 
 const appEl = document.getElementById('app');
@@ -189,6 +190,11 @@ route('/admin/members', (container) => {
 route('/admin/companies', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
   renderCompanies(container);
+});
+
+route('/admin/market', (container) => {
+  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+  renderMarket(container);
 });
 
 route('/ledger/settings', (container) => {

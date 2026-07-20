@@ -71,6 +71,8 @@ export const api = {
   deleteCompany: (id) => request('POST', '/admin/companies/delete', { id }),
   /** Admin: run the D1 → Sheets backup on demand. */
   runBackup: () => request('POST', '/admin/backup', {}),
+  /** Admin: network-wide market analytics. */
+  getMarket: () => request('GET', '/admin/market'),
   /** Owner/admin: read this shop's per-business (ledger) settings. */
   getLedgerSettings: () => request('GET', '/business/settings'),
   /** Owner/admin: save per-business (ledger) settings ([{label, value}]). */

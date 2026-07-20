@@ -31,6 +31,7 @@ import { checkCertification } from './cert.js';
 import { checkout, listSales, voidSale } from './sales.js';
 import { renameBusinessData, ensureSchema } from './db.js';
 import { runBackup } from './backup.js';
+import { marketAnalysis } from './market.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -230,6 +231,12 @@ async function handleDeleteCompany(request, env, body) {
 async function handleRunBackup(request, env) {
   await requireAdmin(request, env);
   return await runBackup(env);
+}
+
+/** Admin-only: network-wide market analytics over the D1 store. */
+async function handleMarket(request, env) {
+  await requireAdmin(request, env);
+  return await marketAnalysis(env);
 }
 
 async function handleSaveSettings(request, env, body) {
@@ -495,6 +502,10 @@ export default {
 
       if (request.method === 'POST' && path === '/admin/backup') {
         return json(await handleRunBackup(request, env), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/admin/market') {
+        return json(await handleMarket(request, env), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/business/settings') {
