@@ -10,14 +10,13 @@ import { api } from '../lib/api.js';
 import { setAdminActions, setOpsActions, subscriptionCard } from '../lib/sections.js';
 
 export function renderHome(container, { me }) {
-  // Message of the day — an admin banner shown to everyone, if set.
+  // Notices — the global MOTD plus any active per-business messages.
   const motdHost = el('div', {});
   api.getMotd().then((r) => {
-    if (r && r.motd) mount(motdHost, el('div', { class: 'card motd-card' }, [
-      el('h3', {}, '📜 Notice'),
-      el('p', {}, r.motd),
-    ]));
-  }).catch(() => { /* banner is non-critical */ });
+    const notices = (r && r.notices) || [];
+    if (notices.length) mount(motdHost, ...notices.map((n) =>
+      el('div', { class: 'card motd-card' }, [el('h3', {}, '📜 Notice'), el('p', {}, n)])));
+  }).catch(() => { /* banners are non-critical */ });
 
   const idCard = el('div.card', {}, [
     el('h2', {}, 'Welcome, ' + esc(me.character || 'trader')),

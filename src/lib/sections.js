@@ -35,6 +35,7 @@ export function setAdminActions() {
   setActions(mark([
     { label: 'Member List', path: '/admin/members', onClick: () => navigate('/admin/members') },
     { label: 'Company List', path: '/admin/companies', onClick: () => navigate('/admin/companies') },
+    { label: 'Messages', path: '/admin/motd', onClick: () => navigate('/admin/motd') },
     { label: 'Network Settings', path: '/admin/settings', onClick: () => navigate('/admin/settings') },
     { label: 'Back up now', onClick: backupNow },
   ]));

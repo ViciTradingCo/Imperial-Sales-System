@@ -25,6 +25,7 @@ import { renderMembers } from './views/members.js';
 import { renderCompanies } from './views/companies.js';
 import { renderMarket } from './views/market.js';
 import { renderHoldReport } from './views/hold-report.js';
+import { renderMotdAdmin } from './views/motd-admin.js';
 import { renderLedgerSettings } from './views/ledger-settings.js';
 
 const appEl = document.getElementById('app');
@@ -36,6 +37,25 @@ const patchEl = document.getElementById('patchnotes');
 initActions(document.getElementById('actionbar'));
 
 const state = { profile: null, me: null };
+
+// A persistent banner (e.g. the subscription-expiry warning) that lives OUTSIDE
+// #app, so it survives every route change and shows on all pages.
+const globalBanner = document.createElement('div');
+globalBanner.id = 'globalBanner';
+globalBanner.hidden = true;
+appEl.parentNode.insertBefore(globalBanner, appEl);
+
+function refreshGlobalBanner() {
+  if (!(state.me && state.me.registered)) { globalBanner.hidden = true; globalBanner.innerHTML = ''; return; }
+  api.getMotd().then((r) => {
+    if (r && r.banner) {
+      mount(globalBanner, el('div', { class: 'global-banner' }, r.banner));
+      globalBanner.hidden = false;
+    } else {
+      globalBanner.hidden = true; globalBanner.innerHTML = '';
+    }
+  }).catch(() => { globalBanner.hidden = true; });
+}
 
 // The header floats (sticky); the action bar sticks just below it. Measure the
 // real header height into --topbar-h so the bar never hides under the header.
@@ -183,6 +203,11 @@ route('/admin/settings', (container) => {
   renderAdminSettings(container);
 });
 
+route('/admin/motd', (container) => {
+  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+  renderMotdAdmin(container);
+});
+
 route('/admin/members', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
   renderMembers(container);
@@ -231,6 +256,7 @@ async function onSignedIn() {
   }
   renderBadge();
   showNav(!!(state.me && state.me.registered));
+  refreshGlobalBanner();
   navigate(state.me.registered ? '/' : '/register');
   render(); // paint even if the hash was already the target
 }

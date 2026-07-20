@@ -75,6 +75,15 @@ body {
 .motd-card h3 { margin-top: 0; color: var(--accent); }
 .motd-card p { margin-bottom: 0; white-space: pre-wrap; }
 
+/* Persistent app-wide banner (subscription-expiry warning). */
+#globalBanner { padding: 0 20px; }
+.global-banner {
+  background: var(--warn); color: #fff; font-weight: bold;
+  padding: 10px 16px; border-radius: var(--radius); margin: 12px 0 0;
+  text-align: center;
+}
+@media (max-width: 600px) { #globalBanner { padding: 0 14px; } }
+
 /* ---- Market Analysis ---- */
 .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 4px; }
 .stat-tile {

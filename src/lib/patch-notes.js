@@ -3,6 +3,11 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.3', date: '2026-07-20', notes: [
+    'Messages of the Day is its own admin page (Messages button).',
+    'Schedule per-business notices with a start/end window.',
+    'Automatic subscription-expiry warning banner (adjustable lead time) that persists on every page.',
+  ] },
   { version: '2.2', date: '2026-07-20', notes: [
     'Message of the day — admins can post a notice shown on everyone’s Home.',
   ] },

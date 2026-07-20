@@ -32,7 +32,7 @@ import { checkout, listSales, voidSale } from './sales.js';
 import { renameBusinessData, ensureSchema, clearLogs } from './db.js';
 import { runBackup } from './backup.js';
 import { marketAnalysis, holdReport } from './market.js';
-import { readMotd, writeMotd } from './motd.js';
+import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd, activeNoticesForBusiness } from './motd.js';
 
 function corsHeaders(env, request) {
   const origin = request.headers.get('Origin') || '';
@@ -247,16 +247,68 @@ async function handleClearLogs(request, env) {
   return await clearLogs(env);
 }
 
-/** Any registered user: the current message of the day (for the banner). */
-async function handleGetMotd(request, env) {
-  await requireRegistered(request, env);
-  return { motd: await readMotd(env) };
+function daysUntil(untilStr) {
+  const d = new Date(untilStr);
+  if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / 86400000);
 }
 
-/** Admin-only: set the message of the day (blank clears it). */
+/**
+ * Any registered user: the banners to show — Home notices (global + active
+ * per-business messages) and a persistent expiry banner for owner/employees.
+ */
+async function handleGetMotd(request, env) {
+  const caller = await requireRegistered(request, env);
+  const notices = [];
+  const global = await readMotd(env);
+  if (global) notices.push(global);
+  notices.push(...(await activeNoticesForBusiness(env, caller.business)));
+
+  let banner = null;
+  if (caller.role === 'owner' || caller.role === 'employee') {
+    const cert = await checkCertification(env, caller.business);
+    if (!cert.perpetual) {
+      if (cert.status === 'EXPIRED') {
+        banner = '⚠ ' + caller.business + '’s East Empire certification has EXPIRED — renew with an admin to keep selling.';
+      } else if (cert.until) {
+        const warnDays = await readWarnDays(env);
+        const left = daysUntil(cert.until);
+        if (left != null && left <= warnDays) {
+          banner = '⚠ ' + caller.business + '’s certification expires in ' + left + ' day' +
+            (left === 1 ? '' : 's') + ' (' + cert.until + '). Renew with an admin.';
+        }
+      }
+    }
+  }
+  return { notices, banner };
+}
+
+/* ---- Admin MOTD management ---- */
+async function handleMotdConfig(request, env) {
+  await requireAdmin(request, env);
+  return { motd: await readMotd(env), warnDays: await readWarnDays(env), individual: await listIndividualMotds(env) };
+}
 async function handleSetMotd(request, env, body) {
   await requireAdmin(request, env);
   return { motd: await writeMotd(env, body.motd) };
+}
+async function handleSetWarnDays(request, env, body) {
+  await requireAdmin(request, env);
+  return { warnDays: await writeWarnDays(env, body.days) };
+}
+async function handleAddIndividual(request, env, body) {
+  await requireAdmin(request, env);
+  return { individual: await addIndividualMotd(env, body) };
+}
+async function handleUpdateIndividual(request, env, body) {
+  await requireAdmin(request, env);
+  return { individual: await updateIndividualMotd(env, body) };
+}
+async function handleDeleteIndividual(request, env, body) {
+  await requireAdmin(request, env);
+  return { individual: await deleteIndividualMotd(env, body.id) };
 }
 
 /** Court businesses only: the market report for their own hold. */
@@ -552,9 +604,33 @@ export default {
         return json(await handleGetMotd(request, env), 200, cors);
       }
 
+      if (request.method === 'GET' && path === '/admin/motd') {
+        return json(await handleMotdConfig(request, env), 200, cors);
+      }
+
       if (request.method === 'POST' && path === '/admin/motd') {
         const body = await readJsonBody(request);
         return json(await handleSetMotd(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/motd/warn') {
+        const body = await readJsonBody(request);
+        return json(await handleSetWarnDays(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/motd/individual') {
+        const body = await readJsonBody(request);
+        return json(await handleAddIndividual(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/motd/individual/update') {
+        const body = await readJsonBody(request);
+        return json(await handleUpdateIndividual(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/motd/individual/delete') {
+        const body = await readJsonBody(request);
+        return json(await handleDeleteIndividual(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/business/settings') {

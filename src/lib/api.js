@@ -77,10 +77,20 @@ export const api = {
   clearLogs: () => request('POST', '/admin/logs/clear', {}),
   /** Court businesses: the market report for their own hold. */
   getHoldReport: () => request('GET', '/market/hold'),
-  /** The current message of the day (banner). */
+  /** Banners for the current user: { notices[], banner }. */
   getMotd: () => request('GET', '/motd'),
-  /** Admin: set the message of the day (blank clears it). */
+  /** Admin: read the MOTD config { motd, warnDays, individual[] }. */
+  getMotdConfig: () => request('GET', '/admin/motd'),
+  /** Admin: set the global message of the day (blank clears it). */
   setMotd: (motd) => request('POST', '/admin/motd', { motd }),
+  /** Admin: set the expiry-warning lead time (days). */
+  setWarnDays: (days) => request('POST', '/admin/motd/warn', { days }),
+  /** Admin: add an individual (per-business, scheduled) message. */
+  addIndividualMotd: (m) => request('POST', '/admin/motd/individual', m),
+  /** Admin: edit an individual message. */
+  updateIndividualMotd: (m) => request('POST', '/admin/motd/individual/update', m),
+  /** Admin: delete an individual message. */
+  deleteIndividualMotd: (id) => request('POST', '/admin/motd/individual/delete', { id }),
   /** Owner/admin: read this shop's per-business (ledger) settings. */
   getLedgerSettings: () => request('GET', '/business/settings'),
   /** Owner/admin: save per-business (ledger) settings ([{label, value}]). */
