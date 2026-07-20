@@ -8,11 +8,11 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
-import { setActions } from '../lib/actions.js';
 import { money } from '../lib/format.js';
+import { setOpsActions } from '../lib/sections.js';
 
 export function renderPos(container, { me }) {
-  setActions([{ label: 'Order Lookup', onClick: () => openLookupModal() }]);
+  setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
 
   const banner = el('div', {});
   const body = el('div', {}, el('p', { class: 'note' }, 'Loading register…'));
@@ -117,6 +117,8 @@ export function renderPos(container, { me }) {
       }
     }
 
+    const lookupBtn = el('button.secondary-btn', { onclick: () => openLookupModal() }, 'Open Order Lookup');
+
     mount(body,
       el('div.card', {}, [
         el('h3', {}, 'Add to order'),
@@ -125,15 +127,26 @@ export function renderPos(container, { me }) {
         el('label', {}, 'Sold for per item (gp)'), price,
         addBtn,
       ]),
-      el('div.card', {}, [el('h3', {}, 'Order'), cartHost]),
+      // Customer Details sits above the Order tab…
       el('div.card', {}, [
-        el('h3', {}, 'Complete'),
+        el('h3', {}, 'Customer Details'),
         el('label', {}, 'Customer'), customer,
         el('label', {}, 'Hold'), holdSel,
         el('label', {}, 'Discount name'), discName,
         el('label', {}, 'Discount %'), discPct,
+      ]),
+      // …and the Complete Sale button lives on the Order tab.
+      el('div.card', {}, [
+        el('h3', {}, 'Order'),
+        cartHost,
         complete,
         status,
+      ]),
+      // Order Lookup is its own card at the bottom.
+      el('div.card', {}, [
+        el('h3', {}, 'Order Lookup'),
+        el('p', { class: 'note' }, 'Find a past sale by order number, customer, or employee — or void one.'),
+        lookupBtn,
       ]),
     );
     renderCart();

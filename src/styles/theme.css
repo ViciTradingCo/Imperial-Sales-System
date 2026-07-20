@@ -68,6 +68,7 @@ body {
   border: none; border-radius: var(--radius); padding: 8px 14px;
 }
 .action-btn:hover { opacity: 0.92; }
+.action-btn.active { box-shadow: inset 0 0 0 2px var(--header-text); font-weight: bold; }
 
 .user-badge {
   font-size: 13px;
@@ -135,17 +136,13 @@ body.has-nav .sidenav { display: flex; }
 .sidenav button:hover { background: var(--paper-raised); }
 .sidenav button.active { background: var(--accent); color: var(--header-text); font-weight: bold; }
 
-/* Sign Out: by the nameplate on desktop, in the drawer on mobile. */
-.nav-signout { display: none; }
-@media (max-width: 720px) {
-  .topbar-signout { display: none; }
-  body.has-nav .nav-signout {
-    display: block; width: 100%; text-align: left;
-    font: inherit; font-size: 15px; background: none; border: none;
-    color: var(--bad); cursor: pointer; padding: 10px 12px;
-    border-radius: var(--radius); margin-top: 8px;
-    border-top: 1px solid rgba(122, 74, 31, 0.2);
-  }
+/* Sign Out lives in the nav menu on both desktop and mobile. */
+.nav-signout {
+  display: block; width: 100%; text-align: left;
+  font: inherit; font-size: 15px; background: none; border: none;
+  color: var(--bad); cursor: pointer; padding: 10px 12px;
+  border-radius: var(--radius); margin-top: 8px;
+  border-top: 1px solid rgba(122, 74, 31, 0.2);
 }
 
 .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 45; }
@@ -173,26 +170,13 @@ body.has-nav .sidenav { display: flex; }
 }
 .modal-close:hover { color: var(--ink); }
 
-/* ---- patch notes column (right) ---- */
-.patchnotes {
-  display: none;
-  flex: none;
-  width: 250px;
-  padding: 20px 14px;
-  font-size: 13px;
-  color: var(--ink);
-}
-body.has-nav .patchnotes { display: block; }
-/* The Patch Notes menu item is only useful where the right-hand column is
-   hidden. It disappears below 900px, so show the nav button from there down
-   (covers both the tablet sidebar and the mobile drawer). */
-.nav-mobile-only { display: none; }
-@media (max-width: 900px) { .nav-mobile-only { display: block; } }
-.patchnotes h3 { margin-top: 0; color: var(--accent); }
+/* ---- patch notes (now a nav page, not a side column) ---- */
+.patchnotes { display: none; } /* the old right-hand column is retired */
 .patch-entry { margin-bottom: 14px; }
 .patch-ver { font-weight: bold; color: var(--note); margin-bottom: 2px; }
-.patchnotes ul { margin: 0; padding-left: 18px; }
-.patchnotes li { margin: 3px 0; }
+.patch-date { font-weight: normal; color: var(--note); font-size: 12px; }
+.patch-notes-page ul { margin: 0 0 4px; padding-left: 18px; }
+.patch-notes-page li { margin: 3px 0; }
 
 /* ---- landing / about ---- */
 .card.hero h2 { font-size: 22px; }
@@ -393,10 +377,6 @@ img, table { max-width: 100%; }
      instead of clustering at their natural width. */
   .actionbar { padding: 8px 14px; }
   .action-btn { flex: 1 1 auto; text-align: center; min-height: 44px; font-size: 14px; }
-
-  /* "Remember me" isn't reliable on mobile (silent re-auth is blocked), so
-     hide the option there to avoid a promise the phone can't keep. */
-  .remember-row { display: none; }
 
   /* Employee rows stack instead of squeezing */
   .emp-row { flex-wrap: wrap; align-items: flex-start; gap: 8px; }

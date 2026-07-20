@@ -52,6 +52,28 @@ export async function updateRange(env, spreadsheetId, range, rows) {
   });
 }
 
+/**
+ * Ensures a tab's grid is at least `minCols` wide, expanding it if needed.
+ * A pre-existing tab created with fewer columns (e.g. the original 10-column
+ * Certified Users) would otherwise reject writes past its last column with
+ * "exceeds grid limits".
+ */
+export async function ensureColumns(env, spreadsheetId, title, minCols) {
+  const data = await authFetch(env, `${BASE}/${spreadsheetId}?fields=sheets.properties(sheetId,title,gridProperties)`);
+  const sheet = (data.sheets || []).find((s) => s.properties.title === title);
+  if (!sheet) return;
+  const cur = (sheet.properties.gridProperties && sheet.properties.gridProperties.columnCount) || 0;
+  if (cur >= minCols) return;
+  await authFetch(env, `${BASE}/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests: [{ updateSheetProperties: {
+      properties: { sheetId: sheet.properties.sheetId, gridProperties: { columnCount: minCols } },
+      fields: 'gridProperties.columnCount',
+    } }] }),
+  });
+}
+
 /** Clears the values in a range (leaves formatting/tab intact). */
 export async function clearRange(env, spreadsheetId, range) {
   const url = `${BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:clear`;

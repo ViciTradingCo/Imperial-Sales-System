@@ -10,7 +10,7 @@
  * Business NAME is the human key that links a Users row to its business, so we
  * enforce name uniqueness at registration.
  */
-import { readRange, appendRows, updateRange, ensureSheet } from './sheets.js';
+import { readRange, appendRows, updateRange, ensureSheet, ensureColumns } from './sheets.js';
 import { appendUser, findUserByEmail, reconcileUsersHeader, USERS_SHEET, USERS_HEADERS } from './users.js';
 import { renameBusinessKey } from './business-settings.js';
 import { renameBusinessData } from './db.js';
@@ -21,8 +21,10 @@ export const CERT_SHEET = 'Certified Users';
 // hold the business trades in, chosen at registration.
 export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe', 'Hold', 'Court'];
 
-/** Rewrites the Certified Users header row so a pre-existing tab gains the Hold/Court labels. */
+/** Widens the grid (if needed) and rewrites the Certified Users header row so a
+ *  pre-existing 10-column tab gains the Hold/Court columns + labels. */
 export async function reconcileCertHeader(env) {
+  await ensureColumns(env, env.CORE_SPREADSHEET_ID, CERT_SHEET, CERT_HEADERS.length);
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A1`, [CERT_HEADERS]);
 }
 
@@ -186,6 +188,8 @@ export async function listCompanies(env) {
 export async function updateCompany(env, { id, name, until, perpetual, hold, court }) {
   const targetId = String(id || '').trim();
   if (!targetId) throw new Error('Missing company id.');
+  // Ensure the Hold/Court columns exist before we read or write them.
+  await reconcileCertHeader(env);
   const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
   let rowIdx = null;
   let current = null;

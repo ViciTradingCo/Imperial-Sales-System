@@ -51,6 +51,8 @@ export const api = {
   listEmployees: () => request('GET', '/business/employees'),
   /** Owner/admin: activate a pending employee. */
   activateEmployee: (uid) => request('POST', '/business/employees/activate', { uid }),
+  /** Owner/admin: set an owner-private note on an employee. */
+  setEmployeeNote: (uid, note) => request('POST', '/business/employees/note', { uid, note }),
   /** Admin: read the network's Master Settings. */
   getSettings: () => request('GET', '/admin/settings'),
   /** Admin: save Master Settings updates ([{label, value}]). */

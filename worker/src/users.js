@@ -13,8 +13,9 @@
 import { readRange, appendRows, updateRange } from './sheets.js';
 
 export const USERS_SHEET = 'Users';
-// Character is appended at the end so existing rows/headers never shift.
-export const USERS_HEADERS = ['UID', 'Email', 'Business', 'Role', 'Is Owner', 'Status', 'Created', 'Last Seen', 'Character'];
+// Character (I) and owner Notes (J) are appended at the end so existing
+// rows/headers never shift.
+export const USERS_HEADERS = ['UID', 'Email', 'Business', 'Role', 'Is Owner', 'Status', 'Created', 'Last Seen', 'Character', 'Notes'];
 
 function normalizeRow(r) {
   return {
@@ -25,6 +26,7 @@ function normalizeRow(r) {
     isOwner: String(r[4]).trim().toUpperCase() === 'TRUE',
     status: String(r[5] || '').trim().toLowerCase() || 'active',
     character: String(r[8] || '').trim(),
+    notes: String(r[9] || '').trim(),
   };
 }
 
@@ -68,7 +70,7 @@ export async function listAllUsers(env) {
 export async function listUsersByBusiness(env, business) {
   const target = String(business || '').trim().toLowerCase();
   if (!target) return [];
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:J`);
   const out = [];
   rows.forEach((r, i) => {
     if (String(r[2] || '').trim().toLowerCase() === target) {
@@ -105,6 +107,11 @@ export async function setUserCharacter(env, row, character) {
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!I${row}`, [[character]]);
 }
 
+/** Sets a user's owner-only Notes cell (column J) by sheet row. */
+export async function setUserNote(env, row, note) {
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!J${row}`, [[String(note || '').trim()]]);
+}
+
 /** Admin edit of a member (by UID): character, company, and role. */
 export async function updateMember(env, { uid, character, business, role }) {
   const target = String(uid || '').trim();
@@ -136,8 +143,8 @@ export async function deleteMember(env, uid) {
   let rowIdx = null;
   rows.forEach((row, i) => { if (String(row[0] || '').trim() === target) rowIdx = i + 2; });
   if (!rowIdx) throw new Error('Member not found.');
-  await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A${rowIdx}:I${rowIdx}`,
-    [['', '', '', '', '', '', '', '', '']]);
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A${rowIdx}:J${rowIdx}`,
+    [['', '', '', '', '', '', '', '', '', '']]);
 }
 
 /** Best-effort Last Seen stamp (column H). Never throws into the caller. */

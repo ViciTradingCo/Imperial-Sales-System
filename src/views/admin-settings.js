@@ -4,8 +4,10 @@
  */
 import { api } from '../lib/api.js';
 import { renderSettingsForm } from './settings-form.js';
+import { setAdminActions } from '../lib/sections.js';
 
 export function renderAdminSettings(container) {
+  setAdminActions(); // keep the admin tools on the bar across sub-pages
   renderSettingsForm(container, {
     title: 'Network Settings',
     subtitle: 'Network-wide settings for the whole East Empire network, saved to the Core ' +

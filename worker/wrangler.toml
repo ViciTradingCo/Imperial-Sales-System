@@ -12,10 +12,10 @@ compatibility_date = "2024-09-01"
 CORE_SPREADSHEET_ID = "1-T-R_5BJmaeHv3fkqGSI06xKc9yXgI3pVqXQ1DzgiGk"
 GOOGLE_CLIENT_ID = "987037150604-djt5q7a16kgs77jvc8lnhrk74p76u5oj.apps.googleusercontent.com"
 ALLOWED_ORIGIN = "https://meretheec.github.io,http://localhost:5173"
-# Operator-owned backup Sheet for the scheduled D1 mirror. Leave blank to
-# disable the backup. It must be a DIFFERENT Sheet, shared with EDIT access to
-# the service-account email. See docs/SETUP.md → "Data backup".
-BACKUP_SPREADSHEET_ID = ""
+# Backup target for the scheduled D1 mirror — the Core spreadsheet itself
+# (Backup_* tabs live alongside the registry). Run the Apps Script in
+# docs/EEC_Backup_Setup.gs first to prepare the tabs. Leave blank to disable.
+BACKUP_SPREADSHEET_ID = "1-T-R_5BJmaeHv3fkqGSI06xKc9yXgI3pVqXQ1DzgiGk"
 
 # Cron Trigger — the slow backup cadence (D1 → the backup Sheet). Daily at
 # 06:00 UTC; adjust to taste (this is deliberately far less frequent than the

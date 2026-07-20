@@ -9,14 +9,12 @@ import { navigate, currentPath } from './router.js';
 /** The nav destinations available to a given user, in order. */
 export function navItems(me) {
   const items = [{ path: '/', label: 'Home' }];
-  // Register / Inventory / Employees now live on the Business Operations page's
-  // action bar; Network Settings on the admin Home action bar.
-  items.push({ path: '/operations', label: 'Business Operations' });
+  // Register / Inventory / Employees live on an action bar: on Home for
+  // owners/employees, and on the Business Operations page for admins.
+  if (me.role === 'admin') items.push({ path: '/operations', label: 'Business Operations' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });
   items.push({ path: '/profile', label: 'Profile' });
-  // Patch notes have their own right-hand column on desktop; on mobile that
-  // column is hidden, so surface them as a menu page instead (mobile-only).
-  items.push({ path: '/patch-notes', label: 'Patch Notes', mobileOnly: true });
+  items.push({ path: '/patch-notes', label: 'Patch Notes' });
   items.push({ path: '/about', label: 'About' });
   return items;
 }
@@ -30,7 +28,6 @@ export function renderNav(navEl, me, onNavigate, onSignOut) {
     const b = document.createElement('button');
     b.textContent = it.label;
     b.dataset.path = it.path;
-    if (it.mobileOnly) b.className = 'nav-mobile-only';
     b.addEventListener('click', () => {
       navigate(it.path);
       if (onNavigate) onNavigate();

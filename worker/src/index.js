@@ -19,7 +19,7 @@
  *   GOOGLE_CLIENT_ID, ALLOWED_ORIGIN.
  */
 import { verifyIdToken } from './verify.js';
-import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, deleteMember, setUserStatus, setUserCharacter, touchLastSeen, USERS_SHEET } from './users.js';
+import { findUserByEmail, listUsersByBusiness, listAllUsers, updateMember, deleteMember, setUserStatus, setUserCharacter, setUserNote, touchLastSeen, USERS_SHEET } from './users.js';
 import { registerUser, renameBusiness, listCompanies, updateCompany, archiveCompany } from './registry.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
@@ -150,8 +150,32 @@ async function handleListEmployees(request, env, url) {
   const users = await listUsersByBusiness(env, business);
   return {
     business,
-    employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status })),
+    // Notes are owner/admin-only — they're only ever returned on this roster.
+    employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status, notes: u.notes || '' })),
   };
+}
+
+/** Owners/admins only: set an owner-private note on one of their employees. */
+async function handleEmployeeNote(request, env, body) {
+  const caller = await requireRegistered(request, env);
+  if (caller.role !== 'owner' && caller.role !== 'admin') {
+    const e = new Error('Only a business owner or an admin can add employee notes.');
+    e.forbidden = true;
+    throw e;
+  }
+  const targetUid = String(body.uid || '').trim();
+  if (!targetUid) throw new Error('Which employee? A uid is required.');
+  const roster = await listUsersByBusiness(env, caller.business);
+  const target = roster.find((u) => u.uid === targetUid);
+  // Scope: an owner can only note their OWN business's roster (an admin any).
+  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid) : null);
+  if (!found) {
+    const e = new Error('That employee is not part of your business.');
+    e.forbidden = true;
+    throw e;
+  }
+  await setUserNote(env, found.row, body.note);
+  return { ok: true, uid: targetUid };
 }
 
 /** Requires the caller to be a registered admin. */
@@ -425,6 +449,11 @@ export default {
       if (request.method === 'POST' && path === '/business/employees/activate') {
         const body = await readJsonBody(request);
         return json(await handleActivateEmployee(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/business/employees/note') {
+        const body = await readJsonBody(request);
+        return json(await handleEmployeeNote(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/admin/settings') {

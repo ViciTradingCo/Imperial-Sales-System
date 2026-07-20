@@ -11,30 +11,33 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
-import { setActions } from '../lib/actions.js';
 import { money } from '../lib/format.js';
+import { setOpsActions } from '../lib/sections.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
+  setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading inventory…'));
 
-  const nodes = [el('div.card', {}, [
+  // The Record Intake button sits between the intro and the item list.
+  const firstCard = [
     el('h2', {}, 'Inventory'),
     el('p', { class: 'note' }, esc(me.business || 'Your shop') +
       ' — items, prices, and stock. "Low" means at or below an item’s own Low Stock number.'),
-    listHost,
-  ])];
+  ];
+  if (canEdit) {
+    firstCard.push(el('button.primary', { onclick: () => openIntakeModal(refreshAll) }, 'Record Intake'));
+  }
+  firstCard.push(listHost);
+  const nodes = [el('div.card', {}, firstCard)];
 
   let intakeHost = null;
-
   if (canEdit) {
     intakeHost = el('div', {}, '');
     nodes.push(el('div.card', {}, [
       el('h3', {}, 'Recent intake'),
       intakeHost,
     ]));
-    // First action-bar button: open the intake transaction as a focus modal.
-    setActions([{ label: 'Record Intake', onClick: () => openIntakeModal(refreshAll) }]);
   }
 
   mount(container, ...nodes);

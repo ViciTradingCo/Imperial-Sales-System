@@ -1,22 +1,12 @@
 /**
- * Home page — the signed-in landing. Shows the user's identity + status and the
- * per-role feature sections (stubs until each phase builds them). Settings,
- * employees, profile, etc. are reached from the nav, not here.
+ * Home page — the signed-in landing.
+ *   • Admins get the network tools on the action bar (Member/Company/Settings/Backup).
+ *   • Owners & employees get their business tools merged in here: the action bar
+ *     is the Business Operations bar (Register/Inventory/Employees) and the page
+ *     shows their subscription status.
  */
 import { el, mount, esc } from '../lib/dom.js';
-import { navigate } from '../lib/router.js';
-import { setActions } from '../lib/actions.js';
-import { api } from '../lib/api.js';
-
-const ROLE_SECTIONS = {
-  admin: [
-    ['Core Dashboard', 'Registry, connect shops, sync pipeline, MOTD.', 'Phase 5'],
-  ],
-  owner: [
-    ['Shop Ledger', 'Discounts, style, Coffers, and more.', 'Phase 4'],
-  ],
-  employee: [],
-};
+import { setAdminActions, setOpsActions, subscriptionCard } from '../lib/sections.js';
 
 export function renderHome(container, { me }) {
   const idCard = el('div.card', {}, [
@@ -31,45 +21,17 @@ export function renderHome(container, { me }) {
       : el('p', { class: 'ok' }, 'Your account is active.'),
   ]);
 
-  const sections = (ROLE_SECTIONS[me.role] || []).map(([title, desc, phase]) =>
-    el('div.card.stub', {}, [
-      el('h3', {}, title),
-      el('p', { class: 'note' }, desc),
-      el('span', { class: 'pill-soon' }, 'Arrives in ' + phase),
-    ]));
+  const nodes = [idCard];
 
-  mount(container, idCard, ...sections);
-
-  // Admin gets quick links to the network-wide tools on the action bar.
   if (me.role === 'admin') {
-    setActions([
-      { label: 'Member List', onClick: () => navigate('/admin/members') },
-      { label: 'Company List', onClick: () => navigate('/admin/companies') },
-      { label: 'Network Settings', onClick: () => navigate('/admin/settings') },
-      { label: 'Back up now', onClick: backupNow },
-    ]);
+    setAdminActions();
+  } else {
+    // Business Operations lives here for owners/employees.
+    setOpsActions(me);
+    nodes.push(subscriptionCard(me));
   }
-}
 
-/** Runs the D1 → Sheets backup on demand and reports the result. */
-async function backupNow(e) {
-  const btn = e && e.currentTarget;
-  const label = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Backing up…'; }
-  try {
-    const r = await api.runBackup();
-    if (r && r.ok) {
-      window.alert('Backup complete (' + r.at + ')\n\n' +
-        'Sales: ' + r.sales + '\nIntake: ' + r.intake + '\nInventory: ' + r.inventory);
-    } else {
-      window.alert('Backup not run: ' + ((r && r.skipped) || 'unknown reason') +
-        '\n\nSet BACKUP_SPREADSHEET_ID (see docs/SETUP.md) to enable it.');
-    }
-  } catch (err) {
-    window.alert('Backup failed: ' + (err.message || String(err)));
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = label; }
-  }
+  mount(container, ...nodes);
 }
 
 function roleTitle(role) {

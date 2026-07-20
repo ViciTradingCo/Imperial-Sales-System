@@ -4,7 +4,6 @@
  * the app and credits SmileDaemon, with a note on how to reach them.
  */
 import { el, mount } from '../lib/dom.js';
-import { getRemember, setRemember } from '../lib/auth.js';
 
 export function renderLanding(container, { signInMount } = {}) {
   const nodes = [];
@@ -18,15 +17,11 @@ export function renderLanding(container, { signInMount } = {}) {
   ]));
 
   if (signInMount) {
-    const remember = el('input', { type: 'checkbox' });
-    remember.checked = getRemember();
-    remember.addEventListener('change', () => setRemember(remember.checked));
     nodes.push(el('div.card.signin-wrap', {}, [
       el('h3', {}, 'Sign in to begin'),
       el('p', { class: 'note' }, 'Use the Google account you trade under. ' +
         'New faces are asked to register a character and a business.'),
       signInMount,
-      el('label', { class: 'inline remember-row' }, [remember, document.createTextNode(' Remember me — stay signed in on this device')]),
     ]));
   }
 

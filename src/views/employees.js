@@ -1,16 +1,20 @@
 /**
  * Employees page (owner/admin) — the roster for the caller's business, with
- * activation of pending accounts. Scoped to the caller's business by the API.
+ * activation of pending accounts and owner-private notes per employee. Scoped
+ * to the caller's business by the API.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { openModal } from '../lib/modal.js';
+import { setOpsActions } from '../lib/sections.js';
 
 export function renderEmployees(container, { me }) {
+  setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
   const list = el('div', {}, el('p', { class: 'note' }, 'Loading roster…'));
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Employees'),
     el('p', { class: 'note' }, 'Everyone registered under ' + esc(me.business || 'your business') +
-      '. Activate pending accounts to let them ring up sales.'),
+      '. Activate pending accounts to let them ring up sales. Notes are private to you.'),
     list,
   ]));
 
@@ -22,8 +26,10 @@ export function renderEmployees(container, { me }) {
       const items = rows.map((u) => {
         const who = u.character || u.email; // character name is the display identity
         const label = el('span', { html:
-          '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(u.role) + '</span> · ' + statusBadge(u.status) });
+          '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(u.role) + '</span> · ' + statusBadge(u.status) +
+          (u.notes ? '<br><span class="note">📝 ' + esc(u.notes) + '</span>' : '') });
         const row = el('div.emp-row', {}, [label]);
+        const actions = el('span', { class: 'row-actions' }, []);
         if (u.status === 'pending') {
           const btn = el('button.primary.small', {
             onclick: async () => {
@@ -33,8 +39,10 @@ export function renderEmployees(container, { me }) {
               catch (e) { btn.disabled = false; btn.textContent = 'Activate'; alert(e.message || e); }
             },
           }, 'Activate');
-          row.appendChild(btn);
+          actions.appendChild(btn);
         }
+        actions.appendChild(el('button.secondary-btn.small', { onclick: () => openNoteModal(u, refresh) }, 'Notes'));
+        row.appendChild(actions);
         return row;
       });
       mount(list, ...items);
@@ -43,6 +51,38 @@ export function renderEmployees(container, { me }) {
     }
   }
   refresh();
+}
+
+/** Focus modal to view/edit an owner-private note on one employee. */
+function openNoteModal(u, onSaved) {
+  const who = u.character || u.email || u.uid;
+  const note = el('textarea', { rows: '5', placeholder: 'Private notes about ' + who + '…' });
+  note.value = u.notes || '';
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save note');
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  let modal;
+  async function doSave() {
+    save.disabled = true;
+    setStatus('Saving…', '');
+    try {
+      await api.setEmployeeNote(u.uid, note.value.trim());
+      onSaved();
+      modal.close();
+    } catch (e) {
+      save.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  modal = openModal([
+    el('h3', {}, 'Notes — ' + who),
+    el('p', { class: 'note' }, 'Only you (the business owner/admin) can see these notes.'),
+    note,
+    save,
+    status,
+  ]);
 }
 
 function statusBadge(status) {

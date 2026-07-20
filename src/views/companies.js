@@ -8,10 +8,12 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
+import { setAdminActions } from '../lib/sections.js';
 
 const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
 
 export function renderCompanies(container) {
+  setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading companies…'));
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
