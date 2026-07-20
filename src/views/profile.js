@@ -11,6 +11,7 @@ import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { signOut } from '../lib/auth.js';
 import { THEMES, loadPrefs, savePrefs } from '../lib/theme.js';
+import { LANGS, getLang, setLang } from '../lib/i18n.js';
 
 export function renderProfile(container, { me, onProfileUpdated }) {
   mount(container, el('div', {}, [
@@ -79,11 +80,25 @@ function appearanceCard() {
   });
   themeSel.addEventListener('change', () => savePrefs({ theme: themeSel.value }));
 
+  // Language — swaps the interface language for this device. Reloads so every
+  // surface re-renders cleanly in the new language.
+  const langSel = el('select', {});
+  Object.keys(LANGS).forEach((code) => {
+    const opt = el('option', { value: code }, LANGS[code]);
+    if (code === getLang()) opt.selected = true;
+    langSel.appendChild(opt);
+  });
+  langSel.addEventListener('change', () => { setLang(langSel.value); location.reload(); });
+
   return el('div.card', {}, [
     el('h2', {}, 'Appearance'),
-    el('p', { class: 'note' }, 'Choose a theme for this device.'),
+    el('p', { class: 'note' }, 'Choose a theme and language for this device.'),
     el('label', {}, 'Theme'),
     themeSel,
+    el('label', {}, 'Language'),
+    langSel,
+    el('p', { class: 'note' }, 'Translations cover the interface; names and some ' +
+      'messages stay as written.'),
   ]);
 }
 

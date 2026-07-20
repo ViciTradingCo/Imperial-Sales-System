@@ -9,6 +9,7 @@ import { initRouter, route, navigate, render, onBeforeRender } from './lib/route
 import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
+import { applyLang } from './lib/i18n.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
 import { initActions, clearActions } from './lib/actions.js';
 import { renderLanding } from './views/landing.js';
@@ -217,6 +218,7 @@ async function onSignedIn() {
 
 async function main() {
   applyPrefs(); // apply saved GUI theme before anything paints
+  applyLang();  // translate the shell + every subsequent render to the chosen language
 
   let config;
   try {
