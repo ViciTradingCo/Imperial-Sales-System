@@ -27,6 +27,7 @@ import { renderMarket } from './views/market.js';
 import { renderHoldReport } from './views/hold-report.js';
 import { renderMotdAdmin } from './views/motd-admin.js';
 import { renderAudit } from './views/audit.js';
+import { renderItemIndex } from './views/item-index.js';
 import { renderLedgerSettings } from './views/ledger-settings.js';
 
 const appEl = document.getElementById('app');
@@ -218,6 +219,11 @@ route('/admin/motd', (container) => {
 route('/admin/audit', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
   renderAudit(container);
+});
+
+route('/admin/items', (container) => {
+  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+  renderItemIndex(container);
 });
 
 route('/admin/members', (container) => {

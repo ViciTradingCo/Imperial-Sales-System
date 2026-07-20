@@ -13,13 +13,23 @@
  */
 import { getDb } from './db.js';
 import { parseSaleItems } from './sales.js';
+import { listItemIndex, matchMasterItem, normalizeItem } from './item-index.js';
 
-/** Aggregates per-item sales from the stored item summaries ({item, qty, revenue, orders}). */
-function itemStats(saleRows) {
+/**
+ * Aggregates per-item sales from the stored summaries, but ONLY for items in the
+ * master index (new/off-index items are kept out of the market so the data stays
+ * clean). Names are canonicalized to their master spelling.
+ */
+function itemStats(saleRows, master) {
+  const exact = new Map();
+  master.forEach((it) => exact.set(normalizeItem(it.name), it));
   const map = {};
   (saleRows || []).forEach((r) => {
     parseSaleItems(r.items).lines.forEach((l) => {
-      const m = map[l.name] || (map[l.name] = { item: l.name, qty: 0, revenue: 0, orders: 0 });
+      const hit = exact.get(normalizeItem(l.name)) || matchMasterItem(l.name, master);
+      if (!hit) return; // not in the master index → excluded from market
+      const key = hit.name;
+      const m = map[key] || (map[key] = { item: key, qty: 0, revenue: 0, orders: 0 });
       m.qty += l.qty;
       m.revenue += l.qty * l.price;
       m.orders += 1;
@@ -79,7 +89,7 @@ export async function marketAnalysis(env) {
 
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE status != 'VOIDED'`).all()).results) || [];
-  const items = itemStats(saleRows);
+  const items = itemStats(saleRows, await listItemIndex(env));
 
   return { overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, holds, items, underpriced, lowStock };
 }
@@ -107,5 +117,5 @@ export async function holdReport(env, hold) {
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE status != 'VOIDED' AND hold = ?`).bind(h).all()).results) || [];
 
-  return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: itemStats(saleRows) };
+  return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: itemStats(saleRows, await listItemIndex(env)) };
 }

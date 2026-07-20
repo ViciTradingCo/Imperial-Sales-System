@@ -11,8 +11,9 @@ import { setAdminActions } from '../lib/sections.js';
 export function renderAdminSettings(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const formHost = el('div', {});
+  const holdsHost = el('div', {});
   const dangerHost = el('div', {});
-  mount(container, formHost, dangerHost);
+  mount(container, formHost, holdsHost, dangerHost);
 
   renderSettingsForm(formHost, {
     title: 'Network Settings',
@@ -22,7 +23,37 @@ export function renderAdminSettings(container) {
     save: async (updates) => (await api.saveSettings(updates)).settings,
   });
 
+  mount(holdsHost, holdsCard());
   mount(dangerHost, clearLogsCard());
+}
+
+/** Editor for the network hold index (one hold per line). */
+function holdsCard() {
+  const box = el('textarea', { rows: '10' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save holds');
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  api.getHolds().then((r) => { box.value = (r.holds || []).join('\n'); }).catch(() => {});
+
+  async function doSave() {
+    const holds = box.value.split('\n').map((h) => h.trim()).filter(Boolean);
+    save.disabled = true; setStatus('Saving…', '');
+    try {
+      const r = await api.setHolds(holds);
+      box.value = (r.holds || []).join('\n');
+      setStatus('Saved ✓ — ' + (r.holds || []).length + ' holds.', 'ok');
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
+    finally { save.disabled = false; }
+  }
+
+  return el('div.card', {}, [
+    el('h3', {}, 'Holds'),
+    el('p', { class: 'note' }, 'The network’s hold names, one per line, in order. Used by every hold dropdown.'),
+    box,
+    save,
+    status,
+  ]);
 }
 
 /** Danger-zone card: wipe the sales + intake logs across the whole network. */

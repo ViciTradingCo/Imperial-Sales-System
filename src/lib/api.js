@@ -133,6 +133,14 @@ export const api = {
   setStyle: (tagline, accent) => request('POST', '/business/style', { tagline, accent }),
   /** Admin: the audit trail. */
   getAudit: () => request('GET', '/admin/audit'),
+  /** Any registered user: the master item index (name + base value). */
+  getItems: () => request('GET', '/items'),
+  /** Admin: add/edit a master item (rename via oldName). */
+  saveMasterItem: (item) => request('POST', '/admin/items', item),
+  /** Admin: delete a master item. */
+  deleteMasterItem: (name) => request('POST', '/admin/items/delete', { name }),
+  /** Admin: replace the hold index. */
+  setHolds: (holds) => request('POST', '/admin/holds', { holds }),
   /** The network hold list. */
   getHolds: () => request('GET', '/holds'),
   /** Recent intake transactions for the caller's business. */

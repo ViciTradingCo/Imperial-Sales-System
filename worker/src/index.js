@@ -31,7 +31,8 @@ import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
 import { listInventory, upsertItem, deleteItem } from './inventory.js';
 import { recordIntake, listIntake } from './intake.js';
-import { readHolds } from './holds.js';
+import { readHolds, writeHolds } from './holds.js';
+import { listItemIndex, upsertItem as upsertMasterItem, deleteItemIndex } from './item-index.js';
 import { checkCertification } from './cert.js';
 import { checkout, listSales, voidSale } from './sales.js';
 import { renameBusinessData, ensureSchema, clearLogs } from './db.js';
@@ -423,6 +424,30 @@ async function handleSetStyle(request, env, body) {
 async function handleAudit(request, env) {
   await requireAdmin(request, env);
   return { audit: await listAudit(env) };
+}
+
+/* ---- Master Item Index + Holds index (admin-managed) ---- */
+async function handleGetItems(request, env) {
+  await requireRegistered(request, env);
+  return { items: await listItemIndex(env) };
+}
+async function handleUpsertItem(request, env, body) {
+  const caller = await requireAdmin(request, env);
+  const items = await upsertMasterItem(env, body);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.upsert', detail: (body.oldName && body.oldName !== body.name ? body.oldName + ' → ' : '') + body.name + ' @ ' + body.baseValue });
+  return { items };
+}
+async function handleDeleteMasterItem(request, env, body) {
+  const caller = await requireAdmin(request, env);
+  const items = await deleteItemIndex(env, body.name);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.delete', detail: body.name });
+  return { items };
+}
+async function handleSetHolds(request, env, body) {
+  const caller = await requireAdmin(request, env);
+  const holds = await writeHolds(env, body.holds);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'holds.set', detail: holds.join(', ') });
+  return { holds };
 }
 
 /** A short actor label for the audit trail. */
@@ -839,6 +864,22 @@ export default {
       }
       if (request.method === 'GET' && path === '/admin/audit') {
         return json(await handleAudit(request, env), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/items') {
+        return json(await handleGetItems(request, env), 200, cors);
+      }
+      if (request.method === 'POST' && path === '/admin/items') {
+        const body = await readJsonBody(request);
+        return json(await handleUpsertItem(request, env, body), 200, cors);
+      }
+      if (request.method === 'POST' && path === '/admin/items/delete') {
+        const body = await readJsonBody(request);
+        return json(await handleDeleteMasterItem(request, env, body), 200, cors);
+      }
+      if (request.method === 'POST' && path === '/admin/holds') {
+        const body = await readJsonBody(request);
+        return json(await handleSetHolds(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/holds') {

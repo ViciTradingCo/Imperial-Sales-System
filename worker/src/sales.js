@@ -9,6 +9,8 @@
  */
 import { getDb } from './db.js';
 import { checkCertification } from './cert.js';
+import { listItemIndex, matchMasterItem } from './item-index.js';
+import { logAudit } from './audit.js';
 
 /**
  * "Name x2 @ 30gp, Other x1 @ 5gp" -> [{name, qty, price}], counting failures.
@@ -54,26 +56,42 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   if (!holdName) throw new Error('Pick the hold this sale happened in.');
 
   const db = await getDb(env);
+  const master = await listItemIndex(env);
   const { results } = await db.prepare('SELECT item, price, stock FROM inventory WHERE business = ?').bind(business).all();
   const inv = {};
   (results || []).forEach((r) => { inv[r.item.toLowerCase()] = { item: r.item, price: r.price, stock: r.stock }; });
 
-  const need = {};
+  const need = {};            // in-inventory items → stock decrements
   const lines = [];
+  const offInventory = [];    // sold but not in this shop's inventory
+  const newItems = [];        // not in the master index → excluded from market
   let subtotal = 0;
   let qtyTotal = 0;
   for (const line of cart) {
-    const it = inv[String(line.item || '').trim().toLowerCase()];
-    if (!it) throw new Error('Item not found: ' + line.item);
+    let name = String(line.item || '').trim();
+    if (!name) throw new Error('Each line needs an item.');
+    // Normalize typos/grammar to the canonical master name where we can.
+    const canon = matchMasterItem(name, master);
+    const inMaster = !!canon;
+    if (canon) name = canon.name;
+    const invItem = inv[name.toLowerCase()];
+    const inInv = !!invItem;
+
     const qty = Math.floor(Number(line.qty));
-    if (!qty || qty < 1) throw new Error('Bad quantity for ' + it.item + '.');
-    const price = Number(line.price);
-    if (!isFinite(price) || price < 0) throw new Error('Bad sold-for price for ' + it.item + '.');
-    need[it.item] = (need[it.item] || 0) + qty;
+    if (!qty || qty < 1) throw new Error('Bad quantity for ' + name + '.');
+    // Sold-for price wins; else the shop's own price; else the master base value.
+    let price = Number(line.price);
+    if (!isFinite(price) || price < 0) price = inInv ? invItem.price : (inMaster ? canon.baseValue : 0);
+
+    if (inInv) need[invItem.item] = (need[invItem.item] || 0) + qty;
+    else offInventory.push(name);
+    if (!inMaster) newItems.push(name);
+
     subtotal += price * qty;
     qtyTotal += qty;
-    lines.push({ name: it.item, qty, price });
+    lines.push({ name, qty, price });
   }
+  // Only in-inventory items are stock-checked (off-inventory items still sell).
   for (const item in need) {
     if (need[item] > inv[item.toLowerCase()].stock) {
       throw new Error('Not enough stock for ' + item + ' (have ' + inv[item.toLowerCase()].stock + ', cart wants ' + need[item] + ').');
@@ -106,7 +124,15 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   ).bind(business, ts, finalTotal, orderNo));
   await db.batch(stmts);
 
-  return { ok: true, orderNo, total: finalTotal, hold: holdName, discount: discountLabel };
+  // Flag off-inventory / non-master (new) items in the audit log — the sale
+  // still processes so the data is captured, but new items stay out of market.
+  const actor = caller.character || caller.email;
+  const offList = [...new Set(offInventory)];
+  const newList = [...new Set(newItems)];
+  if (offList.length) await logAudit(env, { actor, business, action: 'sale.off_inventory', detail: orderNo + ': ' + offList.join(', ') });
+  if (newList.length) await logAudit(env, { actor, business, action: 'sale.new_item', detail: orderNo + ': ' + newList.join(', ') });
+
+  return { ok: true, orderNo, total: finalTotal, hold: holdName, discount: discountLabel, offInventory: offList, newItems: newList };
 }
 
 /** Recent sales, optionally filtered by order #, customer, or employee. */

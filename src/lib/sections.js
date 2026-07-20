@@ -35,6 +35,7 @@ export function setAdminActions() {
   setActions(mark([
     { label: 'Member List', path: '/admin/members', onClick: () => navigate('/admin/members') },
     { label: 'Company List', path: '/admin/companies', onClick: () => navigate('/admin/companies') },
+    { label: 'Item Index', path: '/admin/items', onClick: () => navigate('/admin/items') },
     { label: 'MOTD', path: '/admin/motd', onClick: () => navigate('/admin/motd') },
     { label: 'Audit Log', path: '/admin/audit', onClick: () => navigate('/admin/audit') },
     { label: 'Network Settings', path: '/admin/settings', onClick: () => navigate('/admin/settings') },

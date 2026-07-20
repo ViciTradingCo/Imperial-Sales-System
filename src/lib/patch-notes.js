@@ -3,6 +3,11 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.6', date: '2026-07-20', notes: [
+    'Master Item Index (admin) — manage canonical item names and base values.',
+    'Editable Holds index in Network Settings.',
+    'Register item search backed by the master index; base value / your price auto-fill; off-inventory and new items still sell but are flagged in the audit log (new items stay out of market). Typos are normalized to canonical names.',
+  ] },
   { version: '2.5', date: '2026-07-20', notes: [
     'Shop Ledger: Coffers (treasury with sales/intake/void tracking + manual adjustments), reusable Discounts on the register, and a shop Style (tagline + accent).',
     'Audit Log (admin), transfer history, and searchable Member/Company lists.',

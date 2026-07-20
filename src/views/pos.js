@@ -22,18 +22,21 @@ export function renderPos(container, { me }) {
   let holds = [];
   let discounts = [];
   let style = {};
+  let master = [];
   const cart = []; // [{ item, qty, price }]
 
   Promise.all([
     api.getCert(), api.getInventory(), api.getHolds(),
     api.getDiscounts().catch(() => ({ discounts: [] })),
     api.getStyle().catch(() => ({})),
+    api.getItems().catch(() => ({ items: [] })),
   ])
-    .then(([cert, inv, hs, dc, st]) => {
+    .then(([cert, inv, hs, dc, st, mi]) => {
       inventory = inv.inventory || [];
       holds = hs.holds || [];
       discounts = dc.discounts || [];
       style = st || {};
+      master = mi.items || [];
       // Shop style: a tagline strip (coloured by the shop's accent) on the header.
       if (style.tagline) {
         const strip = el('p', { class: 'shop-tagline' }, style.tagline);
@@ -48,16 +51,40 @@ export function renderPos(container, { me }) {
     })
     .catch((e) => mount(body, el('p', { class: 'error' }, e.message || String(e))));
 
+  // Mirror the server's normalization so client hints match server resolution.
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
   function renderSale(canSell) {
-    const itemSel = el('select', {}, el('option', { value: '' }, 'Pick an item…'));
-    inventory.forEach((it) => itemSel.appendChild(
-      el('option', { value: it.item }, it.item + ' (' + money(it.price) + ', ' + it.stock + ' in stock)')));
+    // Item search: a text box backed by a datalist of master + inventory names.
+    const listId = 'itemlist-' + Math.random().toString(36).slice(2, 7);
+    const datalist = el('datalist', { id: listId });
+    const itemInput = el('input', { type: 'text', placeholder: 'Search item…', autocomplete: 'off' });
+    itemInput.setAttribute('list', listId);
+    const itemHint = el('p', { class: 'note' }, '');
     const qty = el('input', { type: 'number', min: '1', step: '1', value: '1' });
     const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: 'Sold for per item (gp)' });
-    itemSel.addEventListener('change', () => {
-      const it = inventory.find((x) => x.item === itemSel.value);
-      if (it) price.value = String(it.price);
-    });
+
+    let invByNorm = new Map();
+    let masterByNorm = new Map();
+    function rebuildSuggestions() {
+      invByNorm = new Map(inventory.map((it) => [norm(it.item), it]));
+      masterByNorm = new Map(master.map((m) => [norm(m.name), m]));
+      const names = new Set();
+      master.forEach((m) => names.add(m.name));
+      inventory.forEach((it) => names.add(it.item));
+      datalist.innerHTML = '';
+      names.forEach((n) => datalist.appendChild(el('option', { value: n })));
+    }
+    function resolveHint() {
+      const key = norm(itemInput.value);
+      const inv = invByNorm.get(key);
+      const mas = masterByNorm.get(key);
+      if (inv) { if (!price.value) price.value = String(inv.price); itemHint.textContent = inv.stock + ' in stock · your price ' + money(inv.price); }
+      else if (mas) { if (!price.value) price.value = String(mas.baseValue); itemHint.textContent = 'Not in your inventory · master base ' + money(mas.baseValue); }
+      else { itemHint.textContent = itemInput.value.trim() ? 'New item — not in the master index (will be flagged, excluded from market).' : ''; }
+    }
+    itemInput.addEventListener('input', () => { price.value = ''; resolveHint(); });
+    rebuildSuggestions();
     const addBtn = el('button.secondary-btn', { onclick: addToCart }, 'Add to order');
 
     const cartHost = el('div', {}, el('p', { class: 'note' }, 'Cart is empty.'));
@@ -95,14 +122,20 @@ export function renderPos(container, { me }) {
     }
 
     function addToCart() {
-      const item = itemSel.value;
-      if (!item) { setStatus('Pick an item.', 'error'); return; }
+      const item = itemInput.value.trim();
+      if (!item) { setStatus('Enter an item.', 'error'); return; }
       const q = Math.floor(Number(qty.value));
       if (!q || q < 1) { setStatus('Enter a quantity.', 'error'); return; }
-      const p = Number(price.value);
+      let p = Number(price.value);
+      // Default the price from inventory / master if it was left blank.
+      if (!isFinite(p) || p < 0 || price.value === '') {
+        const inv = invByNorm.get(norm(item));
+        const mas = masterByNorm.get(norm(item));
+        p = inv ? inv.price : (mas ? mas.baseValue : NaN);
+      }
       if (!isFinite(p) || p < 0) { setStatus('Enter a sold-for price.', 'error'); return; }
       cart.push({ item, qty: q, price: p });
-      itemSel.value = ''; qty.value = '1'; price.value = '';
+      itemInput.value = ''; qty.value = '1'; price.value = ''; itemHint.textContent = '';
       setStatus('', '');
       renderCart();
     }
@@ -121,17 +154,15 @@ export function renderPos(container, { me }) {
         renderCart();
         customer.value = ''; discName.value = ''; discPct.value = '';
         // Keep the hold selected for quick back-to-back sales.
-        setStatus('Sale complete ✓ — ' + res.orderNo + ' · ' + money(res.total), 'ok');
+        let msg = 'Sale complete ✓ — ' + res.orderNo + ' · ' + money(res.total);
+        if (res.offInventory && res.offInventory.length) msg += ' · off-inventory: ' + res.offInventory.join(', ');
+        if (res.newItems && res.newItems.length) msg += ' · new item flagged: ' + res.newItems.join(', ');
+        setStatus(msg, 'ok');
         complete.disabled = false;
-        // Refresh stock counts in the item dropdown.
+        // Refresh stock counts + item suggestions.
         api.getInventory().then((inv) => {
           inventory = inv.inventory || [];
-          const keep = itemSel.value;
-          itemSel.innerHTML = '';
-          itemSel.appendChild(el('option', { value: '' }, 'Pick an item…'));
-          inventory.forEach((it) => itemSel.appendChild(
-            el('option', { value: it.item }, it.item + ' (' + money(it.price) + ', ' + it.stock + ' in stock)')));
-          itemSel.value = keep;
+          rebuildSuggestions();
         }).catch(() => {});
       } catch (e) {
         complete.disabled = false;
@@ -144,7 +175,7 @@ export function renderPos(container, { me }) {
     mount(body,
       el('div.card', {}, [
         el('h3', {}, 'Add to order'),
-        el('label', {}, 'Item'), itemSel,
+        el('label', {}, 'Item'), itemInput, datalist, itemHint,
         el('label', {}, 'Quantity'), qty,
         el('label', {}, 'Sold for per item (gp)'), price,
         addBtn,
