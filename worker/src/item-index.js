@@ -93,6 +93,31 @@ export async function importItemIndex(env, rows) {
   return { imported, items: await listItemIndex(env) };
 }
 
+/**
+ * Classifies a pasted import WITHOUT applying it, so the admin can review:
+ *   • update — an exact (normalized) match on an existing item.
+ *   • typos  — a fuzzy match that ISN'T exact (a likely misspelling), with the
+ *              suggested canonical name so the admin can fix or keep-as-new.
+ *   • create — no match at all (a genuinely new item).
+ */
+export async function analyzeItemImport(env, rows) {
+  await ensureSeeded(env);
+  const existing = await listItemIndex(env);
+  const byNorm = new Map(existing.map((it) => [normalizeItem(it.name), it]));
+  const create = [], update = [], typos = [];
+  (rows || []).forEach((r) => {
+    const name = String(r.name || '').trim();
+    const val = Number(r.baseValue);
+    if (!name || !isFinite(val) || val < 0) return;
+    const exact = byNorm.get(normalizeItem(name));
+    if (exact) { update.push({ name, baseValue: val, current: exact.name }); return; }
+    const fuzzy = matchMasterItem(name, existing);
+    if (fuzzy) { typos.push({ name, baseValue: val, suggestion: fuzzy.name }); return; }
+    create.push({ name, baseValue: val });
+  });
+  return { create, update, typos };
+}
+
 export async function deleteItemIndex(env, name) {
   await ensureSeeded(env);
   const db = await getDb(env);

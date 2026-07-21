@@ -39,7 +39,6 @@ export function setAdminActions() {
     { label: 'MOTD', path: '/admin/motd', onClick: () => navigate('/admin/motd') },
     { label: 'Audit Log', path: '/admin/audit', onClick: () => navigate('/admin/audit') },
     { label: 'Network Settings', path: '/admin/settings', onClick: () => navigate('/admin/settings') },
-    { label: 'Back up now', onClick: backupNow },
   ]));
 }
 
@@ -52,26 +51,6 @@ export function setMarketActions() {
     { label: 'Company Performance', path: '/admin/market/companies', onClick: () => navigate('/admin/market/companies') },
     { label: 'Trends', path: '/admin/market/trends', onClick: () => navigate('/admin/market/trends') },
   ]));
-}
-
-/** Runs the D1 → Sheets backup on demand and reports the result. */
-async function backupNow(e) {
-  const btn = e && e.currentTarget;
-  const label = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Backing up…'; }
-  try {
-    const r = await api.runBackup();
-    if (r && r.ok) {
-      window.alert('Backup complete (' + r.at + ')\n\n' +
-        'Sales: ' + r.sales + '\nIntake: ' + r.intake + '\nInventory: ' + r.inventory);
-    } else {
-      window.alert('Backup not run: ' + ((r && r.skipped) || 'unknown reason'));
-    }
-  } catch (err) {
-    window.alert('Backup failed: ' + (err.message || String(err)));
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = label; }
-  }
 }
 
 /**

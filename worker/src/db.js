@@ -129,6 +129,22 @@ export async function clearLogs(env) {
   return { sales, intake };
 }
 
+/** Gentle retention: delete sales + intake older than `months` months. */
+export async function purgeLogs(env, months) {
+  const m = Math.max(1, Math.floor(Number(months) || 0));
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - m);
+  const iso = cutoff.toISOString();
+  const db = await getDb(env);
+  const sales = (await db.prepare('SELECT COUNT(*) AS n FROM sales WHERE ts < ?').bind(iso).first()).n;
+  const intake = (await db.prepare('SELECT COUNT(*) AS n FROM intake WHERE ts < ?').bind(iso).first()).n;
+  await db.batch([
+    db.prepare('DELETE FROM sales WHERE ts < ?').bind(iso),
+    db.prepare('DELETE FROM intake WHERE ts < ?').bind(iso),
+  ]);
+  return { sales, intake, cutoff: iso.slice(0, 10) };
+}
+
 /** Renames a business across the D1 tables (part of a full company rename). */
 export async function renameBusinessData(env, oldName, newName) {
   if (!env.DB) return;

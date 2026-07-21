@@ -135,29 +135,22 @@ yet" message; everything else works.
    automatically. (It safely no-ops until the binding exists.)
 5. Sign in as an **owner** → **Inventory** → add an item. If it saves, D1 is live.
 
-### Data backup (optional but recommended)
+### Data backup (operator-controlled file export)
 
-The Worker mirrors the live D1 store (sales, intake, inventory) into the **Core
-spreadsheet** (in `Backup_*` tabs), on a slow schedule (a Cloudflare Cron
-Trigger — daily at 06:00 UTC by default; change `crons` in
-`worker/wrangler.toml`). D1 stays the source of truth; this is an
-operator-controlled copy for safekeeping and off-platform analysis. Each run is
-a full mirror, so the tabs never drift.
+D1 is the source of truth. Backups are downloadable snapshot files that the
+admin keeps off-platform — there is no automatic mirror and nothing to set up.
 
-The backup target (`BACKUP_SPREADSHEET_ID`) is already set to the Core in
-`worker/wrangler.toml`. To finish setup:
+- **Export:** sign in as an **admin** → **Admin Panel** → **Network Settings** →
+  **Data backup** → **Export backup**. This downloads a gzipped JSON snapshot
+  (`eec-backup-YYYY-MM-DD.json.gz`) of every D1 table.
+- **Restore:** on the same card, choose a backup file and **Restore backup**.
+  This replaces all live data with the file's contents (used to recover after a
+  failure). It cannot be undone, so export first.
+- **Reminder:** admins get a Monday start-of-week banner prompting a fresh
+  export. Do it weekly and keep the files somewhere safe.
 
-1. **Run the setup script once:** in the Core, **Extensions → Apps Script**,
-   paste `docs/EEC_Backup_Setup.gs`, and run `setupCore`. It creates the
-   `Backup_Sales`, `Backup_Intake`, `Backup_Inventory`, and `Backup_Meta` tabs
-   (with headers) and adds the `Hold`/`Court` columns to `Certified Users`.
-2. The service account already has Editor access to the Core, so no extra
-   sharing is needed.
-
-Verify without waiting for the cron: sign in as an **admin** → **Home** →
-**Back up now**. It reports the rows written. `GET /health` also shows
-`configured.backup: true`. (The Worker also self-heals the tabs if the script
-hasn't been run, but running it first gives you tidy, frozen headers.)
+No service-account tabs or Apps Script are involved — the export streams
+straight from the Worker to the browser.
 
 ## What lives where (security summary)
 

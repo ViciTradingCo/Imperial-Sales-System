@@ -32,12 +32,13 @@ import { readBusinessSettings, writeBusinessSettings } from './business-settings
 import { listInventory, upsertItem, deleteItem, importInventory } from './inventory.js';
 import { recordIntake, listIntake } from './intake.js';
 import { readHolds, writeHolds } from './holds.js';
-import { listItemIndex, upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex } from './item-index.js';
+import { listItemIndex, upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex, analyzeItemImport } from './item-index.js';
 import { checkCertification } from './cert.js';
 import { checkout, listSales, voidSale, employeePerformance } from './sales.js';
 import { rateHit, isPriorityToken, markPriority, MAX_BODY_BYTES } from './ratelimit.js';
-import { renameBusinessData, ensureSchema, clearLogs } from './db.js';
-import { runBackup } from './backup.js';
+import { renameBusinessData, ensureSchema, clearLogs, purgeLogs } from './db.js';
+import { systemStatus } from './status.js';
+import { collectExport, restoreImport, gzipJson } from './export.js';
 import { marketAnalysis, holdReport } from './market.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd, activeNoticesForBusiness } from './motd.js';
 
@@ -246,10 +247,37 @@ async function handleDeleteCompany(request, env, body) {
   return { companies };
 }
 
-/** Admin-only: run the D1 → Sheets backup on demand (the cron does it on a schedule). */
-async function handleRunBackup(request, env) {
+/** Admin-only: a gzipped JSON export of all D1 data (a downloadable backup). */
+async function handleExport(request, env, cors) {
   await requireAdmin(request, env);
-  return await runBackup(env);
+  const buf = await gzipJson(await collectExport(env));
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  return new Response(buf, {
+    status: 200,
+    headers: { ...cors, 'Content-Type': 'application/gzip', 'Content-Disposition': 'attachment; filename="eec-backup-' + stamp + '.json.gz"' },
+  });
+}
+
+/** Admin-only: restore all D1 data from a previously exported backup. */
+async function handleImport(request, env, body) {
+  const caller = await requireAdmin(request, env);
+  const res = await restoreImport(env, body);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'data.restore', detail: 'restored from backup' });
+  return res;
+}
+
+/** Admin-only: delete sales + intake older than N months. */
+async function handlePurgeLogs(request, env, body) {
+  const caller = await requireAdmin(request, env);
+  const res = await purgeLogs(env, body.months);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'logs.purge', detail: 'older than ' + res.cutoff + ': ' + res.sales + ' sales, ' + res.intake + ' intake' });
+  return res;
+}
+
+/** Admin-only: D1 status snapshot. */
+async function handleStatus(request, env) {
+  await requireAdmin(request, env);
+  return await systemStatus(env);
 }
 
 /** Admin-only: network-wide market analytics over the D1 store. */
@@ -312,6 +340,13 @@ async function handleGetMotd(request, env) {
         });
       }
     } catch (e) { /* D1 optional */ }
+  }
+  // Start-of-week reminder for admins to download a fresh data backup (Monday).
+  if (caller.role === 'admin' && new Date().getUTCDay() === 1) {
+    banners.push({
+      text: '🗓️ Start of the week — download a fresh data backup.',
+      action: { label: 'Backup', route: '/admin/settings' },
+    });
   }
   return { notices, banner: banners[0] ? banners[0].text : null, banners };
 }
@@ -452,6 +487,10 @@ async function handleImportMasterItems(request, env, body) {
   const res = await importItemIndex(env, body.rows);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.import', detail: (res.imported || 0) + ' items' });
   return res;
+}
+async function handleAnalyzeItems(request, env, body) {
+  await requireAdmin(request, env);
+  return await analyzeItemImport(env, body.rows);
 }
 async function handleSetHolds(request, env, body) {
   const caller = await requireAdmin(request, env);
@@ -662,8 +701,9 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
 
-    // Request-size cap (cheap abuse guard, before we read the body).
-    if (Number(request.headers.get('Content-Length') || 0) > MAX_BODY_BYTES) {
+    // Request-size cap (cheap abuse guard). The backup restore is exempt — it's
+    // an admin-only full-data upload that can legitimately be large.
+    if (path !== '/admin/import' && Number(request.headers.get('Content-Length') || 0) > MAX_BODY_BYTES) {
       return json({ error: 'Request too large.' }, 413, cors);
     }
     // Rate limit — keyed by token (or IP), with a higher ceiling for priority
@@ -692,7 +732,6 @@ export default {
             clientId: !!env.GOOGLE_CLIENT_ID,
             saKey: !!env.SA_KEY,
             db,
-            backup: !!(env.BACKUP_SPREADSHEET_ID && String(env.BACKUP_SPREADSHEET_ID).trim()),
           },
           time: new Date().toISOString(),
         }, 200, cors);
@@ -767,8 +806,13 @@ export default {
         return json(await handleDeleteCompany(request, env, body), 200, cors);
       }
 
-      if (request.method === 'POST' && path === '/admin/backup') {
-        return json(await handleRunBackup(request, env), 200, cors);
+      if (request.method === 'GET' && path === '/admin/export') {
+        return await handleExport(request, env, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/import') {
+        const body = await readJsonBody(request);
+        return json(await handleImport(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/admin/market') {
@@ -777,6 +821,15 @@ export default {
 
       if (request.method === 'POST' && path === '/admin/logs/clear') {
         return json(await handleClearLogs(request, env), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/admin/logs/purge') {
+        const body = await readJsonBody(request);
+        return json(await handlePurgeLogs(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/admin/status') {
+        return json(await handleStatus(request, env), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/market/hold') {
@@ -925,6 +978,10 @@ export default {
         const body = await readJsonBody(request);
         return json(await handleImportMasterItems(request, env, body), 200, cors);
       }
+      if (request.method === 'POST' && path === '/admin/items/import/analyze') {
+        const body = await readJsonBody(request);
+        return json(await handleAnalyzeItems(request, env, body), 200, cors);
+      }
       if (request.method === 'POST' && path === '/admin/holds') {
         const body = await readJsonBody(request);
         return json(await handleSetHolds(request, env, body), 200, cors);
@@ -972,17 +1029,5 @@ export default {
       else if (/token|bearer|verified|audience|expired|issuer/i.test(msg)) status = 401;
       return json({ error: msg }, status, cors);
     }
-  },
-
-  /**
-   * Cron Trigger (wrangler.toml [triggers]) — the slow, operator-owned backup.
-   * Runs off the request path; errors are logged, not surfaced (no client).
-   */
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      runBackup(env)
-        .then((r) => console.log('Scheduled backup:', JSON.stringify(r)))
-        .catch((e) => console.error('Scheduled backup failed:', e && e.message ? e.message : String(e)))
-    );
   },
 };

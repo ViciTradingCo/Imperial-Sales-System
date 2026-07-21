@@ -73,12 +73,23 @@ export const api = {
   updateCompany: (company) => request('POST', '/admin/companies/update', company),
   /** Admin: archive (delete) a company — data retained, name freed. */
   deleteCompany: (id) => request('POST', '/admin/companies/delete', { id }),
-  /** Admin: run the D1 → Sheets backup on demand. */
-  runBackup: () => request('POST', '/admin/backup', {}),
+  /** Admin: download a gzipped full-data backup (returns a Blob). */
+  exportBackupBlob: async () => {
+    const token = getIdToken();
+    const res = await fetch(baseUrl + '/admin/export', { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+    if (!res.ok) { throw new Error((await res.text()) || res.statusText); }
+    return await res.blob();
+  },
+  /** Admin: restore all data from a parsed backup document. */
+  importBackup: (data) => request('POST', '/admin/import', data),
   /** Admin: network-wide market analytics. */
   getMarket: () => request('GET', '/admin/market'),
   /** Admin: wipe all sales + intake logs across the network. */
   clearLogs: () => request('POST', '/admin/logs/clear', {}),
+  /** Admin: delete sales + intake older than N months. */
+  purgeLogs: (months) => request('POST', '/admin/logs/purge', { months }),
+  /** Admin: D1 status snapshot. */
+  getStatus: () => request('GET', '/admin/status'),
   /** Court businesses: the market report for their own hold. */
   getHoldReport: () => request('GET', '/market/hold'),
   /** Banners for the current user: { notices[], banners[] }. Deduped for ~3s. */
@@ -158,6 +169,8 @@ export const api = {
   deleteMasterItem: (name) => request('POST', '/admin/items/delete', { name }),
   /** Admin: bulk import master items [{name, baseValue}] (recognized names update, not duplicate). */
   importMasterItems: (rows) => request('POST', '/admin/items/import', { rows }),
+  /** Admin: classify an item import (create/update/typos) without applying it. */
+  analyzeItems: (rows) => request('POST', '/admin/items/import/analyze', { rows }),
   /** Admin: replace the hold index. */
   setHolds: (holds) => request('POST', '/admin/holds', { holds }),
   /** The network hold list. */

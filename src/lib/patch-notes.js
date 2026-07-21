@@ -3,6 +3,12 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '3.0', date: '2026-07-21', notes: [
+    'Backups are now downloadable files — Export a compressed snapshot of all data, and Restore from one after a failure. The old Google Sheets mirror is gone. Admins get a Monday reminder to grab a fresh backup.',
+    'Item imports get a preview: it flags likely typos, suggests the canonical spelling, and lets you fix-vs-add-new for each before applying.',
+    'New admin System Status panel (live row counts + last activity) and gentle data retention (purge history older than N months).',
+    'More checkout tests covering stock, coffers, off-inventory, and idempotency.',
+  ] },
   { version: '2.9', date: '2026-07-21', notes: [
     'Master Item Index gets Import/Export — recognized names update (and re-spell) instead of duplicating.',
   ] },

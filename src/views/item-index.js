@@ -55,26 +55,56 @@ export function renderItemIndex(container) {
   }
 
   function openImportExportModal(onImported) {
-    const exportBox = el('textarea', { rows: '8', readonly: true });
-    const importBox = el('textarea', { rows: '8', placeholder: 'Item, base value\n(one per line — “Item value” also works)' });
+    const exportBox = el('textarea', { rows: '6', readonly: true });
+    const importBox = el('textarea', { rows: '6', placeholder: 'Item, base value\n(one per line — “Item value” also works)' });
     const status = el('p', {});
-    const importBtn = el('button.primary', { onclick: doImport }, 'Import');
+    const reportHost = el('div', {});
+    const previewBtn = el('button.primary', { onclick: doPreview }, 'Preview' );
     function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
 
     api.getItems().then((r) => {
       exportBox.value = 'Item, Base Value\n' + (r.items || []).map((it) => it.name + ', ' + it.baseValue).join('\n');
     }).catch(() => {});
 
-    async function doImport() {
+    async function doPreview() {
       const rows = parseItems(importBox.value);
       if (!rows.length) { setStatus('Nothing to import.', 'error'); return; }
-      importBtn.disabled = true; setStatus('Importing…', '');
+      previewBtn.disabled = true; setStatus('Analyzing…', '');
+      try { renderReport(await api.analyzeItems(rows)); setStatus('', ''); }
+      catch (e) { setStatus(e.message || String(e), 'error'); }
+      finally { previewBtn.disabled = false; }
+    }
+
+    function renderReport(a) {
+      const create = a.create || [], update = a.update || [], typos = a.typos || [];
+      const nodes = [el('p', { html: '<b>' + create.length + '</b> new · <b>' + update.length +
+        '</b> to update · <b>' + typos.length + '</b> possible typo(s).' })];
+      const choices = typos.map((t) => {
+        const sel = el('select', {});
+        sel.appendChild(el('option', { value: 'fix' }, 'Fix → update “' + t.suggestion + '”'));
+        sel.appendChild(el('option', { value: 'new' }, 'Add as new “' + t.name + '”'));
+        nodes.push(el('div.member-row', {}, [
+          el('p', { html: '<b>' + esc(t.name) + '</b> (' + money(t.baseValue) + ') — did you mean <b>' + esc(t.suggestion) + '</b>?' }),
+          sel,
+        ]));
+        return { t, sel };
+      });
+      nodes.push(el('button.primary', { onclick: () => doApply(a, choices) }, 'Apply import'));
+      mount(reportHost, ...nodes);
+    }
+
+    async function doApply(a, choices) {
+      const rows = [];
+      (a.create || []).forEach((r) => rows.push({ name: r.name, baseValue: r.baseValue }));
+      (a.update || []).forEach((r) => rows.push({ name: r.name, baseValue: r.baseValue }));
+      choices.forEach(({ t, sel }) => rows.push({ name: sel.value === 'fix' ? t.suggestion : t.name, baseValue: t.baseValue }));
+      setStatus('Applying…', '');
       try {
         const res = await api.importMasterItems(rows);
         setStatus('Imported / updated ' + (res.imported || 0) + ' item(s).', 'ok');
+        mount(reportHost);
         onImported();
       } catch (e) { setStatus(e.message || String(e), 'error'); }
-      finally { importBtn.disabled = false; }
     }
 
     openModal([
@@ -82,11 +112,12 @@ export function renderItemIndex(container) {
       el('label', {}, 'Export — copy this'),
       exportBox,
       el('label', {}, 'Import — paste here'),
-      el('p', { class: 'note' }, 'One item per line: “Item, base value”. Recognized names (any casing/spacing) are ' +
-        'updated — not duplicated — and re-spelled to what you paste. A header line is ignored.'),
+      el('p', { class: 'note' }, 'One item per line: “Item, base value”. Preview checks for typos first; recognized ' +
+        'names (any casing/spacing) update — not duplicate.'),
       importBox,
-      importBtn,
+      previewBtn,
       status,
+      reportHost,
     ]);
   }
 
