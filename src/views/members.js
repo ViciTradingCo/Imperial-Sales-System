@@ -20,7 +20,7 @@ export function renderMembers(container) {
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Member List'),
-    el('p', { class: 'note' }, 'Everyone registered in the East Empire network.'),
+    el('p', { class: 'note' }, 'Everyone registered in the Vici trading network.'),
     search,
     listHost,
   ]));

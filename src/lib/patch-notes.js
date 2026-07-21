@@ -3,6 +3,9 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '4.1', date: '2026-07-21', notes: [
+    'Rebranded to Vici Trading Co. — the East Empire name is retired across the app.',
+  ] },
   { version: '4.0', date: '2026-07-21', notes: [
     'Google Sheets is gone — the whole system now runs on Cloudflare D1. Sign-in is unchanged; everything is faster and simpler. Admins are set by email (ADMIN_EMAILS).',
     'The register keeps working offline: sales made without a connection are saved on the device and sync automatically when you’re back online.',

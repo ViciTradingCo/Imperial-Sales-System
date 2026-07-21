@@ -69,7 +69,7 @@ export function renderPos(container, { me }) {
       }
       if (cert.status === 'EXPIRED') {
         banner.appendChild(el('p', { class: 'warn', html:
-          '⚠ This shop’s East Empire certification is <b>EXPIRED</b> — sales are blocked until an admin renews it.' }));
+          '⚠ This shop’s Vici Trading Co. certification is <b>EXPIRED</b> — sales are blocked until an admin renews it.' }));
       }
       renderSale(cert.status !== 'EXPIRED');
     })

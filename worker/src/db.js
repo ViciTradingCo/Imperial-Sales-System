@@ -76,7 +76,7 @@ const SCHEMA = [
      created TEXT, last_seen TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`,
   `CREATE INDEX IF NOT EXISTS idx_users_business ON users (business)`,
-  // Registered businesses + their East Empire certification (subscription).
+  // Registered businesses + their Vici Trading Co. certification (subscription).
   `CREATE TABLE IF NOT EXISTS companies (
      id TEXT PRIMARY KEY, business TEXT NOT NULL, point_of_contact TEXT,
      until TEXT, perpetual INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT '',

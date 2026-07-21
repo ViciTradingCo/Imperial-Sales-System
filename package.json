@@ -1,7 +1,7 @@
 {
   "name": "eec-sales-system",
   "version": "0.1.0",
-  "description": "East Empire Trading Company sales network — static web frontend (GitHub Pages) backed by Google Sheets via a thin API.",
+  "description": "Vici Trading Co. sales network — static web frontend (GitHub Pages) backed by a Cloudflare Worker + D1 API.",
   "type": "module",
   "private": true,
   "scripts": {

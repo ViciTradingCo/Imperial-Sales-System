@@ -1,5 +1,5 @@
 /**
- * EEC Sales System — backend API (Cloudflare Worker). THE trust boundary.
+ * Vici Trading Co. Sales System — backend API (Cloudflare Worker). THE trust boundary.
  *
  * This module is only the shell: CORS, the request-size cap, rate limiting, the
  * /health probe, and dispatch to the route tables. Authorization and data logic

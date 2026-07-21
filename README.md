@@ -1,6 +1,6 @@
 # EEC-Sales-System
 
-Wheel-And-Spoke style sales system for the Mereth Skyrim RP server. Run by the East Empire Trading Company, managed by SmileDaemon on Discord.
+Wheel-And-Spoke style sales system for the Mereth Skyrim RP server. Run by Vici Trading Co., managed by SmileDaemon on Discord.
 
 Originally a Google Apps Script + Google Sheets system, now being ported to a
 static web app on **GitHub Pages** backed by the **same Google Sheets**, with a

@@ -31,7 +31,7 @@ export async function collectExport(env) {
 /** Restores tables from an export document (full replace). Returns row counts. */
 export async function restoreImport(env, data) {
   if (!data || data.app !== 'eec-ledger' || !data.tables) {
-    throw new Error('That doesn’t look like an EEC backup file.');
+    throw new Error('That doesn’t look like a Vici backup file.');
   }
   const db = await getDb(env);
   const counts = {};
@@ -58,7 +58,7 @@ export async function restoreImport(env, data) {
  */
 export async function previewImport(env, data) {
   if (!data || data.app !== 'eec-ledger' || !data.tables) {
-    throw new Error('That doesn’t look like an EEC backup file.');
+    throw new Error('That doesn’t look like a Vici backup file.');
   }
   const db = await getDb(env);
   const diff = {};

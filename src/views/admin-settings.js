@@ -19,8 +19,7 @@ export function renderAdminSettings(container) {
 
   renderSettingsForm(formHost, {
     title: 'Network Settings',
-    subtitle: 'Network-wide settings for the whole East Empire network, saved to the Core ' +
-      'and applied on the next sync.',
+    subtitle: 'Network-wide settings for the whole Vici trading network.',
     load: async () => (await api.getSettings()).settings,
     save: async (updates) => (await api.saveSettings(updates)).settings,
   });

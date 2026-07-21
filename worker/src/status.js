@@ -36,7 +36,7 @@ async function notifyDiscord(env, where, message) {
     await fetch(hook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: '⚠️ EEC API error at `' + String(where || '') + '`: ' + String(message || '').slice(0, 300) }),
+      body: JSON.stringify({ content: '⚠️ Vici API error at `' + String(where || '') + '`: ' + String(message || '').slice(0, 300) }),
     });
   } catch (e) { /* best-effort */ }
 }

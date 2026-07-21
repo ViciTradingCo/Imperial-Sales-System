@@ -289,7 +289,7 @@ async function getMotd({ request, env }) {
     const cert = await checkCertification(env, caller.business);
     if (!cert.perpetual) {
       if (cert.status === 'EXPIRED') {
-        banners.push({ text: '⚠ ' + caller.business + '’s East Empire certification has EXPIRED — renew with an admin to keep selling.' });
+        banners.push({ text: '⚠ ' + caller.business + '’s Vici Trading Co. certification has EXPIRED — renew with an admin to keep selling.' });
       } else if (cert.until) {
         const warnDays = await readWarnDays(env);
         const left = daysUntil(cert.until);

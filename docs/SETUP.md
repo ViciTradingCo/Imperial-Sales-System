@@ -1,4 +1,4 @@
-# EEC Sales System — Setup & Go-Live Guide
+# Vici Trading Co. — Setup & Go-Live Guide
 
 This is the one-time setup to bring the web app online, plus the checklist for
 going live. The system is three moving parts:
@@ -24,7 +24,7 @@ You do this once. Nothing here puts a secret in the repo.
 ### 1b. OAuth consent screen
 1. **APIs & Services → OAuth consent screen**.
 2. User type **External** → Create.
-3. Fill app name (`East Empire Trading Company`), your support email, developer email. Save and continue.
+3. Fill app name (`Vici Trading Co.`), your support email, developer email. Save and continue.
 4. Scopes: none needed — Save and continue.
 5. Test users: add the Google accounts that will sign in while the app is in "Testing" (publish later to allow anyone). Save.
 

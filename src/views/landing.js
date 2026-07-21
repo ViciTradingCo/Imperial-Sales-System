@@ -9,10 +9,10 @@ export function renderLanding(container, { signInMount } = {}) {
   const nodes = [];
 
   nodes.push(el('div.card.hero', {}, [
-    el('h2', {}, 'The EEC Automated Ledger'),
+    el('h2', {}, 'The Vici Automated Ledger'),
     el('p', {}, 'A sales system for the Mereth Skyrim RP server. Shops across the ' +
       'holds record their sales and restocks, owners manage their own inventory ' +
-      'and staff, and the EEC keeps the whole trade network — certification ' +
+      'and staff, and Vici Trading Co. keeps the whole trade network — certification ' +
       'and pooled records — in one place.'),
   ]));
 

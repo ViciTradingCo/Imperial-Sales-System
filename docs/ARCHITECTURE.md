@@ -1,4 +1,4 @@
-# EEC Sales System — Architecture
+# Vici Trading Co. — Architecture
 
 A static web app that keeps the original wheel-and-spoke data model, backed
 entirely by **Cloudflare D1**. It began as a Google Apps Script + Sheets system;

@@ -1,5 +1,5 @@
 /**
- * East Empire certification check for a business. Read from the D1 `companies`
+ * Vici Trading Co. certification check for a business. Read from the D1 `companies`
  * registry: Perpetual grants VALID forever; otherwise VALID while today ≤ the
  * subscription `until` date, EXPIRED beyond it (a blank/unreadable date — or a
  * business not in the registry — is EXPIRED).

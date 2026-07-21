@@ -58,7 +58,7 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
 
   const cert = await checkCertification(env, business);
   if (cert.status === 'EXPIRED') {
-    throw new Error("This shop's East Empire certification has EXPIRED — an admin must renew it before you can sell.");
+    throw new Error("This shop's Vici Trading Co. certification has EXPIRED — an admin must renew it before you can sell.");
   }
   if (!Array.isArray(cart) || !cart.length) throw new Error('The cart is empty.');
   const holdName = String(hold || '').trim();
