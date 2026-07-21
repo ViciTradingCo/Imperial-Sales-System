@@ -63,7 +63,7 @@ function refreshGlobalBanner() {
   }).catch(() => { globalBanner.hidden = true; });
 }
 // Views can ask the shell to re-check banners (e.g. after accepting a transfer).
-window.addEventListener('eec:banners', refreshGlobalBanner);
+window.addEventListener('eec:banners', () => { api.bustMotd(); refreshGlobalBanner(); });
 
 // The header floats (sticky); the action bar sticks just below it. Measure the
 // real header height into --topbar-h so the bar never hides under the header.
@@ -246,6 +246,7 @@ route('/admin/market', adminMarket('overview'));
 route('/admin/market/items', adminMarket('items'));
 route('/admin/market/holds', adminMarket('holds'));
 route('/admin/market/companies', adminMarket('companies'));
+route('/admin/market/trends', adminMarket('trends'));
 
 route('/hold-report', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }

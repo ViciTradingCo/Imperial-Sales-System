@@ -50,6 +50,7 @@ export function setMarketActions() {
     { label: 'Item Performance', path: '/admin/market/items', onClick: () => navigate('/admin/market/items') },
     { label: 'Hold Performance', path: '/admin/market/holds', onClick: () => navigate('/admin/market/holds') },
     { label: 'Company Performance', path: '/admin/market/companies', onClick: () => navigate('/admin/market/companies') },
+    { label: 'Trends', path: '/admin/market/trends', onClick: () => navigate('/admin/market/trends') },
   ]));
 }
 

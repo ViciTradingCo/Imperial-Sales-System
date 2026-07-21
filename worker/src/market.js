@@ -14,6 +14,12 @@
 import { getDb } from './db.js';
 import { parseSaleItems } from './sales.js';
 import { listItemIndex, matchMasterItem, normalizeItem } from './item-index.js';
+import { readSettings } from './settings.js';
+
+function settingVal(settings, label, dflt) {
+  const s = (settings || []).find((x) => x.label === label);
+  return s && isFinite(Number(s.value)) ? Number(s.value) : dflt;
+}
 
 /**
  * Aggregates per-item sales from the stored summaries, but ONLY for items in the
@@ -87,11 +93,41 @@ export async function marketAnalysis(env) {
       ORDER BY (low_stock - stock) DESC
       LIMIT 50`).all()).results) || [];
 
+  const master = await listItemIndex(env);
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE status != 'VOIDED'`).all()).results) || [];
-  const items = itemStats(saleRows, await listItemIndex(env));
+  const items = itemStats(saleRows, master);
 
-  return { overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, holds, items, underpriced, lowStock };
+  // Pricing anomalies vs the master base values, using the network thresholds.
+  const settings = await readSettings(env);
+  const overX = settingVal(settings, 'Overpricing threshold (x item average)', 1.5);
+  const underX = settingVal(settings, 'Undercutting threshold (x item average)', 0.5);
+  const masterByNorm = new Map(master.map((m) => [normalizeItem(m.name), m]));
+  const invRows = ((await db.prepare('SELECT business, item, price FROM inventory').all()).results) || [];
+  const overpriced = [];
+  const undercut = [];
+  invRows.forEach((r) => {
+    const m = masterByNorm.get(normalizeItem(r.item));
+    if (!m || !(m.baseValue > 0)) return; // only items with a real base value
+    const ratio = r.price / m.baseValue;
+    if (ratio >= overX) overpriced.push({ business: r.business, item: m.name, price: r.price, baseValue: m.baseValue, ratio });
+    else if (ratio <= underX) undercut.push({ business: r.business, item: m.name, price: r.price, baseValue: m.baseValue, ratio });
+  });
+  overpriced.sort((a, b) => b.ratio - a.ratio);
+  undercut.sort((a, b) => a.ratio - b.ratio);
+
+  // Daily revenue trend (last 30 days with activity), oldest → newest.
+  const trends = (((await db.prepare(
+    `SELECT substr(ts, 1, 10) AS day, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
+       FROM sales WHERE status != 'VOIDED'
+      GROUP BY day ORDER BY day DESC LIMIT 30`).all()).results) || []).reverse();
+
+  return {
+    overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 },
+    businesses, holds, items, underpriced, lowStock,
+    overpriced: overpriced.slice(0, 50), undercut: undercut.slice(0, 50),
+    thresholds: { over: overX, under: underX }, trends,
+  };
 }
 
 /**

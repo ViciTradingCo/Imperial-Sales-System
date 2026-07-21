@@ -46,7 +46,16 @@ function mapSale(r) {
  * Rings up a multi-item sale. cart = [{item, qty, price}] where price is the
  * actual sold-for amount per unit. Attributed to the caller's character.
  */
-export async function checkout(env, business, caller, { cart, customer, hold, discountName, discountPercent }) {
+export async function checkout(env, business, caller, { cart, customer, hold, discountName, discountPercent, idempotencyKey }) {
+  const db = await getDb(env);
+  // Idempotency: a retried submit with the same key returns the original sale
+  // instead of ringing it up twice.
+  const idem = String(idempotencyKey || '').trim();
+  if (idem) {
+    const prior = await db.prepare('SELECT order_no, total FROM sales WHERE business = ? AND idem = ? LIMIT 1').bind(business, idem).first();
+    if (prior) return { ok: true, orderNo: prior.order_no, total: prior.total, duplicate: true };
+  }
+
   const cert = await checkCertification(env, business);
   if (cert.status === 'EXPIRED') {
     throw new Error("This shop's East Empire certification has EXPIRED — an admin must renew it before you can sell.");
@@ -55,7 +64,6 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   const holdName = String(hold || '').trim();
   if (!holdName) throw new Error('Pick the hold this sale happened in.');
 
-  const db = await getDb(env);
   const master = await listItemIndex(env);
   const { results } = await db.prepare('SELECT item, price, stock FROM inventory WHERE business = ?').bind(business).all();
   const inv = {};
@@ -115,9 +123,9 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     stmts.push(db.prepare('UPDATE inventory SET stock = stock - ? WHERE business = ? AND item = ?').bind(need[item], business, item));
   }
   stmts.push(db.prepare(
-    `INSERT INTO sales (business, ts, order_no, customer, hold, items, qty_total, total, employee, discount, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')`
-  ).bind(business, ts, orderNo, String(customer || '').trim() || 'Walk-in', holdName, itemSummary, qtyTotal, finalTotal, employee, discountLabel));
+    `INSERT INTO sales (business, ts, order_no, customer, hold, items, qty_total, total, employee, discount, status, idem)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`
+  ).bind(business, ts, orderNo, String(customer || '').trim() || 'Walk-in', holdName, itemSummary, qtyTotal, finalTotal, employee, discountLabel, idem || null));
   // Credit the shop's coffers with the sale proceeds.
   stmts.push(db.prepare(
     `INSERT INTO coffer_entries (business, ts, kind, amount, note) VALUES (?, ?, 'sale', ?, ?)`

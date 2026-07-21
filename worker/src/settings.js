@@ -8,6 +8,7 @@
  * with the exact labels the market analysis reads.
  */
 import { readRange, updateRange, appendRows, ensureSheet } from './sheets.js';
+import { cacheGet, cacheSet, cacheBust } from './cache.js';
 
 export const MASTER_SETTINGS_SHEET = 'Master Settings';
 export const SETTINGS_HEADERS = ['Setting', 'Value', 'Notes'];
@@ -41,11 +42,13 @@ export async function ensureSettings(env) {
 
 /** Returns the settings in schema order: [{ label, value, notes, kind, min, max, def }]. */
 export async function readSettings(env) {
+  const cached = cacheGet('settings');
+  if (cached) return cached;
   await ensureSettings(env);
   const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${MASTER_SETTINGS_SHEET}!A2:C`);
   const byLabel = {};
   rows.forEach((r, i) => { byLabel[String(r[0] || '').trim()] = { value: r[1], row: i + 2 }; });
-  return SETTINGS_SCHEMA.map((s) => ({
+  const out = SETTINGS_SCHEMA.map((s) => ({
     label: s.label,
     value: byLabel[s.label] !== undefined && byLabel[s.label].value !== '' ? Number(byLabel[s.label].value) : s.def,
     notes: s.notes,
@@ -54,6 +57,8 @@ export async function readSettings(env) {
     max: s.max === undefined ? null : s.max,
     def: s.def,
   }));
+  cacheSet('settings', out, 60000);
+  return out;
 }
 
 function validate(schema, value) {
@@ -85,5 +90,6 @@ export async function writeSettings(env, updates) {
   for (const w of writes) {
     await updateRange(env, env.CORE_SPREADSHEET_ID, `${MASTER_SETTINGS_SHEET}!B${w.row}`, [[w.value]]);
   }
+  cacheBust('settings');
   return readSettings(env);
 }

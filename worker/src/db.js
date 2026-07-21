@@ -19,8 +19,9 @@ const SCHEMA = [
      business TEXT NOT NULL, ts TEXT NOT NULL, order_no TEXT NOT NULL,
      customer TEXT, hold TEXT, items TEXT,
      qty_total INTEGER NOT NULL DEFAULT 0, total REAL NOT NULL DEFAULT 0,
-     employee TEXT, discount TEXT, status TEXT NOT NULL DEFAULT '')`,
+     employee TEXT, discount TEXT, status TEXT NOT NULL DEFAULT '', idem TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_sales_business ON sales (business)`,
+  `CREATE INDEX IF NOT EXISTS idx_sales_idem ON sales (business, idem)`,
   `CREATE TABLE IF NOT EXISTS intake (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      business TEXT NOT NULL, ts TEXT NOT NULL, item TEXT, vendor TEXT,
@@ -56,13 +57,22 @@ const SCHEMA = [
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      ts TEXT NOT NULL, actor TEXT, actor_business TEXT, action TEXT NOT NULL, detail TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit (id DESC)`,
+  // Config indexes moved off Sheets onto D1 (hot paths: checkout, market, hold
+  // dropdowns). Seeded once from the Core's index tabs (see item-index.js /
+  // holds.js), then D1 is the source of truth.
+  `CREATE TABLE IF NOT EXISTS master_item (name TEXT PRIMARY KEY, base_value REAL NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS hold_index (ord INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)`,
+  // Small key/value store for one-shot migration flags, checkout idempotency, etc.
+  `CREATE TABLE IF NOT EXISTS sys_flags (k TEXT PRIMARY KEY, v TEXT)`,
+];
+
+// Additive migrations for databases created before a column existed. Each is
+// run best-effort; "duplicate column" on an already-migrated DB is ignored.
+const MIGRATIONS = [
+  'ALTER TABLE sales ADD COLUMN idem TEXT',
 ];
 
 let schemaReady = false;
-
-export function hasDb(env) {
-  return !!env.DB;
-}
 
 /** Ensures the tables exist (once per instance). */
 export async function ensureSchema(env) {
@@ -70,7 +80,23 @@ export async function ensureSchema(env) {
   for (const stmt of SCHEMA) {
     await env.DB.prepare(stmt).run();
   }
+  for (const alter of MIGRATIONS) {
+    try { await env.DB.prepare(alter).run(); } catch (e) { /* already applied */ }
+  }
   schemaReady = true;
+}
+
+/** Reads a one-shot flag from sys_flags (null if unset). */
+export async function getFlag(env, k) {
+  const db = await getDb(env);
+  const r = await db.prepare('SELECT v FROM sys_flags WHERE k = ?').bind(k).first();
+  return r ? r.v : null;
+}
+/** Sets a sys_flags value. */
+export async function setFlag(env, k, v) {
+  const db = await getDb(env);
+  await db.prepare('INSERT INTO sys_flags (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v')
+    .bind(k, String(v)).run();
 }
 
 /** Returns the D1 binding (schema ensured), or throws a friendly error. */

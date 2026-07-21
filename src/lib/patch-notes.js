@@ -3,6 +3,12 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.7', date: '2026-07-21', notes: [
+    'Faster: hold + item indexes moved to D1; registry reads cached — far fewer Sheets calls.',
+    'Market Analysis: Overpriced/Undercut alerts (vs base value) and a revenue Trends page.',
+    'Register is double-submit-safe (checkout idempotency).',
+    'Paged Member / Company / Audit lists; a worker test suite; code cleanup.',
+  ] },
   { version: '2.6', date: '2026-07-20', notes: [
     'Master Item Index (admin) — manage canonical item names and base values.',
     'Editable Holds index in Network Settings.',

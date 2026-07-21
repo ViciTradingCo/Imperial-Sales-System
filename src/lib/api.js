@@ -38,6 +38,10 @@ async function request(method, path, body) {
   return data;
 }
 
+// Short-lived shared cache for /motd so the Home notices and the shell banner
+// (fetched near-simultaneously) collapse into one request.
+let _motd = null;
+
 export const api = {
   health: () => request('GET', '/health'),
   /** Verifies the signed-in user and returns their profile, or {registered:false}. */
@@ -77,8 +81,17 @@ export const api = {
   clearLogs: () => request('POST', '/admin/logs/clear', {}),
   /** Court businesses: the market report for their own hold. */
   getHoldReport: () => request('GET', '/market/hold'),
-  /** Banners for the current user: { notices[], banner }. */
-  getMotd: () => request('GET', '/motd'),
+  /** Banners for the current user: { notices[], banners[] }. Deduped for ~3s. */
+  getMotd: () => {
+    const now = Date.now();
+    if (_motd && now - _motd.at < 3000) return _motd.p;
+    const p = request('GET', '/motd');
+    _motd = { at: now, p };
+    p.catch(() => { if (_motd && _motd.p === p) _motd = null; });
+    return p;
+  },
+  /** Forces the next getMotd to refetch (e.g. after accepting a transfer). */
+  bustMotd: () => { _motd = null; },
   /** Admin: read the MOTD config { motd, warnDays, individual[] }. */
   getMotdConfig: () => request('GET', '/admin/motd'),
   /** Admin: set the global message of the day (blank clears it). */

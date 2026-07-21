@@ -1,59 +1,66 @@
 /**
- * The Master Item Index — the shared item library in the Core's
- * `index_Items_Master` tab (Item | Base Value). It is the source of truth for
- * canonical item names (proper grammar/capitalization) and base values that the
- * market is measured against.
+ * The Master Item Index — the shared item library (canonical name + base value).
+ *
+ * Now stored in D1 (`master_item`) so the register and market don't hit Google
+ * Sheets on hot paths. On first use it seeds itself ONCE from the Core's
+ * `index_Items_Master` tab (the original data), then D1 is the source of truth.
  *
  * Also home to the fuzzy matcher that normalizes a typed item name to its
  * canonical master entry, so typos and stray spacing don't fragment the data.
  */
-import { readRange, updateRange, appendRows, ensureSheet } from './sheets.js';
+import { getDb, getFlag, setFlag } from './db.js';
+import { readRange } from './sheets.js';
 
-const ITEMS_SHEET = 'index_Items_Master';
-const HEADERS = ['Item', 'Base Value'];
+const SEED_FLAG = 'items_seeded';
+const LEGACY_SHEET = 'index_Items_Master';
 
-async function ensureItems(env) {
-  await ensureSheet(env, env.CORE_SPREADSHEET_ID, ITEMS_SHEET, HEADERS);
+/** One-shot migration: copy the Core's item tab into D1 the first time. */
+async function ensureSeeded(env) {
+  if (await getFlag(env, SEED_FLAG)) return;
+  const db = await getDb(env);
+  let rows = [];
+  try {
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${LEGACY_SHEET}!A2:B`);
+  } catch (e) {
+    return; // Sheets unreachable — retry seeding next call (flag stays unset).
+  }
+  const items = (rows || []).filter((r) => String(r[0] || '').trim());
+  if (items.length) {
+    await db.batch(items.map((r) =>
+      db.prepare('INSERT INTO master_item (name, base_value) VALUES (?, ?) ON CONFLICT(name) DO NOTHING')
+        .bind(String(r[0]).trim(), Number(r[1]) || 0)));
+  }
+  await setFlag(env, SEED_FLAG, '1');
 }
 
 export async function listItemIndex(env) {
-  await ensureItems(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${ITEMS_SHEET}!A2:B`);
-  return (rows || [])
-    .filter((r) => String(r[0] || '').trim())
-    .map((r) => ({ name: String(r[0]).trim(), baseValue: Number(r[1]) || 0 }));
+  await ensureSeeded(env);
+  const db = await getDb(env);
+  const { results } = await db.prepare('SELECT name, base_value FROM master_item ORDER BY name').all();
+  return (results || []).map((r) => ({ name: r.name, baseValue: Number(r.base_value) || 0 }));
 }
 
 /** Add a new item or edit an existing one (rename via oldName). */
 export async function upsertItem(env, { name, baseValue, oldName }) {
-  await ensureItems(env);
+  await ensureSeeded(env);
   const nm = String(name || '').trim();
   if (!nm) throw new Error('Enter an item name.');
   const val = Number(baseValue);
   if (!isFinite(val) || val < 0) throw new Error('Base value must be a number ≥ 0.');
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${ITEMS_SHEET}!A2:B`);
-  const key = String(oldName || name).trim().toLowerCase();
-  let rowIdx = null;
-  rows.forEach((r, i) => { if (String(r[0] || '').trim().toLowerCase() === key) rowIdx = i + 2; });
-  // Block renaming onto a different existing item.
-  const clashIdx = rows.findIndex((r) => String(r[0] || '').trim().toLowerCase() === nm.toLowerCase());
-  if (clashIdx !== -1 && clashIdx + 2 !== rowIdx) throw new Error('An item named "' + nm + '" already exists.');
-  if (rowIdx) {
-    await updateRange(env, env.CORE_SPREADSHEET_ID, `${ITEMS_SHEET}!A${rowIdx}:B${rowIdx}`, [[nm, val]]);
-  } else {
-    await appendRows(env, env.CORE_SPREADSHEET_ID, `${ITEMS_SHEET}!A1`, [[nm, val]]);
-  }
+  const db = await getDb(env);
+  const clash = await db.prepare('SELECT name FROM master_item WHERE lower(name) = ? AND lower(name) != ?')
+    .bind(nm.toLowerCase(), String(oldName || '').toLowerCase()).first();
+  if (clash) throw new Error('An item named "' + nm + '" already exists.');
+  if (oldName && oldName !== nm) await db.prepare('DELETE FROM master_item WHERE name = ?').bind(oldName).run();
+  await db.prepare('INSERT INTO master_item (name, base_value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET base_value = excluded.base_value')
+    .bind(nm, val).run();
   return listItemIndex(env);
 }
 
 export async function deleteItemIndex(env, name) {
-  await ensureItems(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${ITEMS_SHEET}!A2:B`);
-  const key = String(name || '').trim().toLowerCase();
-  let rowIdx = null;
-  rows.forEach((r, i) => { if (String(r[0] || '').trim().toLowerCase() === key) rowIdx = i + 2; });
-  if (!rowIdx) throw new Error('Item not found.');
-  await updateRange(env, env.CORE_SPREADSHEET_ID, `${ITEMS_SHEET}!A${rowIdx}:B${rowIdx}`, [['', '']]);
+  await ensureSeeded(env);
+  const db = await getDb(env);
+  await db.prepare('DELETE FROM master_item WHERE lower(name) = ?').bind(String(name || '').trim().toLowerCase()).run();
   return listItemIndex(env);
 }
 
@@ -96,7 +103,6 @@ export function matchMasterItem(name, master) {
     if (d < bestDist) { bestDist = d; best = it; }
   }
   if (!best) return null;
-  // Allow more slack on longer names; short names must match tightly.
   const L = target.length;
   const allowed = L <= 4 ? 1 : L <= 8 ? 2 : 3;
   return bestDist <= allowed ? best : null;

@@ -7,12 +7,16 @@ import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { setAdminActions } from '../lib/sections.js';
+import { pager } from '../lib/paginate.js';
+
+const PAGE_SIZE = 25;
 
 export function renderMembers(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading members…'));
   const search = el('input', { type: 'search', placeholder: 'Search name, business, email, role…' });
-  search.addEventListener('input', () => draw());
+  let page = 1;
+  search.addEventListener('input', () => { page = 1; draw(); });
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Member List'),
@@ -32,11 +36,14 @@ export function renderMembers(container) {
     const q = search.value.trim().toLowerCase();
     const members = !q ? all : all.filter((m) =>
       [m.character, m.email, m.business, m.role, m.uid].some((v) => String(v || '').toLowerCase().includes(q)));
-    renderList(members);
+    if (!members.length) { mount(listHost, el('p', { class: 'note' }, all.length ? 'No matches.' : 'No members yet.')); return; }
+    const pg = pager(members.length, page, PAGE_SIZE, (n) => { page = n; draw(); });
+    page = pg.page;
+    renderList(members.slice(pg.start, pg.end));
+    listHost.appendChild(pg.bar);
   }
 
   function renderList(members) {
-    if (!members.length) { mount(listHost, el('p', { class: 'note' }, all.length ? 'No matches.' : 'No members yet.')); return; }
     mount(listHost, ...members.map((m) => el('div', { class: 'member-row' }, [
       el('p', { html:
         '<b>' + esc(m.character || m.email || '—') + '</b> · <span class="role-pill">' + esc(m.role) + '</span> ' +

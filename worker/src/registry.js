@@ -11,6 +11,7 @@
  * enforce name uniqueness at registration.
  */
 import { readRange, appendRows, updateRange, ensureSheet, ensureColumns } from './sheets.js';
+import { cacheGet, cacheSet, cacheBust } from './cache.js';
 import { appendUser, findUserByEmail, reconcileUsersHeader, USERS_SHEET, USERS_HEADERS } from './users.js';
 import { renameBusinessKey } from './business-settings.js';
 import { renameBusinessData } from './db.js';
@@ -69,19 +70,25 @@ export async function listBusinessNames(env) {
 export async function findBusinessMeta(env, name) {
   const target = String(name || '').trim().toLowerCase();
   if (!target) return { hold: '', court: false };
+  const cached = cacheGet('meta:' + target);
+  if (cached) return cached;
   let rows;
   try {
     rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
   } catch (e) {
-    return { hold: '', court: false };
+    return { hold: '', court: false }; // transient — not cached
   }
+  const put = (res) => { cacheSet('meta:' + target, res, 60000); return res; };
   for (const r of rows) {
     if (String(r[2] || '').trim().toLowerCase() === target) {
-      return { hold: String(r[10] || '').trim(), court: String(r[11]).trim().toUpperCase() === 'TRUE' };
+      return put({ hold: String(r[10] || '').trim(), court: String(r[11]).trim().toUpperCase() === 'TRUE' });
     }
   }
-  return { hold: '', court: false };
+  return put({ hold: '', court: false });
 }
+
+/** Invalidates the cert + business-meta caches (call on any registry change). */
+export function bustRegistryCache() { cacheBust('cert:'); cacheBust('meta:'); }
 
 /** Appends a business row to Certified Users (subscription/sync columns left for the admin + sync to fill). */
 async function appendBusiness(env, { ledgerId, businessName, pointOfContact, hold }) {
@@ -126,6 +133,7 @@ export async function registerUser(env, { email, name, character, businessName, 
     const businessId = genUid('biz');
     // Point of Contact is the owner's character (the in-character name).
     await appendBusiness(env, { ledgerId: businessId, businessName: biz, pointOfContact: char, hold: String(hold || '').trim() });
+    bustRegistryCache();
     const uid = genUid('usr');
     return appendUser(env, { uid, email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active' });
   }
@@ -171,6 +179,7 @@ export async function renameBusiness(env, oldName, newName) {
   }
 
   await renameBusinessKey(env, old, nw);
+  bustRegistryCache();
   return nw;
 }
 
@@ -247,6 +256,7 @@ export async function updateCompany(env, { id, name, until, perpetual, hold, cou
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!K${rowIdx}:L${rowIdx}`,
     [[holdStr, courtBool ? 'TRUE' : 'FALSE']]);
 
+  bustRegistryCache();
   return listCompanies(env);
 }
 
@@ -280,5 +290,6 @@ export async function archiveCompany(env, id) {
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!F${rowIdx}`, [['ARCHIVED']]);
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!I${rowIdx}`, [['FALSE']]);
 
+  bustRegistryCache();
   return listCompanies(env);
 }

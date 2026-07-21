@@ -9,14 +9,17 @@ import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { setAdminActions } from '../lib/sections.js';
+import { pager } from '../lib/paginate.js';
 
+const PAGE_SIZE = 25;
 const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
 
 export function renderCompanies(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading companies…'));
   const search = el('input', { type: 'search', placeholder: 'Search business, contact, hold, status…' });
-  search.addEventListener('input', () => draw());
+  let page = 1;
+  search.addEventListener('input', () => { page = 1; draw(); });
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Company List'),
@@ -36,11 +39,14 @@ export function renderCompanies(container) {
     const q = search.value.trim().toLowerCase();
     const companies = !q ? all : all.filter((c) =>
       [c.business, c.pointOfContact, c.hold, c.status, c.court ? 'court' : ''].some((v) => String(v || '').toLowerCase().includes(q)));
-    renderList(companies);
+    if (!companies.length) { mount(listHost, el('p', { class: 'note' }, all.length ? 'No matches.' : 'No companies yet.')); return; }
+    const pg = pager(companies.length, page, PAGE_SIZE, (n) => { page = n; draw(); });
+    page = pg.page;
+    renderList(companies.slice(pg.start, pg.end));
+    listHost.appendChild(pg.bar);
   }
 
   function renderList(companies) {
-    if (!companies.length) { mount(listHost, el('p', { class: 'note' }, all.length ? 'No matches.' : 'No companies yet.')); return; }
     mount(listHost, ...companies.map((c) => {
       const sub = c.perpetual ? 'Perpetual' : (c.until ? 'until ' + c.until : 'no subscription');
       const statusCls = String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';

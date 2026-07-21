@@ -11,6 +11,7 @@
  * writes the rest.
  */
 import { readRange, appendRows, updateRange } from './sheets.js';
+import { cacheGet, cacheSet, cacheBust } from './cache.js';
 
 export const USERS_SHEET = 'Users';
 // Character (I) and owner Notes (J) are appended at the end so existing
@@ -37,9 +38,13 @@ function normalizeRow(r) {
 export async function findUserByEmail(env, email) {
   const target = String(email || '').trim().toLowerCase();
   if (!target) return null;
+  // Positive-only cache: a hit is a registered user; misses are never cached
+  // so a just-registered account is found immediately.
+  const cached = cacheGet('user:' + target);
+  if (cached) return { ...cached };
   let rows;
   try {
-    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:I`);
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A2:J`);
   } catch (e) {
     // A missing Users tab is an expected pre-registration state, not a crash.
     if (/Unable to parse range|not found/i.test(e.message)) return null;
@@ -49,11 +54,15 @@ export async function findUserByEmail(env, email) {
     if (String(rows[i][1] || '').trim().toLowerCase() === target) {
       const user = normalizeRow(rows[i]);
       user.row = i + 2; // 1-based sheet row (data starts at row 2)
-      return user;
+      cacheSet('user:' + target, user, 15000);
+      return { ...user };
     }
   }
   return null;
 }
+
+/** Invalidates the cached identity for any Users write. */
+export function bustUserCache() { cacheBust('user:'); }
 
 /** Every user in the system (admin member list). */
 export async function listAllUsers(env) {
@@ -88,6 +97,7 @@ export async function appendUser(env, { uid, email, business, role, isOwner, sta
   await appendRows(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A1`, [[
     uid, email, business, role, isOwner ? 'TRUE' : 'FALSE', status, now, now, character || '',
   ]]);
+  bustUserCache();
   return { uid, email, business, role, isOwner: !!isOwner, status, character: character || '' };
 }
 
@@ -100,16 +110,19 @@ export async function reconcileUsersHeader(env) {
 /** Sets a user's Status cell (column F) by sheet row. */
 export async function setUserStatus(env, row, status) {
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!F${row}`, [[status]]);
+  bustUserCache();
 }
 
 /** Sets a user's Character cell (column I) by sheet row. */
 export async function setUserCharacter(env, row, character) {
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!I${row}`, [[character]]);
+  bustUserCache();
 }
 
 /** Sets a user's owner-only Notes cell (column J) by sheet row. */
 export async function setUserNote(env, row, note) {
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!J${row}`, [[String(note || '').trim()]]);
+  bustUserCache();
 }
 
 /** Admin edit of a member (by UID): character, company, and role. */
@@ -129,6 +142,7 @@ export async function updateMember(env, { uid, character, business, role }) {
     [[String(business || '').trim(), r, r === 'owner' ? 'TRUE' : 'FALSE']]);
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!I${rowIdx}`,
     [[String(character || '').trim()]]);
+  bustUserCache();
 }
 
 /**
@@ -145,6 +159,7 @@ export async function deleteMember(env, uid) {
   if (!rowIdx) throw new Error('Member not found.');
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${USERS_SHEET}!A${rowIdx}:J${rowIdx}`,
     [['', '', '', '', '', '', '', '', '', '']]);
+  bustUserCache();
 }
 
 /** Best-effort Last Seen stamp (column H). Never throws into the caller. */

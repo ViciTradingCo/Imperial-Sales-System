@@ -11,6 +11,12 @@ import { openModal } from '../lib/modal.js';
 import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
 
+/** A unique key per order-in-progress for checkout idempotency. */
+function newIdem() {
+  try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) { /* fallback */ }
+  return 'idem-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
 export function renderPos(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
 
@@ -107,6 +113,10 @@ export function renderPos(container, { me }) {
     const complete = el('button.primary', { onclick: doCheckout }, 'Complete sale');
     if (!canSell) complete.disabled = true;
 
+    // One idempotency key per order-in-progress, so a retried submit can't
+    // ring the same sale up twice. Reset after a successful checkout.
+    let idemKey = null;
+
     function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
     function renderCart() {
@@ -134,6 +144,7 @@ export function renderPos(container, { me }) {
         p = inv ? inv.price : (mas ? mas.baseValue : NaN);
       }
       if (!isFinite(p) || p < 0) { setStatus('Enter a sold-for price.', 'error'); return; }
+      if (!idemKey) idemKey = newIdem();
       cart.push({ item, qty: q, price: p });
       itemInput.value = ''; qty.value = '1'; price.value = ''; itemHint.textContent = '';
       setStatus('', '');
@@ -149,7 +160,9 @@ export function renderPos(container, { me }) {
         const res = await api.checkout({
           cart, customer: customer.value.trim(), hold: holdSel.value,
           discountName: discName.value.trim(), discountPercent: discPct.value,
+          idempotencyKey: idemKey,
         });
+        idemKey = null; // next order gets a fresh key
         cart.length = 0;
         renderCart();
         customer.value = ''; discName.value = ''; discPct.value = '';

@@ -26,6 +26,7 @@ function renderTab(host, tab, d) {
   if (tab === 'items') return mount(host, itemPerformance(d.items || []));
   if (tab === 'holds') return mount(host, holdPerformance(d.holds || []));
   if (tab === 'companies') return mount(host, companyPerformance(d.businesses || []));
+  if (tab === 'trends') return mount(host, trendsCard(d.trends || []));
   return mount(host, ...overview(d));
 }
 
@@ -58,7 +59,34 @@ function overview(d) {
         '<b>' + esc(s.business) + '</b> · ' + esc(s.item) + ' — ' + s.stock +
         ' left (threshold ' + s.lowStock + ')'),
       'No items are low on stock.'),
+    alertsCard('⤴ Overpriced (vs base value)', 'bad',
+      (d.overpriced || []).map((o) =>
+        '<b>' + esc(o.business) + '</b> · ' + esc(o.item) + ' — ' + money(o.price) +
+        ' vs base ' + money(o.baseValue) + ' (' + o.ratio.toFixed(2) + '×)'),
+      'No items are overpriced.'),
+    alertsCard('⤵ Undercut (vs base value)', 'warn',
+      (d.undercut || []).map((u) =>
+        '<b>' + esc(u.business) + '</b> · ' + esc(u.item) + ' — ' + money(u.price) +
+        ' vs base ' + money(u.baseValue) + ' (' + u.ratio.toFixed(2) + '×)'),
+      'No items are undercut.'),
   ];
+}
+
+/* ---- Trends: daily revenue bars ---- */
+function trendsCard(trends) {
+  if (!trends.length) return el('div.card', {}, [el('h3', {}, 'Revenue trend'), el('p', { class: 'note' }, 'No sales yet.')]);
+  const max = Math.max(...trends.map((t) => Number(t.revenue) || 0), 1);
+  const bars = trends.map((t) => {
+    const h = Math.round(((Number(t.revenue) || 0) / max) * 100);
+    const bar = el('div', { class: 'trend-bar', title: t.day + ': ' + money(t.revenue) + ' · ' + t.orders + ' orders' },
+      el('div', { class: 'trend-fill' }, ''));
+    bar.querySelector('.trend-fill').style.height = h + '%';
+    return el('div', { class: 'trend-col' }, [bar, el('div', { class: 'trend-day' }, String(t.day).slice(5))]);
+  });
+  return el('div.card', {}, [
+    el('h3', {}, 'Revenue trend (last ' + trends.length + ' days)'),
+    el('div', { class: 'trend-chart' }, bars),
+  ]);
 }
 
 /* ---- Item Performance: searchable ---- */
