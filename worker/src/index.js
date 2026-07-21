@@ -29,12 +29,13 @@ import { logAudit, listAudit } from './audit.js';
 import { readRange } from './sheets.js';
 import { readSettings, writeSettings } from './settings.js';
 import { readBusinessSettings, writeBusinessSettings } from './business-settings.js';
-import { listInventory, upsertItem, deleteItem } from './inventory.js';
+import { listInventory, upsertItem, deleteItem, importInventory } from './inventory.js';
 import { recordIntake, listIntake } from './intake.js';
 import { readHolds, writeHolds } from './holds.js';
 import { listItemIndex, upsertItem as upsertMasterItem, deleteItemIndex } from './item-index.js';
 import { checkCertification } from './cert.js';
-import { checkout, listSales, voidSale } from './sales.js';
+import { checkout, listSales, voidSale, employeePerformance } from './sales.js';
+import { rateHit, isPriorityToken, markPriority, MAX_BODY_BYTES } from './ratelimit.js';
 import { renameBusinessData, ensureSchema, clearLogs } from './db.js';
 import { runBackup } from './backup.js';
 import { marketAnalysis, holdReport } from './market.js';
@@ -117,6 +118,9 @@ async function handleMe(request, env) {
   }
   touchLastSeen(env, user.row); // fire-and-forget
   const meta = await findBusinessMeta(env, user.business);
+  // Learn this token's priority tier for the rate limiter.
+  const tok = (String(request.headers.get('Authorization') || '').match(/^Bearer\s+(.+)$/i) || [])[1];
+  markPriority(tok, meta.priority);
   return publicUser(user, { court: meta.court, hold: meta.hold });
 }
 
@@ -527,6 +531,18 @@ async function handleSaveItem(request, env, body) {
 }
 
 /** Owner/admin: remove an inventory item. */
+async function handleImportInventory(request, env, body) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const res = await importInventory(env, caller.business, body.rows);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'inventory.import', detail: (res.imported || 0) + ' items' });
+  return res;
+}
+
+async function handleEmployeePerformance(request, env) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return { performance: await employeePerformance(env, caller.business) };
+}
+
 async function handleDeleteItem(request, env, body) {
   const caller = await requireRegistered(request, env);
   if (caller.role !== 'owner' && caller.role !== 'admin') {
@@ -640,6 +656,19 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
 
+    // Request-size cap (cheap abuse guard, before we read the body).
+    if (Number(request.headers.get('Content-Length') || 0) > MAX_BODY_BYTES) {
+      return json({ error: 'Request too large.' }, 413, cors);
+    }
+    // Rate limit — keyed by token (or IP), with a higher ceiling for priority
+    // businesses (learned at /auth/me). Health checks are exempt.
+    if (path !== '/health' && path !== '/') {
+      const tok = (String(request.headers.get('Authorization') || '').match(/^Bearer\s+(.+)$/i) || [])[1] || '';
+      const key = tok ? 'tok:' + tok : 'ip:' + (request.headers.get('CF-Connecting-IP') || 'unknown');
+      const rl = rateHit(key, isPriorityToken(tok));
+      if (!rl.ok) return json({ error: 'Rate limit exceeded — slow down.' }, 429, { ...cors, 'Retry-After': String(rl.retryAfter) });
+    }
+
     try {
       if (request.method === 'GET' && (path === '/health' || path === '/')) {
         // Probe D1: 'ok' means bound + migrated; 'error' means bound but the
@@ -689,6 +718,10 @@ export default {
       if (request.method === 'POST' && path === '/business/employees/note') {
         const body = await readJsonBody(request);
         return json(await handleEmployeeNote(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'GET' && path === '/business/employees/performance') {
+        return json(await handleEmployeePerformance(request, env), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/admin/settings') {
@@ -803,6 +836,11 @@ export default {
       if (request.method === 'POST' && path === '/inventory/delete') {
         const body = await readJsonBody(request);
         return json(await handleDeleteItem(request, env, body), 200, cors);
+      }
+
+      if (request.method === 'POST' && path === '/inventory/import') {
+        const body = await readJsonBody(request);
+        return json(await handleImportInventory(request, env, body), 200, cors);
       }
 
       if (request.method === 'GET' && path === '/businesses') {

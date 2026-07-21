@@ -10,12 +10,7 @@ import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
 import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
-
-/** A unique key per order-in-progress for checkout idempotency. */
-function newIdem() {
-  try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) { /* fallback */ }
-  return 'idem-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-}
+import { newIdem } from '../lib/id.js';
 
 export function renderPos(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees

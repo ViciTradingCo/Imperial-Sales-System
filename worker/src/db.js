@@ -28,14 +28,14 @@ const SCHEMA = [
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      business TEXT NOT NULL, ts TEXT NOT NULL, item TEXT, vendor TEXT,
      source_hold TEXT, num_items INTEGER NOT NULL DEFAULT 0,
-     price_per REAL NOT NULL DEFAULT 0)`,
+     price_per REAL NOT NULL DEFAULT 0, idem TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_intake_business ON intake (business)`,
   `CREATE TABLE IF NOT EXISTS transfers (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      from_business TEXT NOT NULL, to_business TEXT NOT NULL,
      item TEXT NOT NULL, qty INTEGER NOT NULL DEFAULT 0,
      price REAL NOT NULL DEFAULT 0,
-     status TEXT NOT NULL DEFAULT 'pending', ts TEXT NOT NULL)`,
+     status TEXT NOT NULL DEFAULT 'pending', ts TEXT NOT NULL, idem TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_transfers_to ON transfers (to_business)`,
   `CREATE INDEX IF NOT EXISTS idx_transfers_from ON transfers (from_business)`,
   // Coffers — a shop's treasury ledger. Balance = SUM(amount); credits are
@@ -74,6 +74,10 @@ const SCHEMA = [
 const MIGRATIONS = [
   'ALTER TABLE sales ADD COLUMN idem TEXT',
   'CREATE INDEX IF NOT EXISTS idx_sales_idem ON sales (business, idem)',
+  'ALTER TABLE intake ADD COLUMN idem TEXT',
+  'CREATE INDEX IF NOT EXISTS idx_intake_idem ON intake (business, idem)',
+  'ALTER TABLE transfers ADD COLUMN idem TEXT',
+  'CREATE INDEX IF NOT EXISTS idx_transfers_idem ON transfers (from_business, idem)',
 ];
 
 let schemaReady = false;

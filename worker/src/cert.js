@@ -19,7 +19,7 @@ function startOfToday() {
 export async function checkCertification(env, business) {
   const target = String(business || '').trim().toLowerCase();
   if (!target) return { status: 'EXPIRED', until: '' };
-  const cached = cacheGet('cert:' + target);
+  const cached = await cacheGet(env, 'cert:' + target);
   if (cached) return cached;
   let rows;
   try {
@@ -27,7 +27,7 @@ export async function checkCertification(env, business) {
   } catch (e) {
     return { status: 'EXPIRED', until: '', error: 'Could not read the registry.' }; // transient — not cached
   }
-  const put = (r) => { cacheSet('cert:' + target, r, 30000); return r; };
+  const put = async (r) => { await cacheSet(env, 'cert:' + target, r, 30000); return r; };
   for (const r of rows) {
     if (String(r[2] || '').trim().toLowerCase() !== target) continue;
     const perpetual = String(r[4]).trim().toUpperCase() === 'TRUE';

@@ -8,8 +8,13 @@
 import { getDb } from './db.js';
 
 /** Records one intake transaction. Returns the recent intake list. */
-export async function recordIntake(env, business, { item, vendor, hold, numItems, pricePer }) {
+export async function recordIntake(env, business, { item, vendor, hold, numItems, pricePer, idempotencyKey }) {
   const db = await getDb(env);
+  const idem = String(idempotencyKey || '').trim();
+  if (idem) {
+    const prior = await db.prepare('SELECT id FROM intake WHERE business = ? AND idem = ? LIMIT 1').bind(business, idem).first();
+    if (prior) return listIntake(env, business, 20); // already recorded — no double stock
+  }
   const name = String(item || '').trim();
   if (!name) throw new Error('Item name is required.');
   const qty = Math.floor(Number(numItems));
@@ -20,9 +25,9 @@ export async function recordIntake(env, business, { item, vendor, hold, numItems
 
   await db.batch([
     db.prepare(
-      `INSERT INTO intake (business, ts, item, vendor, source_hold, num_items, price_per)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(business, ts, name, String(vendor || '').trim(), String(hold || '').trim(), qty, per),
+      `INSERT INTO intake (business, ts, item, vendor, source_hold, num_items, price_per, idem)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(business, ts, name, String(vendor || '').trim(), String(hold || '').trim(), qty, per, idem || null),
     // New item → created with sale price = cost paid; existing item → stock only.
     db.prepare(
       `INSERT INTO inventory (business, item, price, stock, low_stock)

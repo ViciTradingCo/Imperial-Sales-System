@@ -116,6 +116,10 @@ export const api = {
   saveItem: (item) => request('POST', '/inventory', item),
   /** Owner/admin: delete an inventory item. */
   deleteItem: (item) => request('POST', '/inventory/delete', { item }),
+  /** Owner/admin: bulk import inventory rows [{item, price, stock, lowStock}]. */
+  importInventory: (rows) => request('POST', '/inventory/import', { rows }),
+  /** Owner/admin: per-employee sales performance. */
+  getEmployeePerformance: () => request('GET', '/business/employees/performance'),
   /** Any registered user: active business names (transfer targets). */
   getBusinesses: () => request('GET', '/businesses'),
   /** Owner/admin: pending transfers ({ incoming, outgoing }). */

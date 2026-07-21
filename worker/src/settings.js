@@ -42,7 +42,7 @@ export async function ensureSettings(env) {
 
 /** Returns the settings in schema order: [{ label, value, notes, kind, min, max, def }]. */
 export async function readSettings(env) {
-  const cached = cacheGet('settings');
+  const cached = await cacheGet(env, 'settings');
   if (cached) return cached;
   await ensureSettings(env);
   const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${MASTER_SETTINGS_SHEET}!A2:C`);
@@ -57,7 +57,7 @@ export async function readSettings(env) {
     max: s.max === undefined ? null : s.max,
     def: s.def,
   }));
-  cacheSet('settings', out, 60000);
+  await cacheSet(env, 'settings', out, 60000);
   return out;
 }
 

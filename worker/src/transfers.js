@@ -9,7 +9,13 @@
 import { getDb } from './db.js';
 
 /** Owner/admin: send a pending transfer; debits the sender's stock now. */
-export async function createTransfer(env, fromBusiness, { toBusiness, item, qty }) {
+export async function createTransfer(env, fromBusiness, { toBusiness, item, qty, idempotencyKey }) {
+  const db = await getDb(env);
+  const idem = String(idempotencyKey || '').trim();
+  if (idem) {
+    const prior = await db.prepare('SELECT id FROM transfers WHERE from_business = ? AND idem = ? LIMIT 1').bind(fromBusiness, idem).first();
+    if (prior) return { ok: true, duplicate: true }; // already sent — no double debit
+  }
   const to = String(toBusiness || '').trim();
   const it = String(item || '').trim();
   const n = Math.floor(Number(qty));
@@ -20,7 +26,6 @@ export async function createTransfer(env, fromBusiness, { toBusiness, item, qty 
   if (!it) throw new Error('Pick an item to transfer.');
   if (!n || n < 1) throw new Error('Enter a quantity of at least 1.');
 
-  const db = await getDb(env);
   const { results } = await db.prepare(
     'SELECT item, price, stock FROM inventory WHERE business = ? AND item = ?').bind(fromBusiness, it).all();
   const row = results && results[0];
@@ -30,8 +35,8 @@ export async function createTransfer(env, fromBusiness, { toBusiness, item, qty 
   await db.batch([
     db.prepare('UPDATE inventory SET stock = stock - ? WHERE business = ? AND item = ?').bind(n, fromBusiness, it),
     db.prepare(
-      `INSERT INTO transfers (from_business, to_business, item, qty, price, status, ts)
-       VALUES (?, ?, ?, ?, ?, 'pending', ?)`).bind(fromBusiness, to, it, n, row.price, new Date().toISOString()),
+      `INSERT INTO transfers (from_business, to_business, item, qty, price, status, ts, idem)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`).bind(fromBusiness, to, it, n, row.price, new Date().toISOString(), idem || null),
   ]);
   return { ok: true };
 }

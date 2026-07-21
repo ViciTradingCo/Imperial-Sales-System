@@ -20,7 +20,7 @@ export const CERT_SHEET = 'Certified Users';
 // Hold (K) and Court (L) are appended after the classic Apps Script columns so
 // existing rows never shift. Court is an admin-only flag; Hold is the Skyrim
 // hold the business trades in, chosen at registration.
-export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe', 'Hold', 'Court'];
+export const CERT_HEADERS = ['User ID', 'Point of Contact', 'Business Name', 'Subscription Valid Until', 'Perpetual', 'Status', 'Sync Status', 'Last Sync', 'Sync?', 'Last Wipe', 'Hold', 'Court', 'Priority'];
 
 /** Widens the grid (if needed) and rewrites the Certified Users header row so a
  *  pre-existing 10-column tab gains the Hold/Court columns + labels. */
@@ -70,21 +70,25 @@ export async function listBusinessNames(env) {
 export async function findBusinessMeta(env, name) {
   const target = String(name || '').trim().toLowerCase();
   if (!target) return { hold: '', court: false };
-  const cached = cacheGet('meta:' + target);
+  const cached = await cacheGet(env, 'meta:' + target);
   if (cached) return cached;
   let rows;
   try {
-    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:M`);
   } catch (e) {
-    return { hold: '', court: false }; // transient — not cached
+    return { hold: '', court: false, priority: false }; // transient — not cached
   }
-  const put = (res) => { cacheSet('meta:' + target, res, 60000); return res; };
+  const put = async (res) => { await cacheSet(env, 'meta:' + target, res, 60000); return res; };
   for (const r of rows) {
     if (String(r[2] || '').trim().toLowerCase() === target) {
-      return put({ hold: String(r[10] || '').trim(), court: String(r[11]).trim().toUpperCase() === 'TRUE' });
+      return put({
+        hold: String(r[10] || '').trim(),
+        court: String(r[11]).trim().toUpperCase() === 'TRUE',
+        priority: String(r[12]).trim().toUpperCase() === 'TRUE',
+      });
     }
   }
-  return put({ hold: '', court: false });
+  return put({ hold: '', court: false, priority: false });
 }
 
 /** Invalidates the cert + business-meta caches (call on any registry change). */
@@ -93,7 +97,7 @@ export function bustRegistryCache() { cacheBust('cert:'); cacheBust('meta:'); }
 /** Appends a business row to Certified Users (subscription/sync columns left for the admin + sync to fill). */
 async function appendBusiness(env, { ledgerId, businessName, pointOfContact, hold }) {
   await appendRows(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A1`, [[
-    ledgerId, pointOfContact || '', businessName, '', 'FALSE', '', '', '', 'FALSE', '', hold || '', 'FALSE',
+    ledgerId, pointOfContact || '', businessName, '', 'FALSE', '', '', '', 'FALSE', '', hold || '', 'FALSE', 'FALSE',
   ]]);
 }
 
@@ -202,7 +206,7 @@ function statusFromDate(untilStr) {
 export async function listCompanies(env) {
   let rows;
   try {
-    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
+    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:M`);
   } catch (e) {
     return [];
   }
@@ -218,6 +222,7 @@ export async function listCompanies(env) {
       status: String(r[5] || '').trim(),
       hold: String(r[10] || '').trim(),
       court: String(r[11]).trim().toUpperCase() === 'TRUE',
+      priority: String(r[12]).trim().toUpperCase() === 'TRUE',
     }));
 }
 
@@ -225,12 +230,12 @@ export async function listCompanies(env) {
  * Admin edit of a company (targeted by its stable id = User ID / ledger id):
  * rename (propagated everywhere) and/or set the subscription expiry + Perpetual.
  */
-export async function updateCompany(env, { id, name, until, perpetual, hold, court }) {
+export async function updateCompany(env, { id, name, until, perpetual, hold, court, priority }) {
   const targetId = String(id || '').trim();
   if (!targetId) throw new Error('Missing company id.');
-  // Ensure the Hold/Court columns exist before we read or write them.
+  // Ensure the Hold/Court/Priority columns exist before we read or write them.
   await reconcileCertHeader(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:L`);
+  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!A2:M`);
   let rowIdx = null;
   let current = null;
   rows.forEach((r, i) => { if (String(r[0] || '').trim() === targetId) { rowIdx = i + 2; current = r; } });
@@ -250,11 +255,12 @@ export async function updateCompany(env, { id, name, until, perpetual, hold, cou
   await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!D${rowIdx}:F${rowIdx}`,
     [[untilStr, perp ? 'TRUE' : 'FALSE', status]]);
 
-  // Hold (K) and the admin-only Court flag (L). Preserve either if not supplied.
+  // Hold (K), Court (L), Priority (M). Preserve any not supplied.
   const holdStr = hold === undefined ? String(current[10] || '').trim() : String(hold || '').trim();
   const courtBool = court === undefined ? String(current[11]).trim().toUpperCase() === 'TRUE' : !!court;
-  await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!K${rowIdx}:L${rowIdx}`,
-    [[holdStr, courtBool ? 'TRUE' : 'FALSE']]);
+  const prioBool = priority === undefined ? String(current[12]).trim().toUpperCase() === 'TRUE' : !!priority;
+  await updateRange(env, env.CORE_SPREADSHEET_ID, `${CERT_SHEET}!K${rowIdx}:M${rowIdx}`,
+    [[holdStr, courtBool ? 'TRUE' : 'FALSE', prioBool ? 'TRUE' : 'FALSE']]);
 
   bustRegistryCache();
   return listCompanies(env);

@@ -7,16 +7,28 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
 import { setOpsActions } from '../lib/sections.js';
+import { money } from '../lib/format.js';
 
 export function renderEmployees(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
   const list = el('div', {}, el('p', { class: 'note' }, 'Loading roster…'));
-  mount(container, el('div.card', {}, [
-    el('h2', {}, 'Employees'),
-    el('p', { class: 'note' }, 'Everyone registered under ' + esc(me.business || 'your business') +
-      '. Activate pending accounts to let them ring up sales. Notes are private to you.'),
-    list,
-  ]));
+  const perfHost = el('div', {}, el('p', { class: 'note' }, 'Loading performance…'));
+  mount(container,
+    el('div.card', {}, [
+      el('h2', {}, 'Employees'),
+      el('p', { class: 'note' }, 'Everyone registered under ' + esc(me.business || 'your business') +
+        '. Activate pending accounts to let them ring up sales. Notes are private to you.'),
+      list,
+    ]),
+    el('div.card', {}, [
+      el('h3', {}, 'Employee performance'),
+      el('p', { class: 'note' }, 'Sales rung up per employee (voided sales excluded).'),
+      perfHost,
+    ]));
+
+  api.getEmployeePerformance()
+    .then((r) => renderPerformance(perfHost, r.performance || []))
+    .catch((e) => mount(perfHost, el('p', { class: 'error' }, e.message || String(e))));
 
   async function refresh() {
     try {
@@ -88,4 +100,27 @@ function openNoteModal(u, onSaved) {
 function statusBadge(status) {
   const cls = status === 'active' ? 'ok' : 'warn';
   return '<span class="' + cls + '">' + esc(status) + '</span>';
+}
+
+/** Table + horizontal revenue bars for per-employee performance. */
+function renderPerformance(host, rows) {
+  if (!rows.length) { mount(host, el('p', { class: 'note' }, 'No sales recorded yet.')); return; }
+  const max = Math.max(...rows.map((r) => Number(r.revenue) || 0), 1);
+  const bars = rows.map((r) => {
+    const pct = Math.round(((Number(r.revenue) || 0) / max) * 100);
+    const fill = el('div', { class: 'hbar-fill' }, '');
+    fill.style.width = pct + '%';
+    return el('div', { class: 'hbar-row' }, [
+      el('div', { class: 'hbar-label' }, r.employee),
+      el('div', { class: 'hbar-track' }, fill),
+      el('div', { class: 'hbar-val' }, money(r.revenue)),
+    ]);
+  });
+  const table = el('div', { class: 'table-scroll' }, el('table', { class: 'data-table' }, [
+    el('thead', {}, el('tr', {}, ['Employee', 'Orders', 'Items', 'Revenue'].map((h) => el('th', {}, h)))),
+    el('tbody', {}, rows.map((r) => el('tr', {}, [
+      el('td', {}, r.employee), el('td', {}, String(r.orders)), el('td', {}, String(r.items)), el('td', {}, money(r.revenue)),
+    ]))),
+  ]));
+  mount(host, el('div', { class: 'hbar-chart' }, bars), table);
 }

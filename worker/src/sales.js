@@ -161,6 +161,19 @@ export async function listSales(env, business, query, limit = 25) {
   return (rows || []).map(mapSale);
 }
 
+/** Per-employee sales performance for a business (voided sales excluded). */
+export async function employeePerformance(env, business) {
+  const db = await getDb(env);
+  const { results } = await db.prepare(
+    `SELECT employee, COUNT(*) AS orders,
+            COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
+       FROM sales WHERE business = ? AND status != 'VOIDED'
+      GROUP BY employee ORDER BY revenue DESC`).bind(business).all();
+  return (results || []).map((r) => ({
+    employee: r.employee || '(unknown)', orders: r.orders, items: r.items, revenue: r.revenue,
+  }));
+}
+
 /** Voids a sale: restores stock and marks it VOIDED (atomic). */
 export async function voidSale(env, business, orderNo) {
   const db = await getDb(env);

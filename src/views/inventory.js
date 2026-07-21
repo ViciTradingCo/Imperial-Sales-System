@@ -13,6 +13,7 @@ import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
 import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
+import { newIdem } from '../lib/id.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
@@ -29,6 +30,7 @@ export function renderInventory(container, { me }) {
     firstCard.push(el('div', { class: 'row-actions' }, [
       el('button.primary', { onclick: () => openIntakeModal(refreshAll) }, 'Record Intake'),
       el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshAll) }, 'Transfer'),
+      el('button.secondary-btn', { onclick: () => openImportExportModal(refreshInventory) }, 'Import/Export'),
     ]));
   }
   firstCard.push(listHost);
@@ -138,6 +140,7 @@ function openItemModal(it, onSaved) {
 
 /** Intake (restock) transaction as a focus modal. */
 function openIntakeModal(onRecorded) {
+  const idem = newIdem(); // one key per intake entry — retries won't double the stock
   const item = el('input', { type: 'text', placeholder: 'Item name' });
   const vendor = el('input', { type: 'text', placeholder: 'Vendor (who you bought from)' });
   const hold = el('select', {}, el('option', { value: '' }, 'Select a hold…'));
@@ -164,6 +167,7 @@ function openIntakeModal(onRecorded) {
         hold: hold.value,
         numItems: qty.value,
         pricePer: per.value,
+        idempotencyKey: idem,
       });
       onRecorded();
       modal.close();
@@ -184,6 +188,63 @@ function openIntakeModal(onRecorded) {
     save,
     status,
   ]);
+}
+
+/** Bulk import/export inventory via a copy-paste text box (focus modal). */
+function openImportExportModal(onImported) {
+  const exportBox = el('textarea', { rows: '8', readonly: true });
+  const importBox = el('textarea', { rows: '8', placeholder: 'Item, price, stock, low\n(one per line — “Item price” also works)' });
+  const status = el('p', {});
+  const importBtn = el('button.primary', { onclick: doImport }, 'Import');
+  function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
+
+  api.getInventory().then((inv) => {
+    const rows = (inv.inventory || []).map((it) => [it.item, it.price, it.stock, it.lowStock].join(', '));
+    exportBox.value = 'Item, Price, Stock, Low Stock\n' + rows.join('\n');
+  }).catch(() => {});
+
+  async function doImport() {
+    const rows = parseImport(importBox.value);
+    if (!rows.length) { setStatus('Nothing to import.', 'error'); return; }
+    importBtn.disabled = true; setStatus('Importing…', '');
+    try {
+      const res = await api.importInventory(rows);
+      setStatus('Imported ' + (res.imported || 0) + ' item(s).', 'ok');
+      onImported();
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
+    finally { importBtn.disabled = false; }
+  }
+
+  openModal([
+    el('h3', {}, 'Import / Export inventory'),
+    el('label', {}, 'Export — copy this'),
+    exportBox,
+    el('label', {}, 'Import — paste here'),
+    el('p', { class: 'note' }, 'One item per line: “Item, price, stock, low”. Stock/low optional; a header line is ignored. Sets prices (and stock if given).'),
+    importBox,
+    importBtn,
+    status,
+  ]);
+}
+
+/** Parses pasted lines into rows (comma-CSV, or "Name price stock low"). */
+function parseImport(text) {
+  const out = [];
+  String(text || '').split('\n').forEach((line) => {
+    line = line.trim();
+    if (!line) return;
+    let parts;
+    if (line.includes(',')) parts = line.split(',').map((s) => s.trim());
+    else {
+      const toks = line.split(/\s+/);
+      const nums = [];
+      while (toks.length && /^-?\d+(\.\d+)?$/.test(toks[toks.length - 1])) nums.unshift(toks.pop());
+      parts = [toks.join(' '), ...nums];
+    }
+    const [item, price, stock, lowStock] = parts;
+    if (item) out.push({ item, price, stock, lowStock });
+  });
+  return out;
 }
 
 /**
@@ -249,15 +310,18 @@ function openTransferModal(me, onChanged) {
     }).catch((e) => mount(historyHost, el('p', { class: 'error' }, e.message || String(e))));
   }
 
+  let sendKey = null; // stable across a retry of the same send; cleared on success
   async function doSend() {
     if (!item.value) { setStatus('Pick an item.', 'error'); return; }
     if (!toSel.value) { setStatus('Pick a receiving company.', 'error'); return; }
     const n = Math.floor(Number(qty.value));
     if (!n || n < 1) { setStatus('Enter an amount.', 'error'); return; }
+    if (!sendKey) sendKey = newIdem();
     send.disabled = true;
     setStatus('Sending…', '');
     try {
-      renderPending(await api.createTransfer({ toBusiness: toSel.value, item: item.value, qty: n }));
+      renderPending(await api.createTransfer({ toBusiness: toSel.value, item: item.value, qty: n, idempotencyKey: sendKey }));
+      sendKey = null; // next transfer gets a fresh key
       setStatus('Transfer sent — awaiting acceptance.', 'ok');
       qty.value = '';
       loadHistory();

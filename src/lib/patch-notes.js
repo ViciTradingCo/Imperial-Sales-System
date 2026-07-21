@@ -3,6 +3,13 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.8', date: '2026-07-21', notes: [
+    'Inventory Import/Export (paste a list) and idempotent intake & transfers.',
+    'Employee performance report with a revenue chart.',
+    'Rate-limiting + request-size caps, with an admin “Priority” flag per company.',
+    'Optional KV cache layer; integration tests for stock/gold invariants.',
+    'Fixed a D1 schema-init error (idem column).',
+  ] },
   { version: '2.7', date: '2026-07-21', notes: [
     'Faster: hold + item indexes moved to D1; registry reads cached — far fewer Sheets calls.',
     'Market Analysis: Overpriced/Undercut alerts (vs base value) and a revenue Trends page.',

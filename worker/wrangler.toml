@@ -32,3 +32,12 @@ crons = ["0 6 * * *"]
 binding = "DB"
 database_name = "eec-ledger"
 database_id = "6749b2d0-e59f-4fb2-8d92-d1e2c5716b6b"
+
+# OPTIONAL cross-isolate cache. The code uses KV automatically when this binding
+# exists and falls back to the per-isolate in-memory cache otherwise, so leaving
+# it commented is safe. To turn it on:
+#   1. Cloudflare dashboard → Workers & Pages → KV → Create namespace ("eec-cache")
+#   2. Uncomment below and paste its ID, then redeploy.
+# [[kv_namespaces]]
+# binding = "KV"
+# id = "<your-kv-namespace-id>"

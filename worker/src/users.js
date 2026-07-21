@@ -40,7 +40,7 @@ export async function findUserByEmail(env, email) {
   if (!target) return null;
   // Positive-only cache: a hit is a registered user; misses are never cached
   // so a just-registered account is found immediately.
-  const cached = cacheGet('user:' + target);
+  const cached = await cacheGet(env, 'user:' + target);
   if (cached) return { ...cached };
   let rows;
   try {
@@ -54,7 +54,7 @@ export async function findUserByEmail(env, email) {
     if (String(rows[i][1] || '').trim().toLowerCase() === target) {
       const user = normalizeRow(rows[i]);
       user.row = i + 2; // 1-based sheet row (data starts at row 2)
-      cacheSet('user:' + target, user, 15000);
+      await cacheSet(env, 'user:' + target, user, 15000);
       return { ...user };
     }
   }

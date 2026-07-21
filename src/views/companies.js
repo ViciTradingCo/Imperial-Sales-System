@@ -98,6 +98,9 @@ function openNameModal(company, onSaved) {
   const court = el('input', { type: 'checkbox' });
   court.checked = !!company.court;
 
+  const priority = el('input', { type: 'checkbox' });
+  priority.checked = !!company.priority;
+
   const status = el('p', {});
   const save = el('button.primary', { onclick: doSave }, 'Save');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
@@ -112,7 +115,7 @@ function openNameModal(company, onSaved) {
       // Preserve the current subscription while editing name / hold / court.
       await api.updateCompany({
         id: company.id, name: newName, until: company.until, perpetual: company.perpetual,
-        hold: hold.value, court: court.checked,
+        hold: hold.value, court: court.checked, priority: priority.checked,
       });
       onSaved();
       modal.close();
@@ -130,6 +133,7 @@ function openNameModal(company, onSaved) {
     el('label', {}, 'Hold'),
     hold,
     el('label', { class: 'inline' }, [court, document.createTextNode(' Court (admin-only flag)')]),
+    el('label', { class: 'inline' }, [priority, document.createTextNode(' Priority (higher rate-limit ceiling)')]),
     save,
     status,
   ]);

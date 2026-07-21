@@ -52,6 +52,42 @@ export async function upsertItem(env, business, { item, price, lowStock }) {
   return listInventory(env, business);
 }
 
+/**
+ * Bulk upsert from a pasted/CSV list. Each row: { item, price?, stock?, lowStock? }.
+ * Omitted numeric fields keep the item's current value (or 0 for a new item), so
+ * you can paste just names+prices without wiping stock. Rows with a non-numeric
+ * price (e.g. a header line) are skipped.
+ */
+export async function importInventory(env, business, rows) {
+  const db = await getDb(env);
+  const cur = {};
+  (await listInventory(env, business)).forEach((it) => { cur[it.item.toLowerCase()] = it; });
+  const pick = (v, existing, dflt) => {
+    if (v === undefined || v === null || String(v).trim() === '') return existing;
+    const n = Number(v);
+    return isFinite(n) ? n : dflt;
+  };
+  const stmts = [];
+  let imported = 0;
+  (rows || []).forEach((r) => {
+    const name = String(r.item || '').trim();
+    if (!name) return;
+    const ex = cur[name.toLowerCase()] || {};
+    const price = pick(r.price, ex.price, NaN);
+    if (!isFinite(price) || price < 0) return; // skip headers / bad rows
+    const stock = Math.floor(pick(r.stock, ex.stock !== undefined ? ex.stock : 0, 0));
+    const lowRaw = Math.floor(pick(r.lowStock, ex.lowStock !== undefined ? ex.lowStock : 0, 0));
+    const low = isFinite(lowRaw) && lowRaw > 0 ? lowRaw : 0;
+    stmts.push(db.prepare(
+      `INSERT INTO inventory (business, item, price, stock, low_stock) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (business, item) DO UPDATE SET price = excluded.price, stock = excluded.stock, low_stock = excluded.low_stock`
+    ).bind(business, name, price, isFinite(stock) ? stock : 0, low));
+    imported++;
+  });
+  if (stmts.length) await db.batch(stmts);
+  return { imported, inventory: await listInventory(env, business) };
+}
+
 /** Removes an item from a business's inventory. */
 export async function deleteItem(env, business, item) {
   const db = await getDb(env);
