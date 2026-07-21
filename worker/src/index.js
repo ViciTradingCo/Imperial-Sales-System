@@ -32,7 +32,7 @@ import { readBusinessSettings, writeBusinessSettings } from './business-settings
 import { listInventory, upsertItem, deleteItem, importInventory } from './inventory.js';
 import { recordIntake, listIntake } from './intake.js';
 import { readHolds, writeHolds } from './holds.js';
-import { listItemIndex, upsertItem as upsertMasterItem, deleteItemIndex } from './item-index.js';
+import { listItemIndex, upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex } from './item-index.js';
 import { checkCertification } from './cert.js';
 import { checkout, listSales, voidSale, employeePerformance } from './sales.js';
 import { rateHit, isPriorityToken, markPriority, MAX_BODY_BYTES } from './ratelimit.js';
@@ -446,6 +446,12 @@ async function handleDeleteMasterItem(request, env, body) {
   const items = await deleteItemIndex(env, body.name);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.delete', detail: body.name });
   return { items };
+}
+async function handleImportMasterItems(request, env, body) {
+  const caller = await requireAdmin(request, env);
+  const res = await importItemIndex(env, body.rows);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.import', detail: (res.imported || 0) + ' items' });
+  return res;
 }
 async function handleSetHolds(request, env, body) {
   const caller = await requireAdmin(request, env);
@@ -914,6 +920,10 @@ export default {
       if (request.method === 'POST' && path === '/admin/items/delete') {
         const body = await readJsonBody(request);
         return json(await handleDeleteMasterItem(request, env, body), 200, cors);
+      }
+      if (request.method === 'POST' && path === '/admin/items/import') {
+        const body = await readJsonBody(request);
+        return json(await handleImportMasterItems(request, env, body), 200, cors);
       }
       if (request.method === 'POST' && path === '/admin/holds') {
         const body = await readJsonBody(request);

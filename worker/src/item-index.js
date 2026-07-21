@@ -57,6 +57,42 @@ export async function upsertItem(env, { name, baseValue, oldName }) {
   return listItemIndex(env);
 }
 
+/**
+ * Bulk upsert from a pasted list. Each row: { name, baseValue }. Matching is by
+ * NORMALIZED name (case / spacing / punctuation-insensitive), so recognized
+ * items are UPDATED, not duplicated: the base value is set, and the canonical
+ * spelling is corrected to the pasted name when it differs. Unrecognized names
+ * are added. Rows with a non-numeric value (e.g. a header) are skipped.
+ *
+ * Matching is deliberately exact-after-normalization (not fuzzy) so a genuine
+ * typo becomes a new item rather than silently overwriting a real one's name.
+ */
+export async function importItemIndex(env, rows) {
+  await ensureSeeded(env);
+  const db = await getDb(env);
+  const byNorm = new Map((await listItemIndex(env)).map((it) => [normalizeItem(it.name), it]));
+  const stmts = [];
+  let imported = 0;
+  (rows || []).forEach((r) => {
+    const name = String(r.name || '').trim();
+    if (!name) return;
+    const val = Number(r.baseValue);
+    if (!isFinite(val) || val < 0) return; // skip headers / bad rows
+    const norm = normalizeItem(name);
+    const hit = byNorm.get(norm);
+    if (hit && hit.name !== name) {
+      stmts.push(db.prepare('DELETE FROM master_item WHERE name = ?').bind(hit.name)); // rename
+    }
+    stmts.push(db.prepare(
+      'INSERT INTO master_item (name, base_value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET base_value = excluded.base_value')
+      .bind(name, val));
+    byNorm.set(norm, { name, baseValue: val }); // dedupe within the same paste
+    imported++;
+  });
+  if (stmts.length) await db.batch(stmts);
+  return { imported, items: await listItemIndex(env) };
+}
+
 export async function deleteItemIndex(env, name) {
   await ensureSeeded(env);
   const db = await getDb(env);

@@ -22,7 +22,10 @@ export function renderItemIndex(container) {
     el('h2', {}, 'Master Item Index'),
     el('p', { class: 'note' }, 'The shared item library — canonical names and base values. The register ' +
       'and Market Analysis measure against these.'),
-    el('button.primary', { onclick: () => openItemModal(null) }, 'Add item'),
+    el('div', { class: 'row-actions' }, [
+      el('button.primary', { onclick: () => openItemModal(null) }, 'Add item'),
+      el('button.secondary-btn', { onclick: () => openImportExportModal(load) }, 'Import/Export'),
+    ]),
     search,
     listHost,
   ]));
@@ -49,6 +52,42 @@ export function renderItemIndex(container) {
     if (!window.confirm('Delete "' + it.name + '" from the master index?')) return;
     try { all = (await api.deleteMasterItem(it.name)).items || []; draw(); }
     catch (e) { alert(e.message || e); }
+  }
+
+  function openImportExportModal(onImported) {
+    const exportBox = el('textarea', { rows: '8', readonly: true });
+    const importBox = el('textarea', { rows: '8', placeholder: 'Item, base value\n(one per line — “Item value” also works)' });
+    const status = el('p', {});
+    const importBtn = el('button.primary', { onclick: doImport }, 'Import');
+    function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
+
+    api.getItems().then((r) => {
+      exportBox.value = 'Item, Base Value\n' + (r.items || []).map((it) => it.name + ', ' + it.baseValue).join('\n');
+    }).catch(() => {});
+
+    async function doImport() {
+      const rows = parseItems(importBox.value);
+      if (!rows.length) { setStatus('Nothing to import.', 'error'); return; }
+      importBtn.disabled = true; setStatus('Importing…', '');
+      try {
+        const res = await api.importMasterItems(rows);
+        setStatus('Imported / updated ' + (res.imported || 0) + ' item(s).', 'ok');
+        onImported();
+      } catch (e) { setStatus(e.message || String(e), 'error'); }
+      finally { importBtn.disabled = false; }
+    }
+
+    openModal([
+      el('h3', {}, 'Import / Export items'),
+      el('label', {}, 'Export — copy this'),
+      exportBox,
+      el('label', {}, 'Import — paste here'),
+      el('p', { class: 'note' }, 'One item per line: “Item, base value”. Recognized names (any casing/spacing) are ' +
+        'updated — not duplicated — and re-spelled to what you paste. A header line is ignored.'),
+      importBox,
+      importBtn,
+      status,
+    ]);
   }
 
   function openItemModal(item) {
@@ -83,4 +122,25 @@ export function renderItemIndex(container) {
   }
 
   load();
+}
+
+/** Parses pasted lines into [{name, baseValue}] (comma-CSV, or "Name value"). */
+function parseItems(text) {
+  const out = [];
+  String(text || '').split('\n').forEach((line) => {
+    line = line.trim();
+    if (!line) return;
+    let name, value;
+    if (line.includes(',')) {
+      const parts = line.split(',');
+      value = parts.pop().trim();
+      name = parts.join(',').trim();
+    } else {
+      const toks = line.split(/\s+/);
+      value = toks.pop();
+      name = toks.join(' ');
+    }
+    if (name) out.push({ name, baseValue: value });
+  });
+  return out;
 }

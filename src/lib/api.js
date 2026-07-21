@@ -156,6 +156,8 @@ export const api = {
   saveMasterItem: (item) => request('POST', '/admin/items', item),
   /** Admin: delete a master item. */
   deleteMasterItem: (name) => request('POST', '/admin/items/delete', { name }),
+  /** Admin: bulk import master items [{name, baseValue}] (recognized names update, not duplicate). */
+  importMasterItems: (rows) => request('POST', '/admin/items/import', { rows }),
   /** Admin: replace the hold index. */
   setHolds: (holds) => request('POST', '/admin/holds', { holds }),
   /** The network hold list. */

@@ -3,6 +3,9 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '2.9', date: '2026-07-21', notes: [
+    'Master Item Index gets Import/Export — recognized names update (and re-spell) instead of duplicating.',
+  ] },
   { version: '2.8', date: '2026-07-21', notes: [
     'Inventory Import/Export (paste a list) and idempotent intake & transfers.',
     'Employee performance report with a revenue chart.',
