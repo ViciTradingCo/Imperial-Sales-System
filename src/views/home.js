@@ -1,6 +1,6 @@
 /**
  * Home page — the signed-in landing.
- *   • Admins get the network tools on the action bar (Member/Company/Settings/Backup).
+ *   • Admins get the network tools on the action bar (Members/Companies/Items/MOTD/Audit/Settings).
  *   • Owners & employees get their business tools merged in here: the action bar
  *     is the Business Operations bar (Register/Inventory/Employees) and the page
  *     shows their subscription status.

@@ -23,8 +23,7 @@ export function renderItemIndex(container) {
     el('p', { class: 'note' }, 'The shared item library — canonical names and base values. The register ' +
       'and Market Analysis measure against these.'),
     el('div', { class: 'row-actions' }, [
-      el('button.primary', { onclick: () => openItemModal(null) }, 'Add item'),
-      el('button.secondary-btn', { onclick: () => openImportExportModal(load) }, 'Import/Export'),
+      el('button.primary', { onclick: () => openImportExportModal(load) }, 'Import/Export'),
     ]),
     search,
     listHost,

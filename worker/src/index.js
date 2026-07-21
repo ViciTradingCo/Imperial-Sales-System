@@ -266,10 +266,10 @@ async function handleImport(request, env, body) {
   return res;
 }
 
-/** Admin-only: delete sales + intake older than N months. */
+/** Admin-only: delete sales + intake older than N days/weeks/months. */
 async function handlePurgeLogs(request, env, body) {
   const caller = await requireAdmin(request, env);
-  const res = await purgeLogs(env, body.months);
+  const res = await purgeLogs(env, body.amount != null ? body.amount : body.months, body.unit);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'logs.purge', detail: 'older than ' + res.cutoff + ': ' + res.sales + ' sales, ' + res.intake + ' intake' });
   return res;
 }

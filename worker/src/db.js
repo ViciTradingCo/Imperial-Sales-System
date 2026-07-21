@@ -130,10 +130,12 @@ export async function clearLogs(env) {
 }
 
 /** Gentle retention: delete sales + intake older than `months` months. */
-export async function purgeLogs(env, months) {
-  const m = Math.max(1, Math.floor(Number(months) || 0));
+export async function purgeLogs(env, amount, unit) {
+  const n = Math.max(1, Math.floor(Number(amount) || 0));
   const cutoff = new Date();
-  cutoff.setMonth(cutoff.getMonth() - m);
+  if (unit === 'days') cutoff.setDate(cutoff.getDate() - n);
+  else if (unit === 'weeks') cutoff.setDate(cutoff.getDate() - n * 7);
+  else cutoff.setMonth(cutoff.getMonth() - n); // 'months' (default)
   const iso = cutoff.toISOString();
   const db = await getDb(env);
   const sales = (await db.prepare('SELECT COUNT(*) AS n FROM sales WHERE ts < ?').bind(iso).first()).n;

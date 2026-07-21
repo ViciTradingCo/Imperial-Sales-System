@@ -135,18 +135,23 @@ function backupCard() {
 /** Danger zone: purge old logs, or clear all of them. */
 function logsCard() {
   const status = el('p', {});
-  const months = el('input', { type: 'number', min: '1', value: '6', style: 'width:5em' });
+  const amount = el('input', { type: 'number', min: '1', value: '6', style: 'width:5em' });
+  const unit = el('select', {}, [
+    el('option', { value: 'days' }, 'days'),
+    el('option', { value: 'weeks' }, 'weeks'),
+    el('option', { value: 'months', selected: true }, 'months'),
+  ]);
   const purgeBtn = el('button.secondary-btn', { onclick: doPurge }, 'Purge older');
   const clearBtn = el('button.danger', { onclick: doClear }, 'Clear all logs');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
   async function doPurge() {
-    const m = Math.floor(Number(months.value));
-    if (!m || m < 1) { setStatus('Enter a number of months.', 'error'); return; }
-    if (!window.confirm('Delete sales & intake older than ' + m + ' months across the network? This cannot be undone.')) return;
+    const n = Math.floor(Number(amount.value));
+    if (!n || n < 1) { setStatus('Enter a number.', 'error'); return; }
+    if (!window.confirm('Delete sales & intake older than ' + n + ' ' + unit.value + ' across the network? This cannot be undone.')) return;
     purgeBtn.disabled = true; setStatus('Purging…', '');
     try {
-      const r = await api.purgeLogs(m);
+      const r = await api.purgeLogs(n, unit.value);
       setStatus('Purged ' + r.sales + ' sales and ' + r.intake + ' intake older than ' + r.cutoff + '.', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { purgeBtn.disabled = false; }
@@ -168,7 +173,7 @@ function logsCard() {
     el('h3', {}, 'Log maintenance'),
     el('p', { class: 'note' }, 'Purge trims old history; Clear wipes it all (used to start a fresh season). ' +
       'Inventory catalogs are always kept. Neither can be undone — export a backup first.'),
-    el('div', { class: 'row-actions' }, [months, el('span', { class: 'note' }, 'months'), purgeBtn]),
+    el('div', { class: 'row-actions' }, [amount, unit, purgeBtn]),
     el('div', { class: 'row-actions' }, [clearBtn]),
     status,
   ]);

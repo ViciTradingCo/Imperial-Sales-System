@@ -86,8 +86,8 @@ export const api = {
   getMarket: () => request('GET', '/admin/market'),
   /** Admin: wipe all sales + intake logs across the network. */
   clearLogs: () => request('POST', '/admin/logs/clear', {}),
-  /** Admin: delete sales + intake older than N months. */
-  purgeLogs: (months) => request('POST', '/admin/logs/purge', { months }),
+  /** Admin: delete sales + intake older than N days/weeks/months. */
+  purgeLogs: (amount, unit) => request('POST', '/admin/logs/purge', { amount, unit }),
   /** Admin: D1 status snapshot. */
   getStatus: () => request('GET', '/admin/status'),
   /** Court businesses: the market report for their own hold. */

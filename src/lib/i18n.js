@@ -45,7 +45,6 @@ const T = {
   'About': { es: 'Acerca de', fr: 'À propos', de: 'Über', it: 'Informazioni' },
   'Sign Out': { es: 'Cerrar sesión', fr: 'Se déconnecter', de: 'Abmelden', it: 'Esci' },
   'Sign out': { es: 'Cerrar sesión', fr: 'Se déconnecter', de: 'Abmelden', it: 'Esci' },
-  'Back up now': { es: 'Copia de seguridad', fr: 'Sauvegarder', de: 'Jetzt sichern', it: 'Backup ora' },
 
   // Action bars / lists
   'Register': { es: 'Caja', fr: 'Caisse', de: 'Kasse', it: 'Cassa' },
