@@ -21,7 +21,9 @@ const SCHEMA = [
      qty_total INTEGER NOT NULL DEFAULT 0, total REAL NOT NULL DEFAULT 0,
      employee TEXT, discount TEXT, status TEXT NOT NULL DEFAULT '', idem TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_sales_business ON sales (business)`,
-  `CREATE INDEX IF NOT EXISTS idx_sales_idem ON sales (business, idem)`,
+  // NOTE: the idx_sales_idem index references the `idem` column, which is added
+  // by an ALTER migration on pre-existing DBs — so it's created in MIGRATIONS,
+  // AFTER that column exists, not here.
   `CREATE TABLE IF NOT EXISTS intake (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      business TEXT NOT NULL, ts TEXT NOT NULL, item TEXT, vendor TEXT,
@@ -66,10 +68,12 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS sys_flags (k TEXT PRIMARY KEY, v TEXT)`,
 ];
 
-// Additive migrations for databases created before a column existed. Each is
-// run best-effort; "duplicate column" on an already-migrated DB is ignored.
+// Additive migrations for databases created before a column existed. Each runs
+// best-effort and IN ORDER; "duplicate column" on an already-migrated DB is
+// ignored. The idem index comes AFTER its column is guaranteed to exist.
 const MIGRATIONS = [
   'ALTER TABLE sales ADD COLUMN idem TEXT',
+  'CREATE INDEX IF NOT EXISTS idx_sales_idem ON sales (business, idem)',
 ];
 
 let schemaReady = false;
