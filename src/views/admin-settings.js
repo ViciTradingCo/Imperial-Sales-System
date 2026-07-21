@@ -60,7 +60,7 @@ function holdsCard() {
   ]);
 }
 
-/** System status — D1 row counts + recent activity. */
+/** System status — D1 row counts, recent activity, and recent internal errors. */
 function statusCard() {
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
   api.getStatus().then((s) => {
@@ -69,18 +69,30 @@ function statusCard() {
       el('span', { class: 'fact-label' }, k.replace(/_/g, ' ')),
       el('span', { class: 'fact-value' }, String(c[k])),
     ]));
+    const errs = s.errors || [];
+    const errorSection = errs.length
+      ? el('div', {}, [
+          el('h4', {}, 'Recent errors (' + errs.length + ')'),
+          ...errs.slice(0, 8).map((e) => el('p', { class: 'note error' },
+            new Date(e.ts).toLocaleString() + ' · ' + e.where + ' — ' + e.message)),
+        ])
+      : el('p', { class: 'note ok' }, 'No recent errors ✓');
     mount(host,
       el('div', { class: 'readonly-facts' }, facts),
-      el('p', { class: 'note' }, 'Last sale: ' + (s.lastSale ? new Date(s.lastSale).toLocaleString() : '—')));
+      el('p', { class: 'note' }, 'Last sale: ' + (s.lastSale ? new Date(s.lastSale).toLocaleString() : '—')),
+      el('p', { class: 'note' }, 'Error alerts to Discord: ' + (s.discordConfigured ? 'on' : 'off (set DISCORD_WEBHOOK_URL to enable)')),
+      errorSection);
   }).catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
   return el('div.card', {}, [el('h3', {}, 'System status'), host]);
 }
 
-/** Data backup — download an export, or restore from one. */
+/** Data backup — download an export, or restore from one (with a preview diff). */
 function backupCard() {
   const status = el('p', {});
+  const diffHost = el('div', {});
   const exportBtn = el('button.primary', { onclick: doExport }, 'Export backup');
   const file = el('input', { type: 'file', accept: '.gz,application/gzip,application/json' });
+  const previewBtn = el('button.secondary-btn', { onclick: doPreview }, 'Preview restore');
   const importBtn = el('button.danger', { onclick: doImport }, 'Restore backup');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
@@ -88,31 +100,50 @@ function backupCard() {
     exportBtn.disabled = true; setStatus('Preparing…', '');
     try {
       const blob = await api.exportBackupBlob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'eec-backup-' + new Date().toISOString().slice(0, 10) + '.json.gz';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, 'eec-backup-' + new Date().toISOString().slice(0, 10) + '.json.gz');
       setStatus('Backup downloaded — keep it somewhere safe.', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { exportBtn.disabled = false; }
   }
 
-  async function doImport() {
+  /** Reads the chosen file into a parsed backup document (gzip or plain JSON). */
+  async function readFile() {
     const f = file.files && file.files[0];
-    if (!f) { setStatus('Choose a backup file first.', 'error'); return; }
-    if (!window.confirm('Restore from this backup?\n\nThis REPLACES all current data (sales, intake, ' +
+    if (!f) throw new Error('Choose a backup file first.');
+    const buf = await f.arrayBuffer();
+    let text;
+    try {
+      const stream = new Response(buf).body.pipeThrough(new DecompressionStream('gzip'));
+      text = await new Response(stream).text();
+    } catch (e) { text = new TextDecoder().decode(buf); } // maybe already uncompressed
+    return JSON.parse(text);
+  }
+
+  async function doPreview() {
+    mount(diffHost);
+    previewBtn.disabled = true; setStatus('Reading…', '');
+    try {
+      const data = await readFile();
+      const p = await api.previewBackup(data);
+      const rows = Object.keys(p.diff || {}).map((t) => el('div.fact', {}, [
+        el('span', { class: 'fact-label' }, t.replace(/_/g, ' ')),
+        el('span', { class: 'fact-value' }, p.diff[t].current + ' → ' + p.diff[t].incoming),
+      ]));
+      mount(diffHost,
+        el('p', { class: 'note' }, 'This file was made ' + (p.exportedAt ? new Date(p.exportedAt).toLocaleString() : 'at an unknown time') +
+          '. Restoring replaces ' + p.currentTotal + ' current rows with ' + p.incomingTotal + ' (current → incoming):'),
+        el('div', { class: 'readonly-facts' }, rows));
+      setStatus('Preview ready — review, then Restore to apply.', '');
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
+    finally { previewBtn.disabled = false; }
+  }
+
+  async function doImport() {
+    if (!window.confirm('Restore from this backup?\n\nThis REPLACES all current data (registry, sales, intake, ' +
       'inventory, transfers, coffers, discounts, item index, holds, audit). This cannot be undone.')) return;
     importBtn.disabled = true; setStatus('Restoring…', '');
     try {
-      const buf = await f.arrayBuffer();
-      let text;
-      try {
-        const stream = new Response(buf).body.pipeThrough(new DecompressionStream('gzip'));
-        text = await new Response(stream).text();
-      } catch (e) { text = new TextDecoder().decode(buf); } // maybe already uncompressed
-      const data = JSON.parse(text);
+      const data = await readFile();
       const res = await api.importBackup(data);
       const total = Object.values(res.restored || {}).reduce((a, b) => a + Number(b || 0), 0);
       setStatus('Restored ' + total + ' rows across ' + Object.keys(res.restored || {}).length + ' tables.', 'ok');
@@ -127,9 +158,19 @@ function backupCard() {
     el('div', { class: 'row-actions' }, [exportBtn]),
     el('label', {}, 'Restore from a backup file'),
     file,
-    el('div', { class: 'row-actions' }, [importBtn]),
+    el('div', { class: 'row-actions' }, [previewBtn, importBtn]),
+    diffHost,
     status,
   ]);
+}
+
+/** Triggers a browser download of a Blob. */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /** Danger zone: purge old logs, or clear all of them. */

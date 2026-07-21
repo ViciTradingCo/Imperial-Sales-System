@@ -11,13 +11,36 @@ import { openModal } from '../lib/modal.js';
 import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
+import { enqueueSale, flushSales, queuedCount, isNetworkError } from '../lib/offline-queue.js';
 
 export function renderPos(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
 
   const banner = el('div', {});
+  const offlineBar = el('div', {});
   const body = el('div', {}, el('p', { class: 'note' }, 'Loading register…'));
-  mount(container, el('div.card', {}, [el('h2', {}, 'Register — ' + esc(me.business || 'Your shop')), banner]), body);
+  mount(container, el('div.card', {}, [el('h2', {}, 'Register — ' + esc(me.business || 'Your shop')), banner]), offlineBar, body);
+
+  // Offline queue status + replay. Sales that couldn't reach the API are held in
+  // localStorage and flushed here (on load, on reconnect, or on demand).
+  function renderOfflineBar(extra) {
+    const n = queuedCount();
+    if (!n && !extra) { mount(offlineBar); return; }
+    const sync = el('button.secondary-btn.small', { onclick: () => syncQueue(true) }, 'Sync now');
+    mount(offlineBar, el('div.card', { style: 'border-color:#c60' }, [
+      el('p', { html: (n ? '📴 <b>' + n + '</b> sale' + (n === 1 ? '' : 's') + ' saved offline — will sync when back online.' : '')
+        + (extra ? ' ' + esc(extra) : '') }),
+      n ? el('div', { class: 'row-actions' }, [sync]) : el('span', {}),
+    ]));
+  }
+  async function syncQueue(manual) {
+    if (!queuedCount()) { if (manual) renderOfflineBar('Nothing to sync.'); return; }
+    const res = await flushSales((sale) => api.checkout(sale));
+    renderOfflineBar(res.flushed ? 'Synced ' + res.flushed + ' sale' + (res.flushed === 1 ? '' : 's') + '.' : '');
+  }
+  if (!renderPos._online) { renderPos._online = true; window.addEventListener('online', () => syncQueue(false)); }
+  renderOfflineBar();
+  syncQueue(false);
 
   let inventory = [];
   let holds = [];
@@ -151,12 +174,14 @@ export function renderPos(container, { me }) {
       if (!holdSel.value) { setStatus('Pick a hold.', 'error'); return; }
       complete.disabled = true;
       setStatus('Completing…', '');
+      // Snapshot the order so it can be queued verbatim if the network is down.
+      const sale = {
+        cart: cart.slice(), customer: customer.value.trim(), hold: holdSel.value,
+        discountName: discName.value.trim(), discountPercent: discPct.value,
+        idempotencyKey: idemKey,
+      };
       try {
-        const res = await api.checkout({
-          cart, customer: customer.value.trim(), hold: holdSel.value,
-          discountName: discName.value.trim(), discountPercent: discPct.value,
-          idempotencyKey: idemKey,
-        });
+        const res = await api.checkout(sale);
         idemKey = null; // next order gets a fresh key
         cart.length = 0;
         renderCart();
@@ -174,7 +199,16 @@ export function renderPos(container, { me }) {
         }).catch(() => {});
       } catch (e) {
         complete.disabled = false;
-        setStatus(e.message || String(e), 'error');
+        if (isNetworkError(e)) {
+          // Offline — stash the sale (with its idem key) to replay on reconnect.
+          enqueueSale(sale);
+          idemKey = null; cart.length = 0; renderCart();
+          customer.value = ''; discName.value = ''; discPct.value = '';
+          setStatus('📴 No connection — sale saved offline and will sync automatically.', 'ok');
+          renderOfflineBar();
+        } else {
+          setStatus(e.message || String(e), 'error');
+        }
       }
     }
 

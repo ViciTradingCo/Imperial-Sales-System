@@ -19,6 +19,7 @@ export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     companyCard(me, onBusinessRenamed),
     cofferCard(),
+    exportCard(),
     discountsCard(),
     styleCard(),
     formHost,
@@ -103,6 +104,33 @@ function cofferCard() {
     el('div', { class: 'row-actions' }, [amount, note, apply]),
     status,
     ledger,
+  ]);
+}
+
+/* ---- Data export (owner-facing CSV) ---- */
+function exportCard() {
+  const status = el('p', {});
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+  async function download(type, btn) {
+    btn.disabled = true; setStatus('Preparing…', '');
+    try {
+      const blob = await api.exportBusinessCsvBlob(type);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = type + '-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setStatus('Downloaded ✓', 'ok');
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
+    finally { btn.disabled = false; }
+  }
+  const salesBtn = el('button.secondary-btn', { onclick: () => download('sales', salesBtn) }, 'Export sales (CSV)');
+  const cofferBtn = el('button.secondary-btn', { onclick: () => download('coffer', cofferBtn) }, 'Export coffer (CSV)');
+  return el('div.card', {}, [
+    el('h2', {}, 'Export data'),
+    el('p', { class: 'note' }, 'Download your shop’s records as a spreadsheet-friendly CSV for your own bookkeeping.'),
+    el('div', { class: 'row-actions' }, [salesBtn, cofferBtn]),
+    status,
   ]);
 }
 

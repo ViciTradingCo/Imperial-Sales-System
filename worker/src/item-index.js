@@ -1,40 +1,14 @@
 /**
- * The Master Item Index — the shared item library (canonical name + base value).
- *
- * Now stored in D1 (`master_item`) so the register and market don't hit Google
- * Sheets on hot paths. On first use it seeds itself ONCE from the Core's
- * `index_Items_Master` tab (the original data), then D1 is the source of truth.
+ * The Master Item Index — the shared item library (canonical name + base value),
+ * stored in D1 (`master_item`) so the register and market are a fast local read.
+ * It starts empty; admins populate it (add or bulk Import).
  *
  * Also home to the fuzzy matcher that normalizes a typed item name to its
  * canonical master entry, so typos and stray spacing don't fragment the data.
  */
-import { getDb, getFlag, setFlag } from './db.js';
-import { readRange } from './sheets.js';
-
-const SEED_FLAG = 'items_seeded';
-const LEGACY_SHEET = 'index_Items_Master';
-
-/** One-shot migration: copy the Core's item tab into D1 the first time. */
-async function ensureSeeded(env) {
-  if (await getFlag(env, SEED_FLAG)) return;
-  const db = await getDb(env);
-  let rows = [];
-  try {
-    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${LEGACY_SHEET}!A2:B`);
-  } catch (e) {
-    return; // Sheets unreachable — retry seeding next call (flag stays unset).
-  }
-  const items = (rows || []).filter((r) => String(r[0] || '').trim());
-  if (items.length) {
-    await db.batch(items.map((r) =>
-      db.prepare('INSERT INTO master_item (name, base_value) VALUES (?, ?) ON CONFLICT(name) DO NOTHING')
-        .bind(String(r[0]).trim(), Number(r[1]) || 0)));
-  }
-  await setFlag(env, SEED_FLAG, '1');
-}
+import { getDb } from './db.js';
 
 export async function listItemIndex(env) {
-  await ensureSeeded(env);
   const db = await getDb(env);
   const { results } = await db.prepare('SELECT name, base_value FROM master_item ORDER BY name').all();
   return (results || []).map((r) => ({ name: r.name, baseValue: Number(r.base_value) || 0 }));
@@ -42,7 +16,6 @@ export async function listItemIndex(env) {
 
 /** Add a new item or edit an existing one (rename via oldName). */
 export async function upsertItem(env, { name, baseValue, oldName }) {
-  await ensureSeeded(env);
   const nm = String(name || '').trim();
   if (!nm) throw new Error('Enter an item name.');
   const val = Number(baseValue);
@@ -68,7 +41,6 @@ export async function upsertItem(env, { name, baseValue, oldName }) {
  * typo becomes a new item rather than silently overwriting a real one's name.
  */
 export async function importItemIndex(env, rows) {
-  await ensureSeeded(env);
   const db = await getDb(env);
   const byNorm = new Map((await listItemIndex(env)).map((it) => [normalizeItem(it.name), it]));
   const stmts = [];
@@ -101,7 +73,6 @@ export async function importItemIndex(env, rows) {
  *   • create — no match at all (a genuinely new item).
  */
 export async function analyzeItemImport(env, rows) {
-  await ensureSeeded(env);
   const existing = await listItemIndex(env);
   const byNorm = new Map(existing.map((it) => [normalizeItem(it.name), it]));
   const create = [], update = [], typos = [];
@@ -119,7 +90,6 @@ export async function analyzeItemImport(env, rows) {
 }
 
 export async function deleteItemIndex(env, name) {
-  await ensureSeeded(env);
   const db = await getDb(env);
   await db.prepare('DELETE FROM master_item WHERE lower(name) = ?').bind(String(name || '').trim().toLowerCase()).run();
   return listItemIndex(env);

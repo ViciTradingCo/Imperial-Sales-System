@@ -3,6 +3,14 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '4.0', date: '2026-07-21', notes: [
+    'Google Sheets is gone — the whole system now runs on Cloudflare D1. Sign-in is unchanged; everything is faster and simpler. Admins are set by email (ADMIN_EMAILS).',
+    'The register keeps working offline: sales made without a connection are saved on the device and sync automatically when you’re back online.',
+    'Owners can export their shop’s sales and coffer ledgers as CSV (Shop Ledger → Export data).',
+    'Automated off-site backups to Cloudflare R2 (optional) plus a restore preview that diffs a backup against live data before applying it.',
+    'System Status now shows recent internal errors (with optional Discord alerts).',
+    'Under the hood: the API was split into focused route modules.',
+  ] },
   { version: '3.0', date: '2026-07-21', notes: [
     'Backups are now downloadable files — Export a compressed snapshot of all data, and Restore from one after a failure. The old Google Sheets mirror is gone. Admins get a Monday reminder to grab a fresh backup.',
     'Item imports get a preview: it flags likely typos, suggests the canonical spelling, and lets you fix-vs-add-new for each before applying.',

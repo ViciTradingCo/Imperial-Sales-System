@@ -64,8 +64,34 @@ const SCHEMA = [
   // holds.js), then D1 is the source of truth.
   `CREATE TABLE IF NOT EXISTS master_item (name TEXT PRIMARY KEY, base_value REAL NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS hold_index (ord INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)`,
-  // Small key/value store for one-shot migration flags, checkout idempotency, etc.
+  // Small key/value store for global MOTD, config values, checkout idempotency, etc.
   `CREATE TABLE IF NOT EXISTS sys_flags (k TEXT PRIMARY KEY, v TEXT)`,
+  // ---- Registry (formerly Google Sheets; now D1 is the sole source of truth) ----
+  // Who's registered: identity, role, and business. char_name / notes avoid the
+  // SQLite keyword `character`.
+  `CREATE TABLE IF NOT EXISTS users (
+     uid TEXT PRIMARY KEY, email TEXT NOT NULL, business TEXT,
+     role TEXT NOT NULL DEFAULT 'employee', is_owner INTEGER NOT NULL DEFAULT 0,
+     status TEXT NOT NULL DEFAULT 'active', char_name TEXT, notes TEXT,
+     created TEXT, last_seen TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`,
+  `CREATE INDEX IF NOT EXISTS idx_users_business ON users (business)`,
+  // Registered businesses + their East Empire certification (subscription).
+  `CREATE TABLE IF NOT EXISTS companies (
+     id TEXT PRIMARY KEY, business TEXT NOT NULL, point_of_contact TEXT,
+     until TEXT, perpetual INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT '',
+     hold TEXT, court INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE INDEX IF NOT EXISTS idx_companies_business ON companies (business)`,
+  // Network Master Settings (label → value); schema/defaults live in settings.js.
+  `CREATE TABLE IF NOT EXISTS master_settings (label TEXT PRIMARY KEY, value REAL)`,
+  // Per-shop settings (business + label → value); schema lives in business-settings.js.
+  `CREATE TABLE IF NOT EXISTS business_settings (
+     business TEXT NOT NULL, label TEXT NOT NULL, value REAL,
+     PRIMARY KEY (business, label))`,
+  // Individual (per-business, scheduled) MOTD messages. start_at/end_at avoid
+  // the SQLite keyword `end`.
+  `CREATE TABLE IF NOT EXISTS motd_list (
+     id TEXT PRIMARY KEY, business TEXT, message TEXT, start_at TEXT, end_at TEXT)`,
 ];
 
 // Additive migrations for databases created before a column existed. Each runs
@@ -161,5 +187,9 @@ export async function renameBusinessData(env, oldName, newName) {
     db.prepare('UPDATE coffer_entries SET business = ? WHERE business = ?').bind(newName, oldName),
     db.prepare('UPDATE discounts SET business = ? WHERE business = ?').bind(newName, oldName),
     db.prepare('UPDATE shop_style SET business = ? WHERE business = ?').bind(newName, oldName),
+    // Registry tables (now D1): the company row, its members, and its settings.
+    db.prepare('UPDATE companies SET business = ? WHERE business = ?').bind(newName, oldName),
+    db.prepare('UPDATE users SET business = ? WHERE business = ?').bind(newName, oldName),
+    db.prepare('UPDATE business_settings SET business = ? WHERE business = ?').bind(newName, oldName),
   ]);
 }

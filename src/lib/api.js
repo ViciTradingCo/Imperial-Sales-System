@@ -1,8 +1,8 @@
 /**
  * Frontend → Worker API client. Every call carries the Google ID token as a
  * Bearer credential; the Worker verifies it and scopes the response to the
- * caller's role/business. The browser never talks to Google Sheets directly and
- * never holds any service-account secret.
+ * caller's role/business. The browser never touches the datastore directly and
+ * never holds any backend credential.
  */
 import { getIdToken } from './auth.js';
 
@@ -80,6 +80,8 @@ export const api = {
     if (!res.ok) { throw new Error((await res.text()) || res.statusText); }
     return await res.blob();
   },
+  /** Admin: dry-run a restore — current-vs-incoming row counts, no changes made. */
+  previewBackup: (data) => request('POST', '/admin/import/preview', data),
   /** Admin: restore all data from a parsed backup document. */
   importBackup: (data) => request('POST', '/admin/import', data),
   /** Admin: network-wide market analytics. */
@@ -131,6 +133,14 @@ export const api = {
   importInventory: (rows) => request('POST', '/inventory/import', { rows }),
   /** Owner/admin: per-employee sales performance. */
   getEmployeePerformance: () => request('GET', '/business/employees/performance'),
+  /** Owner/admin: download this shop's sales or coffer ledger as a CSV Blob. */
+  exportBusinessCsvBlob: async (type) => {
+    const token = getIdToken();
+    const res = await fetch(baseUrl + '/business/export?type=' + encodeURIComponent(type || 'sales'),
+      { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+    if (!res.ok) { throw new Error((await res.text()) || res.statusText); }
+    return await res.blob();
+  },
   /** Any registered user: active business names (transfer targets). */
   getBusinesses: () => request('GET', '/businesses'),
   /** Owner/admin: pending transfers ({ incoming, outgoing }). */

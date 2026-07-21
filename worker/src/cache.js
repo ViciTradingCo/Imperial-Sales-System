@@ -1,5 +1,5 @@
 /**
- * Two-tier cache for hot Google Sheets reads: a per-isolate in-memory layer
+ * Two-tier cache for hot identity/registry reads: a per-isolate in-memory layer
  * (always on) plus an optional Cloudflare KV layer (cross-isolate) that turns on
  * automatically when a `KV` binding exists — see wrangler.toml. Until KV is
  * provisioned, this is exactly the in-memory cache, so it's zero-risk.

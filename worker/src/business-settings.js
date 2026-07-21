@@ -1,22 +1,15 @@
 /**
  * Per-business (per-shop) settings — the tunables that belong to one store
- * rather than the whole network. Stored in a Core "Business Settings" tab keyed
- * by business name (one row per business), so it works even before a shop's
- * ledger is linked (Phase 3). Owned and edited by the store owner via the
- * Ledger Settings page.
- *
- * Wide layout: Business | <one column per setting>.
+ * rather than the whole network. Stored in D1 (`business_settings`, keyed by
+ * business + label). Owned and edited by the store owner via the Ledger Settings
+ * page. (Renames are handled by renameBusinessData in db.js.)
  */
-import { readRange, updateRange, appendRows, ensureSheet } from './sheets.js';
-
-export const BUSINESS_SETTINGS_SHEET = 'Business Settings';
+import { getDb } from './db.js';
 
 export const BUSINESS_SETTINGS_SCHEMA = [
   { label: 'Minimum priced units before flagging', def: 3, kind: 'int', min: 1,
     notes: 'Ignore items with fewer priced units when judging this shop’s pricing, so a one-off sale can’t raise a false alarm.' },
 ];
-
-const HEADERS = ['Business'].concat(BUSINESS_SETTINGS_SCHEMA.map((s) => s.label));
 
 function validate(schema, value) {
   let n = Number(value);
@@ -29,60 +22,37 @@ function validate(schema, value) {
 
 /** Reads a business's settings (with defaults for any unset value). */
 export async function readBusinessSettings(env, business) {
-  await ensureSheet(env, env.CORE_SPREADSHEET_ID, BUSINESS_SETTINGS_SHEET, HEADERS);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${BUSINESS_SETTINGS_SHEET}!A2:Z`);
   const target = String(business || '').trim().toLowerCase();
-  let found = null;
-  let foundRow = null;
-  rows.forEach((r, i) => {
-    if (String(r[0] || '').trim().toLowerCase() === target) { found = r; foundRow = i + 2; }
-  });
-  const settings = BUSINESS_SETTINGS_SCHEMA.map((s, idx) => {
-    const cell = found ? found[idx + 1] : undefined;
-    return {
-      label: s.label,
-      value: cell !== undefined && cell !== '' ? Number(cell) : s.def,
-      notes: s.notes,
-      kind: s.kind,
-      min: s.min,
-      max: s.max === undefined ? null : s.max,
-      def: s.def,
-    };
-  });
-  return { business, settings, _row: foundRow };
+  const db = await getDb(env);
+  const { results } = await db.prepare('SELECT label, value FROM business_settings WHERE lower(business) = ?').bind(target).all();
+  const byLabel = {};
+  (results || []).forEach((r) => { byLabel[String(r.label || '').trim()] = r.value; });
+  const settings = BUSINESS_SETTINGS_SCHEMA.map((s) => ({
+    label: s.label,
+    value: byLabel[s.label] != null && byLabel[s.label] !== '' ? Number(byLabel[s.label]) : s.def,
+    notes: s.notes,
+    kind: s.kind,
+    min: s.min,
+    max: s.max === undefined ? null : s.max,
+    def: s.def,
+  }));
+  return { business, settings };
 }
 
-/** Validates and writes a business's settings; upserts its row. */
+/** Validates and writes a business's settings; upserts each row. */
 export async function writeBusinessSettings(env, business, updates) {
-  const cur = await readBusinessSettings(env, business);
-  const values = BUSINESS_SETTINGS_SCHEMA.map((s, i) => cur.settings[i].value);
+  const db = await getDb(env);
+  const writes = [];
   (updates || []).forEach((u) => {
-    const idx = BUSINESS_SETTINGS_SCHEMA.findIndex((s) => s.label === u.label);
-    if (idx === -1) return;
-    values[idx] = validate(BUSINESS_SETTINGS_SCHEMA[idx], u.value);
+    const schema = BUSINESS_SETTINGS_SCHEMA.find((s) => s.label === u.label);
+    if (!schema) return;
+    writes.push({ label: u.label, value: validate(schema, u.value) });
   });
-  const rowValues = [business].concat(values);
-  if (cur._row) {
-    await updateRange(env, env.CORE_SPREADSHEET_ID, `${BUSINESS_SETTINGS_SHEET}!A${cur._row}`, [rowValues]);
-  } else {
-    await appendRows(env, env.CORE_SPREADSHEET_ID, `${BUSINESS_SETTINGS_SHEET}!A1`, [rowValues]);
+  if (writes.length) {
+    await db.batch(writes.map((w) =>
+      db.prepare('INSERT INTO business_settings (business, label, value) VALUES (?, ?, ?) ' +
+        'ON CONFLICT(business, label) DO UPDATE SET value = excluded.value')
+        .bind(business, w.label, w.value)));
   }
-  const fresh = await readBusinessSettings(env, business);
-  return { business: fresh.business, settings: fresh.settings };
-}
-
-/** Renames a business's settings row key (part of a full business rename). */
-export async function renameBusinessKey(env, oldName, newName) {
-  let rows;
-  try {
-    rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${BUSINESS_SETTINGS_SHEET}!A2:A`);
-  } catch (e) {
-    return; // tab may not exist yet — nothing to rename
-  }
-  const lc = String(oldName || '').trim().toLowerCase();
-  for (let i = 0; i < rows.length; i++) {
-    if (String(rows[i][0] || '').trim().toLowerCase() === lc) {
-      await updateRange(env, env.CORE_SPREADSHEET_ID, `${BUSINESS_SETTINGS_SHEET}!A${i + 2}`, [[newName]]);
-    }
-  }
+  return readBusinessSettings(env, business);
 }

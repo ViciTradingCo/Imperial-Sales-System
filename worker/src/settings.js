@@ -7,11 +7,8 @@
  * Stored as label / value / notes rows in the Core's "Master Settings" tab,
  * with the exact labels the market analysis reads.
  */
-import { readRange, updateRange, appendRows, ensureSheet } from './sheets.js';
+import { getDb } from './db.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
-
-export const MASTER_SETTINGS_SHEET = 'Master Settings';
-export const SETTINGS_HEADERS = ['Setting', 'Value', 'Notes'];
 
 // Canonical schema — the source of truth for defaults, validation, and UI.
 export const SETTINGS_SCHEMA = [
@@ -27,30 +24,23 @@ export const SETTINGS_SCHEMA = [
   // lives in Business Settings (the owner's Ledger Settings page), not here.
 ];
 
-/** Creates the tab (if missing) and seeds every setting the first time. */
-export async function ensureSettings(env) {
-  await ensureSheet(env, env.CORE_SPREADSHEET_ID, MASTER_SETTINGS_SHEET, SETTINGS_HEADERS);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${MASTER_SETTINGS_SHEET}!A2:C`);
-  const have = {};
-  rows.forEach((r) => { have[String(r[0] || '').trim()] = true; });
-  const missing = SETTINGS_SCHEMA.filter((s) => !have[s.label]);
-  if (missing.length) {
-    await appendRows(env, env.CORE_SPREADSHEET_ID, `${MASTER_SETTINGS_SHEET}!A1`,
-      missing.map((s) => [s.label, s.def, s.notes]));
-  }
+/** Reads stored values (label → value) from D1. */
+async function storedValues(env) {
+  const db = await getDb(env);
+  const { results } = await db.prepare('SELECT label, value FROM master_settings').all();
+  const byLabel = {};
+  (results || []).forEach((r) => { byLabel[String(r.label || '').trim()] = r.value; });
+  return byLabel;
 }
 
 /** Returns the settings in schema order: [{ label, value, notes, kind, min, max, def }]. */
 export async function readSettings(env) {
   const cached = await cacheGet(env, 'settings');
   if (cached) return cached;
-  await ensureSettings(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${MASTER_SETTINGS_SHEET}!A2:C`);
-  const byLabel = {};
-  rows.forEach((r, i) => { byLabel[String(r[0] || '').trim()] = { value: r[1], row: i + 2 }; });
+  const byLabel = await storedValues(env);
   const out = SETTINGS_SCHEMA.map((s) => ({
     label: s.label,
-    value: byLabel[s.label] !== undefined && byLabel[s.label].value !== '' ? Number(byLabel[s.label].value) : s.def,
+    value: byLabel[s.label] != null && byLabel[s.label] !== '' ? Number(byLabel[s.label]) : s.def,
     notes: s.notes,
     kind: s.kind,
     min: s.min,
@@ -72,23 +62,18 @@ function validate(schema, value) {
 
 /** Validates and writes the given { label, value } updates; returns the fresh settings. */
 export async function writeSettings(env, updates) {
-  await ensureSettings(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${MASTER_SETTINGS_SHEET}!A2:C`);
-  const rowByLabel = {};
-  rows.forEach((r, i) => { rowByLabel[String(r[0] || '').trim()] = i + 2; });
-
+  const db = await getDb(env);
   // Validate everything first, so one bad value rejects the whole save.
   const writes = [];
   (updates || []).forEach((u) => {
     const schema = SETTINGS_SCHEMA.find((s) => s.label === u.label);
     if (!schema) return; // ignore unknown labels
-    const v = validate(schema, u.value);
-    const row = rowByLabel[u.label];
-    if (row) writes.push({ row, value: v });
+    writes.push({ label: u.label, value: validate(schema, u.value) });
   });
-
-  for (const w of writes) {
-    await updateRange(env, env.CORE_SPREADSHEET_ID, `${MASTER_SETTINGS_SHEET}!B${w.row}`, [[w.value]]);
+  if (writes.length) {
+    await db.batch(writes.map((w) =>
+      db.prepare('INSERT INTO master_settings (label, value) VALUES (?, ?) ON CONFLICT(label) DO UPDATE SET value = excluded.value')
+        .bind(w.label, w.value)));
   }
   cacheBust('settings');
   return readSettings(env);

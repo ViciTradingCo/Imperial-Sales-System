@@ -3,27 +3,43 @@ main = "src/index.js"
 compatibility_date = "2024-09-01"
 
 # Public, non-secret configuration. Fill these in for your deployment.
-#   CORE_SPREADSHEET_ID — the EEC Core spreadsheet's ID
-#   GOOGLE_CLIENT_ID    — the OAuth client ID (must match app-config.json)
-#   ALLOWED_ORIGIN      — comma-separated site origins allowed to call the API,
-#                         e.g. "https://meretheec.github.io" (add
-#                         "http://localhost:5173" while developing)
+#   GOOGLE_CLIENT_ID — the OAuth client ID (must match app-config.json)
+#   ALLOWED_ORIGIN   — comma-separated site origins allowed to call the API,
+#                      e.g. "https://meretheec.github.io" (add
+#                      "http://localhost:5173" while developing)
+#   ADMIN_EMAILS     — comma-separated emails granted admin. Anyone signing in
+#                      with a listed email is an admin (auto-provisioned on first
+#                      sign-in). This is how the FIRST admin is established; there
+#                      is no hand-seeded row anymore. Add the network operator(s).
 [vars]
-CORE_SPREADSHEET_ID = "1-T-R_5BJmaeHv3fkqGSI06xKc9yXgI3pVqXQ1DzgiGk"
 GOOGLE_CLIENT_ID = "987037150604-djt5q7a16kgs77jvc8lnhrk74p76u5oj.apps.googleusercontent.com"
 ALLOWED_ORIGIN = "https://meretheec.github.io,http://localhost:5173"
-# Backups are now operator-downloaded files (admin → Network Settings → Data
-# backup: Export / Import), not a scheduled Sheets mirror.
+ADMIN_EMAILS = "cmaerten77@gmail.com"
 
-# SECRET (never in this file) — set once with:
-#   wrangler secret put SA_KEY
-# Paste the entire service-account JSON key when prompted.
+# Google Sheets is no longer used — D1 is the sole source of truth. There is no
+# service-account secret anymore. Identity still uses Google *Sign-In* (the
+# OAuth client ID above); that is unrelated to Sheets.
 
-# D1 (the live transactional store for inventory/sales/intake).
+# D1 — the live datastore for the WHOLE system (registry + inventory/sales/…).
 [[d1_databases]]
 binding = "DB"
 database_name = "eec-ledger"
 database_id = "6749b2d0-e59f-4fb2-8d92-d1e2c5716b6b"
+
+# Scheduled off-site backup to R2 (see backup-cron.js). Daily at 06:00 UTC. The
+# handler is a no-op unless the BACKUPS bucket below is bound, so this is safe to
+# leave enabled.
+[triggers]
+crons = ["0 6 * * *"]
+
+# OPTIONAL off-site backup bucket. When bound, the daily cron writes a gzipped
+# full-data snapshot here and keeps the most recent BACKUP_KEEP (default 14). To
+# turn it on:
+#   1. Cloudflare dashboard → R2 → Create bucket ("eec-backups")
+#   2. Uncomment below, then redeploy.
+# [[r2_buckets]]
+# binding = "BACKUPS"
+# bucket_name = "eec-backups"
 
 # OPTIONAL cross-isolate cache. The code uses KV automatically when this binding
 # exists and falls back to the per-isolate in-memory cache otherwise, so leaving

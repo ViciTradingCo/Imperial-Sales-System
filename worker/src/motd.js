@@ -7,49 +7,34 @@
  *  • Expiry warning — an automatic banner for a business's owner/employees when
  *    its certification is near (or past) expiry; the lead time is configurable.
  *
- * Storage in the Core (self-healing):
- *  • "MOTD" tab: A2 = global message, B2 = expiry-warning lead days.
- *  • "MOTD List" tab: ID | Business | Message | Start | End (ISO datetimes).
+ * Storage in D1:
+ *  • sys_flags: 'motd_global' = global message, 'motd_warn_days' = lead days.
+ *  • motd_list: id | business | message | start_at | end_at (ISO datetimes).
  */
-import { readRange, updateRange, appendRows, ensureSheet } from './sheets.js';
+import { getDb, getFlag, setFlag } from './db.js';
 
-const MOTD_SHEET = 'MOTD';
-const LIST_SHEET = 'MOTD List';
-const LIST_HEADERS = ['ID', 'Business', 'Message', 'Start', 'End'];
 const DEFAULT_WARN_DAYS = 7;
-
-async function ensureMotd(env) {
-  await ensureSheet(env, env.CORE_SPREADSHEET_ID, MOTD_SHEET, ['Message', 'Expiry Warn Days']);
-}
-async function ensureList(env) {
-  await ensureSheet(env, env.CORE_SPREADSHEET_ID, LIST_SHEET, LIST_HEADERS);
-}
 
 /* ---- global message ---- */
 export async function readMotd(env) {
-  await ensureMotd(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${MOTD_SHEET}!A2`);
-  return rows[0] && rows[0][0] != null ? String(rows[0][0]).trim() : '';
+  return (await getFlag(env, 'motd_global')) || '';
 }
 export async function writeMotd(env, text) {
-  await ensureMotd(env);
   const msg = String(text || '').trim();
-  await updateRange(env, env.CORE_SPREADSHEET_ID, `${MOTD_SHEET}!A2`, [[msg]]);
+  await setFlag(env, 'motd_global', msg);
   return msg;
 }
 
 /* ---- expiry-warning lead days ---- */
 export async function readWarnDays(env) {
-  await ensureMotd(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${MOTD_SHEET}!B2`);
-  const n = rows[0] && rows[0][0] != null ? Number(rows[0][0]) : NaN;
+  const raw = await getFlag(env, 'motd_warn_days');
+  const n = raw != null ? Number(raw) : NaN;
   return isFinite(n) && n >= 0 ? Math.round(n) : DEFAULT_WARN_DAYS;
 }
 export async function writeWarnDays(env, days) {
-  await ensureMotd(env);
   let n = Math.round(Number(days));
   if (!isFinite(n) || n < 0) n = DEFAULT_WARN_DAYS;
-  await updateRange(env, env.CORE_SPREADSHEET_ID, `${MOTD_SHEET}!B2`, [[n]]);
+  await setFlag(env, 'motd_warn_days', String(n));
   return n;
 }
 
@@ -58,53 +43,49 @@ function genId() {
   return 'm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 
+function rowToMotd(r) {
+  return {
+    id: String(r.id || '').trim(),
+    business: String(r.business || '').trim(),
+    message: String(r.message || '').trim(),
+    start: String(r.start_at || '').trim(),
+    end: String(r.end_at || '').trim(),
+  };
+}
+
 export async function listIndividualMotds(env) {
-  await ensureList(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${LIST_SHEET}!A2:E`);
-  return (rows || [])
-    .filter((r) => String(r[0] || '').trim())
-    .map((r) => ({
-      id: String(r[0] || '').trim(),
-      business: String(r[1] || '').trim(),
-      message: String(r[2] || '').trim(),
-      start: String(r[3] || '').trim(),
-      end: String(r[4] || '').trim(),
-    }));
+  const db = await getDb(env);
+  const { results } = await db.prepare('SELECT * FROM motd_list ORDER BY business').all();
+  return (results || []).map(rowToMotd);
 }
 
 export async function addIndividualMotd(env, { business, message, start, end }) {
-  await ensureList(env);
   const biz = String(business || '').trim();
   const msg = String(message || '').trim();
   if (!biz) throw new Error('Pick a business.');
   if (!msg) throw new Error('Enter a message.');
-  await appendRows(env, env.CORE_SPREADSHEET_ID, `${LIST_SHEET}!A1`,
-    [[genId(), biz, msg, String(start || '').trim(), String(end || '').trim()]]);
+  const db = await getDb(env);
+  await db.prepare('INSERT INTO motd_list (id, business, message, start_at, end_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(genId(), biz, msg, String(start || '').trim(), String(end || '').trim()).run();
   return listIndividualMotds(env);
 }
 
-function findRow(rows, id) {
-  let idx = null;
-  rows.forEach((r, i) => { if (String(r[0] || '').trim() === id) idx = i + 2; });
-  return idx;
-}
-
 export async function updateIndividualMotd(env, { id, business, message, start, end }) {
-  await ensureList(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${LIST_SHEET}!A2:E`);
-  const rowIdx = findRow(rows, String(id || '').trim());
-  if (!rowIdx) throw new Error('Entry not found.');
-  await updateRange(env, env.CORE_SPREADSHEET_ID, `${LIST_SHEET}!B${rowIdx}:E${rowIdx}`,
-    [[String(business || '').trim(), String(message || '').trim(), String(start || '').trim(), String(end || '').trim()]]);
+  const db = await getDb(env);
+  const target = String(id || '').trim();
+  const existing = await db.prepare('SELECT id FROM motd_list WHERE id = ?').bind(target).first();
+  if (!existing) throw new Error('Entry not found.');
+  await db.prepare('UPDATE motd_list SET business = ?, message = ?, start_at = ?, end_at = ? WHERE id = ?')
+    .bind(String(business || '').trim(), String(message || '').trim(), String(start || '').trim(), String(end || '').trim(), target).run();
   return listIndividualMotds(env);
 }
 
 export async function deleteIndividualMotd(env, id) {
-  await ensureList(env);
-  const rows = await readRange(env, env.CORE_SPREADSHEET_ID, `${LIST_SHEET}!A2:E`);
-  const rowIdx = findRow(rows, String(id || '').trim());
-  if (!rowIdx) throw new Error('Entry not found.');
-  await updateRange(env, env.CORE_SPREADSHEET_ID, `${LIST_SHEET}!A${rowIdx}:E${rowIdx}`, [['', '', '', '', '']]);
+  const db = await getDb(env);
+  const target = String(id || '').trim();
+  const existing = await db.prepare('SELECT id FROM motd_list WHERE id = ?').bind(target).first();
+  if (!existing) throw new Error('Entry not found.');
+  await db.prepare('DELETE FROM motd_list WHERE id = ?').bind(target).run();
   return listIndividualMotds(env);
 }
 
