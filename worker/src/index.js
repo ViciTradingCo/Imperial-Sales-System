@@ -35,7 +35,7 @@ async function healthResponse(env, cors) {
   }
   return json({
     ok: true,
-    service: 'eec-sales-system-api',
+    service: 'vici-sales-system-api',
     configured: {
       clientId: !!env.GOOGLE_CLIENT_ID,
       admins: !!String(env.ADMIN_EMAILS || '').trim(),

@@ -15,7 +15,7 @@ export async function runScheduledBackup(env) {
   if (!env.BACKUPS) return { skipped: 'no R2 bucket bound' };
   const buf = await gzipJson(await collectExport(env));
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const key = PREFIX + 'eec-backup-' + stamp + '.json.gz';
+  const key = PREFIX + 'vici-backup-' + stamp + '.json.gz';
   await env.BACKUPS.put(key, buf, { httpMetadata: { contentType: 'application/gzip' } });
 
   // Prune old snapshots beyond the retention count (newest kept).

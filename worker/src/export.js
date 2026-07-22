@@ -18,9 +18,15 @@ const TABLES = ['inventory', 'sales', 'intake', 'transfers', 'coffer_entries',
 
 const SAFE_COL = /^[a-z_][a-z0-9_]*$/i;
 
+// Backup-format identifier written into every export. Renamed eec-ledger →
+// vici-ledger; ACCEPTED_APPS keeps the old value valid so backups taken before
+// the rebrand still restore.
+const APP_TAG = 'vici-ledger';
+const ACCEPTED_APPS = ['vici-ledger', 'eec-ledger'];
+
 export async function collectExport(env) {
   const db = await getDb(env);
-  const data = { app: 'eec-ledger', version: 1, exportedAt: new Date().toISOString(), tables: {} };
+  const data = { app: APP_TAG, version: 1, exportedAt: new Date().toISOString(), tables: {} };
   for (const t of TABLES) {
     const { results } = await db.prepare('SELECT * FROM ' + t).all();
     data.tables[t] = results || [];
@@ -30,7 +36,7 @@ export async function collectExport(env) {
 
 /** Restores tables from an export document (full replace). Returns row counts. */
 export async function restoreImport(env, data) {
-  if (!data || data.app !== 'eec-ledger' || !data.tables) {
+  if (!data || !ACCEPTED_APPS.includes(data.app) || !data.tables) {
     throw new Error('That doesn’t look like a Vici backup file.');
   }
   const db = await getDb(env);
@@ -57,7 +63,7 @@ export async function restoreImport(env, data) {
  * file before the destructive restore.
  */
 export async function previewImport(env, data) {
-  if (!data || data.app !== 'eec-ledger' || !data.tables) {
+  if (!data || !ACCEPTED_APPS.includes(data.app) || !data.tables) {
     throw new Error('That doesn’t look like a Vici backup file.');
   }
   const db = await getDb(env);

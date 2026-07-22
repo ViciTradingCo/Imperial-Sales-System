@@ -1,4 +1,4 @@
-name = "eec-sales-system-api"
+name = "vici-sales-system-api"
 main = "src/index.js"
 compatibility_date = "2024-09-01"
 
