@@ -1,5 +1,5 @@
 {
-  "name": "vici-sales-system-api",
+  "name": "eec-sales-system-api",
   "version": "0.1.0",
   "description": "Backend API (Cloudflare Worker) for Vici Trading Co. — the trust boundary in front of the D1 datastore.",
   "type": "module",

@@ -66,7 +66,7 @@ async function exportData({ request, env, cors }) {
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   return new Response(buf, {
     status: 200,
-    headers: { ...cors, 'Content-Type': 'application/gzip', 'Content-Disposition': 'attachment; filename="vici-backup-' + stamp + '.json.gz"' },
+    headers: { ...cors, 'Content-Type': 'application/gzip', 'Content-Disposition': 'attachment; filename="eec-backup-' + stamp + '.json.gz"' },
   });
 }
 /** Dry-run: current-vs-incoming row counts per table, without changing anything. */

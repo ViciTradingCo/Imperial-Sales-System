@@ -50,20 +50,6 @@ You do this once. Nothing here puts a secret in the repo.
 
 The Worker creates every table in code on first run (idempotent `CREATE TABLE IF NOT EXISTS`), so there's no migration step.
 
-> **Note on the database name.** The app binds D1 by `database_id` + the `DB`
-> binding, so the database's *name* is only a dashboard label. This repo's live
-> database happens to be named `eec-ledger`. Cloudflare D1 has **no in-place
-> rename**, so to change the label you create a fresh database and copy the data:
-> ```bash
-> cd worker
-> npx wrangler d1 export eec-ledger --remote --output data.sql   # full dump
-> npx wrangler d1 create vici-ledger                              # note the new id
-> npx wrangler d1 execute vici-ledger --remote --file data.sql   # load the dump
-> # then set database_name = "vici-ledger" and database_id = "<new-id>" in wrangler.toml, deploy,
-> # verify /health db:"ok" + your data, and finally: npx wrangler d1 delete eec-ledger
-> ```
-> This is purely cosmetic — nothing in the app reads the name.
-
 ### 2b. Set the admins
 In `worker/wrangler.toml` `[vars]`, set **`ADMIN_EMAILS`** to a comma-separated list
 of the Google emails that should be admins:
@@ -91,7 +77,7 @@ plus `http://localhost:5173` while developing) in the same `[vars]` block.
    - `CLOUDFLARE_ACCOUNT_ID` = the account ID
    (No `SA_KEY` — there is no service account anymore.)
 4. **Actions** tab → **Deploy Worker API → Run workflow**.
-5. Smoke test: visit `https://vici-sales-system-api.<subdomain>.workers.dev/health`.
+5. Smoke test: visit `https://eec-sales-system-api.<subdomain>.workers.dev/health`.
    Expect `{"ok":true,...,"configured":{"clientId":true,"admins":true,"db":"ok"}}`.
    `db:"ok"` means D1 is bound and its tables exist.
 
@@ -123,7 +109,7 @@ There are three independent layers; use as many as you like.
 
 ### 4a. Manual file backup (always available)
 Admin → **Network Settings → Data backup**:
-- **Export backup** downloads a gzipped JSON snapshot (`vici-backup-YYYY-MM-DD.json.gz`) of the **entire** database.
+- **Export backup** downloads a gzipped JSON snapshot (`eec-backup-YYYY-MM-DD.json.gz`) of the **entire** database.
 - **Preview restore** shows a current-vs-incoming row-count diff for a chosen file — sanity-check before applying.
 - **Restore backup** replaces all live data with the file. It cannot be undone, so export first.
 - Admins get a Monday reminder banner to grab a fresh export. Do it weekly.
