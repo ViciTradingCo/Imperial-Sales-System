@@ -13,7 +13,7 @@ compatibility_date = "2024-09-01"
 #                      is no hand-seeded row anymore. Add the network operator(s).
 [vars]
 GOOGLE_CLIENT_ID = "987037150604-djt5q7a16kgs77jvc8lnhrk74p76u5oj.apps.googleusercontent.com"
-ALLOWED_ORIGIN = "https://meretheec.github.io,http://localhost:5173"
+ALLOWED_ORIGIN = "https://vicitradingco.github.io,https://meretheec.github.io,http://localhost:5173"
 ADMIN_EMAILS = "cmaerten77@gmail.com"
 
 # Google Sheets is no longer used — D1 is the sole source of truth. There is no
