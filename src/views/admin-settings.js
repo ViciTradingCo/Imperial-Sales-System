@@ -99,7 +99,7 @@ function backupCard() {
     exportBtn.disabled = true; setStatus('Preparing…', '');
     try {
       const blob = await api.exportBackupBlob();
-      downloadBlob(blob, 'eec-backup-' + new Date().toISOString().slice(0, 10) + '.json.gz');
+      downloadBlob(blob, 'vici-backup-' + new Date().toISOString().slice(0, 10) + '.json.gz');
       setStatus('Backup downloaded — keep it somewhere safe.', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { exportBtn.disabled = false; }
