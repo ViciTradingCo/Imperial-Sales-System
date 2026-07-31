@@ -14,6 +14,7 @@ import { openModal } from '../lib/modal.js';
 import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
+import { createItemPicker } from '../lib/item-picker.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
@@ -141,7 +142,13 @@ function openItemModal(it, onSaved) {
 /** Intake (restock) transaction as a focus modal. */
 function openIntakeModal(onRecorded) {
   const idem = newIdem(); // one key per intake entry — retries won't double the stock
-  const item = el('input', { type: 'text', placeholder: 'Item name' });
+  // Items must be chosen from the master index so stock never lands under a typo.
+  const picker = createItemPicker({
+    placeholder: 'Search the item index…',
+    meta: (it) => 'base ' + money(it.baseValue),
+    onPick: (it) => { if (!per.value) per.value = String(it.baseValue); },
+  });
+  api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});
   const vendor = el('input', { type: 'text', placeholder: 'Vendor (who you bought from)' });
   const hold = el('select', {}, el('option', { value: '' }, 'Select a hold…'));
   const qty = el('input', { type: 'number', step: '1', min: '1', placeholder: '# of items' });
@@ -158,11 +165,13 @@ function openIntakeModal(onRecorded) {
 
   let modal;
   async function doRecord() {
+    const picked = picker.selected();
+    if (!picked) { setStatus('Pick an item from the index — start typing and click a result.', 'error'); return; }
     save.disabled = true;
     setStatus('Recording…', '');
     try {
       await api.recordIntake({
-        item: item.value.trim(),
+        item: picked.name,
         vendor: vendor.value.trim(),
         hold: hold.value,
         numItems: qty.value,
@@ -179,8 +188,8 @@ function openIntakeModal(onRecorded) {
 
   modal = openModal([
     el('h3', {}, 'Record intake (restock)'),
-    el('p', { class: 'note' }, 'Log a purchase — this adds the stock and records what you paid and where. A new item name is created automatically.'),
-    el('label', {}, 'Item'), item,
+    el('p', { class: 'note' }, 'Log a purchase — this adds the stock and records what you paid and where. Pick the item from the index.'),
+    el('label', {}, 'Item'), picker.el,
     el('label', {}, 'Vendor'), vendor,
     el('label', {}, 'Hold purchased in'), hold,
     el('label', {}, '# of items'), qty,
@@ -253,7 +262,12 @@ function parseImport(text) {
  * incoming list here). Shows pending incoming (with Accept) and outgoing.
  */
 function openTransferModal(me, onChanged) {
-  const item = el('select', {}, el('option', { value: '' }, 'Pick an item…'));
+  // Transfers move YOUR stock, so the picker is bound to in-stock inventory
+  // (already canonical names) rather than the whole master index.
+  const picker = createItemPicker({
+    placeholder: 'Search your stock…',
+    meta: (it) => it.stock + ' in stock',
+  });
   const qty = el('input', { type: 'number', min: '1', step: '1', placeholder: 'Amount' });
   const toSel = el('select', {}, el('option', { value: '' }, 'Receiving company…'));
   const status = el('p', {});
@@ -261,10 +275,9 @@ function openTransferModal(me, onChanged) {
   const pendingHost = el('div', {}, el('p', { class: 'note' }, 'Loading transfers…'));
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
-  // Populate the item dropdown from current stock, and the company dropdown.
+  // Populate the item picker from current stock, and the company dropdown.
   api.getInventory().then((inv) => {
-    (inv.inventory || []).filter((it) => it.stock > 0).forEach((it) =>
-      item.appendChild(el('option', { value: it.item }, it.item + ' (' + it.stock + ' in stock)')));
+    picker.setItems((inv.inventory || []).filter((it) => it.stock > 0).map((it) => ({ name: it.item, stock: it.stock })));
   }).catch(() => {});
   api.getBusinesses().then((res) => {
     (res.businesses || []).filter((b) => b.toLowerCase() !== String(me.business || '').toLowerCase())
@@ -312,7 +325,8 @@ function openTransferModal(me, onChanged) {
 
   let sendKey = null; // stable across a retry of the same send; cleared on success
   async function doSend() {
-    if (!item.value) { setStatus('Pick an item.', 'error'); return; }
+    const picked = picker.selected();
+    if (!picked) { setStatus('Pick an item from your stock.', 'error'); return; }
     if (!toSel.value) { setStatus('Pick a receiving company.', 'error'); return; }
     const n = Math.floor(Number(qty.value));
     if (!n || n < 1) { setStatus('Enter an amount.', 'error'); return; }
@@ -320,7 +334,7 @@ function openTransferModal(me, onChanged) {
     send.disabled = true;
     setStatus('Sending…', '');
     try {
-      renderPending(await api.createTransfer({ toBusiness: toSel.value, item: item.value, qty: n, idempotencyKey: sendKey }));
+      renderPending(await api.createTransfer({ toBusiness: toSel.value, item: picked.name, qty: n, idempotencyKey: sendKey }));
       sendKey = null; // next transfer gets a fresh key
       setStatus('Transfer sent — awaiting acceptance.', 'ok');
       qty.value = '';
@@ -350,7 +364,7 @@ function openTransferModal(me, onChanged) {
   openModal([
     el('h3', {}, 'Transfer goods'),
     el('p', { class: 'note' }, 'Send stock to another company. It leaves your inventory now and appears in theirs once they accept.'),
-    el('label', {}, 'Item'), item,
+    el('label', {}, 'Item'), picker.el,
     el('label', {}, 'Amount'), qty,
     el('label', {}, 'Receiving company'), toSel,
     send,

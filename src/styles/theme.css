@@ -333,6 +333,23 @@ label.inline input { width: auto; }
   letter-spacing: 0.04em; padding: 2px 8px; border-radius: 20px;
   background: var(--note); color: var(--paper-raised);
 }
+
+/* Item picker — narrowing search bound to the master item index */
+.item-picker { position: relative; }
+.item-picker-input { width: 100%; }
+.item-picker-list {
+  position: absolute; z-index: 40; left: 0; right: 0; top: 100%;
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+  max-height: 260px; overflow-y: auto; padding: 4px;
+}
+.item-picker-opt {
+  display: block; width: 100%; text-align: left; background: none; border: 0;
+  padding: 10px 12px; border-radius: 6px; cursor: pointer; font: inherit; color: inherit;
+  min-height: 44px; /* comfortable tap target */
+}
+.item-picker-opt:hover, .item-picker-opt:focus { background: var(--rule); outline: none; }
+.item-picker-empty { padding: 10px 12px; margin: 0; }
 .pill.danger { background: #a4302a; color: #fff; }
 .pill.warn { background: #b5741c; color: #fff; }
 

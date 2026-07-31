@@ -12,6 +12,7 @@ import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { enqueueSale, flushSales, queuedCount, isNetworkError } from '../lib/offline-queue.js';
+import { createItemPicker } from '../lib/item-picker.js';
 
 export function renderPos(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
@@ -79,35 +80,31 @@ export function renderPos(container, { me }) {
   const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
   function renderSale(canSell) {
-    // Item search: a text box backed by a datalist of master + inventory names.
-    const listId = 'itemlist-' + Math.random().toString(36).slice(2, 7);
-    const datalist = el('datalist', { id: listId });
-    const itemInput = el('input', { type: 'text', placeholder: 'Search item…', autocomplete: 'off' });
-    itemInput.setAttribute('list', listId);
+    // Item entry is a narrowing search over the MASTER INDEX — the clerk picks a
+    // canonical item, never free text, so sales can't fragment the index.
     const itemHint = el('p', { class: 'note' }, '');
     const qty = el('input', { type: 'number', min: '1', step: '1', value: '1' });
     const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: 'Sold for per item (gp)' });
 
     let invByNorm = new Map();
-    let masterByNorm = new Map();
+    const picker = createItemPicker({
+      placeholder: 'Search the item index…',
+      meta: (it) => {
+        const inv = invByNorm.get(norm(it.name));
+        return inv ? inv.stock + ' in stock · ' + money(inv.price) : 'base ' + money(it.baseValue);
+      },
+      onPick: (it) => {
+        const inv = invByNorm.get(norm(it.name));
+        price.value = String(inv ? inv.price : it.baseValue);
+        itemHint.textContent = inv
+          ? inv.stock + ' in stock · your price ' + money(inv.price)
+          : 'Not in your inventory · master base ' + money(it.baseValue);
+      },
+    });
     function rebuildSuggestions() {
       invByNorm = new Map(inventory.map((it) => [norm(it.item), it]));
-      masterByNorm = new Map(master.map((m) => [norm(m.name), m]));
-      const names = new Set();
-      master.forEach((m) => names.add(m.name));
-      inventory.forEach((it) => names.add(it.item));
-      datalist.innerHTML = '';
-      names.forEach((n) => datalist.appendChild(el('option', { value: n })));
+      picker.setItems(master);
     }
-    function resolveHint() {
-      const key = norm(itemInput.value);
-      const inv = invByNorm.get(key);
-      const mas = masterByNorm.get(key);
-      if (inv) { if (!price.value) price.value = String(inv.price); itemHint.textContent = inv.stock + ' in stock · your price ' + money(inv.price); }
-      else if (mas) { if (!price.value) price.value = String(mas.baseValue); itemHint.textContent = 'Not in your inventory · master base ' + money(mas.baseValue); }
-      else { itemHint.textContent = itemInput.value.trim() ? 'New item — not in the master index (will be flagged, excluded from market).' : ''; }
-    }
-    itemInput.addEventListener('input', () => { price.value = ''; resolveHint(); });
     rebuildSuggestions();
     const addBtn = el('button.secondary-btn', { onclick: addToCart }, 'Add to order');
 
@@ -150,21 +147,21 @@ export function renderPos(container, { me }) {
     }
 
     function addToCart() {
-      const item = itemInput.value.trim();
-      if (!item) { setStatus('Enter an item.', 'error'); return; }
+      const picked = picker.selected();
+      if (!picked) { setStatus('Pick an item from the index — start typing and click a result.', 'error'); return; }
+      const item = picked.name; // canonical spelling
       const q = Math.floor(Number(qty.value));
       if (!q || q < 1) { setStatus('Enter a quantity.', 'error'); return; }
       let p = Number(price.value);
       // Default the price from inventory / master if it was left blank.
       if (!isFinite(p) || p < 0 || price.value === '') {
         const inv = invByNorm.get(norm(item));
-        const mas = masterByNorm.get(norm(item));
-        p = inv ? inv.price : (mas ? mas.baseValue : NaN);
+        p = inv ? inv.price : picked.baseValue;
       }
       if (!isFinite(p) || p < 0) { setStatus('Enter a sold-for price.', 'error'); return; }
       if (!idemKey) idemKey = newIdem();
       cart.push({ item, qty: q, price: p });
-      itemInput.value = ''; qty.value = '1'; price.value = ''; itemHint.textContent = '';
+      picker.clear(); qty.value = '1'; price.value = ''; itemHint.textContent = '';
       setStatus('', '');
       renderCart();
     }
@@ -217,7 +214,7 @@ export function renderPos(container, { me }) {
     mount(body,
       el('div.card', {}, [
         el('h3', {}, 'Add to order'),
-        el('label', {}, 'Item'), itemInput, datalist, itemHint,
+        el('label', {}, 'Item'), picker.el, itemHint,
         el('label', {}, 'Quantity'), qty,
         el('label', {}, 'Sold for per item (gp)'), price,
         addBtn,
