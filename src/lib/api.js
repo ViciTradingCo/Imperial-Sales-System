@@ -187,6 +187,12 @@ export const api = {
   analyzeItems: (rows) => request('POST', '/admin/items/import/analyze', { rows }),
   /** Admin: replace the hold index. */
   setHolds: (holds) => request('POST', '/admin/holds', { holds }),
+  /** Any registered user: tile artwork (key → image URL). */
+  getTiles: () => request('GET', '/tiles'),
+  /** Admin: read the tile artwork map. */
+  getTileImages: () => request('GET', '/admin/tiles'),
+  /** Admin: save the tile artwork map ({ key: httpsUrl }); blank clears a tile. */
+  setTileImages: (images) => request('POST', '/admin/tiles', { images }),
   /** Admin: whether public storefronts are enabled. */
   getStorefrontFlag: () => request('GET', '/admin/storefronts'),
   /** Admin: enable/disable public storefronts. */

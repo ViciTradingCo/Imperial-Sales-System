@@ -16,6 +16,7 @@ import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, 
 import { upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex, analyzeItemImport } from '../item-index.js';
 import { writeHolds } from '../holds.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
+import { getFlag, setFlag } from '../db.js';
 
 async function getSettings({ request, env }) {
   await requireAdmin(request, env);
@@ -165,6 +166,33 @@ async function analyzeItems({ request, env, body }) {
   await requireAdmin(request, env);
   return await analyzeItemImport(env, body.rows);
 }
+/* ---- Tile images (admin-assigned artwork for the big-button grids) ---- */
+const TILE_IMAGES_KEY = 'tile_images';
+const HTTPS_URL = /^https:\/\/[^\s"'<>]+$/i;
+
+async function readTileImages(env) {
+  const raw = await getFlag(env, TILE_IMAGES_KEY);
+  try { return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; }
+}
+async function getTileImages({ request, env }) {
+  await requireAdmin(request, env);
+  return { images: await readTileImages(env) };
+}
+async function setTileImages({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const next = {};
+  Object.keys(body.images || {}).forEach((k) => {
+    const url = String((body.images || {})[k] || '').trim();
+    if (!url) return; // blank clears the tile
+    // Externally hosted images only, and https so the page stays secure.
+    if (!HTTPS_URL.test(url)) throw new Error('Image links must be full https:// URLs (' + k + ').');
+    next[String(k).slice(0, 40)] = url.slice(0, 500);
+  });
+  await setFlag(env, TILE_IMAGES_KEY, JSON.stringify(next));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'tiles.images', detail: Object.keys(next).length + ' image(s) set' });
+  return { images: next };
+}
+
 async function getStorefrontFlag({ request, env }) {
   await requireAdmin(request, env);
   return { enabled: await storefrontsEnabled(env) };
@@ -211,6 +239,8 @@ export const routes = [
   { method: 'POST', path: '/admin/items/import', handler: importMasterItems },
   { method: 'POST', path: '/admin/items/import/analyze', handler: analyzeItems },
   { method: 'POST', path: '/admin/holds', handler: setHolds },
+  { method: 'GET', path: '/admin/tiles', handler: getTileImages },
+  { method: 'POST', path: '/admin/tiles', handler: setTileImages },
   { method: 'GET', path: '/admin/storefronts', handler: getStorefrontFlag },
   { method: 'POST', path: '/admin/storefronts', handler: setStorefrontFlag },
 ];

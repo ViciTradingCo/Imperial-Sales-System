@@ -7,6 +7,7 @@ import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { renderSettingsForm } from './settings-form.js';
 import { setAdminActions } from '../lib/sections.js';
+import { toast } from '../lib/toast.js';
 
 export function renderAdminSettings(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
@@ -24,7 +25,7 @@ export function renderAdminSettings(container) {
     save: async (updates) => (await api.saveSettings(updates)).settings,
   });
 
-  mount(holdsHost, holdsCard(), storefrontCard());
+  mount(holdsHost, holdsCard(), tileImagesCard(), storefrontCard());
   mount(statusHost, statusCard());
   mount(backupHost, backupCard());
   mount(dangerHost, logsCard(), resetCard());
@@ -85,6 +86,71 @@ function holdsCard() {
     el('p', { class: 'note' }, 'The network’s hold names, one per line, in order. Used by every hold dropdown.'),
     box,
     save,
+    status,
+  ]);
+}
+
+/**
+ * Tile artwork — assign an externally hosted image (https URL) to each home
+ * tile. Blank falls back to the tile's glyph.
+ */
+const TILE_KEYS = [
+  ['members', 'Members'], ['companies', 'Companies'], ['items', 'Item Index'],
+  ['market', 'Market'], ['motd', 'MOTD'], ['audit', 'Audit Log'], ['settings', 'Settings'],
+  ['register', 'Register'], ['inventory', 'Inventory'], ['employees', 'Employees'],
+  ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
+];
+function tileImagesCard() {
+  const status = el('p', {});
+  const inputs = {};
+  const previews = {};
+
+  function paint(key) {
+    const preview = previews[key];
+    const url = String(inputs[key].value || '').trim();
+    preview.innerHTML = '';
+    if (!/^https:\/\//i.test(url)) { preview.textContent = '◆'; return; }
+    const img = el('img', { src: url, alt: '' });
+    img.addEventListener('error', () => { preview.innerHTML = ''; preview.textContent = '✕'; });
+    preview.appendChild(img);
+  }
+
+  const rows = TILE_KEYS.map(([key, label]) => {
+    const preview = el('span', { class: 'tile-img-preview' }, '◆');
+    const input = el('input', { type: 'url', placeholder: 'https://… (blank = default glyph)' });
+    input.addEventListener('input', () => paint(key));
+    inputs[key] = input;
+    previews[key] = preview;
+    return el('div', { class: 'tile-img-row' }, [preview, el('label', {}, label), input]);
+  });
+
+  api.getTileImages().then((r) => {
+    const images = r.images || {};
+    TILE_KEYS.forEach(([key]) => {
+      if (images[key]) { inputs[key].value = images[key]; paint(key); }
+    });
+  }).catch(() => {});
+
+  const save = el('button.primary', { onclick: doSave }, 'Save tile images');
+  async function doSave() {
+    const images = {};
+    TILE_KEYS.forEach(([key]) => { const v = inputs[key].value.trim(); if (v) images[key] = v; });
+    save.disabled = true; status.className = ''; status.textContent = 'Saving…';
+    try {
+      await api.setTileImages(images);
+      status.textContent = '';
+      toast('Tile images saved', 'ok');
+    } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
+    finally { save.disabled = false; }
+  }
+
+  return el('div.card', {}, [
+    el('h3', {}, 'Tile images'),
+    el('p', { class: 'note' }, 'Give each home tile a picture by pasting a link to an image hosted elsewhere ' +
+      '(Discord, Imgur, your own host). Must be a full https:// link straight to the image file. Leave blank to ' +
+      'use the default glyph.'),
+    el('div', { class: 'tile-img-list' }, rows),
+    el('div', { class: 'row-actions' }, [save]),
     status,
   ]);
 }

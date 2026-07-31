@@ -15,6 +15,7 @@ import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
+import { emptyState } from '../lib/empty.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
@@ -49,7 +50,12 @@ export function renderInventory(container, { me }) {
   mount(container, ...nodes);
 
   function renderList(items) {
-    if (!items.length) { mount(listHost, el('p', { class: 'note' }, 'No items yet.')); return; }
+    if (!items.length) {
+      mount(listHost, emptyState({ glyph: '📦', title: 'No items yet',
+        hint: 'Record an intake to stock your first item — it will appear here with its price and stock.',
+        actionLabel: canEdit ? 'Record Intake' : null, onAction: canEdit ? () => openIntakeModal(refreshAll) : null }));
+      return;
+    }
     const rows = items.map((it) => {
       const meta = el('span', { html:
         '<b>' + esc(it.item) + '</b> · ' + money(it.price) +
@@ -73,7 +79,7 @@ export function renderInventory(container, { me }) {
 
   function renderIntake(list) {
     if (!intakeHost) return;
-    if (!list.length) { mount(intakeHost, el('p', { class: 'note' }, 'No intake recorded yet.')); return; }
+    if (!list.length) { mount(intakeHost, emptyState({ glyph: '🚚', title: 'No intake recorded yet', hint: 'Purchases you record will be listed here.' })); return; }
     mount(intakeHost, ...list.map((r) => el('div.emp-row', {}, [
       el('span', { html:
         '<b>' + esc(r.item) + '</b> ×' + r.numItems + ' @ ' + money(r.pricePer) +

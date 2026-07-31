@@ -13,6 +13,8 @@ import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { enqueueSale, flushSales, queuedCount, isNetworkError } from '../lib/offline-queue.js';
 import { createItemPicker } from '../lib/item-picker.js';
+import { emptyState } from '../lib/empty.js';
+import { toast } from '../lib/toast.js';
 
 export function renderPos(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
@@ -108,7 +110,7 @@ export function renderPos(container, { me }) {
     rebuildSuggestions();
     const addBtn = el('button.secondary-btn', { onclick: addToCart }, 'Add to order');
 
-    const cartHost = el('div', {}, el('p', { class: 'note' }, 'Cart is empty.'));
+    const cartHost = el('div', {}, emptyState({ glyph: '🧺', title: 'Cart is empty', hint: 'Search the item index above and add items to build the order.' }));
 
     const customer = el('input', { type: 'text', placeholder: 'Customer name (optional)' });
     const holdSel = el('select', {}, el('option', { value: '' }, 'Pick a hold…'));
@@ -135,7 +137,7 @@ export function renderPos(container, { me }) {
     function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
     function renderCart() {
-      if (!cart.length) { mount(cartHost, el('p', { class: 'note' }, 'Cart is empty.')); return; }
+      if (!cart.length) { mount(cartHost, emptyState({ glyph: '🧺', title: 'Cart is empty', hint: 'Search the item index above and add items to build the order.' })); return; }
       const rows = cart.map((line, i) => el('div.emp-row', {}, [
         el('span', { html: '<b>' + esc(line.item) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
           ' = ' + money(line.qty * line.price) }),
@@ -184,10 +186,11 @@ export function renderPos(container, { me }) {
         renderCart();
         customer.value = ''; discName.value = ''; discPct.value = '';
         // Keep the hold selected for quick back-to-back sales.
-        let msg = 'Sale complete ✓ — ' + res.orderNo + ' · ' + money(res.total);
-        if (res.offInventory && res.offInventory.length) msg += ' · off-inventory: ' + res.offInventory.join(', ');
-        if (res.newItems && res.newItems.length) msg += ' · new item flagged: ' + res.newItems.join(', ');
-        setStatus(msg, 'ok');
+        toast('Sale complete — ' + res.orderNo + ' · ' + money(res.total), 'ok');
+        let msg = '';
+        if (res.offInventory && res.offInventory.length) msg += 'Off-inventory: ' + res.offInventory.join(', ') + '. ';
+        if (res.newItems && res.newItems.length) msg += 'New item flagged: ' + res.newItems.join(', ') + '.';
+        setStatus(msg, msg ? 'warn' : '');
         complete.disabled = false;
         // Refresh stock counts + item suggestions.
         api.getInventory().then((inv) => {

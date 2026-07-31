@@ -7,6 +7,7 @@
 import { requireUser, requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta } from '../guards.js';
 import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid } from '../users.js';
 import { renameBusiness, listBusinessNames } from '../registry.js';
+import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport } from '../inventory.js';
@@ -260,6 +261,14 @@ async function getItems({ request, env }) {
   await requireRegistered(request, env);
   return { items: await listItemIndex(env) };
 }
+/** Any registered user: the admin-assigned tile artwork (key → image URL). */
+async function getTiles({ request, env }) {
+  await requireRegistered(request, env);
+  const raw = await getFlag(env, 'tile_images');
+  let images = {};
+  try { images = raw ? JSON.parse(raw) : {}; } catch (e) { images = {}; }
+  return { images };
+}
 async function getHolds({ request, env }) {
   await requireUser(request, env); // usable during registration (caller not registered yet)
   return { holds: await readHolds(env) };
@@ -379,6 +388,7 @@ export const routes = [
   { method: 'GET', path: '/businesses', handler: listBusinesses },
   { method: 'GET', path: '/items', handler: getItems },
   { method: 'GET', path: '/holds', handler: getHolds },
+  { method: 'GET', path: '/tiles', handler: getTiles },
   { method: 'GET', path: '/market/hold', handler: holdReportRoute },
   { method: 'GET', path: '/motd', handler: getMotd },
   { method: 'GET', path: '/public/storefront', handler: storefront },

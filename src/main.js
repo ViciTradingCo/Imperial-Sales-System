@@ -153,7 +153,10 @@ function renderSignedOutLanding(container) {
 // ---- routes --------------------------------------------------------------
 function showRoot(container) {
   if (!state.me) { renderSignedOutLanding(container); return; }
-  if (state.me.registered) renderHome(container, { me: state.me });
+  if (state.me.registered) renderHome(container, {
+    me: state.me,
+    onProfileUpdated: (me) => { state.me = me; renderBadge(); render(); },
+  });
   else navigate('/register');
 }
 route('/', showRoot);
