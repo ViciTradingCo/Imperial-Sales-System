@@ -92,6 +92,8 @@ export const api = {
   purgeLogs: (amount, unit) => request('POST', '/admin/logs/purge', { amount, unit }),
   /** Admin: D1 status snapshot. */
   getStatus: () => request('GET', '/admin/status'),
+  /** Admin: full reset — wipe all data, keep admin accounts (requires confirm: 'ERASE'). */
+  wipeData: () => request('POST', '/admin/data/wipe', { confirm: 'ERASE' }),
   /** Court businesses: the market report for their own hold. */
   getHoldReport: () => request('GET', '/market/hold'),
   /** Banners for the current user: { notices[], banners[] }. Deduped for ~3s. */

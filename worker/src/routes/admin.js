@@ -10,7 +10,7 @@ import { listAllUsers, updateMember, deleteMember } from '../users.js';
 import { listCompanies, updateCompany, archiveCompany } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
 import { marketAnalysis } from '../market.js';
-import { clearLogs, purgeLogs } from '../db.js';
+import { clearLogs, purgeLogs, resetAllData } from '../db.js';
 import { systemStatus } from '../status.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex, analyzeItemImport } from '../item-index.js';
@@ -103,6 +103,15 @@ async function status({ request, env }) {
   return await systemStatus(env);
 }
 
+/** Full reset — wipe all data, keep admin accounts. Guarded by a typed confirm. */
+async function wipeData({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  if (String(body.confirm || '') !== 'ERASE') throw new Error('Reset not confirmed.');
+  const res = await resetAllData(env);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'data.reset', detail: 'full reset — ' + res.tablesCleared + ' tables cleared, ' + res.adminsKept + ' admin(s) kept' });
+  return res;
+}
+
 async function motdConfig({ request, env }) {
   await requireAdmin(request, env);
   return { motd: await readMotd(env), warnDays: await readWarnDays(env), individual: await listIndividualMotds(env) };
@@ -178,6 +187,7 @@ export const routes = [
   { method: 'POST', path: '/admin/logs/clear', handler: clearLogsRoute },
   { method: 'POST', path: '/admin/logs/purge', handler: purgeLogsRoute },
   { method: 'GET', path: '/admin/status', handler: status },
+  { method: 'POST', path: '/admin/data/wipe', handler: wipeData },
   { method: 'GET', path: '/admin/motd', handler: motdConfig },
   { method: 'POST', path: '/admin/motd', handler: setMotd },
   { method: 'POST', path: '/admin/motd/warn', handler: setWarnDays },

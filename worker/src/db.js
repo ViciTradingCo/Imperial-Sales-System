@@ -173,6 +173,25 @@ export async function purgeLogs(env, amount, unit) {
   return { sales, intake, cutoff: iso.slice(0, 10) };
 }
 
+/**
+ * Full reset — wipes every table, keeping ONLY admin user accounts. Used to
+ * clear all test/launch data for a clean start. Irreversible (export a backup
+ * first). Holds re-seed to defaults and settings fall back to defaults on next
+ * read. Returns a small summary.
+ */
+export async function resetAllData(env) {
+  const db = await getDb(env);
+  const FULL = ['inventory', 'sales', 'intake', 'transfers', 'coffer_entries',
+    'discounts', 'shop_style', 'audit', 'master_item', 'hold_index', 'sys_flags',
+    'companies', 'master_settings', 'business_settings', 'motd_list'];
+  const stmts = FULL.map((t) => db.prepare('DELETE FROM ' + t));
+  // Keep admin accounts only; everyone else is removed.
+  stmts.push(db.prepare("DELETE FROM users WHERE lower(role) != 'admin'"));
+  await db.batch(stmts);
+  const admins = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE lower(role) = 'admin'").first()).n || 0;
+  return { reset: true, tablesCleared: FULL.length, adminsKept: admins };
+}
+
 /** Renames a business across the D1 tables (part of a full company rename). */
 export async function renameBusinessData(env, oldName, newName) {
   if (!env.DB) return;

@@ -27,7 +27,34 @@ export function renderAdminSettings(container) {
   mount(holdsHost, holdsCard());
   mount(statusHost, statusCard());
   mount(backupHost, backupCard());
-  mount(dangerHost, logsCard());
+  mount(dangerHost, logsCard(), resetCard());
+}
+
+/** Danger zone: full reset — wipe everything, keep only admin accounts. */
+function resetCard() {
+  const status = el('p', {});
+  const btn = el('button.danger', { onclick: doReset }, 'Clear ALL data (full reset)');
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+  async function doReset() {
+    if (!window.confirm('FULL RESET — permanently delete ALL data: companies, members (except admins), inventory, ' +
+      'sales, intake, transfers, coffers, discounts, shop styles, the audit log, the item index, holds, network ' +
+      'settings, and MOTDs. Holds and settings return to defaults.\n\nThis CANNOT be undone. Export a backup first.')) return;
+    const typed = window.prompt('Type ERASE (all caps) to confirm the full reset:');
+    if (typed !== 'ERASE') { setStatus('Reset cancelled.', ''); return; }
+    btn.disabled = true; setStatus('Erasing…', '');
+    try {
+      const r = await api.wipeData();
+      setStatus('Done — ' + r.tablesCleared + ' tables cleared, ' + r.adminsKept + ' admin account(s) kept. Reload the page to see the clean state.', 'ok');
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
+    finally { btn.disabled = false; }
+  }
+  return el('div.card', {}, [
+    el('h3', {}, 'Full reset'),
+    el('p', { class: 'note' }, 'Permanently erase ALL data and start fresh — keeps only admin accounts. Holds and ' +
+      'network settings return to defaults. Export a backup first; this cannot be undone.'),
+    el('div', { class: 'row-actions' }, [btn]),
+    status,
+  ]);
 }
 
 /** Editor for the network hold index (one hold per line). */
