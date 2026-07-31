@@ -36,22 +36,25 @@ function resetCard() {
   const btn = el('button.danger', { onclick: doReset }, 'Clear ALL data (full reset)');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
   async function doReset() {
-    if (!window.confirm('FULL RESET — permanently delete ALL data: companies, members (except admins), inventory, ' +
-      'sales, intake, transfers, coffers, discounts, shop styles, the audit log, the item index, holds, network ' +
-      'settings, and MOTDs. Holds and settings return to defaults.\n\nThis CANNOT be undone. Export a backup first.')) return;
+    if (!window.confirm('FULL RESET — permanently delete: companies, members (except admins), inventory, sales, ' +
+      'intake, transfers, coffers, discounts, shop styles, the audit log, network settings, and MOTDs.\n\n' +
+      'KEPT: admin accounts, the Master Item Index, and the Holds list (reference defaults).\n\n' +
+      'This CANNOT be undone. Export a backup first.')) return;
     const typed = window.prompt('Type ERASE (all caps) to confirm the full reset:');
     if (typed !== 'ERASE') { setStatus('Reset cancelled.', ''); return; }
     btn.disabled = true; setStatus('Erasing…', '');
     try {
       const r = await api.wipeData();
-      setStatus('Done — ' + r.tablesCleared + ' tables cleared, ' + r.adminsKept + ' admin account(s) kept. Reload the page to see the clean state.', 'ok');
+      setStatus('Done — ' + r.tablesCleared + ' tables cleared. Kept ' + r.adminsKept + ' admin account(s), ' +
+        r.itemsKept + ' master item(s), and ' + r.holdsKept + ' hold(s). Reload the page to see the clean state.', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { btn.disabled = false; }
   }
   return el('div.card', {}, [
     el('h3', {}, 'Full reset'),
-    el('p', { class: 'note' }, 'Permanently erase ALL data and start fresh — keeps only admin accounts. Holds and ' +
-      'network settings return to defaults. Export a backup first; this cannot be undone.'),
+    el('p', { class: 'note' }, 'Erase all business and transaction data and start fresh. Keeps admin accounts plus ' +
+      'the reference defaults — the Master Item Index and the Holds list. Network settings and MOTDs return to ' +
+      'defaults. Export a backup first; this cannot be undone.'),
     el('div', { class: 'row-actions' }, [btn]),
     status,
   ]);
