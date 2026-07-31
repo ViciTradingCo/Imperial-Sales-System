@@ -10,7 +10,6 @@
  * first sign-in. See docs/SETUP.md.
  */
 import { getDb } from './db.js';
-import { cacheGet, cacheSet, cacheBust } from './cache.js';
 
 /** Emails granted admin by configuration (comma-separated ADMIN_EMAILS var). */
 function adminEmails(env) {
@@ -45,14 +44,15 @@ function genUid(prefix) {
  * Looks up a user by verified email. A configured admin (ADMIN_EMAILS) is always
  * returned as an active admin — auto-provisioned a row the first time. Returns a
  * normalized record or null when the email isn't registered.
+ *
+ * Identity is read LIVE from D1 on every call (no caching). A per-isolate cache
+ * here caused a stale-identity bug: after someone changed business (re-register,
+ * admin edit, company archive), other isolates kept serving the OLD business
+ * until the entry expired. D1 reads are cheap, so correctness wins.
  */
 export async function findUserByEmail(env, email) {
   const target = String(email || '').trim().toLowerCase();
   if (!target) return null;
-  // Positive-only cache: a hit is a registered user; misses are never cached so
-  // a just-registered account is found immediately.
-  const cached = await cacheGet(env, 'user:' + target);
-  if (cached) return { ...cached };
 
   const db = await getDb(env);
   const row = await db.prepare('SELECT * FROM users WHERE lower(email) = ?').bind(target).first();
@@ -69,12 +69,11 @@ export async function findUserByEmail(env, email) {
     await db.prepare('UPDATE users SET role = ?, status = ? WHERE uid = ?').bind('admin', 'active', user.uid).run();
     user.role = 'admin'; user.status = 'active';
   }
-  if (user) await cacheSet(env, 'user:' + target, user, 15000);
   return user ? { ...user } : null;
 }
 
-/** Invalidates the cached identity for any Users write. */
-export function bustUserCache() { cacheBust('user:'); }
+/** No-op retained for call sites; identity is no longer cached (see findUserByEmail). */
+export function bustUserCache() { /* identity reads are live now */ }
 
 /** Locate any user by uid (admin cross-business operations). */
 export async function findUserByUid(env, uid) {
