@@ -14,6 +14,7 @@ import { renderPatchNotes } from './lib/patch-notes.js';
 import { initActions, clearActions } from './lib/actions.js';
 import { renderLanding } from './views/landing.js';
 import { renderHome } from './views/home.js';
+import { openLowStockModal } from './views/low-stock.js';
 import { renderRegister } from './views/register.js';
 import { renderProfile } from './views/profile.js';
 import { renderEmployees } from './views/employees.js';
@@ -54,7 +55,9 @@ function refreshGlobalBanner() {
     if (!banners.length) { globalBanner.hidden = true; globalBanner.innerHTML = ''; return; }
     mount(globalBanner, ...banners.map((b) => {
       const row = el('div', { class: 'global-banner' }, [el('span', {}, b.text)]);
-      if (b.action && b.action.route) {
+      if (b.action && b.action.modal === 'lowstock') {
+        row.appendChild(el('button', { class: 'banner-btn', onclick: () => openLowStockModal() }, b.action.label || 'Open'));
+      } else if (b.action && b.action.route) {
         row.appendChild(el('button', { class: 'banner-btn', onclick: () => navigate(b.action.route) }, b.action.label || 'Open'));
       }
       return row;

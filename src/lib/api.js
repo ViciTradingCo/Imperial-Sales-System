@@ -135,6 +135,8 @@ export const api = {
   importInventory: (rows) => request('POST', '/inventory/import', { rows }),
   /** Owner/admin: per-employee sales performance. */
   getEmployeePerformance: () => request('GET', '/business/employees/performance'),
+  /** Owner/admin: low + out-of-stock report ({ out, low }). */
+  getLowStock: () => request('GET', '/business/low-stock'),
   /** Owner/admin: download this shop's sales or coffer ledger as a CSV Blob. */
   exportBusinessCsvBlob: async (type) => {
     const token = getIdToken();

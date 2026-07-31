@@ -11,6 +11,25 @@ function statusFor(stock, low) {
   return 'In Stock';
 }
 
+/**
+ * Low/out-of-stock report for a business. `out` = stock ≤ 0; `low` = a positive
+ * stock at or below the item's Low Stock threshold. Items with no threshold only
+ * appear once they're fully out. Ordered worst-first.
+ */
+export async function lowStockReport(env, business) {
+  const db = await getDb(env);
+  const { results } = await db
+    .prepare('SELECT item, price, stock, low_stock FROM inventory WHERE business = ? ' +
+      'AND (stock <= 0 OR (low_stock > 0 AND stock <= low_stock)) ORDER BY stock ASC, item COLLATE NOCASE')
+    .bind(business).all();
+  const out = [], low = [];
+  (results || []).forEach((r) => {
+    const row = { item: r.item, price: r.price, stock: r.stock, lowStock: r.low_stock };
+    (r.stock <= 0 ? out : low).push(row);
+  });
+  return { out, low };
+}
+
 /** Every item for a business, ordered by name. */
 export async function listInventory(env, business) {
   const db = await getDb(env);

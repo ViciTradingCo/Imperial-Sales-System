@@ -9,7 +9,7 @@ import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid } from '
 import { renameBusiness, listBusinessNames } from '../registry.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
-import { listInventory, upsertItem, deleteItem, importInventory } from '../inventory.js';
+import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport } from '../inventory.js';
 import { recordIntake, listIntake } from '../intake.js';
 import { readHolds } from '../holds.js';
 import { listItemIndex } from '../item-index.js';
@@ -78,6 +78,10 @@ async function employeeNote({ request, env, body }) {
 async function employeePerformanceRoute({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
   return { performance: await employeePerformance(env, caller.business) };
+}
+async function lowStock({ request, env }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return await lowStockReport(env, caller.business);
 }
 
 /* ---- per-shop settings + rename ---- */
@@ -317,6 +321,19 @@ async function getMotd({ request, env }) {
       action: { label: 'Backup', route: '/admin/settings' },
     });
   }
+  // Owner low/out-of-stock nudge → opens a focal report.
+  if (caller.role === 'owner' || caller.role === 'admin') {
+    try {
+      const { out, low } = await lowStockReport(env, caller.business);
+      const n = out.length + low.length;
+      if (n > 0) {
+        banners.push({
+          text: '📦 ' + n + ' item' + (n === 1 ? '' : 's') + ' need restocking' + (out.length ? ' — ' + out.length + ' out of stock' : '') + '.',
+          action: { label: 'View report', modal: 'lowstock' },
+        });
+      }
+    } catch (e) { /* inventory optional */ }
+  }
   return { notices, banner: banners[0] ? banners[0].text : null, banners };
 }
 
@@ -325,6 +342,7 @@ export const routes = [
   { method: 'POST', path: '/business/employees/activate', handler: activateEmployee },
   { method: 'POST', path: '/business/employees/note', handler: employeeNote },
   { method: 'GET', path: '/business/employees/performance', handler: employeePerformanceRoute },
+  { method: 'GET', path: '/business/low-stock', handler: lowStock },
   { method: 'GET', path: '/business/settings', handler: getLedgerSettings },
   { method: 'POST', path: '/business/settings', handler: saveLedgerSettings },
   { method: 'POST', path: '/business/rename', handler: renameBusinessRoute },

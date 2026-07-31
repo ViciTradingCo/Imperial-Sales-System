@@ -328,6 +328,13 @@ label.inline input { width: auto; }
   letter-spacing: 0.04em; background: var(--note); color: var(--paper-raised);
   padding: 2px 8px; border-radius: 20px; margin-top: 6px;
 }
+.pill {
+  display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 2px 8px; border-radius: 20px;
+  background: var(--note); color: var(--paper-raised);
+}
+.pill.danger { background: #a4302a; color: #fff; }
+.pill.warn { background: #b5741c; color: #fff; }
 
 /* Employee management */
 .emp-row {
