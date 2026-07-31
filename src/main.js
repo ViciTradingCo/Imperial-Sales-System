@@ -307,3 +307,12 @@ async function main() {
 }
 
 main();
+
+// ---- PWA: register the service worker (installable + offline app shell) ----
+// Resolved against the document URL so it works under the GitHub Pages subpath;
+// the default scope is the app directory, which covers every route.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(new URL('sw.js', location.href)).catch(() => { /* offline shell is best-effort */ });
+  });
+}
