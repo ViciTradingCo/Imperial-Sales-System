@@ -187,6 +187,12 @@ export const api = {
   analyzeItems: (rows) => request('POST', '/admin/items/import/analyze', { rows }),
   /** Admin: replace the hold index. */
   setHolds: (holds) => request('POST', '/admin/holds', { holds }),
+  /** Admin: whether public storefronts are enabled. */
+  getStorefrontFlag: () => request('GET', '/admin/storefronts'),
+  /** Admin: enable/disable public storefronts. */
+  setStorefrontFlag: (enabled) => request('POST', '/admin/storefronts', { enabled }),
+  /** Public (no auth): a shop's read-only catalog. */
+  getPublicStorefront: (business) => request('GET', '/public/storefront?b=' + encodeURIComponent(business || '')),
   /** The network hold list. */
   getHolds: () => request('GET', '/holds'),
   /** Recent intake transactions for the caller's business. */

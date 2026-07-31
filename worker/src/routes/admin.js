@@ -15,6 +15,7 @@ import { systemStatus } from '../status.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex, analyzeItemImport } from '../item-index.js';
 import { writeHolds } from '../holds.js';
+import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 
 async function getSettings({ request, env }) {
   await requireAdmin(request, env);
@@ -164,6 +165,16 @@ async function analyzeItems({ request, env, body }) {
   await requireAdmin(request, env);
   return await analyzeItemImport(env, body.rows);
 }
+async function getStorefrontFlag({ request, env }) {
+  await requireAdmin(request, env);
+  return { enabled: await storefrontsEnabled(env) };
+}
+async function setStorefrontFlag({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const on = await setStorefrontsEnabled(env, !!body.enabled);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'storefronts.toggle', detail: on ? 'enabled' : 'disabled' });
+  return { enabled: on };
+}
 async function setHolds({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   const holds = await writeHolds(env, body.holds);
@@ -200,4 +211,6 @@ export const routes = [
   { method: 'POST', path: '/admin/items/import', handler: importMasterItems },
   { method: 'POST', path: '/admin/items/import/analyze', handler: analyzeItems },
   { method: 'POST', path: '/admin/holds', handler: setHolds },
+  { method: 'GET', path: '/admin/storefronts', handler: getStorefrontFlag },
+  { method: 'POST', path: '/admin/storefronts', handler: setStorefrontFlag },
 ];

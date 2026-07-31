@@ -24,7 +24,7 @@ export function renderAdminSettings(container) {
     save: async (updates) => (await api.saveSettings(updates)).settings,
   });
 
-  mount(holdsHost, holdsCard());
+  mount(holdsHost, holdsCard(), storefrontCard());
   mount(statusHost, statusCard());
   mount(backupHost, backupCard());
   mount(dangerHost, logsCard(), resetCard());
@@ -82,6 +82,31 @@ function holdsCard() {
     el('p', { class: 'note' }, 'The network’s hold names, one per line, in order. Used by every hold dropdown.'),
     box,
     save,
+    status,
+  ]);
+}
+
+/** Admin toggle for the public storefront feature (off by default). */
+function storefrontCard() {
+  const status = el('p', {});
+  const toggle = el('input', { type: 'checkbox' });
+  const save = el('button.primary', { onclick: doSave }, 'Save');
+  function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
+  api.getStorefrontFlag().then((r) => { toggle.checked = !!r.enabled; }).catch(() => {});
+  async function doSave() {
+    save.disabled = true; setStatus('Saving…', '');
+    try {
+      const r = await api.setStorefrontFlag(toggle.checked);
+      setStatus('Public storefronts ' + (r.enabled ? 'enabled' : 'disabled') + '.', 'ok');
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
+    finally { save.disabled = false; }
+  }
+  return el('div.card', {}, [
+    el('h3', {}, 'Public storefronts'),
+    el('p', { class: 'note' }, 'When on, every active shop gets a public, read-only catalog page (no sign-in) at ' +
+      'its share link — great for RP customers. Off by default.'),
+    el('label', { class: 'inline' }, [toggle, document.createTextNode(' Enable public storefronts')]),
+    el('div', { class: 'row-actions' }, [save]),
     status,
   ]);
 }

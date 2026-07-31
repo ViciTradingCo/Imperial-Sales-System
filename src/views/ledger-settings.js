@@ -18,6 +18,7 @@ export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
   mount(container,
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     companyCard(me, onBusinessRenamed),
+    storefrontLinkCard(me),
     cofferCard(),
     exportCard(),
     discountsCard(),
@@ -104,6 +105,26 @@ function cofferCard() {
     el('div', { class: 'row-actions' }, [amount, note, apply]),
     status,
     ledger,
+  ]);
+}
+
+/* ---- Public storefront share link ---- */
+function storefrontLinkCard(me) {
+  const url = location.origin + location.pathname + '#/shop?b=' + encodeURIComponent(me.business || '');
+  const box = el('input', { type: 'text', readonly: true, value: url });
+  const status = el('p', {});
+  const copy = el('button.secondary-btn', { onclick: async () => {
+    try { await navigator.clipboard.writeText(url); status.className = 'ok'; status.textContent = 'Copied ✓'; }
+    catch (e) { box.select(); status.className = ''; status.textContent = 'Press Ctrl/Cmd-C to copy.'; }
+  } }, 'Copy link');
+  const open = el('a', { class: 'secondary-btn', href: url, target: '_blank', rel: 'noopener' }, 'Preview');
+  return el('div.card', {}, [
+    el('h2', {}, 'Storefront'),
+    el('p', { class: 'note' }, 'A public, read-only page of your wares (no sign-in) that customers can browse. Share this ' +
+      'link. It only works while an admin has public storefronts enabled network-wide.'),
+    box,
+    el('div', { class: 'row-actions' }, [copy, open]),
+    status,
   ]);
 }
 

@@ -35,7 +35,10 @@ export function currentPath() {
 
 export function render() {
   if (beforeRender) beforeRender();
-  const path = currentPath();
+  const full = currentPath();
+  const qIdx = full.indexOf('?');
+  const path = qIdx === -1 ? full : full.slice(0, qIdx);
+  const query = qIdx === -1 ? '' : full.slice(qIdx + 1);
   const handler = routes.get(path) || notFound;
-  if (handler) handler(container, path);
+  if (handler) handler(container, path, query);
 }

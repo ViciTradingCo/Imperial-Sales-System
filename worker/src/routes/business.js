@@ -22,6 +22,7 @@ import { getShopStyle, setShopStyle } from '../shop-style.js';
 import { readMotd, readWarnDays, activeNoticesForBusiness } from '../motd.js';
 import { holdReport } from '../market.js';
 import { businessCsv } from '../export.js';
+import { publicStorefront } from '../storefront.js';
 
 /* ---- employees ---- */
 async function listEmployees({ request, env, url }) {
@@ -273,6 +274,11 @@ async function holdReportRoute({ request, env }) {
   return await holdReport(env, meta.hold);
 }
 
+/** Public (no auth): a shop's read-only catalog, if storefronts are enabled. */
+async function storefront({ env, url }) {
+  return await publicStorefront(env, url.searchParams.get('b'));
+}
+
 /* ---- MOTD banners ---- */
 function daysUntil(untilStr) {
   const d = new Date(untilStr);
@@ -375,4 +381,5 @@ export const routes = [
   { method: 'GET', path: '/holds', handler: getHolds },
   { method: 'GET', path: '/market/hold', handler: holdReportRoute },
   { method: 'GET', path: '/motd', handler: getMotd },
+  { method: 'GET', path: '/public/storefront', handler: storefront },
 ];

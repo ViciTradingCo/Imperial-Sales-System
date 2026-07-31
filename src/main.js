@@ -5,7 +5,7 @@
 import { loadConfig } from './lib/config.js';
 import { initAuth, renderSignInButton, onAuthChange, getProfile, signOut } from './lib/auth.js';
 import { configureApi, api } from './lib/api.js';
-import { initRouter, route, navigate, render, onBeforeRender } from './lib/router.js';
+import { initRouter, route, navigate, render, onBeforeRender, currentPath } from './lib/router.js';
 import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
@@ -15,6 +15,7 @@ import { initActions, clearActions } from './lib/actions.js';
 import { renderLanding } from './views/landing.js';
 import { renderHome } from './views/home.js';
 import { openLowStockModal } from './views/low-stock.js';
+import { renderStorefront } from './views/storefront.js';
 import { renderRegister } from './views/register.js';
 import { renderProfile } from './views/profile.js';
 import { renderEmployees } from './views/employees.js';
@@ -171,6 +172,12 @@ route('/register', (container) => {
   });
 });
 
+// Public storefront — no sign-in required. #/shop?b=<business>
+route('/shop', (container, path, query) => {
+  const b = new URLSearchParams(query || '').get('b');
+  renderStorefront(container, b);
+});
+
 route('/patch-notes', (container) => {
   const host = el('div', {});
   mount(container, el('div.card', {}, [
@@ -276,6 +283,8 @@ async function onSignedIn() {
     fatal(e);
     return;
   }
+  // A public deep-link (e.g. a shared storefront) stays put — don't redirect.
+  if (currentPath().split('?')[0] === '/shop') { render(); return; }
   renderBadge();
   showNav(!!(state.me && state.me.registered));
   refreshGlobalBanner();
@@ -298,12 +307,15 @@ async function main() {
   initRouter(appEl, showRoot);
   onBeforeRender(clearActions); // reset per-view action buttons before each render
 
-  renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
+  // Honor a public deep-link (shared storefront) on first load; else show landing.
+  const publicDeepLink = currentPath().split('?')[0] === '/shop';
+  if (publicDeepLink) render();
+  else renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
   onAuthChange(({ idToken }) => { if (idToken) onSignedIn(); });
   await initAuth(config.googleClientId);
   // GIS is ready now — re-render so the sign-in button paints (unless one-tap
   // already signed the user in).
-  if (!state.profile) renderSignedOutLanding(appEl);
+  if (!state.profile && !publicDeepLink) renderSignedOutLanding(appEl);
 }
 
 main();
