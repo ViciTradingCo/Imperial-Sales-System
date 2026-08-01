@@ -9,7 +9,7 @@
  * ADMIN_EMAILS worker var is treated as an admin, and auto-provisioned a row on
  * first sign-in. See docs/SETUP.md.
  */
-import { getDb } from './db.js';
+import { getDb, DEFAULT_REALM_ID } from './db.js';
 
 /** Emails granted admin by configuration (comma-separated ADMIN_EMAILS var). */
 function adminEmails(env) {
@@ -33,6 +33,9 @@ function rowToUser(r) {
     status: String(r.status || '').trim().toLowerCase() || 'active',
     character: String(r.char_name || '').trim(),
     notes: String(r.notes || '').trim(),
+    // Which realm this account belongs to. Every downstream query scopes to it,
+    // and it comes ONLY from this row — never from the request.
+    realmId: String(r.realm_id || DEFAULT_REALM_ID).trim() || DEFAULT_REALM_ID,
   };
 }
 
@@ -49,6 +52,10 @@ function genUid(prefix) {
  * here caused a stale-identity bug: after someone changed business (re-register,
  * admin edit, company archive), other isolates kept serving the OLD business
  * until the entry expired. D1 reads are cheap, so correctness wins.
+ *
+ * MULTI-REALM: an email belongs to ONE realm — sign-in carries no realm, so the
+ * account's own row decides which realm the session operates in. Everything
+ * downstream scopes to user.realmId.
  */
 export async function findUserByEmail(env, email) {
   const target = String(email || '').trim().toLowerCase();
@@ -75,43 +82,51 @@ export async function findUserByEmail(env, email) {
 /** No-op retained for call sites; identity is no longer cached (see findUserByEmail). */
 export function bustUserCache() { /* identity reads are live now */ }
 
-/** Locate any user by uid (admin cross-business operations). */
-export async function findUserByUid(env, uid) {
+/**
+ * Locate a user by uid WITHIN a realm (admin cross-business operations). The
+ * realm filter is the isolation boundary: a realm admin holding a uid from
+ * another realm simply gets null.
+ */
+export async function findUserByUid(env, uid, realmId) {
   const target = String(uid || '').trim();
   if (!target) return null;
   const db = await getDb(env);
-  return rowToUser(await db.prepare('SELECT * FROM users WHERE uid = ?').bind(target).first());
+  return rowToUser(await db.prepare('SELECT * FROM users WHERE uid = ? AND realm_id = ?')
+    .bind(target, String(realmId || DEFAULT_REALM_ID)).first());
 }
 
 /** Every user in the system (admin member list). */
-export async function listAllUsers(env) {
+export async function listAllUsers(env, realmId) {
   const db = await getDb(env);
-  const { results } = await db.prepare('SELECT * FROM users ORDER BY business, char_name').all();
+  const { results } = await db.prepare('SELECT * FROM users WHERE realm_id = ? ORDER BY business, char_name')
+    .bind(String(realmId || DEFAULT_REALM_ID)).all();
   return (results || []).map((r) => {
     const u = rowToUser(r);
-    return { uid: u.uid, email: u.email, character: u.character, business: u.business, role: u.role, isOwner: u.isOwner, status: u.status };
+    return { uid: u.uid, email: u.email, character: u.character, business: u.business, role: u.role, isOwner: u.isOwner, status: u.status, realmId: u.realmId };
   });
 }
 
 /** Every user belonging to a business (case-insensitive match on the name). */
-export async function listUsersByBusiness(env, business) {
+export async function listUsersByBusiness(env, business, realmId) {
   const target = String(business || '').trim().toLowerCase();
   if (!target) return [];
   const db = await getDb(env);
-  const { results } = await db.prepare('SELECT * FROM users WHERE lower(business) = ?').bind(target).all();
+  const { results } = await db.prepare('SELECT * FROM users WHERE lower(business) = ? AND realm_id = ?')
+    .bind(target, String(realmId || DEFAULT_REALM_ID)).all();
   return (results || []).map(rowToUser);
 }
 
 /** Inserts a new user row. Returns the written record. */
-export async function appendUser(env, { uid, email, business, role, isOwner, status, character }) {
+export async function appendUser(env, { uid, email, business, role, isOwner, status, character, realmId }) {
   const now = new Date().toISOString();
+  const realm = String(realmId || DEFAULT_REALM_ID).trim() || DEFAULT_REALM_ID;
   const db = await getDb(env);
   await db.prepare(
-    'INSERT INTO users (uid, email, business, role, is_owner, status, char_name, notes, created, last_seen) ' +
-    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(uid, email, business || '', role, isOwner ? 1 : 0, status, character || '', '', now, now).run();
+    'INSERT INTO users (uid, email, business, role, is_owner, status, char_name, notes, created, last_seen, realm_id) ' +
+    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(uid, email, business || '', role, isOwner ? 1 : 0, status, character || '', '', now, now, realm).run();
   bustUserCache();
-  return { uid, email, business: business || '', role, isOwner: !!isOwner, status, character: character || '' };
+  return { uid, email, business: business || '', role, isOwner: !!isOwner, status, character: character || '', realmId: realm };
 }
 
 /** Sets a user's Status by uid. */
@@ -136,27 +151,29 @@ export async function setUserNote(env, uid, note) {
 }
 
 /** Admin edit of a member (by UID): character, company, and role. */
-export async function updateMember(env, { uid, character, business, role }) {
+export async function updateMember(env, { uid, character, business, role }, realmId) {
   const target = String(uid || '').trim();
   if (!target) throw new Error('Missing member uid.');
   const r = String(role || '').trim().toLowerCase();
   if (!['admin', 'owner', 'employee'].includes(r)) throw new Error('Role must be admin, owner, or employee.');
+  const realm = String(realmId || DEFAULT_REALM_ID);
   const db = await getDb(env);
-  const existing = await db.prepare('SELECT uid FROM users WHERE uid = ?').bind(target).first();
+  const existing = await db.prepare('SELECT uid FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).first();
   if (!existing) throw new Error('Member not found.');
-  await db.prepare('UPDATE users SET business = ?, role = ?, is_owner = ?, char_name = ? WHERE uid = ?')
-    .bind(String(business || '').trim(), r, r === 'owner' ? 1 : 0, String(character || '').trim(), target).run();
+  await db.prepare('UPDATE users SET business = ?, role = ?, is_owner = ?, char_name = ? WHERE uid = ? AND realm_id = ?')
+    .bind(String(business || '').trim(), r, r === 'owner' ? 1 : 0, String(character || '').trim(), target, realm).run();
   bustUserCache();
 }
 
 /** Admin delete of a member (by UID). The member disappears and can register again fresh. */
-export async function deleteMember(env, uid) {
+export async function deleteMember(env, uid, realmId) {
   const target = String(uid || '').trim();
   if (!target) throw new Error('Missing member uid.');
+  const realm = String(realmId || DEFAULT_REALM_ID);
   const db = await getDb(env);
-  const existing = await db.prepare('SELECT uid FROM users WHERE uid = ?').bind(target).first();
+  const existing = await db.prepare('SELECT uid FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).first();
   if (!existing) throw new Error('Member not found.');
-  await db.prepare('DELETE FROM users WHERE uid = ?').bind(target).run();
+  await db.prepare('DELETE FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).run();
   bustUserCache();
 }
 

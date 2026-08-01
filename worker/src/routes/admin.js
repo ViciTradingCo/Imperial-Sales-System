@@ -3,7 +3,7 @@
  * item + hold indexes, MOTD, market analytics, data backup/restore, log
  * maintenance, and the system-status snapshot.
  */
-import { requireAdmin, actorName } from '../guards.js';
+import { requireAdmin, requireSuperAdmin, actorName, realmIdOf } from '../guards.js';
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember } from '../users.js';
@@ -18,6 +18,7 @@ import { writeHolds } from '../holds.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, writeBranding } from '../branding.js';
 import { getFlag, setFlag } from '../db.js';
+import { listRealms, createRealm, renameRealm, deleteRealm, realmStats } from '../realm.js';
 
 async function getSettings({ request, env }) {
   await requireAdmin(request, env);
@@ -29,35 +30,35 @@ async function saveSettings({ request, env, body }) {
 }
 
 async function listMembers({ request, env }) {
-  await requireAdmin(request, env);
-  return { members: await listAllUsers(env) };
+  const caller = await requireAdmin(request, env);
+  return { members: await listAllUsers(env, realmIdOf(caller)) };
 }
 async function updateMemberRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  await updateMember(env, body);
+  await updateMember(env, body, realmIdOf(caller));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.update', detail: 'uid ' + body.uid + ' → ' + body.role + ', ' + (body.business || '') });
-  return { members: await listAllUsers(env) };
+  return { members: await listAllUsers(env, realmIdOf(caller)) };
 }
 async function deleteMemberRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  await deleteMember(env, body.uid);
+  await deleteMember(env, body.uid, realmIdOf(caller));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.delete', detail: 'uid ' + body.uid });
-  return { members: await listAllUsers(env) };
+  return { members: await listAllUsers(env, realmIdOf(caller)) };
 }
 
 async function listCompaniesRoute({ request, env }) {
-  await requireAdmin(request, env);
-  return { companies: await listCompanies(env) };
+  const caller = await requireAdmin(request, env);
+  return { companies: await listCompanies(env, realmIdOf(caller)) };
 }
 async function updateCompanyRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const companies = await updateCompany(env, body);
+  const companies = await updateCompany(env, body, realmIdOf(caller));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.update', detail: (body.name || '') + (body.court ? ' [Court]' : '') });
   return { companies };
 }
 async function deleteCompanyRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const companies = await archiveCompany(env, body.id);
+  const companies = await archiveCompany(env, body.id, realmIdOf(caller));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.archive', detail: 'id ' + body.id });
   return { companies };
 }
@@ -259,6 +260,11 @@ export const routes = [
   { method: 'POST', path: '/admin/items/import', handler: importMasterItems },
   { method: 'POST', path: '/admin/items/import/analyze', handler: analyzeItems },
   { method: 'POST', path: '/admin/holds', handler: setHolds },
+  { method: 'GET', path: '/admin/realms', handler: realmsList },
+  { method: 'POST', path: '/admin/realms/create', handler: realmCreate },
+  { method: 'POST', path: '/admin/realms/rename', handler: realmRename },
+  { method: 'POST', path: '/admin/realms/delete', handler: realmDelete },
+  { method: 'GET', path: '/admin/realms/stats', handler: realmStatsRoute },
   { method: 'GET', path: '/admin/branding', handler: getBranding },
   { method: 'POST', path: '/admin/branding', handler: saveBranding },
   { method: 'GET', path: '/admin/tiles', handler: getTileImages },

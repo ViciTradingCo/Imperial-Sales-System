@@ -4,7 +4,7 @@
  * discounts / style), per-shop settings, the item + hold lookups, certification,
  * MOTD banners, the Court hold report, and the owner CSV export.
  */
-import { requireUser, requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta } from '../guards.js';
+import { requireUser, requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
 import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid } from '../users.js';
 import { renameBusiness, listBusinessNames } from '../registry.js';
 import { getFlag } from '../db.js';
@@ -36,7 +36,7 @@ async function listEmployees({ request, env, url }) {
   }
   const business = caller.role === 'admin' && url.searchParams.get('business')
     ? url.searchParams.get('business') : caller.business;
-  const users = await listUsersByBusiness(env, business);
+  const users = await listUsersByBusiness(env, business, realmIdOf(caller));
   return {
     business,
     employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status, notes: u.notes || '' })),
@@ -50,13 +50,13 @@ async function activateEmployee({ request, env, body }) {
   }
   const targetUid = String(body.uid || '').trim();
   if (!targetUid) throw new Error('Which employee? A uid is required.');
-  const roster = await listUsersByBusiness(env, caller.business);
+  const roster = await listUsersByBusiness(env, caller.business, realmIdOf(caller));
   const target = roster.find((u) => u.uid === targetUid);
   if (!target && caller.role !== 'admin') {
     const e = new Error('That employee is not part of your business.');
     e.forbidden = true; throw e;
   }
-  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid) : null);
+  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid, realmIdOf(caller)) : null);
   if (!found) throw new Error('No such employee.');
   await setUserStatus(env, found.uid, 'active');
   return { ok: true, uid: targetUid, status: 'active' };
@@ -69,9 +69,9 @@ async function employeeNote({ request, env, body }) {
   }
   const targetUid = String(body.uid || '').trim();
   if (!targetUid) throw new Error('Which employee? A uid is required.');
-  const roster = await listUsersByBusiness(env, caller.business);
+  const roster = await listUsersByBusiness(env, caller.business, realmIdOf(caller));
   const target = roster.find((u) => u.uid === targetUid);
-  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid) : null);
+  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid, realmIdOf(caller)) : null);
   if (!found) {
     const e = new Error('That employee is not part of your business.');
     e.forbidden = true; throw e;
@@ -129,7 +129,7 @@ async function renameBusinessRoute({ request, env, body }) {
   }
   const newName = String(body.name || '').trim();
   if (!newName) throw new Error('Enter a company name.');
-  await renameBusiness(env, caller.business, newName);
+  await renameBusiness(env, caller.business, newName, realmIdOf(caller));
   caller.business = newName;
   return publicUser(caller);
 }
@@ -274,8 +274,8 @@ async function ownerExport({ request, env, url, cors }) {
 
 /* ---- lookups shared across the app ---- */
 async function listBusinesses({ request, env }) {
-  await requireRegistered(request, env);
-  return { businesses: await listBusinessNames(env) };
+  const caller = await requireRegistered(request, env);
+  return { businesses: await listBusinessNames(env, realmIdOf(caller)) };
 }
 async function getItems({ request, env }) {
   await requireRegistered(request, env);
@@ -295,7 +295,7 @@ async function getHolds({ request, env }) {
 }
 async function holdReportRoute({ request, env }) {
   const caller = await requireRegistered(request, env);
-  const meta = await findBusinessMeta(env, caller.business);
+  const meta = await findBusinessMeta(env, caller.business, realmIdOf(caller));
   if (!meta.court) {
     const e = new Error('This report is available to Court businesses only.');
     e.forbidden = true; throw e;

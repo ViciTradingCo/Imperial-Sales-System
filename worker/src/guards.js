@@ -4,9 +4,10 @@
  * Google ID token and map it to a registry identity + role.
  */
 import { verifyIdToken } from './verify.js';
-import { findUserByEmail } from './users.js';
+import { findUserByEmail, isConfiguredAdmin } from './users.js';
 import { markPriority } from './ratelimit.js';
 import { findBusinessMeta } from './registry.js';
+import { DEFAULT_REALM_ID } from './db.js';
 
 /** Verifies the Bearer ID token on a request; returns the decoded payload or throws. */
 export async function requireUser(request, env) {
@@ -34,7 +35,7 @@ export async function requireRegistered(request, env) {
   return user;
 }
 
-/** Requires the caller to be a registered admin. */
+/** Requires the caller to be a registered admin (of their own realm). */
 export async function requireAdmin(request, env) {
   const caller = await requireRegistered(request, env);
   if (caller.role !== 'admin') {
@@ -43,6 +44,31 @@ export async function requireAdmin(request, env) {
     throw e;
   }
   return caller;
+}
+
+/**
+ * A SUPER admin — an email in ADMIN_EMAILS. Only they may manage realms
+ * themselves (create/rename/delete) or act across realm boundaries; a realm's
+ * own admin is confined to that realm.
+ */
+export async function requireSuperAdmin(request, env) {
+  const caller = await requireAdmin(request, env);
+  if (!isConfiguredAdmin(env, caller.email)) {
+    const e = new Error('Only a system administrator can manage realms.');
+    e.forbidden = true;
+    throw e;
+  }
+  return caller;
+}
+
+/** True when this caller is configured as a system (super) admin. */
+export function isSuperAdmin(env, caller) {
+  return !!caller && caller.role === 'admin' && isConfiguredAdmin(env, caller.email);
+}
+
+/** The realm a caller operates in — always from their own record. */
+export function realmIdOf(caller) {
+  return (caller && caller.realmId) || DEFAULT_REALM_ID;
 }
 
 /** Requires the caller to be an owner or admin; returns the caller record. */

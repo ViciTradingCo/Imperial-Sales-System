@@ -92,7 +92,23 @@ const SCHEMA = [
   // the SQLite keyword `end`.
   `CREATE TABLE IF NOT EXISTS motd_list (
      id TEXT PRIMARY KEY, business TEXT, message TEXT, start_at TEXT, end_at TEXT)`,
+  // ---- Realms (multi-tenancy) ----
+  // One deployment can host several independent RP servers. Every data table
+  // carries a realm_id and queries filter on it, so nothing is ever shared or
+  // cross-referenced between realms. See realm.js.
+  `CREATE TABLE IF NOT EXISTS realms (
+     id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT, created TEXT)`,
 ];
+
+/** Every table that holds realm-owned data (all get a realm_id column). */
+export const REALM_TABLES = [
+  'inventory', 'sales', 'intake', 'transfers', 'coffer_entries', 'discounts',
+  'shop_style', 'audit', 'master_item', 'hold_index', 'users', 'companies',
+  'master_settings', 'business_settings', 'motd_list',
+];
+
+/** The realm existing (pre-multi-realm) data belongs to. */
+export const DEFAULT_REALM_ID = 'default';
 
 // Additive migrations for databases created before a column existed. Each runs
 // best-effort and IN ORDER; "duplicate column" on an already-migrated DB is
@@ -104,6 +120,19 @@ const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS idx_intake_idem ON intake (business, idem)',
   'ALTER TABLE transfers ADD COLUMN idem TEXT',
   'CREATE INDEX IF NOT EXISTS idx_transfers_idem ON transfers (from_business, idem)',
+  // Multi-realm: every data table gains realm_id. The DEFAULT means existing
+  // rows land in the 'default' realm automatically — no backfill needed.
+  ...REALM_TABLES.map((t) => `ALTER TABLE ${t} ADD COLUMN realm_id TEXT NOT NULL DEFAULT '${DEFAULT_REALM_ID}'`),
+  ...REALM_TABLES.map((t) => `CREATE INDEX IF NOT EXISTS idx_${t}_realm ON ${t} (realm_id)`),
+  // Per-realm uniqueness. The old global PRIMARY KEYs on master_item.name and
+  // the composite keys elsewhere would stop two realms using the same item or
+  // business name, so uniqueness is re-declared as (realm_id, key).
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_master_item_realm_name ON master_item (realm_id, name)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_realm_business ON companies (realm_id, business)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_realm_email ON users (realm_id, email)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_realm_item ON inventory (realm_id, business, item)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_master_settings_realm_label ON master_settings (realm_id, label)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_business_settings_realm ON business_settings (realm_id, business, label)',
 ];
 
 let schemaReady = false;
@@ -200,23 +229,31 @@ export async function resetAllData(env) {
   return { reset: true, tablesCleared: CLEARED.length, adminsKept: admins, itemsKept: items, holdsKept: holds };
 }
 
-/** Renames a business across the D1 tables (part of a full company rename). */
-export async function renameBusinessData(env, oldName, newName) {
+/**
+ * Renames a business across the D1 tables (part of a full company rename).
+ * Scoped to one realm — two realms may hold the same business name, and a
+ * rename in one must never touch the other.
+ */
+export async function renameBusinessData(env, oldName, newName, realmId) {
   if (!env.DB) return;
   await ensureSchema(env);
   const db = env.DB;
+  const realm = String(realmId || DEFAULT_REALM_ID);
+  const rename = (table, col) => db
+    .prepare(`UPDATE ${table} SET ${col} = ? WHERE ${col} = ? AND realm_id = ?`)
+    .bind(newName, oldName, realm);
   await db.batch([
-    db.prepare('UPDATE inventory SET business = ? WHERE business = ?').bind(newName, oldName),
-    db.prepare('UPDATE sales SET business = ? WHERE business = ?').bind(newName, oldName),
-    db.prepare('UPDATE intake SET business = ? WHERE business = ?').bind(newName, oldName),
-    db.prepare('UPDATE transfers SET from_business = ? WHERE from_business = ?').bind(newName, oldName),
-    db.prepare('UPDATE transfers SET to_business = ? WHERE to_business = ?').bind(newName, oldName),
-    db.prepare('UPDATE coffer_entries SET business = ? WHERE business = ?').bind(newName, oldName),
-    db.prepare('UPDATE discounts SET business = ? WHERE business = ?').bind(newName, oldName),
-    db.prepare('UPDATE shop_style SET business = ? WHERE business = ?').bind(newName, oldName),
+    rename('inventory', 'business'),
+    rename('sales', 'business'),
+    rename('intake', 'business'),
+    rename('transfers', 'from_business'),
+    rename('transfers', 'to_business'),
+    rename('coffer_entries', 'business'),
+    rename('discounts', 'business'),
+    rename('shop_style', 'business'),
     // Registry tables (now D1): the company row, its members, and its settings.
-    db.prepare('UPDATE companies SET business = ? WHERE business = ?').bind(newName, oldName),
-    db.prepare('UPDATE users SET business = ? WHERE business = ?').bind(newName, oldName),
-    db.prepare('UPDATE business_settings SET business = ? WHERE business = ?').bind(newName, oldName),
+    rename('companies', 'business'),
+    rename('users', 'business'),
+    rename('business_settings', 'business'),
   ]);
 }
