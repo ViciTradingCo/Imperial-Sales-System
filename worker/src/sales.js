@@ -56,17 +56,18 @@ function mapSale(r) {
  * Rings up a multi-item sale. cart = [{item, qty, price}] where price is the
  * actual sold-for amount per unit. Attributed to the caller's character.
  */
-export async function checkout(env, business, caller, { cart, customer, hold, discountName, discountPercent, idempotencyKey }) {
+export async function checkout(env, business, caller, { cart, customer, hold, discountName, discountPercent, idempotencyKey }, realmId) {
   const db = await getDb(env);
   // Idempotency: a retried submit with the same key returns the original sale
   // instead of ringing it up twice.
   const idem = String(idempotencyKey || '').trim();
   if (idem) {
-    const prior = await db.prepare('SELECT order_no, total FROM sales WHERE business = ? AND idem = ? LIMIT 1').bind(business, idem).first();
+    const prior = await db.prepare('SELECT order_no, total FROM sales WHERE realm_id = ? AND business = ? AND idem = ? LIMIT 1')
+      .bind(realmId, business, idem).first();
     if (prior) return { ok: true, orderNo: prior.order_no, total: prior.total, duplicate: true };
   }
 
-  const cert = await checkCertification(env, business);
+  const cert = await checkCertification(env, business, realmId);
   if (cert.status === 'EXPIRED') {
     throw new Error("This shop's Vici Trading Co. certification has EXPIRED — an admin must renew it before you can sell.");
   }
@@ -74,8 +75,9 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   const holdName = String(hold || '').trim();
   if (!holdName) throw new Error('Pick the hold this sale happened in.');
 
-  const master = await listItemIndex(env);
-  const { results } = await db.prepare('SELECT item, price, stock FROM inventory WHERE business = ?').bind(business).all();
+  const master = await listItemIndex(env, realmId);
+  const { results } = await db.prepare('SELECT item, price, stock FROM inventory WHERE realm_id = ? AND business = ?')
+    .bind(realmId, business).all();
   const inv = {};
   (results || []).forEach((r) => { inv[r.item.toLowerCase()] = { item: r.item, price: r.price, stock: r.stock }; });
 
@@ -134,16 +136,16 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
 
   const stmts = [];
   for (const item in need) {
-    stmts.push(db.prepare('UPDATE inventory SET stock = stock - ? WHERE business = ? AND item = ?').bind(need[item], business, item));
+    stmts.push(db.prepare('UPDATE inventory SET stock = stock - ? WHERE realm_id = ? AND business = ? AND item = ?').bind(need[item], realmId, business, item));
   }
   stmts.push(db.prepare(
-    `INSERT INTO sales (business, ts, order_no, customer, hold, items, qty_total, total, employee, discount, status, idem)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`
-  ).bind(business, ts, orderNo, String(customer || '').trim() || 'Walk-in', holdName, itemSummary, qtyTotal, finalTotal, employee, discountLabel, idem || null));
+    `INSERT INTO sales (realm_id, business, ts, order_no, customer, hold, items, qty_total, total, employee, discount, status, idem)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`
+  ).bind(realmId, business, ts, orderNo, String(customer || '').trim() || 'Walk-in', holdName, itemSummary, qtyTotal, finalTotal, employee, discountLabel, idem || null));
   // Credit the shop's coffers with the sale proceeds.
   stmts.push(db.prepare(
-    `INSERT INTO coffer_entries (business, ts, kind, amount, note) VALUES (?, ?, 'sale', ?, ?)`
-  ).bind(business, ts, finalTotal, orderNo));
+    `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'sale', ?, ?)`
+  ).bind(realmId, business, ts, finalTotal, orderNo));
   await db.batch(stmts);
 
   // Flag off-inventory / non-master (new) items in the audit log — the sale
@@ -151,67 +153,67 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   const actor = caller.character || caller.email;
   const offList = [...new Set(offInventory)];
   const newList = [...new Set(newItems)];
-  if (offList.length) await logAudit(env, { actor, business, action: 'sale.off_inventory', detail: orderNo + ': ' + offList.join(', ') });
-  if (newList.length) await logAudit(env, { actor, business, action: 'sale.new_item', detail: orderNo + ': ' + newList.join(', ') });
+  if (offList.length) await logAudit(env, { actor, business, action: 'sale.off_inventory', detail: orderNo + ': ' + offList.join(', '), realmId });
+  if (newList.length) await logAudit(env, { actor, business, action: 'sale.new_item', detail: orderNo + ': ' + newList.join(', '), realmId });
 
   return { ok: true, orderNo, total: finalTotal, hold: holdName, discount: discountLabel, offInventory: offList, newItems: newList };
 }
 
 /** Recent sales, optionally filtered by order #, customer, or employee. */
-export async function listSales(env, business, query, limit = 25) {
+export async function listSales(env, business, query, realmId, limit = 25) {
   const db = await getDb(env);
   const q = String(query || '').trim().toLowerCase();
   let rows;
   if (q) {
     const like = '%' + q + '%';
     ({ results: rows } = await db.prepare(
-      `SELECT * FROM sales WHERE business = ?
+      `SELECT * FROM sales WHERE realm_id = ? AND business = ?
        AND (lower(order_no) LIKE ? OR lower(customer) LIKE ? OR lower(employee) LIKE ?)
        ORDER BY id DESC LIMIT ?`
-    ).bind(business, like, like, like, limit).all());
+    ).bind(realmId, business, like, like, like, limit).all());
   } else {
-    ({ results: rows } = await db.prepare('SELECT * FROM sales WHERE business = ? ORDER BY id DESC LIMIT ?').bind(business, limit).all());
+    ({ results: rows } = await db.prepare('SELECT * FROM sales WHERE realm_id = ? AND business = ? ORDER BY id DESC LIMIT ?').bind(realmId, business, limit).all());
   }
   return (rows || []).map(mapSale);
 }
 
 /** Per-employee sales performance for a business (voided sales excluded). */
-export async function employeePerformance(env, business) {
+export async function employeePerformance(env, business, realmId) {
   const db = await getDb(env);
   const { results } = await db.prepare(
     `SELECT employee, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
-       FROM sales WHERE business = ? AND status != 'VOIDED'
-      GROUP BY employee ORDER BY revenue DESC`).bind(business).all();
+       FROM sales WHERE realm_id = ? AND business = ? AND status != 'VOIDED'
+      GROUP BY employee ORDER BY revenue DESC`).bind(realmId, business).all();
   return (results || []).map((r) => ({
     employee: r.employee || '(unknown)', orders: r.orders, items: r.items, revenue: r.revenue,
   }));
 }
 
 /** Voids a sale: restores stock and marks it VOIDED (atomic). */
-export async function voidSale(env, business, orderNo) {
+export async function voidSale(env, business, orderNo, realmId) {
   const db = await getDb(env);
   const order = String(orderNo || '').trim();
   // Target the OLDEST un-voided row for this order number and act on its id, so
   // a legacy duplicate order number can't void (and under-refund) two sales.
   const sale = await db.prepare(
-    "SELECT * FROM sales WHERE business = ? AND order_no = ? AND upper(COALESCE(status, '')) != 'VOIDED' ORDER BY id LIMIT 1"
-  ).bind(business, order).first();
+    "SELECT * FROM sales WHERE realm_id = ? AND business = ? AND order_no = ? AND upper(COALESCE(status, '')) != 'VOIDED' ORDER BY id LIMIT 1"
+  ).bind(realmId, business, order).first();
   if (!sale) {
-    const any = await db.prepare('SELECT id FROM sales WHERE business = ? AND order_no = ? LIMIT 1').bind(business, order).first();
+    const any = await db.prepare('SELECT id FROM sales WHERE realm_id = ? AND business = ? AND order_no = ? LIMIT 1').bind(realmId, business, order).first();
     if (any) throw new Error('That order is already voided.');
     throw new Error('Order not found: ' + order);
   }
 
   const parsed = parseSaleItems(sale.items);
   const stmts = parsed.lines.map((l) =>
-    db.prepare('UPDATE inventory SET stock = stock + ? WHERE business = ? AND item = ?').bind(l.qty, business, l.name)
+    db.prepare('UPDATE inventory SET stock = stock + ? WHERE realm_id = ? AND business = ? AND item = ?').bind(l.qty, realmId, business, l.name)
   );
   stmts.push(db.prepare("UPDATE sales SET status = 'VOIDED' WHERE id = ?").bind(sale.id));
   // Reverse the coffer credit from the original sale.
   stmts.push(db.prepare(
-    `INSERT INTO coffer_entries (business, ts, kind, amount, note) VALUES (?, ?, 'void', ?, ?)`
-  ).bind(business, new Date().toISOString(), -Number(sale.total || 0), 'Void ' + order));
+    `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'void', ?, ?)`
+  ).bind(realmId, business, new Date().toISOString(), -Number(sale.total || 0), 'Void ' + order));
   await db.batch(stmts);
   return { ok: true, orderNo: order };
 }

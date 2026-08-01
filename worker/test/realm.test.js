@@ -10,6 +10,19 @@ import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
 import { createRealm, listRealms, deleteRealm, realmStats, ensureDefaultRealm } from '../src/realm.js';
 import { findUserByEmail, listAllUsers, listUsersByBusiness, appendUser, findUserByUid, updateMember, deleteMember } from '../src/users.js';
 import { registerUser, listCompanies, findBusinessByName, listBusinessNames, findBusinessMeta, updateCompany } from '../src/registry.js';
+import { transferMember } from '../src/users.js';
+import { transferCompany } from '../src/registry.js';
+import { listInventory, upsertItem as upsertInvItem } from '../src/inventory.js';
+import { recordIntake } from '../src/intake.js';
+import { checkout, listSales } from '../src/sales.js';
+import { cofferBalance } from '../src/coffers.js';
+import { createTransfer, listTransfers, acceptTransfer } from '../src/transfers.js';
+import { listItemIndex, upsertItem as upsertMasterItem } from '../src/item-index.js';
+import { readHolds, writeHolds } from '../src/holds.js';
+import { readSettings, writeSettings } from '../src/settings.js';
+import { readMotd, writeMotd } from '../src/motd.js';
+import { logAudit, listAudit } from '../src/audit.js';
+import { marketAnalysis } from '../src/market.js';
 import { cacheBust } from '../src/cache.js';
 
 let env;
@@ -27,6 +40,8 @@ beforeEach(async () => {
   // Same names in both realms — if scoping is wrong, these collide.
   await registerUser(env, { email: 'a@x.test', character: 'Ann', businessName: 'Iron Hearth', asOwner: true, hold: 'Whiterun', realmId: DEFAULT_REALM_ID });
   await registerUser(env, { email: 'b@x.test', character: 'Bex', businessName: 'Iron Hearth', asOwner: true, hold: 'Falkreath', realmId: REALM_B });
+  // Certify both so the register isn't blocked; certification isn't what's under test here.
+  await env.DB.prepare('UPDATE companies SET perpetual = 1').run();
 });
 
 describe('realm isolation', () => {
@@ -105,5 +120,120 @@ describe('realm management', () => {
 
   it('protects the default realm from deletion', async () => {
     await expect(deleteRealm(env, DEFAULT_REALM_ID)).rejects.toThrow(/cannot be deleted/i);
+  });
+});
+
+/**
+ * The operational data. Every module below was scoped in the same pass, so each
+ * gets the same test: do the identical thing in two realms, then assert neither
+ * can see the other. Same shop name in both is the worst case and the point.
+ */
+describe('operational data is realm-scoped', () => {
+  const A = DEFAULT_REALM_ID;
+  const SHOP = 'Iron Hearth';
+
+  it('keeps inventory separate for same-named shops', async () => {
+    await upsertInvItem(env, SHOP, { item: 'Iron Sword', price: 30, lowStock: 1 }, A);
+    await upsertInvItem(env, SHOP, { item: 'Iron Sword', price: 999, lowStock: 1 }, REALM_B);
+    const a = await listInventory(env, SHOP, A);
+    const b = await listInventory(env, SHOP, REALM_B);
+    expect(a).toHaveLength(1);
+    expect(b).toHaveLength(1);
+    expect(a[0].price).toBe(30);
+    expect(b[0].price).toBe(999); // the same name, a different item row
+  });
+
+  it('keeps sales, coffers, and reports separate', async () => {
+    const caller = { character: 'Ann', email: 'a@x.test' };
+    await upsertInvItem(env, SHOP, { item: 'Iron Sword', price: 10, lowStock: 0 }, A);
+    await upsertInvItem(env, SHOP, { item: 'Iron Sword', price: 10, lowStock: 0 }, REALM_B);
+    await recordIntake(env, SHOP, { item: 'Iron Sword', numItems: 10, pricePer: 1, hold: 'Whiterun' }, A);
+    await recordIntake(env, SHOP, { item: 'Iron Sword', numItems: 10, pricePer: 1, hold: 'Falkreath' }, REALM_B);
+
+    await checkout(env, SHOP, caller, { cart: [{ item: 'Iron Sword', qty: 2, price: 10 }], hold: 'Whiterun' }, A);
+
+    expect(await listSales(env, SHOP, '', A)).toHaveLength(1);
+    expect(await listSales(env, SHOP, '', REALM_B)).toHaveLength(0); // realm B sold nothing
+    // Coffers: A took 20 in and paid 10 for stock; B only paid 10 for stock.
+    expect(await cofferBalance(env, SHOP, A)).toBe(10);
+    expect(await cofferBalance(env, SHOP, REALM_B)).toBe(-10);
+    // Stock moved only in A.
+    expect((await listInventory(env, SHOP, A))[0].stock).toBe(8);
+    expect((await listInventory(env, SHOP, REALM_B))[0].stock).toBe(10);
+
+    const market = await marketAnalysis(env, REALM_B);
+    expect(market.overview.orders).toBe(0); // A's sale must not appear here
+  });
+
+  it('keeps the item index, holds, and network settings separate', async () => {
+    await upsertMasterItem(env, { name: 'Dwarven Bow', baseValue: 100 }, A);
+    expect(await listItemIndex(env, A)).toHaveLength(1);
+    expect(await listItemIndex(env, REALM_B)).toHaveLength(0);
+
+    await writeHolds(env, ['Whiterun', 'Riften'], A);
+    await writeHolds(env, ['Elsweyr'], REALM_B);
+    expect(await readHolds(env, A)).toEqual(['Whiterun', 'Riften']);
+    expect(await readHolds(env, REALM_B)).toEqual(['Elsweyr']);
+
+    const label = 'Overpricing threshold (x item average)';
+    await writeSettings(env, [{ label, value: 3 }], A);
+    expect((await readSettings(env, A)).find((s) => s.label === label).value).toBe(3);
+    expect((await readSettings(env, REALM_B)).find((s) => s.label === label).value).toBe(1.5); // untouched default
+  });
+
+  it('keeps the MOTD separate and refuses cross-realm audit reads', async () => {
+    await writeMotd(env, 'Realm A news', A);
+    await writeMotd(env, 'Realm B news', REALM_B);
+    expect(await readMotd(env, A)).toBe('Realm A news');
+    expect(await readMotd(env, REALM_B)).toBe('Realm B news');
+
+    await logAudit(env, { actor: 'Ann', business: SHOP, action: 'test.a', detail: 'x', realmId: A });
+    await logAudit(env, { actor: 'Bex', business: SHOP, action: 'test.b', detail: 'y', realmId: REALM_B });
+    expect((await listAudit(env, { realmId: A })).map((r) => r.action)).toEqual(['test.a']);
+    expect((await listAudit(env, { realmId: REALM_B })).map((r) => r.action)).toEqual(['test.b']);
+  });
+
+  it('refuses to accept a transfer belonging to another realm', async () => {
+    await registerUser(env, { email: 'c@x.test', character: 'Cyn', businessName: 'Second Shop', asOwner: true, hold: 'Riften', realmId: A });
+    await upsertInvItem(env, SHOP, { item: 'Iron Sword', price: 10, lowStock: 0 }, A);
+    await recordIntake(env, SHOP, { item: 'Iron Sword', numItems: 5, pricePer: 1, hold: 'Whiterun' }, A);
+    await createTransfer(env, SHOP, { toBusiness: 'Second Shop', item: 'Iron Sword', qty: 2 }, A);
+
+    const { incoming } = await listTransfers(env, 'Second Shop', A);
+    expect(incoming).toHaveLength(1);
+    // Realm B sees nothing, and cannot act on realm A's transfer id.
+    expect((await listTransfers(env, 'Second Shop', REALM_B)).incoming).toHaveLength(0);
+    await expect(acceptTransfer(env, 'Second Shop', incoming[0].id, REALM_B))
+      .rejects.toThrow(/not found/i);
+  });
+});
+
+describe('moving between realms', () => {
+  it('moves a member and clears a business that does not exist there', async () => {
+    const bex = (await listAllUsers(env, REALM_B))[0];
+    const res = await transferMember(env, bex.uid, DEFAULT_REALM_ID, REALM_B);
+    expect(res.realmId).toBe(DEFAULT_REALM_ID);
+    // "Iron Hearth" exists in the destination too, so the business is KEPT.
+    expect(res.business).toBe('Iron Hearth');
+    expect(await listAllUsers(env, REALM_B)).toHaveLength(0);
+    expect((await listAllUsers(env, DEFAULT_REALM_ID)).map((u) => u.email).sort())
+      .toEqual(['a@x.test', 'b@x.test']);
+  });
+
+  it('refuses a company move when the name is taken in the destination', async () => {
+    const co = (await listCompanies(env, REALM_B))[0];
+    await expect(transferCompany(env, co.id, DEFAULT_REALM_ID, REALM_B))
+      .rejects.toThrow(/already exists/i);
+  });
+
+  it('moves a company and its members when the name is free', async () => {
+    const { id } = await createRealm(env, { name: 'Empty Realm' });
+    const co = (await listCompanies(env, REALM_B))[0];
+    const res = await transferCompany(env, co.id, id, REALM_B);
+    expect(res.members).toBe(1);
+    expect(await listCompanies(env, REALM_B)).toHaveLength(0);
+    expect(await listCompanies(env, id)).toHaveLength(1);
+    // The owner came along.
+    expect((await listAllUsers(env, id))[0].email).toBe('b@x.test');
   });
 });

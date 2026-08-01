@@ -47,15 +47,21 @@ export async function recentErrors(env) {
   try { return raw ? JSON.parse(raw) : []; } catch (e) { return []; }
 }
 
-export async function systemStatus(env) {
+/**
+ * System status for the realm the caller is viewing. The counts and the "last
+ * activity" stamps are per realm — an admin looking at realm B should see how
+ * busy realm B is, not a total across servers. Worker errors are genuinely
+ * global (they belong to the deployment, not a realm) and stay unscoped.
+ */
+export async function systemStatus(env, realmId) {
   const db = await getDb(env);
   const counts = {};
   for (const t of TABLES) {
-    const r = await db.prepare('SELECT COUNT(*) AS n FROM ' + t).first();
+    const r = await db.prepare('SELECT COUNT(*) AS n FROM ' + t + ' WHERE realm_id = ?').bind(realmId).first();
     counts[t] = r ? r.n : 0;
   }
-  const lastSale = await db.prepare('SELECT ts FROM sales ORDER BY id DESC LIMIT 1').first();
-  const lastAudit = await db.prepare('SELECT ts FROM audit ORDER BY id DESC LIMIT 1').first();
+  const lastSale = await db.prepare('SELECT ts FROM sales WHERE realm_id = ? ORDER BY id DESC LIMIT 1').bind(realmId).first();
+  const lastAudit = await db.prepare('SELECT ts FROM audit WHERE realm_id = ? ORDER BY id DESC LIMIT 1').bind(realmId).first();
   return {
     counts,
     lastSale: lastSale ? lastSale.ts : null,

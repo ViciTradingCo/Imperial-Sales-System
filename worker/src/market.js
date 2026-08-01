@@ -43,7 +43,7 @@ function itemStats(saleRows, master) {
   return Object.values(map).sort((a, b) => b.revenue - a.revenue);
 }
 
-export async function marketAnalysis(env) {
+export async function marketAnalysis(env, realmId) {
   const db = await getDb(env);
 
   const overview = await db.prepare(
@@ -52,7 +52,7 @@ export async function marketAnalysis(env) {
             COALESCE(SUM(qty_total), 0) AS itemsSold,
             COUNT(DISTINCT business) AS activeShops
        FROM sales
-      WHERE status != 'VOIDED'`).first();
+      WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).first();
 
   const businesses = ((await db.prepare(
     `SELECT business,
@@ -60,10 +60,10 @@ export async function marketAnalysis(env) {
             COALESCE(SUM(qty_total), 0) AS items,
             COALESCE(SUM(total), 0) AS revenue
        FROM sales
-      WHERE status != 'VOIDED'
+      WHERE realm_id = ? AND status != 'VOIDED'
       GROUP BY business
       ORDER BY revenue DESC
-      LIMIT 200`).all()).results) || [];
+      LIMIT 200`).bind(realmId).all()).results) || [];
 
   const holds = ((await db.prepare(
     `SELECT hold,
@@ -71,35 +71,36 @@ export async function marketAnalysis(env) {
             COALESCE(SUM(qty_total), 0) AS items,
             COALESCE(SUM(total), 0) AS revenue
        FROM sales
-      WHERE status != 'VOIDED' AND hold IS NOT NULL AND hold != ''
+      WHERE realm_id = ? AND status != 'VOIDED' AND hold IS NOT NULL AND hold != ''
       GROUP BY hold
-      ORDER BY revenue DESC`).all()).results) || [];
+      ORDER BY revenue DESC`).bind(realmId).all()).results) || [];
 
   const underpriced = ((await db.prepare(
     `SELECT i.business AS business, i.item AS item,
             i.price AS salePrice, AVG(k.price_per) AS avgCost
        FROM inventory i
-       JOIN intake k ON k.business = i.business AND k.item = i.item
+       JOIN intake k ON k.business = i.business AND k.item = i.item AND k.realm_id = i.realm_id
+      WHERE i.realm_id = ?
       GROUP BY i.business, i.item
      HAVING i.price < AVG(k.price_per)
       ORDER BY (AVG(k.price_per) - i.price) DESC
-      LIMIT 50`).all()).results) || [];
+      LIMIT 50`).bind(realmId).all()).results) || [];
 
   // NOTE: low stock is deliberately NOT part of network analysis — it's a
   // per-shop operational concern, surfaced to owners as the Restock report
   // (inventory.lowStockReport / GET /business/low-stock).
 
-  const master = await listItemIndex(env);
+  const master = await listItemIndex(env, realmId);
   const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE status != 'VOIDED'`).all()).results) || [];
+    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).all()).results) || [];
   const items = itemStats(saleRows, master);
 
   // Pricing anomalies vs the master base values, using the network thresholds.
-  const settings = await readSettings(env);
+  const settings = await readSettings(env, realmId);
   const overX = settingVal(settings, 'Overpricing threshold (x item average)', 1.5);
   const underX = settingVal(settings, 'Undercutting threshold (x item average)', 0.5);
   const masterByNorm = new Map(master.map((m) => [normalizeItem(m.name), m]));
-  const invRows = ((await db.prepare('SELECT business, item, price FROM inventory').all()).results) || [];
+  const invRows = ((await db.prepare('SELECT business, item, price FROM inventory WHERE realm_id = ?').bind(realmId).all()).results) || [];
   const overpriced = [];
   const undercut = [];
   invRows.forEach((r) => {
@@ -115,8 +116,8 @@ export async function marketAnalysis(env) {
   // Daily revenue trend (last 30 days with activity), oldest → newest.
   const trends = (((await db.prepare(
     `SELECT substr(ts, 1, 10) AS day, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
-       FROM sales WHERE status != 'VOIDED'
-      GROUP BY day ORDER BY day DESC LIMIT 30`).all()).results) || []).reverse();
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED'
+      GROUP BY day ORDER BY day DESC LIMIT 30`).bind(realmId).all()).results) || []).reverse();
 
   return {
     overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 },
@@ -131,7 +132,7 @@ export async function marketAnalysis(env) {
  * market view. Scoped strictly to the caller's business: headline totals, a
  * daily revenue trend, and their best-selling items.
  */
-export async function businessReport(env, business) {
+export async function businessReport(env, business, realmId) {
   const db = await getDb(env);
   const b = String(business || '').trim();
   const empty = { business: b, overview: { revenue: 0, orders: 0, itemsSold: 0 }, trends: [], items: [] };
@@ -140,21 +141,21 @@ export async function businessReport(env, business) {
   const overview = await db.prepare(
     `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS itemsSold
-       FROM sales WHERE status != 'VOIDED' AND business = ?`).bind(b).first();
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND business = ?`).bind(realmId, b).first();
 
   const trends = (((await db.prepare(
     `SELECT substr(ts, 1, 10) AS day, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
-       FROM sales WHERE status != 'VOIDED' AND business = ?
-      GROUP BY day ORDER BY day DESC LIMIT 30`).bind(b).all()).results) || []).reverse();
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND business = ?
+      GROUP BY day ORDER BY day DESC LIMIT 30`).bind(realmId, b).all()).results) || []).reverse();
 
   const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE status != 'VOIDED' AND business = ?`).bind(b).all()).results) || [];
+    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND business = ?`).bind(realmId, b).all()).results) || [];
 
   return {
     business: b,
     overview: overview || empty.overview,
     trends,
-    items: itemStats(saleRows, await listItemIndex(env)).slice(0, 20),
+    items: itemStats(saleRows, await listItemIndex(env, realmId)).slice(0, 20),
   };
 }
 
@@ -162,7 +163,7 @@ export async function businessReport(env, business) {
  * A single hold's report — the slice a Court oversees. Scoped to sales made in
  * that hold: overview, the shops trading there, and the items moving there.
  */
-export async function holdReport(env, hold) {
+export async function holdReport(env, hold, realmId) {
   const db = await getDb(env);
   const h = String(hold || '').trim();
   if (!h) return { hold: '', overview: { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses: [], items: [] };
@@ -170,16 +171,16 @@ export async function holdReport(env, hold) {
   const overview = await db.prepare(
     `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS itemsSold, COUNT(DISTINCT business) AS activeShops
-       FROM sales WHERE status != 'VOIDED' AND hold = ?`).bind(h).first();
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND hold = ?`).bind(realmId, h).first();
 
   const businesses = ((await db.prepare(
     `SELECT business, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
-       FROM sales WHERE status != 'VOIDED' AND hold = ?
-      GROUP BY business ORDER BY revenue DESC LIMIT 200`).bind(h).all()).results) || [];
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND hold = ?
+      GROUP BY business ORDER BY revenue DESC LIMIT 200`).bind(realmId, h).all()).results) || [];
 
   const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE status != 'VOIDED' AND hold = ?`).bind(h).all()).results) || [];
+    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND hold = ?`).bind(realmId, h).all()).results) || [];
 
-  return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: itemStats(saleRows, await listItemIndex(env)) };
+  return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: itemStats(saleRows, await listItemIndex(env, realmId)) };
 }

@@ -8,12 +8,13 @@
 import { getDb } from './db.js';
 
 /** Records one intake transaction. Returns the recent intake list. */
-export async function recordIntake(env, business, { item, vendor, hold, numItems, pricePer, idempotencyKey }) {
+export async function recordIntake(env, business, { item, vendor, hold, numItems, pricePer, idempotencyKey }, realmId) {
   const db = await getDb(env);
   const idem = String(idempotencyKey || '').trim();
   if (idem) {
-    const prior = await db.prepare('SELECT id FROM intake WHERE business = ? AND idem = ? LIMIT 1').bind(business, idem).first();
-    if (prior) return listIntake(env, business, 20); // already recorded — no double stock
+    const prior = await db.prepare('SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem = ? LIMIT 1')
+      .bind(realmId, business, idem).first();
+    if (prior) return listIntake(env, business, realmId); // already recorded — no double stock
   }
   const name = String(item || '').trim();
   if (!name) throw new Error('Item name is required.');
@@ -25,33 +26,33 @@ export async function recordIntake(env, business, { item, vendor, hold, numItems
 
   await db.batch([
     db.prepare(
-      `INSERT INTO intake (business, ts, item, vendor, source_hold, num_items, price_per, idem)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(business, ts, name, String(vendor || '').trim(), String(hold || '').trim(), qty, per, idem || null),
+      `INSERT INTO intake (realm_id, business, ts, item, vendor, source_hold, num_items, price_per, idem)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(realmId, business, ts, name, String(vendor || '').trim(), String(hold || '').trim(), qty, per, idem || null),
     // New item → created with sale price = cost paid; existing item → stock only.
     db.prepare(
-      `INSERT INTO inventory (business, item, price, stock, low_stock)
-       VALUES (?, ?, ?, ?, 0)
-       ON CONFLICT (business, item) DO UPDATE SET stock = stock + excluded.stock`
-    ).bind(business, name, per, qty),
+      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock)
+       VALUES (?, ?, ?, ?, ?, 0)
+       ON CONFLICT (realm_id, business, item) DO UPDATE SET stock = stock + excluded.stock`
+    ).bind(realmId, business, name, per, qty),
     // Debit the shop's coffers for what was paid.
     db.prepare(
-      `INSERT INTO coffer_entries (business, ts, kind, amount, note) VALUES (?, ?, 'intake', ?, ?)`
-    ).bind(business, ts, -(qty * per), name),
+      `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'intake', ?, ?)`
+    ).bind(realmId, business, ts, -(qty * per), name),
   ]);
 
-  return listIntake(env, business, 20);
+  return listIntake(env, business, realmId);
 }
 
 /** The most recent intake transactions for a business. */
-export async function listIntake(env, business, limit = 20) {
+export async function listIntake(env, business, realmId, limit = 20) {
   const db = await getDb(env);
   const { results } = await db
     .prepare(
       `SELECT ts, item, vendor, source_hold, num_items, price_per
-       FROM intake WHERE business = ? ORDER BY id DESC LIMIT ?`
+       FROM intake WHERE realm_id = ? AND business = ? ORDER BY id DESC LIMIT ?`
     )
-    .bind(business, limit)
+    .bind(realmId, business, limit)
     .all();
   return (results || []).map((r) => ({
     ts: r.ts, item: r.item, vendor: r.vendor, hold: r.source_hold,

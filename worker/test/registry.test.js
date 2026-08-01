@@ -75,11 +75,11 @@ describe('company edits + certification', () => {
     const co = (await listCompanies(env)).find((c) => c.business === 'Iron Hearth');
     const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     await updateCompany(env, { id: co.id, name: 'Iron Hearth', until: future, perpetual: false });
-    expect((await checkCertification(env, 'Iron Hearth')).status).toBe('VALID');
+    expect((await checkCertification(env, 'Iron Hearth', 'default')).status).toBe('VALID');
 
     const past = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     await updateCompany(env, { id: co.id, name: 'Iron Hearth', until: past, perpetual: false });
-    expect((await checkCertification(env, 'Iron Hearth')).status).toBe('EXPIRED');
+    expect((await checkCertification(env, 'Iron Hearth', 'default')).status).toBe('EXPIRED');
   });
 
   it('renames a company across users + registry', async () => {
@@ -101,18 +101,18 @@ describe('company edits + certification', () => {
 
 describe('settings + motd', () => {
   it('round-trips master settings with validation', async () => {
-    const before = await readSettings(env);
+    const before = await readSettings(env, 'default');
     const overLabel = before.find((s) => /Overpricing/i.test(s.label)).label;
-    await writeSettings(env, [{ label: overLabel, value: 2 }]);
-    expect((await readSettings(env)).find((s) => s.label === overLabel).value).toBe(2);
-    await expect(writeSettings(env, [{ label: overLabel, value: 0.5 }])).rejects.toThrow();
+    await writeSettings(env, [{ label: overLabel, value: 2 }], 'default');
+    expect((await readSettings(env, 'default')).find((s) => s.label === overLabel).value).toBe(2);
+    await expect(writeSettings(env, [{ label: overLabel, value: 0.5 }], 'default')).rejects.toThrow();
   });
 
   it('stores the global MOTD and per-business notices', async () => {
-    await writeMotd(env, 'Welcome to Skyrim');
-    expect(await readMotd(env)).toBe('Welcome to Skyrim');
-    await addIndividualMotd(env, { business: 'Iron Hearth', message: 'Restock Tuesday' });
-    expect(await activeNoticesForBusiness(env, 'iron hearth')).toContain('Restock Tuesday');
-    expect(await activeNoticesForBusiness(env, 'Other Co')).not.toContain('Restock Tuesday');
+    await writeMotd(env, 'Welcome to Skyrim', 'default');
+    expect(await readMotd(env, 'default')).toBe('Welcome to Skyrim');
+    await addIndividualMotd(env, { business: 'Iron Hearth', message: 'Restock Tuesday' }, 'default');
+    expect(await activeNoticesForBusiness(env, 'iron hearth', 'default')).toContain('Restock Tuesday');
+    expect(await activeNoticesForBusiness(env, 'Other Co', 'default')).not.toContain('Restock Tuesday');
   });
 });

@@ -13,7 +13,7 @@ function startOfToday() {
   return d;
 }
 
-export async function checkCertification(env, business) {
+export async function checkCertification(env, business, realmId) {
   const target = String(business || '').trim().toLowerCase();
   if (!target) return { status: 'EXPIRED', until: '' };
   const cached = await cacheGet(env, 'cert:' + target);
@@ -23,7 +23,8 @@ export async function checkCertification(env, business) {
   let row;
   try {
     const db = await getDb(env);
-    row = await db.prepare('SELECT perpetual, until FROM companies WHERE lower(business) = ?').bind(target).first();
+    row = await db.prepare('SELECT perpetual, until FROM companies WHERE realm_id = ? AND lower(business) = ?')
+      .bind(realmId, target).first();
   } catch (e) {
     return { status: 'EXPIRED', until: '', error: 'Could not read the registry.' }; // transient — not cached
   }

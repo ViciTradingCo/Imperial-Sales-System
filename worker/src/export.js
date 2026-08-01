@@ -82,17 +82,17 @@ function csvCell(v) {
  * Owner-facing per-shop CSV export. type='sales' → this shop's sales log;
  * type='coffer' → its coffer ledger. Returns { filename, csv }.
  */
-export async function businessCsv(env, business, type) {
+export async function businessCsv(env, business, type, realmId) {
   const db = await getDb(env);
   const stamp = new Date().toISOString().slice(0, 10);
   const slug = String(business || 'shop').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'shop';
   let cols, rows;
   if (type === 'coffer') {
     cols = ['ts', 'kind', 'amount', 'note'];
-    ({ results: rows } = await db.prepare('SELECT ts, kind, amount, note FROM coffer_entries WHERE business = ? ORDER BY id').bind(business).all());
+    ({ results: rows } = await db.prepare('SELECT ts, kind, amount, note FROM coffer_entries WHERE realm_id = ? AND business = ? ORDER BY id').bind(realmId, business).all());
   } else {
     cols = ['order_no', 'ts', 'customer', 'hold', 'items', 'qty_total', 'total', 'employee', 'discount', 'status'];
-    ({ results: rows } = await db.prepare('SELECT order_no, ts, customer, hold, items, qty_total, total, employee, discount, status FROM sales WHERE business = ? ORDER BY id').bind(business).all());
+    ({ results: rows } = await db.prepare('SELECT order_no, ts, customer, hold, items, qty_total, total, employee, discount, status FROM sales WHERE realm_id = ? AND business = ? ORDER BY id').bind(realmId, business).all());
   }
   const lines = [cols.join(',')];
   (rows || []).forEach((r) => lines.push(cols.map((c) => csvCell(r[c])).join(',')));

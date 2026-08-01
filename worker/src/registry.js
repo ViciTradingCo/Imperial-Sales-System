@@ -8,7 +8,7 @@
  * human key linking a users row to its business — so we enforce name uniqueness
  * at registration.
  */
-import { getDb, renameBusinessData, DEFAULT_REALM_ID } from './db.js';
+import { getDb, renameBusinessData, moveBusinessData, countBusinessTransfers, DEFAULT_REALM_ID } from './db.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
 import { appendUser, findUserByEmail, bustUserCache } from './users.js';
 
@@ -70,6 +70,55 @@ export async function findBusinessMeta(env, name, realmId) {
 
 /** Invalidates the cert + business-meta caches (call on any registry change). */
 export function bustRegistryCache() { cacheBust('cert:'); cacheBust('meta:'); }
+
+/**
+ * Moves a company and everything it owns into another realm — the corrective
+ * action when a shop was registered under the wrong server. Its members go with
+ * it, since a shop without its staff is not a working shop.
+ *
+ * Refused when the name is taken in the destination (names are unique per realm)
+ * or when a transfer is still pending, because a transfer names two shops and
+ * the other end would be left pointing at a company its realm cannot see.
+ */
+export async function transferCompany(env, id, toRealm, fromRealm) {
+  const target = String(id || '').trim();
+  const to = String(toRealm || '').trim();
+  if (!target) throw new Error('Missing company id.');
+  if (!to) throw new Error('Pick a destination realm.');
+  const from = String(fromRealm || DEFAULT_REALM_ID);
+  const db = await getDb(env);
+
+  const co = await db.prepare('SELECT * FROM companies WHERE id = ? AND realm_id = ?').bind(target, from).first();
+  if (!co) throw new Error('Company not found.');
+  if (from === to) return rowToCompany(co);
+
+  const realm = await db.prepare('SELECT id FROM realms WHERE id = ?').bind(to).first();
+  if (!realm) throw new Error('That realm no longer exists.');
+
+  const business = String(co.business || '').trim();
+  const clash = await db.prepare('SELECT id FROM companies WHERE realm_id = ? AND lower(business) = ?')
+    .bind(to, business.toLowerCase()).first();
+  if (clash) throw new Error('A company named "' + business + '" already exists in the destination realm.');
+
+  const pending = await countBusinessTransfers(env, business, from, true);
+  if (pending) {
+    throw new Error('Settle this shop\'s ' + pending + ' pending transfer(s) before moving it to another realm.');
+  }
+
+  // Members must not collide with an email already registered over there.
+  const { results: members } = await db.prepare('SELECT uid, email FROM users WHERE realm_id = ? AND lower(business) = ?')
+    .bind(from, business.toLowerCase()).all();
+  for (const m of members || []) {
+    const taken = await db.prepare('SELECT uid FROM users WHERE realm_id = ? AND lower(email) = ?')
+      .bind(to, String(m.email || '').trim().toLowerCase()).first();
+    if (taken) throw new Error(m.email + ' is already registered in the destination realm.');
+  }
+
+  await moveBusinessData(env, business, from, to);
+  bustRegistryCache();
+  bustUserCache();
+  return { moved: business, from, to, members: (members || []).length };
+}
 
 /**
  * Registers the signed-in user. Idempotent: if they already exist, returns the

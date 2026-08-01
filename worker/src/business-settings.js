@@ -21,10 +21,11 @@ function validate(schema, value) {
 }
 
 /** Reads a business's settings (with defaults for any unset value). */
-export async function readBusinessSettings(env, business) {
+export async function readBusinessSettings(env, business, realmId) {
   const target = String(business || '').trim().toLowerCase();
   const db = await getDb(env);
-  const { results } = await db.prepare('SELECT label, value FROM business_settings WHERE lower(business) = ?').bind(target).all();
+  const { results } = await db.prepare('SELECT label, value FROM business_settings WHERE realm_id = ? AND lower(business) = ?')
+    .bind(realmId, target).all();
   const byLabel = {};
   (results || []).forEach((r) => { byLabel[String(r.label || '').trim()] = r.value; });
   const settings = BUSINESS_SETTINGS_SCHEMA.map((s) => ({
@@ -40,7 +41,7 @@ export async function readBusinessSettings(env, business) {
 }
 
 /** Validates and writes a business's settings; upserts each row. */
-export async function writeBusinessSettings(env, business, updates) {
+export async function writeBusinessSettings(env, business, updates, realmId) {
   const db = await getDb(env);
   const writes = [];
   (updates || []).forEach((u) => {
@@ -50,9 +51,9 @@ export async function writeBusinessSettings(env, business, updates) {
   });
   if (writes.length) {
     await db.batch(writes.map((w) =>
-      db.prepare('INSERT INTO business_settings (business, label, value) VALUES (?, ?, ?) ' +
-        'ON CONFLICT(business, label) DO UPDATE SET value = excluded.value')
-        .bind(business, w.label, w.value)));
+      db.prepare('INSERT INTO business_settings (realm_id, business, label, value) VALUES (?, ?, ?, ?) ' +
+        'ON CONFLICT(realm_id, business, label) DO UPDATE SET value = excluded.value')
+        .bind(realmId, business, w.label, w.value)));
   }
-  return readBusinessSettings(env, business);
+  return readBusinessSettings(env, business, realmId);
 }

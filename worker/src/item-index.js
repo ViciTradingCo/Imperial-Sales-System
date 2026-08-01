@@ -8,26 +8,26 @@
  */
 import { getDb } from './db.js';
 
-export async function listItemIndex(env) {
+export async function listItemIndex(env, realmId) {
   const db = await getDb(env);
-  const { results } = await db.prepare('SELECT name, base_value FROM master_item ORDER BY name').all();
+  const { results } = await db.prepare('SELECT name, base_value FROM master_item WHERE realm_id = ? ORDER BY name').bind(realmId).all();
   return (results || []).map((r) => ({ name: r.name, baseValue: Number(r.base_value) || 0 }));
 }
 
 /** Add a new item or edit an existing one (rename via oldName). */
-export async function upsertItem(env, { name, baseValue, oldName }) {
+export async function upsertItem(env, { name, baseValue, oldName }, realmId) {
   const nm = String(name || '').trim();
   if (!nm) throw new Error('Enter an item name.');
   const val = Number(baseValue);
   if (!isFinite(val) || val < 0) throw new Error('Base value must be a number ≥ 0.');
   const db = await getDb(env);
-  const clash = await db.prepare('SELECT name FROM master_item WHERE lower(name) = ? AND lower(name) != ?')
-    .bind(nm.toLowerCase(), String(oldName || '').toLowerCase()).first();
+  const clash = await db.prepare('SELECT name FROM master_item WHERE realm_id = ? AND lower(name) = ? AND lower(name) != ?')
+    .bind(realmId, nm.toLowerCase(), String(oldName || '').toLowerCase()).first();
   if (clash) throw new Error('An item named "' + nm + '" already exists.');
-  if (oldName && oldName !== nm) await db.prepare('DELETE FROM master_item WHERE name = ?').bind(oldName).run();
-  await db.prepare('INSERT INTO master_item (name, base_value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET base_value = excluded.base_value')
-    .bind(nm, val).run();
-  return listItemIndex(env);
+  if (oldName && oldName !== nm) await db.prepare('DELETE FROM master_item WHERE realm_id = ? AND name = ?').bind(realmId, oldName).run();
+  await db.prepare('INSERT INTO master_item (realm_id, name, base_value) VALUES (?, ?, ?) ON CONFLICT(realm_id, name) DO UPDATE SET base_value = excluded.base_value')
+    .bind(realmId, nm, val).run();
+  return listItemIndex(env, realmId);
 }
 
 /**
@@ -40,9 +40,9 @@ export async function upsertItem(env, { name, baseValue, oldName }) {
  * Matching is deliberately exact-after-normalization (not fuzzy) so a genuine
  * typo becomes a new item rather than silently overwriting a real one's name.
  */
-export async function importItemIndex(env, rows) {
+export async function importItemIndex(env, rows, realmId) {
   const db = await getDb(env);
-  const byNorm = new Map((await listItemIndex(env)).map((it) => [normalizeItem(it.name), it]));
+  const byNorm = new Map((await listItemIndex(env, realmId)).map((it) => [normalizeItem(it.name), it]));
   const stmts = [];
   let imported = 0;
   (rows || []).forEach((r) => {
@@ -53,16 +53,16 @@ export async function importItemIndex(env, rows) {
     const norm = normalizeItem(name);
     const hit = byNorm.get(norm);
     if (hit && hit.name !== name) {
-      stmts.push(db.prepare('DELETE FROM master_item WHERE name = ?').bind(hit.name)); // rename
+      stmts.push(db.prepare('DELETE FROM master_item WHERE realm_id = ? AND name = ?').bind(realmId, hit.name)); // rename
     }
     stmts.push(db.prepare(
-      'INSERT INTO master_item (name, base_value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET base_value = excluded.base_value')
-      .bind(name, val));
+      'INSERT INTO master_item (realm_id, name, base_value) VALUES (?, ?, ?) ON CONFLICT(realm_id, name) DO UPDATE SET base_value = excluded.base_value')
+      .bind(realmId, name, val));
     byNorm.set(norm, { name, baseValue: val }); // dedupe within the same paste
     imported++;
   });
   if (stmts.length) await db.batch(stmts);
-  return { imported, items: await listItemIndex(env) };
+  return { imported, items: await listItemIndex(env, realmId) };
 }
 
 /**
@@ -72,8 +72,8 @@ export async function importItemIndex(env, rows) {
  *              suggested canonical name so the admin can fix or keep-as-new.
  *   • create — no match at all (a genuinely new item).
  */
-export async function analyzeItemImport(env, rows) {
-  const existing = await listItemIndex(env);
+export async function analyzeItemImport(env, rows, realmId) {
+  const existing = await listItemIndex(env, realmId);
   const byNorm = new Map(existing.map((it) => [normalizeItem(it.name), it]));
   const create = [], update = [], typos = [];
   (rows || []).forEach((r) => {
@@ -89,10 +89,10 @@ export async function analyzeItemImport(env, rows) {
   return { create, update, typos };
 }
 
-export async function deleteItemIndex(env, name) {
+export async function deleteItemIndex(env, name, realmId) {
   const db = await getDb(env);
-  await db.prepare('DELETE FROM master_item WHERE lower(name) = ?').bind(String(name || '').trim().toLowerCase()).run();
-  return listItemIndex(env);
+  await db.prepare('DELETE FROM master_item WHERE realm_id = ? AND lower(name) = ?').bind(realmId, String(name || '').trim().toLowerCase()).run();
+  return listItemIndex(env, realmId);
 }
 
 /* ---- fuzzy matching (typo / grammar tolerance) ---- */

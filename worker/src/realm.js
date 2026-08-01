@@ -7,6 +7,11 @@
  * own row — never from a request parameter. A caller cannot name a realm they
  * don't belong to, so there is no way to reach across the boundary.
  *
+ * The ONE exception is a super admin (an ADMIN_EMAILS address), who can switch
+ * which realm they are viewing from the Admin Panel. Even then the choice is
+ * stored on their user row and re-checked on every request (guards.realmIdOf),
+ * so it is still read from the database rather than trusted from the client.
+ *
  * Use `realmScope(env, realmId)` in data modules: it hands back the db plus the
  * realm id and small SQL helpers, so scoping is one consistent idiom rather
  * than an easily-forgotten `AND realm_id = ?`.
@@ -52,11 +57,27 @@ export async function ensureDefaultRealm(env) {
     .bind(DEFAULT_REALM_ID, 'Main Realm', 'main', new Date().toISOString()).run();
 }
 
+/**
+ * Every realm, each with the two counts the management screen actually shows
+ * (shops and members). Two small aggregate queries rather than one per realm,
+ * so the list stays a fixed cost however many realms exist.
+ */
 export async function listRealms(env) {
   await ensureDefaultRealm(env);
   const db = await getDb(env);
   const { results } = await db.prepare('SELECT id, name, slug, created FROM realms ORDER BY created').all();
-  return results || [];
+  const tally = async (table, where) => {
+    const { results: rows } = await db.prepare(
+      'SELECT realm_id, COUNT(*) AS n FROM ' + table + (where ? ' WHERE ' + where : '') + ' GROUP BY realm_id').all();
+    return new Map((rows || []).map((r) => [r.realm_id, r.n]));
+  };
+  const shops = await tally('companies', "upper(status) != 'ARCHIVED'");
+  const members = await tally('users');
+  return (results || []).map((r) => ({
+    ...r,
+    companies: shops.get(r.id) || 0,
+    members: members.get(r.id) || 0,
+  }));
 }
 
 export async function getRealm(env, id) {

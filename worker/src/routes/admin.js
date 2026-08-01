@@ -6,8 +6,8 @@
 import { requireAdmin, requireSuperAdmin, actorName, realmIdOf } from '../guards.js';
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
-import { listAllUsers, updateMember, deleteMember } from '../users.js';
-import { listCompanies, updateCompany, archiveCompany } from '../registry.js';
+import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember } from '../users.js';
+import { listCompanies, updateCompany, archiveCompany, transferCompany } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
 import { marketAnalysis } from '../market.js';
 import { clearLogs, purgeLogs, resetAllData } from '../db.js';
@@ -20,46 +20,51 @@ import { readBranding, writeBranding } from '../branding.js';
 import { getFlag, setFlag } from '../db.js';
 import { listRealms, createRealm, renameRealm, deleteRealm, realmStats } from '../realm.js';
 
+/**
+ * Network Settings belong to a REALM, so these act on whichever realm the
+ * caller is currently viewing. A super admin editing realm B's thresholds edits
+ * realm B's, not the default realm's.
+ */
 async function getSettings({ request, env }) {
-  await requireAdmin(request, env);
-  return { settings: await readSettings(env) };
+  const caller = await requireAdmin(request, env);
+  return { settings: await readSettings(env, realmIdOf(caller, env)) };
 }
 async function saveSettings({ request, env, body }) {
-  await requireAdmin(request, env);
-  return { settings: await writeSettings(env, body.updates || []) };
+  const caller = await requireAdmin(request, env);
+  return { settings: await writeSettings(env, body.updates || [], realmIdOf(caller, env)) };
 }
 
 async function listMembers({ request, env }) {
   const caller = await requireAdmin(request, env);
-  return { members: await listAllUsers(env, realmIdOf(caller)) };
+  return { members: await listAllUsers(env, realmIdOf(caller, env)) };
 }
 async function updateMemberRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  await updateMember(env, body, realmIdOf(caller));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.update', detail: 'uid ' + body.uid + ' → ' + body.role + ', ' + (body.business || '') });
-  return { members: await listAllUsers(env, realmIdOf(caller)) };
+  await updateMember(env, body, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.update', detail: 'uid ' + body.uid + ' → ' + body.role + ', ' + (body.business || ''), realmId: realmIdOf(caller, env) });
+  return { members: await listAllUsers(env, realmIdOf(caller, env)) };
 }
 async function deleteMemberRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  await deleteMember(env, body.uid, realmIdOf(caller));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.delete', detail: 'uid ' + body.uid });
-  return { members: await listAllUsers(env, realmIdOf(caller)) };
+  await deleteMember(env, body.uid, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.delete', detail: 'uid ' + body.uid, realmId: realmIdOf(caller, env) });
+  return { members: await listAllUsers(env, realmIdOf(caller, env)) };
 }
 
 async function listCompaniesRoute({ request, env }) {
   const caller = await requireAdmin(request, env);
-  return { companies: await listCompanies(env, realmIdOf(caller)) };
+  return { companies: await listCompanies(env, realmIdOf(caller, env)) };
 }
 async function updateCompanyRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const companies = await updateCompany(env, body, realmIdOf(caller));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.update', detail: (body.name || '') + (body.court ? ' [Court]' : '') });
+  const companies = await updateCompany(env, body, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.update', detail: (body.name || '') + (body.court ? ' [Court]' : ''), realmId: realmIdOf(caller, env) });
   return { companies };
 }
 async function deleteCompanyRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const companies = await archiveCompany(env, body.id, realmIdOf(caller));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.archive', detail: 'id ' + body.id });
+  const companies = await archiveCompany(env, body.id, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.archive', detail: 'id ' + body.id, realmId: realmIdOf(caller, env) });
   return { companies };
 }
 
@@ -81,99 +86,105 @@ async function importPreview({ request, env, body }) {
 async function importData({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   const res = await restoreImport(env, body);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'data.restore', detail: 'restored from backup' });
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'data.restore', detail: 'restored from backup', realmId: realmIdOf(caller, env) });
   return res;
 }
 
 async function market({ request, env }) {
-  await requireAdmin(request, env);
-  return await marketAnalysis(env);
+  const caller = await requireAdmin(request, env);
+  return await marketAnalysis(env, realmIdOf(caller, env));
 }
 
 async function clearLogsRoute({ request, env }) {
   const caller = await requireAdmin(request, env);
-  const res = await clearLogs(env);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'logs.clear', detail: (res.sales || 0) + ' sales, ' + (res.intake || 0) + ' intake' });
+  const res = await clearLogs(env, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'logs.clear', detail: (res.sales || 0) + ' sales, ' + (res.intake || 0) + ' intake', realmId: realmIdOf(caller, env) });
   return res;
 }
 async function purgeLogsRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const res = await purgeLogs(env, body.amount != null ? body.amount : body.months, body.unit);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'logs.purge', detail: 'older than ' + res.cutoff + ': ' + res.sales + ' sales, ' + res.intake + ' intake' });
+  const res = await purgeLogs(env, body.amount != null ? body.amount : body.months, body.unit, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'logs.purge', detail: 'older than ' + res.cutoff + ': ' + res.sales + ' sales, ' + res.intake + ' intake', realmId: realmIdOf(caller, env) });
   return res;
 }
 async function status({ request, env }) {
-  await requireAdmin(request, env);
-  return await systemStatus(env);
+  const caller = await requireAdmin(request, env);
+  return await systemStatus(env, realmIdOf(caller, env));
 }
 
 /** Full reset — wipe all data, keep admin accounts. Guarded by a typed confirm. */
 async function wipeData({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   if (String(body.confirm || '') !== 'ERASE') throw new Error('Reset not confirmed.');
-  const res = await resetAllData(env);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'data.reset', detail: 'full reset — ' + res.tablesCleared + ' tables cleared, ' + res.adminsKept + ' admin(s) kept' });
+  const res = await resetAllData(env, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'data.reset', detail: 'full reset — ' + res.tablesCleared + ' tables cleared, ' + res.adminsKept + ' admin(s) kept', realmId: realmIdOf(caller, env) });
   return res;
 }
 
 async function motdConfig({ request, env }) {
-  await requireAdmin(request, env);
-  return { motd: await readMotd(env), warnDays: await readWarnDays(env), individual: await listIndividualMotds(env) };
+  const caller = await requireAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  return {
+    motd: await readMotd(env, realmId),
+    warnDays: await readWarnDays(env, realmId),
+    individual: await listIndividualMotds(env, realmId),
+  };
 }
 async function setMotd({ request, env, body }) {
-  await requireAdmin(request, env);
-  return { motd: await writeMotd(env, body.motd) };
+  const caller = await requireAdmin(request, env);
+  return { motd: await writeMotd(env, body.motd, realmIdOf(caller, env)) };
 }
 async function setWarnDays({ request, env, body }) {
-  await requireAdmin(request, env);
-  return { warnDays: await writeWarnDays(env, body.days) };
+  const caller = await requireAdmin(request, env);
+  return { warnDays: await writeWarnDays(env, body.days, realmIdOf(caller, env)) };
 }
 async function addIndividual({ request, env, body }) {
-  await requireAdmin(request, env);
-  return { individual: await addIndividualMotd(env, body) };
+  const caller = await requireAdmin(request, env);
+  return { individual: await addIndividualMotd(env, body, realmIdOf(caller, env)) };
 }
 async function updateIndividual({ request, env, body }) {
-  await requireAdmin(request, env);
-  return { individual: await updateIndividualMotd(env, body) };
+  const caller = await requireAdmin(request, env);
+  return { individual: await updateIndividualMotd(env, body, realmIdOf(caller, env)) };
 }
 async function deleteIndividual({ request, env, body }) {
-  await requireAdmin(request, env);
-  return { individual: await deleteIndividualMotd(env, body.id) };
+  const caller = await requireAdmin(request, env);
+  return { individual: await deleteIndividualMotd(env, body.id, realmIdOf(caller, env)) };
 }
 
 async function audit({ request, env, url }) {
-  await requireAdmin(request, env);
+  const caller = await requireAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
   const q = url.searchParams;
   return {
     audit: await listAudit(env, {
       actor: q.get('actor'), action: q.get('action'),
-      from: q.get('from'), to: q.get('to'),
+      from: q.get('from'), to: q.get('to'), realmId,
     }),
-    actions: await listAuditActions(env),
+    actions: await listAuditActions(env, realmId),
   };
 }
 
 async function upsertItemRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const items = await upsertMasterItem(env, body);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.upsert', detail: (body.oldName && body.oldName !== body.name ? body.oldName + ' → ' : '') + body.name + ' @ ' + body.baseValue });
+  const items = await upsertMasterItem(env, body, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.upsert', detail: (body.oldName && body.oldName !== body.name ? body.oldName + ' → ' : '') + body.name + ' @ ' + body.baseValue, realmId: realmIdOf(caller, env) });
   return { items };
 }
 async function deleteMasterItemRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const items = await deleteItemIndex(env, body.name);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.delete', detail: body.name });
+  const items = await deleteItemIndex(env, body.name, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.delete', detail: body.name, realmId: realmIdOf(caller, env) });
   return { items };
 }
 async function importMasterItems({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const res = await importItemIndex(env, body.rows);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.import', detail: (res.imported || 0) + ' items' });
+  const res = await importItemIndex(env, body.rows, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.import', detail: (res.imported || 0) + ' items', realmId: realmIdOf(caller, env) });
   return res;
 }
 async function analyzeItems({ request, env, body }) {
-  await requireAdmin(request, env);
-  return await analyzeItemImport(env, body.rows);
+  const caller = await requireAdmin(request, env);
+  return await analyzeItemImport(env, body.rows, realmIdOf(caller, env));
 }
 /* ---- Sitewide branding (app name, logo, shared iconography) ---- */
 async function getBranding({ request, env }) {
@@ -183,7 +194,7 @@ async function getBranding({ request, env }) {
 async function saveBranding({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   const b = await writeBranding(env, body || {});
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'branding.update', detail: b.appName });
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'branding.update', detail: b.appName, realmId: realmIdOf(caller, env) });
   return b;
 }
 
@@ -210,24 +221,24 @@ async function setTileImages({ request, env, body }) {
     next[String(k).slice(0, 40)] = url.slice(0, 500);
   });
   await setFlag(env, TILE_IMAGES_KEY, JSON.stringify(next));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'tiles.images', detail: Object.keys(next).length + ' image(s) set' });
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'tiles.images', detail: Object.keys(next).length + ' image(s) set', realmId: realmIdOf(caller, env) });
   return { images: next };
 }
 
 async function getStorefrontFlag({ request, env }) {
-  await requireAdmin(request, env);
-  return { enabled: await storefrontsEnabled(env) };
+  const caller = await requireAdmin(request, env);
+  return { enabled: await storefrontsEnabled(env, realmIdOf(caller, env)) };
 }
 async function setStorefrontFlag({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const on = await setStorefrontsEnabled(env, !!body.enabled);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'storefronts.toggle', detail: on ? 'enabled' : 'disabled' });
+  const on = await setStorefrontsEnabled(env, !!body.enabled, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'storefronts.toggle', detail: on ? 'enabled' : 'disabled', realmId: realmIdOf(caller, env) });
   return { enabled: on };
 }
 async function setHolds({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const holds = await writeHolds(env, body.holds);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'holds.set', detail: holds.join(', ') });
+  const holds = await writeHolds(env, body.holds, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'holds.set', detail: holds.join(', '), realmId: realmIdOf(caller, env) });
   return { holds };
 }
 
@@ -244,13 +255,13 @@ async function realmsList({ request, env }) {
 async function realmCreate({ request, env, body }) {
   const caller = await requireSuperAdmin(request, env);
   const realm = await createRealm(env, { name: body.name, slug: body.slug });
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.create', detail: realm.name + ' (' + realm.id + ')' });
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.create', detail: realm.name + ' (' + realm.id + ')', realmId: realmIdOf(caller, env) });
   return { realm, realms: await listRealms(env) };
 }
 async function realmRename({ request, env, body }) {
   const caller = await requireSuperAdmin(request, env);
   const realm = await renameRealm(env, body.id, body.name);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.rename', detail: realm.id + ' -> ' + realm.name });
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.rename', detail: realm.id + ' -> ' + realm.name, realmId: realmIdOf(caller, env) });
   return { realm, realms: await listRealms(env) };
 }
 async function realmDelete({ request, env, body }) {
@@ -258,12 +269,49 @@ async function realmDelete({ request, env, body }) {
   // Destroys every row in the realm, so require the word to be typed out.
   if (String(body.confirm || '') !== 'DELETE') throw new Error('Type DELETE to confirm removing a realm and everything in it.');
   const result = await deleteRealm(env, body.id);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.delete', detail: result.deleted });
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.delete', detail: result.deleted, realmId: realmIdOf(caller, env) });
   return { ...result, realms: await listRealms(env) };
 }
 async function realmStatsRoute({ request, env }) {
   const caller = await requireAdmin(request, env);
-  return await realmStats(env, realmIdOf(caller));
+  return await realmStats(env, realmIdOf(caller, env));
+}
+
+/**
+ * Switches which realm the caller VIEWS. Super admins only: an ordinary realm
+ * admin has no business seeing another server's books, and guards.realmIdOf
+ * ignores the stored value for anyone who isn't a super admin anyway — this
+ * route is the first of those two locks, not the only one.
+ */
+async function realmSelect({ request, env, body }) {
+  const caller = await requireSuperAdmin(request, env);
+  const target = String(body.realmId || '').trim();
+  // An empty value means "back to my own realm".
+  const chosen = target && target !== caller.realmId ? target : '';
+  await setActiveRealm(env, caller.uid, chosen);
+  const active = chosen || caller.realmId;
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.select', detail: active, realmId: active });
+  return { activeRealm: active, realms: await listRealms(env) };
+}
+
+/**
+ * Moves a member or a whole company to another realm — the fix when someone
+ * picked the wrong server at registration. Super admins only, since it is the
+ * one operation that deliberately crosses the boundary.
+ */
+async function realmTransferMember({ request, env, body }) {
+  const caller = await requireSuperAdmin(request, env);
+  const from = realmIdOf(caller, env);
+  const res = await transferMember(env, body.uid, body.toRealm, from);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.member.transfer', detail: body.uid + ': ' + from + ' → ' + body.toRealm, realmId: from });
+  return { ...res, members: await listAllUsers(env, from) };
+}
+async function realmTransferCompany({ request, env, body }) {
+  const caller = await requireSuperAdmin(request, env);
+  const from = realmIdOf(caller, env);
+  const res = await transferCompany(env, body.id, body.toRealm, from);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.company.transfer', detail: (res.moved || body.id) + ': ' + from + ' → ' + body.toRealm, realmId: from });
+  return { ...res, companies: await listCompanies(env, from), members: await listAllUsers(env, from) };
 }
 
 export const routes = [
@@ -300,6 +348,9 @@ export const routes = [
   { method: 'POST', path: '/admin/realms/rename', handler: realmRename },
   { method: 'POST', path: '/admin/realms/delete', handler: realmDelete },
   { method: 'GET', path: '/admin/realms/stats', handler: realmStatsRoute },
+  { method: 'POST', path: '/admin/realms/select', handler: realmSelect },
+  { method: 'POST', path: '/admin/realms/transfer-member', handler: realmTransferMember },
+  { method: 'POST', path: '/admin/realms/transfer-company', handler: realmTransferCompany },
   { method: 'GET', path: '/admin/branding', handler: getBranding },
   { method: 'POST', path: '/admin/branding', handler: saveBranding },
   { method: 'GET', path: '/admin/tiles', handler: getTileImages },

@@ -1,11 +1,11 @@
 /**
- * Master Settings — the network's tunables (sync cadence + market anomaly
- * thresholds). The web app OWNS this: the Worker creates the tab, seeds it, and
- * is the only thing that reads/writes it, so an admin manages it from the admin
- * panel instead of hand-editing the Core sheet.
+ * Network Settings — a realm's tunables (sync cadence + market anomaly
+ * thresholds). PER REALM: each server runs its own economy, so each keeps its
+ * own thresholds. An admin manages them from that realm's page in Realm
+ * Management.
  *
- * Stored as label / value / notes rows in the Core's "Master Settings" tab,
- * with the exact labels the market analysis reads.
+ * Stored as realm / label / value rows; the labels are the ones the market
+ * analysis reads.
  */
 import { getDb } from './db.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
@@ -25,19 +25,20 @@ export const SETTINGS_SCHEMA = [
 ];
 
 /** Reads stored values (label → value) from D1. */
-async function storedValues(env) {
+async function storedValues(env, realmId) {
   const db = await getDb(env);
-  const { results } = await db.prepare('SELECT label, value FROM master_settings').all();
+  const { results } = await db.prepare('SELECT label, value FROM master_settings WHERE realm_id = ?').bind(realmId).all();
   const byLabel = {};
   (results || []).forEach((r) => { byLabel[String(r.label || '').trim()] = r.value; });
   return byLabel;
 }
 
 /** Returns the settings in schema order: [{ label, value, notes, kind, min, max, def }]. */
-export async function readSettings(env) {
-  const cached = await cacheGet(env, 'settings');
+export async function readSettings(env, realmId) {
+  const key = 'settings:' + realmId;
+  const cached = await cacheGet(env, key);
   if (cached) return cached;
-  const byLabel = await storedValues(env);
+  const byLabel = await storedValues(env, realmId);
   const out = SETTINGS_SCHEMA.map((s) => ({
     label: s.label,
     value: byLabel[s.label] != null && byLabel[s.label] !== '' ? Number(byLabel[s.label]) : s.def,
@@ -47,7 +48,7 @@ export async function readSettings(env) {
     max: s.max === undefined ? null : s.max,
     def: s.def,
   }));
-  await cacheSet(env, 'settings', out, 60000);
+  await cacheSet(env, key, out, 60000);
   return out;
 }
 
@@ -61,7 +62,7 @@ function validate(schema, value) {
 }
 
 /** Validates and writes the given { label, value } updates; returns the fresh settings. */
-export async function writeSettings(env, updates) {
+export async function writeSettings(env, updates, realmId) {
   const db = await getDb(env);
   // Validate everything first, so one bad value rejects the whole save.
   const writes = [];
@@ -72,9 +73,10 @@ export async function writeSettings(env, updates) {
   });
   if (writes.length) {
     await db.batch(writes.map((w) =>
-      db.prepare('INSERT INTO master_settings (label, value) VALUES (?, ?) ON CONFLICT(label) DO UPDATE SET value = excluded.value')
-        .bind(w.label, w.value)));
+      db.prepare('INSERT INTO master_settings (realm_id, label, value) VALUES (?, ?, ?) ' +
+        'ON CONFLICT(realm_id, label) DO UPDATE SET value = excluded.value')
+        .bind(realmId, w.label, w.value)));
   }
-  cacheBust('settings');
-  return readSettings(env);
+  cacheBust('settings:' + realmId);
+  return readSettings(env, realmId);
 }

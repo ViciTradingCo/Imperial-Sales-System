@@ -36,15 +36,15 @@ beforeEach(async () => { for (const t of ['inventory', 'sales', 'coffer_entries'
 describe('checkout', () => {
   it('decrements stock, records the sale, and credits coffers', async () => {
     await seed('Alpha', 'Iron Sword', 30, 10);
-    const res = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Iron Sword', qty: 2, price: 25 }], hold: 'Whiterun' });
+    const res = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Iron Sword', qty: 2, price: 25 }], hold: 'Whiterun' }, 'default');
     expect(res.total).toBe(50);
     expect(await stockOf('Alpha', 'Iron Sword')).toBe(8);
-    expect(await cofferBalance(env, 'Alpha')).toBe(50);
+    expect(await cofferBalance(env, 'Alpha', 'default')).toBe(50);
   });
 
   it('sells an off-inventory item without touching stock, and flags it', async () => {
     await seed('Alpha', 'Iron Sword', 30, 10);
-    const res = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Health Potion', qty: 3, price: 5 }], hold: 'Whiterun' });
+    const res = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Health Potion', qty: 3, price: 5 }], hold: 'Whiterun' }, 'default');
     expect(res.offInventory).toContain('Health Potion');
     expect(res.total).toBe(15);
     expect(await stockOf('Alpha', 'Iron Sword')).toBe(10); // untouched
@@ -52,14 +52,14 @@ describe('checkout', () => {
 
   it('flags a non-master item as new', async () => {
     await seed('Alpha', 'Iron Sword', 30, 10);
-    const res = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Mystery Trinket', qty: 1, price: 99 }], hold: 'Whiterun' });
+    const res = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Mystery Trinket', qty: 1, price: 99 }], hold: 'Whiterun' }, 'default');
     expect(res.newItems).toContain('Mystery Trinket');
   });
 
   it('is idempotent on a repeated key', async () => {
     await seed('Alpha', 'Iron Sword', 30, 10);
-    const a = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Iron Sword', qty: 1, price: 30 }], hold: 'Whiterun', idempotencyKey: 'x1' });
-    const b = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Iron Sword', qty: 1, price: 30 }], hold: 'Whiterun', idempotencyKey: 'x1' });
+    const a = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Iron Sword', qty: 1, price: 30 }], hold: 'Whiterun', idempotencyKey: 'x1' }, 'default');
+    const b = await checkout(env, 'Alpha', caller, { cart: [{ item: 'Iron Sword', qty: 1, price: 30 }], hold: 'Whiterun', idempotencyKey: 'x1' }, 'default');
     expect(b.duplicate).toBe(true);
     expect(b.orderNo).toBe(a.orderNo);
     expect(await stockOf('Alpha', 'Iron Sword')).toBe(9); // decremented once, not twice
@@ -67,7 +67,7 @@ describe('checkout', () => {
 
   it('blocks a sale that exceeds stock', async () => {
     await seed('Alpha', 'Iron Sword', 30, 2);
-    await expect(checkout(env, 'Alpha', caller, { cart: [{ item: 'Iron Sword', qty: 5, price: 30 }], hold: 'Whiterun' }))
+    await expect(checkout(env, 'Alpha', caller, { cart: [{ item: 'Iron Sword', qty: 5, price: 30 }], hold: 'Whiterun' }, 'default'))
       .rejects.toThrow(/not enough stock/i);
   });
 });

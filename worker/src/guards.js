@@ -66,8 +66,26 @@ export function isSuperAdmin(env, caller) {
   return !!caller && caller.role === 'admin' && isConfiguredAdmin(env, caller.email);
 }
 
-/** The realm a caller operates in — always from their own record. */
-export function realmIdOf(caller) {
+/**
+ * The realm whose data a caller sees.
+ *
+ * For everyone except a super admin this is their OWN realm, full stop — an
+ * ordinary account cannot read outside the realm it belongs to. A super admin
+ * (an ADMIN_EMAILS address) may additionally pick a realm to VIEW from the
+ * Admin Panel; that choice is stored on their user row, not sent per request,
+ * so it still cannot be forged by a client.
+ *
+ * The env argument is what makes the super-admin check possible. Call sites
+ * that only ever act on the caller's own realm can use homeRealmOf instead.
+ */
+export function realmIdOf(caller, env) {
+  if (!caller) return DEFAULT_REALM_ID;
+  if (env && caller.activeRealm && isSuperAdmin(env, caller)) return caller.activeRealm;
+  return caller.realmId || DEFAULT_REALM_ID;
+}
+
+/** The realm a caller BELONGS to, ignoring any admin view-switch. */
+export function homeRealmOf(caller) {
   return (caller && caller.realmId) || DEFAULT_REALM_ID;
 }
 

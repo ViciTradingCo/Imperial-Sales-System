@@ -5,8 +5,9 @@
  * MOTD banners, the Court hold report, and the owner CSV export.
  */
 import { requireUser, requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
-import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid } from '../users.js';
+import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, findUserByEmail } from '../users.js';
 import { renameBusiness, listBusinessNames } from '../registry.js';
+import { realmOf } from '../realm.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
@@ -36,7 +37,7 @@ async function listEmployees({ request, env, url }) {
   }
   const business = caller.role === 'admin' && url.searchParams.get('business')
     ? url.searchParams.get('business') : caller.business;
-  const users = await listUsersByBusiness(env, business, realmIdOf(caller));
+  const users = await listUsersByBusiness(env, business, realmIdOf(caller, env));
   return {
     business,
     employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status, notes: u.notes || '' })),
@@ -50,13 +51,13 @@ async function activateEmployee({ request, env, body }) {
   }
   const targetUid = String(body.uid || '').trim();
   if (!targetUid) throw new Error('Which employee? A uid is required.');
-  const roster = await listUsersByBusiness(env, caller.business, realmIdOf(caller));
+  const roster = await listUsersByBusiness(env, caller.business, realmIdOf(caller, env));
   const target = roster.find((u) => u.uid === targetUid);
   if (!target && caller.role !== 'admin') {
     const e = new Error('That employee is not part of your business.');
     e.forbidden = true; throw e;
   }
-  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid, realmIdOf(caller)) : null);
+  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid, realmIdOf(caller, env)) : null);
   if (!found) throw new Error('No such employee.');
   await setUserStatus(env, found.uid, 'active');
   return { ok: true, uid: targetUid, status: 'active' };
@@ -69,9 +70,9 @@ async function employeeNote({ request, env, body }) {
   }
   const targetUid = String(body.uid || '').trim();
   if (!targetUid) throw new Error('Which employee? A uid is required.');
-  const roster = await listUsersByBusiness(env, caller.business, realmIdOf(caller));
+  const roster = await listUsersByBusiness(env, caller.business, realmIdOf(caller, env));
   const target = roster.find((u) => u.uid === targetUid);
-  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid, realmIdOf(caller)) : null);
+  const found = target || (caller.role === 'admin' ? await findUserByUid(env, targetUid, realmIdOf(caller, env)) : null);
   if (!found) {
     const e = new Error('That employee is not part of your business.');
     e.forbidden = true; throw e;
@@ -81,29 +82,29 @@ async function employeeNote({ request, env, body }) {
 }
 async function employeePerformanceRoute({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return { performance: await employeePerformance(env, caller.business) };
+  return { performance: await employeePerformance(env, caller.business, realmIdOf(caller, env)) };
 }
 async function lowStock({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return await lowStockReport(env, caller.business);
+  return await lowStockReport(env, caller.business, realmIdOf(caller, env));
 }
 /** Owner/admin: this shop's own sales performance (totals, trend, top items). */
 async function shopReport({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return await businessReport(env, caller.business);
+  return await businessReport(env, caller.business, realmIdOf(caller, env));
 }
 /* ---- a shop's own notice board (owner posts to their staff) ---- */
 async function listShopNotices({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return { notices: await listMotdsForBusiness(env, caller.business) };
+  return { notices: await listMotdsForBusiness(env, caller.business, realmIdOf(caller, env)) };
 }
 async function addShopNotice({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return { notices: await addMotdForBusiness(env, caller.business, body) };
+  return { notices: await addMotdForBusiness(env, caller.business, body, realmIdOf(caller, env)) };
 }
 async function deleteShopNotice({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return { notices: await deleteMotdForBusiness(env, caller.business, body.id) };
+  return { notices: await deleteMotdForBusiness(env, caller.business, body.id, realmIdOf(caller, env)) };
 }
 
 /* ---- per-shop settings + rename ---- */
@@ -113,13 +114,18 @@ async function ledgerBusiness(request, env, override) {
     const e = new Error('Only a shop owner or an admin can manage ledger settings.');
     e.forbidden = true; throw e;
   }
-  return caller.role === 'admin' && override ? override : caller.business;
+  return {
+    business: caller.role === 'admin' && override ? override : caller.business,
+    realmId: realmIdOf(caller, env),
+  };
 }
 async function getLedgerSettings({ request, env, url }) {
-  return readBusinessSettings(env, await ledgerBusiness(request, env, url.searchParams.get('business')));
+  const { business, realmId } = await ledgerBusiness(request, env, url.searchParams.get('business'));
+  return readBusinessSettings(env, business, realmId);
 }
 async function saveLedgerSettings({ request, env, body }) {
-  return writeBusinessSettings(env, await ledgerBusiness(request, env, body.business), body.updates || []);
+  const { business, realmId } = await ledgerBusiness(request, env, body.business);
+  return writeBusinessSettings(env, business, body.updates || [], realmId);
 }
 async function renameBusinessRoute({ request, env, body }) {
   const caller = await requireRegistered(request, env);
@@ -129,7 +135,7 @@ async function renameBusinessRoute({ request, env, body }) {
   }
   const newName = String(body.name || '').trim();
   if (!newName) throw new Error('Enter a company name.');
-  await renameBusiness(env, caller.business, newName, realmIdOf(caller));
+  await renameBusiness(env, caller.business, newName, realmIdOf(caller, env));
   caller.business = newName;
   return publicUser(caller);
 }
@@ -137,7 +143,7 @@ async function renameBusinessRoute({ request, env, body }) {
 /* ---- inventory ---- */
 async function getInventory({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return { inventory: await listInventory(env, caller.business) };
+  return { inventory: await listInventory(env, caller.business, realmIdOf(caller, env)) };
 }
 async function saveItem({ request, env, body }) {
   const caller = await requireRegistered(request, env);
@@ -145,7 +151,7 @@ async function saveItem({ request, env, body }) {
     const e = new Error('Only a shop owner or an admin can edit inventory.');
     e.forbidden = true; throw e;
   }
-  return { inventory: await upsertItem(env, caller.business, body) };
+  return { inventory: await upsertItem(env, caller.business, body, realmIdOf(caller, env)) };
 }
 async function deleteItemRoute({ request, env, body }) {
   const caller = await requireRegistered(request, env);
@@ -153,19 +159,19 @@ async function deleteItemRoute({ request, env, body }) {
     const e = new Error('Only a shop owner or an admin can edit inventory.');
     e.forbidden = true; throw e;
   }
-  return { inventory: await deleteItem(env, caller.business, body.item) };
+  return { inventory: await deleteItem(env, caller.business, body.item, realmIdOf(caller, env)) };
 }
 async function importInventoryRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  const res = await importInventory(env, caller.business, body.rows);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'inventory.import', detail: (res.imported || 0) + ' items' });
+  const res = await importInventory(env, caller.business, body.rows, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'inventory.import', detail: (res.imported || 0) + ' items', realmId: realmIdOf(caller, env) });
   return res;
 }
 
 /* ---- intake ---- */
 async function getIntake({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return { intake: await listIntake(env, caller.business, 20) };
+  return { intake: await listIntake(env, caller.business, realmIdOf(caller, env)) };
 }
 async function recordIntakeRoute({ request, env, body }) {
   const caller = await requireRegistered(request, env);
@@ -173,99 +179,100 @@ async function recordIntakeRoute({ request, env, body }) {
     const e = new Error('Only a shop owner or an admin can record intake.');
     e.forbidden = true; throw e;
   }
-  const intake = await recordIntake(env, caller.business, body);
-  return { intake, inventory: await listInventory(env, caller.business) };
+  const realmId = realmIdOf(caller, env);
+  const intake = await recordIntake(env, caller.business, body, realmId);
+  return { intake, inventory: await listInventory(env, caller.business, realmId) };
 }
 
 /* ---- register ---- */
 async function getCert({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return await checkCertification(env, caller.business);
+  return await checkCertification(env, caller.business, realmIdOf(caller, env));
 }
 async function checkoutRoute({ request, env, body }) {
   const caller = await requireActive(request, env);
-  return await checkout(env, caller.business, caller, body);
+  return await checkout(env, caller.business, caller, body, realmIdOf(caller, env));
 }
 async function listSalesRoute({ request, env, url }) {
   const caller = await requireActive(request, env);
-  return { sales: await listSales(env, caller.business, url.searchParams.get('q'), 25) };
+  return { sales: await listSales(env, caller.business, url.searchParams.get('q'), realmIdOf(caller, env)) };
 }
 async function voidSaleRoute({ request, env, body }) {
   const caller = await requireActive(request, env);
-  return await voidSale(env, caller.business, body.orderNo);
+  return await voidSale(env, caller.business, body.orderNo, realmIdOf(caller, env));
 }
 
 /* ---- transfers ---- */
 async function listTransfersRoute({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return await listTransfers(env, caller.business);
+  return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function createTransferRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  await createTransfer(env, caller.business, body);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.send', detail: (body.item || '') + ' ×' + (body.qty || '') + ' → ' + (body.toBusiness || '') });
-  return await listTransfers(env, caller.business);
+  await createTransfer(env, caller.business, body, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.send', detail: (body.item || '') + ' ×' + (body.qty || '') + ' → ' + (body.toBusiness || ''), realmId: realmIdOf(caller, env) });
+  return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function acceptTransferRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  await acceptTransfer(env, caller.business, body.id);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.accept', detail: 'id ' + body.id });
-  return await listTransfers(env, caller.business);
+  await acceptTransfer(env, caller.business, body.id, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.accept', detail: 'id ' + body.id, realmId: realmIdOf(caller, env) });
+  return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function cancelTransferRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  await cancelTransfer(env, caller.business, body.id);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.cancel', detail: 'id ' + body.id });
-  return await listTransfers(env, caller.business);
+  await cancelTransfer(env, caller.business, body.id, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.cancel', detail: 'id ' + body.id, realmId: realmIdOf(caller, env) });
+  return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function declineTransferRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  await declineTransfer(env, caller.business, body.id);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.decline', detail: 'id ' + body.id });
-  return await listTransfers(env, caller.business);
+  await declineTransfer(env, caller.business, body.id, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.decline', detail: 'id ' + body.id, realmId: realmIdOf(caller, env) });
+  return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function transferHistory({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return { history: await listTransferHistory(env, caller.business) };
+  return { history: await listTransferHistory(env, caller.business, realmIdOf(caller, env)) };
 }
 
 /* ---- shop ledger: coffers / discounts / style ---- */
 async function getCoffer({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return await cofferSummary(env, caller.business);
+  return await cofferSummary(env, caller.business, realmIdOf(caller, env));
 }
 async function adjustCofferRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  const res = await adjustCoffer(env, caller.business, body);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'coffer.adjust', detail: (Number(body.amount) || 0) + 'gp ' + (body.note || '') });
+  const res = await adjustCoffer(env, caller.business, body, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'coffer.adjust', detail: (Number(body.amount) || 0) + 'gp ' + (body.note || ''), realmId: realmIdOf(caller, env) });
   return res;
 }
 async function getDiscounts({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return { discounts: await listDiscounts(env, caller.business) };
+  return { discounts: await listDiscounts(env, caller.business, realmIdOf(caller, env)) };
 }
 async function addDiscountRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return { discounts: await addDiscount(env, caller.business, body) };
+  return { discounts: await addDiscount(env, caller.business, body, realmIdOf(caller, env)) };
 }
 async function deleteDiscountRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return { discounts: await deleteDiscount(env, caller.business, body.id) };
+  return { discounts: await deleteDiscount(env, caller.business, body.id, realmIdOf(caller, env)) };
 }
 async function getStyle({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return await getShopStyle(env, caller.business);
+  return await getShopStyle(env, caller.business, realmIdOf(caller, env));
 }
 async function setStyle({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
-  return await setShopStyle(env, caller.business, body);
+  return await setShopStyle(env, caller.business, body, realmIdOf(caller, env));
 }
 
 /** Owner/admin: download this shop's sales or coffer ledger as a CSV. */
 async function ownerExport({ request, env, url, cors }) {
   const caller = await requireOwnerOrAdmin(request, env);
   const type = url.searchParams.get('type') === 'coffer' ? 'coffer' : 'sales';
-  const { filename, csv } = await businessCsv(env, caller.business, type);
+  const { filename, csv } = await businessCsv(env, caller.business, type, realmIdOf(caller, env));
   return new Response(csv, {
     status: 200,
     headers: { ...cors, 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="' + filename + '"' },
@@ -275,11 +282,11 @@ async function ownerExport({ request, env, url, cors }) {
 /* ---- lookups shared across the app ---- */
 async function listBusinesses({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return { businesses: await listBusinessNames(env, realmIdOf(caller)) };
+  return { businesses: await listBusinessNames(env, realmIdOf(caller, env)) };
 }
 async function getItems({ request, env }) {
-  await requireRegistered(request, env);
-  return { items: await listItemIndex(env) };
+  const caller = await requireRegistered(request, env);
+  return { items: await listItemIndex(env, realmIdOf(caller, env)) };
 }
 /** Any registered user: the admin-assigned tile artwork (key → image URL). */
 async function getTiles({ request, env }) {
@@ -289,18 +296,26 @@ async function getTiles({ request, env }) {
   try { images = raw ? JSON.parse(raw) : {}; } catch (e) { images = {}; }
   return { images };
 }
-async function getHolds({ request, env }) {
-  await requireUser(request, env); // usable during registration (caller not registered yet)
-  return { holds: await readHolds(env) };
+/**
+ * The hold list. Usable DURING registration, when the caller has no account and
+ * so no realm — in that case the realm comes from the query string, which is
+ * safe here because holds are public reference data and the picker needs them
+ * before the account exists.
+ */
+async function getHolds({ request, env, url }) {
+  const payload = await requireUser(request, env);
+  const user = await findUserByEmail(env, payload.email);
+  const realmId = user ? realmIdOf(user, env) : realmOf(url.searchParams.get('realm'));
+  return { holds: await readHolds(env, realmId) };
 }
 async function holdReportRoute({ request, env }) {
   const caller = await requireRegistered(request, env);
-  const meta = await findBusinessMeta(env, caller.business, realmIdOf(caller));
+  const meta = await findBusinessMeta(env, caller.business, realmIdOf(caller, env));
   if (!meta.court) {
     const e = new Error('This report is available to Court businesses only.');
     e.forbidden = true; throw e;
   }
-  return await holdReport(env, meta.hold);
+  return await holdReport(env, meta.hold, realmIdOf(caller, env));
 }
 
 /** Public (no auth): sitewide branding — needed before sign-in. */
@@ -310,7 +325,7 @@ async function branding({ env }) {
 
 /** Public (no auth): a shop's read-only catalog, if storefronts are enabled. */
 async function storefront({ env, url }) {
-  return await publicStorefront(env, url.searchParams.get('b'));
+  return await publicStorefront(env, url.searchParams.get('b'), realmOf(url.searchParams.get('realm')));
 }
 
 /* ---- MOTD banners ---- */
@@ -323,19 +338,20 @@ function daysUntil(untilStr) {
 }
 async function getMotd({ request, env }) {
   const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
   const notices = [];
-  const global = await readMotd(env);
+  const global = await readMotd(env, realmId);
   if (global) notices.push(global);
-  notices.push(...(await activeNoticesForBusiness(env, caller.business)));
+  notices.push(...(await activeNoticesForBusiness(env, caller.business, realmId)));
 
   const banners = [];
   if (caller.role === 'owner' || caller.role === 'employee') {
-    const cert = await checkCertification(env, caller.business);
+    const cert = await checkCertification(env, caller.business, realmId);
     if (!cert.perpetual) {
       if (cert.status === 'EXPIRED') {
         banners.push({ text: '⚠ ' + caller.business + '’s Vici Trading Co. certification has EXPIRED — renew with an admin to keep selling.' });
       } else if (cert.until) {
-        const warnDays = await readWarnDays(env);
+        const warnDays = await readWarnDays(env, realmId);
         const left = daysUntil(cert.until);
         if (left != null && left <= warnDays) {
           banners.push({ text: '⚠ ' + caller.business + '’s certification expires in ' + left + ' day' +
@@ -346,7 +362,7 @@ async function getMotd({ request, env }) {
   }
   if (caller.role === 'owner' || caller.role === 'admin') {
     try {
-      const n = await countIncomingPending(env, caller.business);
+      const n = await countIncomingPending(env, caller.business, realmId);
       if (n > 0) {
         banners.push({
           text: '📦 You have ' + n + ' pending transfer' + (n === 1 ? '' : 's') + ' to accept.',
@@ -364,7 +380,7 @@ async function getMotd({ request, env }) {
   // Owner low/out-of-stock nudge → opens a focal report.
   if (caller.role === 'owner' || caller.role === 'admin') {
     try {
-      const { out, low } = await lowStockReport(env, caller.business);
+      const { out, low } = await lowStockReport(env, caller.business, realmId);
       const n = out.length + low.length;
       if (n > 0) {
         banners.push({

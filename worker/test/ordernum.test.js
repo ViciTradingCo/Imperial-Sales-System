@@ -33,17 +33,17 @@ const line = (qty) => ({ cart: [{ item: 'Iron Sword', qty, price: 10 }], hold: '
 
 describe('order numbers', () => {
   it('are unique for back-to-back sales in the same second', async () => {
-    const a = await checkout(env, 'Alpha', caller, line(1));
-    const b = await checkout(env, 'Alpha', caller, line(1));
+    const a = await checkout(env, 'Alpha', caller, line(1), 'default');
+    const b = await checkout(env, 'Alpha', caller, line(1), 'default');
     expect(a.orderNo).not.toBe(b.orderNo);
   });
 
   it('voids exactly one sale, restocking and refunding only that one', async () => {
-    const a = await checkout(env, 'Alpha', caller, line(1)); // 10gp, stock 10 -> 9
-    const b = await checkout(env, 'Alpha', caller, line(1)); // 10gp, stock 9 -> 8
-    expect(await cofferBalance(env, 'Alpha')).toBe(20);
+    const a = await checkout(env, 'Alpha', caller, line(1), 'default'); // 10gp, stock 10 -> 9
+    const b = await checkout(env, 'Alpha', caller, line(1), 'default'); // 10gp, stock 9 -> 8
+    expect(await cofferBalance(env, 'Alpha', 'default')).toBe(20);
 
-    await voidSale(env, 'Alpha', a.orderNo);
+    await voidSale(env, 'Alpha', a.orderNo, 'default');
 
     // Only sale A is voided; B still stands.
     const rows = (await env.DB.prepare('SELECT order_no, status FROM sales WHERE business = ?').bind('Alpha').all()).results;
@@ -54,7 +54,7 @@ describe('order numbers', () => {
     // One unit back in stock, one sale's worth reversed from the coffers.
     const stock = (await env.DB.prepare("SELECT stock FROM inventory WHERE business='Alpha' AND item='Iron Sword'").first()).stock;
     expect(stock).toBe(9);
-    expect(await cofferBalance(env, 'Alpha')).toBe(10);
+    expect(await cofferBalance(env, 'Alpha', 'default')).toBe(10);
     expect(b.orderNo).toBeTruthy();
   });
 });

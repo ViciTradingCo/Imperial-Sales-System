@@ -33,9 +33,13 @@ function rowToUser(r) {
     status: String(r.status || '').trim().toLowerCase() || 'active',
     character: String(r.char_name || '').trim(),
     notes: String(r.notes || '').trim(),
-    // Which realm this account belongs to. Every downstream query scopes to it,
-    // and it comes ONLY from this row — never from the request.
+    // The realm this account BELONGS to. It comes only from this row, never
+    // from the request, so it is the caller's permanent home.
     realmId: String(r.realm_id || DEFAULT_REALM_ID).trim() || DEFAULT_REALM_ID,
+    // The realm a super admin is currently VIEWING. Empty for everyone else —
+    // guards.realmIdOf() falls back to realmId, so an ordinary account can
+    // never read outside its own realm even if this column were set.
+    activeRealm: String(r.active_realm || '').trim(),
   };
 }
 
@@ -175,6 +179,58 @@ export async function deleteMember(env, uid, realmId) {
   if (!existing) throw new Error('Member not found.');
   await db.prepare('DELETE FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).run();
   bustUserCache();
+}
+
+/**
+ * Sets which realm a super admin is VIEWING. Passing their own realm (or an
+ * empty value) clears the override. The caller must have already established
+ * that this user may switch realms — see guards.requireSuperAdmin.
+ */
+export async function setActiveRealm(env, uid, realmId) {
+  const db = await getDb(env);
+  const target = String(realmId || '').trim();
+  if (target) {
+    const realm = await db.prepare('SELECT id FROM realms WHERE id = ?').bind(target).first();
+    if (!realm) throw new Error('That realm no longer exists.');
+  }
+  await db.prepare('UPDATE users SET active_realm = ? WHERE uid = ?').bind(target, uid).run();
+  return target;
+}
+
+/**
+ * Moves ONE member to another realm — the fix for someone registering under the
+ * wrong server. Their business does NOT follow them; a member landing in a realm
+ * where their business doesn't exist is cleared to no business, so they show up
+ * as unassigned rather than pointing at a shop that isn't there.
+ */
+export async function transferMember(env, uid, toRealm, fromRealm) {
+  const target = String(uid || '').trim();
+  const to = String(toRealm || '').trim();
+  if (!target) throw new Error('Missing member uid.');
+  if (!to) throw new Error('Pick a destination realm.');
+  const db = await getDb(env);
+  const from = String(fromRealm || DEFAULT_REALM_ID);
+  const row = await db.prepare('SELECT * FROM users WHERE uid = ? AND realm_id = ?').bind(target, from).first();
+  if (!row) throw new Error('Member not found.');
+  if (from === to) return rowToUser(row);
+
+  const realm = await db.prepare('SELECT id FROM realms WHERE id = ?').bind(to).first();
+  if (!realm) throw new Error('That realm no longer exists.');
+  // One email per realm — refuse rather than trip the unique index.
+  const clash = await db.prepare('SELECT uid FROM users WHERE realm_id = ? AND lower(email) = ?')
+    .bind(to, String(row.email || '').trim().toLowerCase()).first();
+  if (clash) throw new Error('That email is already registered in the destination realm.');
+
+  // Keep the business only if a company of that name exists over there.
+  const biz = String(row.business || '').trim();
+  const keeps = biz
+    ? await db.prepare('SELECT business FROM companies WHERE realm_id = ? AND lower(business) = ?')
+        .bind(to, biz.toLowerCase()).first()
+    : null;
+  await db.prepare("UPDATE users SET realm_id = ?, business = ?, active_realm = '' WHERE uid = ?")
+    .bind(to, keeps ? keeps.business : '', target).run();
+  bustUserCache();
+  return { uid: target, realmId: to, business: keeps ? keeps.business : '', businessCleared: !!biz && !keeps };
 }
 
 /** Best-effort Last Seen stamp. Never throws into the caller. */
