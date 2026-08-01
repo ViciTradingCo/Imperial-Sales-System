@@ -13,6 +13,8 @@ export function navItems(me) {
   // owners/employees. Admins manage the network, not a shop, so they don't get
   // the Business Operations entry.
   if (me.role === 'admin') items.push({ path: '/admin/market', label: 'Market Analysis' });
+  // Realm Management: running more than one server from this deployment.
+  if (me.role === 'admin') items.push({ path: '/admin/realms', label: 'Realm Management' });
   // Court businesses get a report for their own hold.
   if (me.court && me.role !== 'admin') items.push({ path: '/hold-report', label: 'Hold Report' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });

@@ -23,6 +23,7 @@ import { renderEmployees } from './views/employees.js';
 import { renderInventory } from './views/inventory.js';
 import { renderPos } from './views/pos.js';
 import { renderAdminSettings } from './views/admin-settings.js';
+import { renderRealms } from './views/realms.js';
 import { renderMembers } from './views/members.js';
 import { renderCompanies } from './views/companies.js';
 import { renderMarket } from './views/market.js';
@@ -156,6 +157,7 @@ function showRoot(container) {
   if (state.me.registered) renderHome(container, {
     me: state.me,
     onProfileUpdated: (me) => { state.me = me; renderBadge(); render(); },
+    onRealmChanged: refreshRealm,
   });
   else navigate('/register');
 }
@@ -177,8 +179,8 @@ route('/register', (container) => {
 
 // Public storefront — no sign-in required. #/shop?b=<business>
 route('/shop', (container, path, query) => {
-  const b = new URLSearchParams(query || '').get('b');
-  renderStorefront(container, b);
+  const q = new URLSearchParams(query || '');
+  renderStorefront(container, q.get('b'), q.get('realm'));
 });
 
 route('/patch-notes', (container) => {
@@ -216,33 +218,51 @@ route('/pos', (container) => {
 
 route('/admin/settings', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderAdminSettings(container);
+  renderAdminSettings(container, { me: state.me });
 });
 
 route('/admin/motd', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderMotdAdmin(container);
+  renderMotdAdmin(container, { me: state.me });
 });
 
 route('/admin/audit', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderAudit(container);
+  renderAudit(container, { me: state.me });
 });
 
 route('/admin/items', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderItemIndex(container);
+  renderItemIndex(container, { me: state.me });
 });
 
 route('/admin/members', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderMembers(container);
+  renderMembers(container, { me: state.me });
 });
 
 route('/admin/companies', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderCompanies(container);
+  renderCompanies(container, { me: state.me });
 });
+
+route('/admin/realms', (container) => {
+  if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
+  renderRealms(container, { me: state.me, onRealmChanged: refreshRealm });
+});
+
+/**
+ * Re-reads the profile after a realm switch and redraws. Every page is scoped to
+ * the active realm, so the safest thing after a switch is to go back to the
+ * Admin Panel with fresh identity rather than leave a page showing stale data.
+ */
+async function refreshRealm() {
+  state.me = await api.me();
+  renderBadge();
+  showNav(true);
+  navigate('/');
+  render();
+}
 
 function adminMarket(tab) {
   return (container) => {

@@ -10,13 +10,15 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 import { setAdminActions, subscriptionCard } from '../lib/sections.js';
+import { toast } from '../lib/toast.js';
 import { renderPos } from './pos.js';
 import { renderInventory } from './inventory.js';
 import { renderEmployees } from './employees.js';
 import { renderLedgerSettings } from './ledger-settings.js';
 import { openLowStockModal } from './low-stock.js';
+import { skeletonLines } from '../lib/skeleton.js';
 
-export function renderHome(container, { me, onProfileUpdated }) {
+export function renderHome(container, { me, onProfileUpdated, onRealmChanged }) {
   // Notices — the global MOTD plus any active per-business messages.
   const motdHost = el('div', {});
   api.getMotd().then((r) => {
@@ -41,11 +43,14 @@ export function renderHome(container, { me, onProfileUpdated }) {
   // change). Owners/employees keep the big-button shop tools on the page.
   const isAdmin = me.role === 'admin';
   const gridHost = el('div', {});
-  const nodes = [motdHost, idCard];
+  const nodes = [motdHost];
   if (isAdmin) {
-    setAdminActions();
-    nodes.push(errorsCard());
+    // The Admin Panel is a landing page: a greeting that says plainly which
+    // realm is being shown, then the realm picker, then anything wrong.
+    setAdminActions(me);
+    nodes.push(adminWelcomeCard(me), realmPickerCard(me, onRealmChanged), errorsCard());
   } else {
+    nodes.push(idCard);
     nodes.push(el('div.card', {}, [el('h3', {}, 'Shop tools'), gridHost]));
     nodes.push(subscriptionCard(me));
   }
@@ -75,6 +80,68 @@ export function renderHome(container, { me, onProfileUpdated }) {
     ];
     mount(gridHost, tileGrid(tiles.filter(Boolean), images));
   }
+}
+
+/** The Admin Panel greeting — who you are, and which realm you are looking at. */
+function adminWelcomeCard(me) {
+  return el('div.card', {}, [
+    el('h2', {}, 'Welcome, ' + esc(me.character || me.email || 'administrator')),
+    el('p', {}, 'This is the Admin Panel — the controls for the whole network. The tools are on the bar above: ' +
+      'members, companies, the item index, notices, the audit log, and settings.'),
+    el('p', { class: 'note', html:
+      'You are viewing <b>' + esc(me.realmName || me.activeRealm || 'the main realm') + '</b>. ' +
+      'Every page in the app shows that realm and nothing else.' }),
+  ]);
+}
+
+/**
+ * Which realm the app displays. Only a super admin can switch; a realm's own
+ * admin sees their realm named here but no picker, because there is nothing for
+ * them to switch to. The Worker re-checks this either way.
+ */
+function realmPickerCard(me, onRealmChanged) {
+  const host = el('div', {}, skeletonLines(1));
+  const card = el('div.card', {}, [
+    el('h3', {}, '🌐 Realm'),
+    el('p', { class: 'note' }, 'Realms are separate servers. Switching changes what every other page shows — ' +
+      'members, companies, inventory, sales, market analysis, and settings all follow the realm you pick.'),
+    host,
+  ]);
+
+  api.getRealms().then((r) => {
+    const realms = r.realms || [];
+    if (!me.superAdmin || realms.length < 2) {
+      mount(host, el('p', {}, [
+        document.createTextNode('Showing '),
+        el('b', {}, me.realmName || me.activeRealm || 'the main realm'),
+        document.createTextNode(realms.length < 2 ? ' — the only realm on this deployment.' : '.'),
+      ]));
+      return;
+    }
+    const sel = el('select', {});
+    realms.forEach((x) => {
+      const o = el('option', { value: x.id }, x.name + ' (' + x.companies + ' shops, ' + x.members + ' members)');
+      if (x.id === me.activeRealm) o.selected = true;
+      sel.appendChild(o);
+    });
+    const status = el('p', {});
+    const apply = el('button.primary', { onclick: async () => {
+      if (sel.value === me.activeRealm) { status.className = ''; status.textContent = 'Already showing that realm.'; return; }
+      apply.disabled = true; status.className = ''; status.textContent = 'Switching…';
+      try {
+        await api.selectRealm(sel.value);
+        toast('Now showing ' + sel.options[sel.selectedIndex].textContent.replace(/ \(.*$/, ''), 'ok');
+        if (onRealmChanged) await onRealmChanged();
+      } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
+      finally { apply.disabled = false; }
+    } }, 'Show this realm');
+    mount(host,
+      el('label', {}, 'Display data for'), sel,
+      el('div', { class: 'row-actions' }, [apply]),
+      status);
+  }).catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
+
+  return card;
 }
 
 /**

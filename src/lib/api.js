@@ -47,8 +47,8 @@ export const api = {
   /** Verifies the signed-in user and returns their profile, or {registered:false}. */
   me: () => request('POST', '/auth/me', {}),
   /** Registers the signed-in user against a business (as owner or employee). */
-  register: (businessName, asOwner, character, hold) =>
-    request('POST', '/auth/register', { businessName, asOwner: !!asOwner, character, hold }),
+  register: (businessName, asOwner, character, hold, realmId) =>
+    request('POST', '/auth/register', { businessName, asOwner: !!asOwner, character, hold, realmId }),
   /** Updates the signed-in user's own profile (character name). */
   updateProfile: (character) => request('POST', '/me/profile', { character }),
   /** Owner/admin: the roster for the caller's business. */
@@ -200,6 +200,32 @@ export const api = {
   analyzeItems: (rows) => request('POST', '/admin/items/import/analyze', { rows }),
   /** Admin: replace the hold index. */
   setHolds: (holds) => request('POST', '/admin/holds', { holds }),
+
+  /* ---- realms (multi-server) ----
+   * Everything below acts on the realm the caller is CURRENTLY VIEWING, which
+   * the Worker reads from their own user row. The client never sends a realm
+   * with ordinary requests — only realmSelect changes which one is active.
+   */
+  /** Admin: every realm, with its shop + member counts. */
+  getRealms: () => request('GET', '/admin/realms'),
+  /** Super admin: create a realm. */
+  createRealm: (name, slug) => request('POST', '/admin/realms/create', { name, slug }),
+  /** Super admin: rename a realm. */
+  renameRealm: (id, name) => request('POST', '/admin/realms/rename', { id, name }),
+  /** Super admin: delete a realm AND everything in it. */
+  deleteRealm: (id) => request('POST', '/admin/realms/delete', { id, confirm: 'DELETE' }),
+  /** Super admin: choose which realm the app shows data for ('' = own realm). */
+  selectRealm: (realmId) => request('POST', '/admin/realms/select', { realmId }),
+  /** Admin: row counts for the realm being viewed. */
+  getRealmStats: () => request('GET', '/admin/realms/stats'),
+  /** Super admin: move one member to another realm. */
+  transferMemberRealm: (uid, toRealm) => request('POST', '/admin/realms/transfer-member', { uid, toRealm }),
+  /** Super admin: move a company (and its members) to another realm. */
+  transferCompanyRealm: (id, toRealm) => request('POST', '/admin/realms/transfer-company', { id, toRealm }),
+  /** Sign-up: the realms a new user can join (verified account, not yet registered). */
+  getRealmChoices: () => request('GET', '/auth/realms'),
+  /** Sign-up: the shops inside a chosen realm. */
+  getRealmBusinesses: (realmId) => request('GET', '/auth/businesses?realm=' + encodeURIComponent(realmId || '')),
   /** Public: sitewide branding (name, logo, favicon, footer, accent). */
   getBranding: () => request('GET', '/branding'),
   /** Admin: read branding for editing. */
@@ -217,9 +243,11 @@ export const api = {
   /** Admin: enable/disable public storefronts. */
   setStorefrontFlag: (enabled) => request('POST', '/admin/storefronts', { enabled }),
   /** Public (no auth): a shop's read-only catalog. */
-  getPublicStorefront: (business) => request('GET', '/public/storefront?b=' + encodeURIComponent(business || '')),
+  getPublicStorefront: (business, realmId) => request('GET', '/public/storefront?b=' + encodeURIComponent(business || '') +
+    (realmId ? '&realm=' + encodeURIComponent(realmId) : '')),
   /** The network hold list. */
-  getHolds: () => request('GET', '/holds'),
+  /** The hold list. During sign-up pass the chosen realm — there's no account yet. */
+  getHolds: (realmId) => request('GET', '/holds' + (realmId ? '?realm=' + encodeURIComponent(realmId) : '')),
   /** Recent intake transactions for the caller's business. */
   getIntake: () => request('GET', '/intake'),
   /** Owner/admin: record a stock intake (purchase). */

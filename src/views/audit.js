@@ -12,8 +12,8 @@ import { emptyState } from '../lib/empty.js';
 
 const PAGE_SIZE = 50;
 
-export function renderAudit(container) {
-  setAdminActions();
+export function renderAudit(container, { me } = {}) {
+  setAdminActions(me);
   const host = el('div', {}, skeletonRows(5));
   const search = el('input', { type: 'search', placeholder: 'Search detail…' });
   // Server-side filters — the log is append-only and grows fast, so actor /

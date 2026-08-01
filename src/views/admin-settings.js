@@ -7,27 +7,21 @@
 import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setAdminActions } from '../lib/sections.js';
-import { renderSettingsForm } from './settings-form.js';
 import { toast } from '../lib/toast.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
-export function renderAdminSettings(container) {
-  setAdminActions(); // keep the admin tools on the bar across sub-pages
+export function renderAdminSettings(container, { me }) {
+  setAdminActions(me); // keep the admin tools + realm switcher on the bar
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Network Settings'),
-    el('p', { class: 'note' }, 'Everything that governs the whole network. Pick a section to open it.'),
+    el('p', { class: 'note' }, 'Everything that governs the deployment. Pick a section to open it.'),
+    el('p', { class: 'note' }, 'Looking for the sync cadence and market thresholds? Those belong to a REALM now, ' +
+      'because each realm runs its own economy — find them under Realm Management, in that realm’s Settings.'),
     gridHost,
   ]));
 
   const sections = [
-    { key: 'set-network', label: 'Network Settings', hint: 'Sync + market thresholds', glyph: '🎚️',
-      open: (host) => renderSettingsForm(host, {
-        title: 'Network Settings',
-        subtitle: 'Network-wide settings for the whole trading network.',
-        load: async () => (await api.getSettings()).settings,
-        save: async (updates) => (await api.saveSettings(updates)).settings,
-      }) },
     { key: 'set-branding', label: 'Branding', hint: 'Name, logo, icons', glyph: '🎨',
       open: (host) => mount(host, brandingCard()) },
     { key: 'set-about', label: 'About page', hint: 'What visitors read', glyph: '📖',
@@ -174,7 +168,7 @@ function resetCard() {
   ]);
 }
 
-/** Editor for the network hold index (one hold per line). */
+/** Editor for this realm's hold index (one hold per line). */
 function holdsCard() {
   const box = el('textarea', { rows: '10' });
   const status = el('p', {});
@@ -196,7 +190,8 @@ function holdsCard() {
 
   return el('div.card', {}, [
     el('h3', {}, 'Holds'),
-    el('p', { class: 'note' }, 'The network’s hold names, one per line, in order. Used by every hold dropdown.'),
+    el('p', { class: 'note' }, 'This realm’s hold names, one per line, in order. Used by every hold dropdown. ' +
+      'Each realm keeps its own list.'),
     box,
     save,
     status,
@@ -215,7 +210,7 @@ const TILE_KEYS = [
   ['register', 'Register'], ['inventory', 'Inventory'], ['employees', 'Employees'],
   ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
   // Network Settings sections
-  ['set-network', 'Settings · Network'], ['set-branding', 'Settings · Branding'],
+  ['set-branding', 'Settings · Branding'],
   ['set-about', 'Settings · About page'],
   ['set-holds', 'Settings · Holds'], ['set-tiles', 'Settings · Tile images'],
   ['set-storefront', 'Settings · Storefronts'], ['set-status', 'Settings · System status'],

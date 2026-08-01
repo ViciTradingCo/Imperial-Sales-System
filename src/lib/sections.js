@@ -30,16 +30,52 @@ export function setOpsActions(me) {
   setActions(mark(items));
 }
 
-/** The admin-tools action set (Member List / Company List / Network Settings / Back up). */
-export function setAdminActions() {
-  setActions(mark([
+/**
+ * The admin-tools action set (Member List / Company List / … / Realms).
+ *
+ * Every one of these pages shows a single realm's data, so the bar ends with
+ * the realms themselves: one button per realm, the current one marked, clicking
+ * switches. `me` is optional — without it the realm buttons are simply omitted,
+ * which keeps older call sites working.
+ */
+export function setAdminActions(me) {
+  const items = [
     { label: 'Member List', path: '/admin/members', onClick: () => navigate('/admin/members') },
     { label: 'Company List', path: '/admin/companies', onClick: () => navigate('/admin/companies') },
     { label: 'Item Index', path: '/admin/items', onClick: () => navigate('/admin/items') },
     { label: 'MOTD', path: '/admin/motd', onClick: () => navigate('/admin/motd') },
     { label: 'Audit Log', path: '/admin/audit', onClick: () => navigate('/admin/audit') },
     { label: 'Network Settings', path: '/admin/settings', onClick: () => navigate('/admin/settings') },
-  ]));
+    { label: 'Realms', path: '/admin/realms', onClick: () => navigate('/admin/realms') },
+  ];
+  setActions(mark(items));
+  if (me) appendRealmButtons(items, me);
+}
+
+/**
+ * Appends one button per realm to the admin bar, so switching servers is always
+ * one click from any admin page. Loaded after the bar is drawn so the bar never
+ * waits on the network; a single realm adds nothing (there is nothing to pick).
+ */
+async function appendRealmButtons(baseItems, me) {
+  if (!me.superAdmin) return;
+  let realms;
+  try { realms = (await api.getRealms()).realms || []; } catch (e) { return; }
+  if (realms.length < 2) return;
+  const realmItems = realms.map((r) => ({
+    label: (r.id === me.activeRealm ? '● ' : '○ ') + r.name,
+    class: r.id === me.activeRealm ? 'active' : undefined,
+    onClick: async () => {
+      if (r.id === me.activeRealm) return;
+      try {
+        await api.selectRealm(r.id);
+        // A realm change invalidates every page, so reload rather than trying
+        // to re-render whatever happens to be open.
+        window.location.reload();
+      } catch (e) { /* the API reports the reason on the page that triggered it */ }
+    },
+  }));
+  setActions([...mark(baseItems), { separator: true }, ...realmItems]);
 }
 
 /** Market Analysis sub-page bar (Overview / Item / Hold / Company performance). */

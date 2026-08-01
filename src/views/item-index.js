@@ -11,8 +11,8 @@ import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { money } from '../lib/format.js';
 
-export function renderItemIndex(container) {
-  setAdminActions();
+export function renderItemIndex(container, { me } = {}) {
+  setAdminActions(me);
   const listHost = el('div', {}, skeletonRows(5));
   const search = el('input', { type: 'search', placeholder: 'Search items…' });
   search.addEventListener('input', draw);

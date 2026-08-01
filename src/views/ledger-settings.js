@@ -139,7 +139,10 @@ function cofferCard() {
 
 /* ---- Public storefront share link ---- */
 function storefrontLinkCard(me) {
-  const url = location.origin + location.pathname + '#/shop?b=' + encodeURIComponent(me.business || '');
+  // The realm is part of the link: a visitor has no account, and two realms can
+  // each have a shop of this name.
+  const url = location.origin + location.pathname + '#/shop?b=' + encodeURIComponent(me.business || '') +
+    (me.homeRealm && me.homeRealm !== 'default' ? '&realm=' + encodeURIComponent(me.homeRealm) : '');
   const box = el('input', { type: 'text', readonly: true, value: url });
   const status = el('p', {});
   const copy = el('button.secondary-btn', { onclick: async () => {

@@ -641,3 +641,42 @@ img, table { max-width: 100%; }
 .modal-window .focal-body > .card > h3:first-child { display: none; }
 .modal-window .focal-body > .card > h2:first-child + p.note,
 .modal-window .focal-body > .card > h3:first-child + p.note { margin-top: 0; }
+
+/* ---- Realms (multi-server) ----
+   The realm switcher sits on the same bar as the page links, so a divider and a
+   quieter button style keep "which server am I on" visually separate from
+   "which page am I on". */
+.action-sep {
+  width: 1px; align-self: stretch; margin: 0 4px;
+  background: rgba(122, 74, 31, 0.35);
+}
+
+.realm-list { display: flex; flex-direction: column; gap: 8px; }
+.realm-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid rgba(122, 74, 31, 0.25);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+}
+/* The realm you're looking at is called out, because acting on the wrong realm
+   is the one mistake here that's expensive to undo. */
+.realm-row.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.realm-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.realm-name { font-weight: bold; }
+.realm-id .note { margin: 0; font-size: 12px; }
+.realm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.realm-badge {
+  font-size: 12px; padding: 4px 10px; border-radius: 999px;
+  background: var(--accent); color: var(--header-text);
+  align-self: center;
+}
+
+@media (max-width: 640px) {
+  .realm-row { flex-direction: column; align-items: stretch; }
+  .realm-actions button { flex: 1 1 auto; min-height: 40px; }
+}

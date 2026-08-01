@@ -1,12 +1,17 @@
 /**
  * Public shop storefront — a read-only catalog anyone can view without signing
- * in (gated by the admin's storefront feature flag). Reached at #/shop?b=Name.
+ * in (gated by the admin's storefront feature flag). Reached at
+ * #/shop?b=Name&realm=<id>.
+ *
+ * The realm is in the link because a public visitor has no account to derive it
+ * from, and two realms may each have a shop of the same name. Omitting it falls
+ * back to the default realm, which is what every existing link does.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { money } from '../lib/format.js';
 
-export function renderStorefront(container, business) {
+export function renderStorefront(container, business, realmId) {
   const body = el('div', {}, el('p', { class: 'note' }, 'Loading storefront…'));
   mount(container, el('div.card', {}, [
     el('a', { class: 'link-back', href: '#/' }, '← Vici Trading Co.'),
@@ -15,7 +20,7 @@ export function renderStorefront(container, business) {
 
   if (!business) { mount(body, el('p', { class: 'error' }, 'No shop specified.')); return; }
 
-  api.getPublicStorefront(business).then((s) => {
+  api.getPublicStorefront(business, realmId).then((s) => {
     const accent = s.accent || '';
     const header = el('div', {}, [
       el('h2', { style: accent ? 'color:' + accent : '' }, s.business),
