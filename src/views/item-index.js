@@ -5,11 +5,13 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { money } from '../lib/format.js';
 
 export function renderItemIndex(container) {
+  setAdminActions();
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading items…'));
   const search = el('input', { type: 'search', placeholder: 'Search items…' });
   search.addEventListener('input', draw);

@@ -6,11 +6,13 @@
  */
 import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { setAdminActions } from '../lib/sections.js';
 import { renderSettingsForm } from './settings-form.js';
 import { toast } from '../lib/toast.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
 export function renderAdminSettings(container) {
+  setAdminActions(); // keep the admin tools on the bar across sub-pages
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Network Settings'),

@@ -9,7 +9,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
-import { subscriptionCard } from '../lib/sections.js';
+import { setAdminActions, subscriptionCard } from '../lib/sections.js';
 import { renderPos } from './pos.js';
 import { renderInventory } from './inventory.js';
 import { renderEmployees } from './employees.js';
@@ -37,12 +37,14 @@ export function renderHome(container, { me, onProfileUpdated }) {
       : el('p', { class: 'ok' }, 'Your account is active.'),
   ]);
 
-  // Admins navigate entirely from the top menu — no tiles, no action bar.
-  // Owners/employees keep the big-button shop tools here.
+  // Admins get the network tools on the header action bar (as before the tile
+  // change). Owners/employees keep the big-button shop tools on the page.
   const isAdmin = me.role === 'admin';
   const gridHost = el('div', {});
   const nodes = [motdHost, idCard];
-  if (!isAdmin) {
+  if (isAdmin) {
+    setAdminActions();
+  } else {
     nodes.push(el('div.card', {}, [el('h3', {}, 'Shop tools'), gridHost]));
     nodes.push(subscriptionCard(me));
   }

@@ -4,12 +4,14 @@
  */
 import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { pager } from '../lib/paginate.js';
 
 const PAGE_SIZE = 50;
 
 export function renderAudit(container) {
+  setAdminActions();
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
   const search = el('input', { type: 'search', placeholder: 'Search actor, action, detail…' });
   let all = [];

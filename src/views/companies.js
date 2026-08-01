@@ -6,6 +6,7 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { pager } from '../lib/paginate.js';
@@ -14,6 +15,7 @@ const PAGE_SIZE = 25;
 const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
 
 export function renderCompanies(container) {
+  setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading companies…'));
   const search = el('input', { type: 'search', placeholder: 'Search business, contact, hold, status…' });
   let page = 1;
