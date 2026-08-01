@@ -12,14 +12,34 @@ import { navigate } from '../lib/router.js';
 import { signOut } from '../lib/auth.js';
 import { THEMES, loadPrefs, savePrefs } from '../lib/theme.js';
 import { LANGS, getLang, setLang } from '../lib/i18n.js';
+import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
 export function renderProfile(container, { me, onProfileUpdated }) {
-  mount(container, el('div', {}, [
+  const gridHost = el('div', {});
+  mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
-    profileCard(me, onProfileUpdated),
-    appearanceCard(),
-    signOutCard(),
+    el('h2', {}, 'Profile'),
+    el('p', { class: 'note' }, 'Your character, how the app looks, and signing out. Pick a section to open it.'),
+    gridHost,
   ]));
+
+  const sections = [
+    { key: 'prof-identity', label: 'Character', hint: 'Name & registry facts', glyph: '🪪',
+      open: (host) => mount(host, profileCard(me, onProfileUpdated)) },
+    { key: 'prof-appearance', label: 'Appearance', hint: 'Theme, accent, language', glyph: '🎨',
+      open: (host) => mount(host, appearanceCard()) },
+    { key: 'prof-signout', label: 'Sign out', hint: 'End this session', glyph: '🚪',
+      open: (host) => mount(host, signOutCard()) },
+  ];
+
+  function draw(images) {
+    mount(gridHost, tileGrid(sections.map((s) => ({
+      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
+      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
+    })), images));
+  }
+  draw({});
+  api.getTiles().then((r) => draw(r.images || {})).catch(() => {});
 }
 
 function profileCard(me, onProfileUpdated) {

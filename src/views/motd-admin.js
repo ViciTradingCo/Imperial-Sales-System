@@ -11,33 +11,54 @@ import { api } from '../lib/api.js';
 import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
+import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
 export function renderMotdAdmin(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
-  const globalHost = el('div', {});
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
   let companies = [];
+
+  const gridHost = el('div', {});
+  let cfg = null;
 
   mount(container,
     el('div.card', {}, [
       el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
       el('h2', {}, 'MOTD'),
-      el('p', { class: 'note' }, 'Post a notice for everyone, schedule per-business messages, and tune the subscription-expiry warning.'),
-    ]),
-    globalHost,
-    el('div.card', {}, [
-      el('h3', {}, 'Individual messages'),
-      el('p', { class: 'note' }, 'Per-business notices, optionally scheduled with a start and end. Shown on that business’s Home while active.'),
-      el('button.primary', { onclick: () => openEntryModal(null) }, 'Add message'),
-      listHost,
-    ]),
-  );
+      el('p', { class: 'note' }, 'Post a notice for everyone, schedule per-business messages, and tune the ' +
+        'subscription-expiry warning. Pick a section to open it.'),
+      gridHost,
+    ]));
+
+  const sections = [
+    { key: 'motd-global', label: 'Global notice', hint: 'Shown to everyone', glyph: '📣',
+      open: (host) => mount(host, globalCard(cfg || {})) },
+    { key: 'motd-individual', label: 'Individual messages', hint: 'Per-business, scheduled', glyph: '✉️',
+      open: (host) => mount(host, el('div.card', {}, [
+        el('h3', {}, 'Individual messages'),
+        el('p', { class: 'note' }, 'Per-business notices, optionally scheduled with a start and end. Shown on ' +
+          'that business’s Home while active.'),
+        el('button.primary', { onclick: () => openEntryModal(null) }, 'Add message'),
+        listHost,
+      ])) },
+    { key: 'motd-warn', label: 'Expiry warning', hint: 'Certification lead time', glyph: '⏳',
+      open: (host) => mount(host, warnCard(cfg || {})) },
+  ];
+
+  function drawTiles(images) {
+    mount(gridHost, tileGrid(sections.map((s) => ({
+      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
+      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
+    })), images));
+  }
+  drawTiles({});
+  api.getTiles().then((r) => drawTiles(r.images || {})).catch(() => {});
 
   function load() {
     Promise.all([api.getMotdConfig(), api.getCompanies()])
-      .then(([cfg, cs]) => {
+      .then(([config, cs]) => {
+        cfg = config;
         companies = (cs.companies || []).map((c) => c.business).filter(Boolean);
-        mount(globalHost, globalCard(cfg), warnCard(cfg));
         renderList(cfg.individual || []);
       })
       .catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));

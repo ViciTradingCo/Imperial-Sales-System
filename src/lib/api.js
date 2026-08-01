@@ -62,13 +62,13 @@ export const api = {
   /** Admin: save Master Settings updates ([{label, value}]). */
   saveSettings: (updates) => request('POST', '/admin/settings', { updates }),
   /** Admin: every user in the system. */
-  getMembers: () => request('GET', '/admin/members'),
+  getMembers: (realmId) => request('GET', '/admin/members' + (realmId ? '?realm=' + encodeURIComponent(realmId) : '')),
   /** Admin: edit a member (character, company, role). */
   updateMember: (member) => request('POST', '/admin/members/update', member),
   /** Admin: remove a member from the network. */
   deleteMember: (uid) => request('POST', '/admin/members/delete', { uid }),
   /** Admin: every registered company. */
-  getCompanies: () => request('GET', '/admin/companies'),
+  getCompanies: (realmId) => request('GET', '/admin/companies' + (realmId ? '?realm=' + encodeURIComponent(realmId) : '')),
   /** Admin: edit a company (name + subscription). */
   updateCompany: (company) => request('POST', '/admin/companies/update', company),
   /** Admin: archive (delete) a company — data retained, name freed. */
@@ -219,9 +219,9 @@ export const api = {
   /** Admin: row counts for the realm being viewed. */
   getRealmStats: () => request('GET', '/admin/realms/stats'),
   /** Super admin: move one member to another realm. */
-  transferMemberRealm: (uid, toRealm) => request('POST', '/admin/realms/transfer-member', { uid, toRealm }),
+  transferMemberRealm: (uid, toRealm, fromRealm) => request('POST', '/admin/realms/transfer-member', { uid, toRealm, fromRealm }),
   /** Super admin: move a company (and its members) to another realm. */
-  transferCompanyRealm: (id, toRealm) => request('POST', '/admin/realms/transfer-company', { id, toRealm }),
+  transferCompanyRealm: (id, toRealm, fromRealm) => request('POST', '/admin/realms/transfer-company', { id, toRealm, fromRealm }),
   /** Sign-up: the realms a new user can join (verified account, not yet registered). */
   getRealmChoices: () => request('GET', '/auth/realms'),
   /** Sign-up: the shops inside a chosen realm. */

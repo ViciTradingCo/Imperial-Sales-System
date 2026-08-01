@@ -18,6 +18,10 @@ async function handleMe({ request, env }) {
   markPriority(bearerToken(request), meta.priority); // learn this token's rate tier
   const activeRealm = realmIdOf(user, env);
   const realm = await getRealm(env, activeRealm);
+  // How many realms exist at all. Multi-realm is dormant until this is >1: the
+  // nav, the Admin Panel, and sign-up all stay silent about realms, so a
+  // single-server deployment never has to know the feature is there.
+  const realmCount = (await listRealms(env)).length;
   return publicUser(user, {
     court: meta.court,
     hold: meta.hold,
@@ -26,6 +30,7 @@ async function handleMe({ request, env }) {
     homeRealm: homeRealmOf(user),
     activeRealm,
     realmName: (realm && realm.name) || activeRealm,
+    realmCount,
   });
 }
 

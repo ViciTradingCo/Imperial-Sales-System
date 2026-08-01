@@ -57,6 +57,32 @@ cd worker && npx wrangler deploy                # deploy the API
 No test suite exists yet. Setup (Google Cloud, Cloudflare, Pages) is in
 `docs/SETUP.md`.
 
+## UI convention: buttons and focal menus
+
+Any page with more than one distinct section renders those sections as a grid of
+big tiles (`tileGrid` in `src/lib/tiles.js`), each opening its content in a focal
+menu (`openFocalMenu`) — not as a column of stacked cards. This is the default
+for new work; reach for stacked cards only when a page is a single continuous
+workflow that would be broken up by hiding half of it (the register and the
+inventory table are the standing examples).
+
+When adding a section, give it a stable `key` and add that key to `TILE_KEYS` in
+`src/views/admin-settings.js` so an admin can assign artwork to it.
+
+Navigation stays in the header/side menu; tiles are for content within a page.
+
+## Multi-realm
+
+The system can host several independent servers ("realms") from one deployment,
+with nothing shared between them — see `worker/src/realm.js` for the isolation
+rule. It is DORMANT until a second realm exists: with one realm, the nav, the
+Admin Panel, and sign-up say nothing about realms and the app looks exactly as it
+did before the feature. The way in is Network Settings → Realms.
+
+`/auth/me` returns `realmCount`, `activeRealm`, and `superAdmin`; the UI gates on
+those. Realm selection happens in exactly ONE place (the Admin Panel) and filters
+the session from then on.
+
 ## Conventions
 
 - Config that is safe to publish (OAuth client ID, API URL, admin emails) lives

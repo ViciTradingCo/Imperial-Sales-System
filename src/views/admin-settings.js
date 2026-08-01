@@ -7,6 +7,7 @@
 import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setAdminActions } from '../lib/sections.js';
+import { navigate } from '../lib/router.js';
 import { toast } from '../lib/toast.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
@@ -32,6 +33,11 @@ export function renderAdminSettings(container) {
       open: (host) => mount(host, tileImagesCard()) },
     { key: 'set-storefront', label: 'Storefronts', hint: 'Public shop pages', glyph: '🏪',
       open: (host) => mount(host, storefrontCard()) },
+    // Multi-realm is dormant until a second realm exists, so this is the way in.
+    // Once there are two, Realm Management also appears in the nav and on the
+    // Admin Panel and this stays as a shortcut.
+    { key: 'set-realms', label: 'Realms', hint: 'Run more than one server', glyph: '🌐',
+      open: () => navigate('/admin/realms') },
     { key: 'set-status', label: 'System status', hint: 'Counts + errors', glyph: '💚',
       open: (host) => mount(host, statusCard()) },
     // Backup, log maintenance, and the full reset are one "data" section — they
@@ -215,7 +221,16 @@ const TILE_KEYS = [
   ['set-about', 'Settings · About page'],
   ['set-holds', 'Settings · Holds'], ['set-tiles', 'Settings · Tile images'],
   ['set-storefront', 'Settings · Storefronts'], ['set-status', 'Settings · System status'],
+  ['set-realms', 'Settings · Realms'],
   ['set-data', 'Settings · Data'],
+  // MOTD sections
+  ['motd-global', 'MOTD · Global notice'], ['motd-individual', 'MOTD · Individual'],
+  ['motd-warn', 'MOTD · Expiry warning'],
+  // Profile sections
+  ['prof-identity', 'Profile · Character'], ['prof-appearance', 'Profile · Appearance'],
+  ['prof-signout', 'Profile · Sign out'],
+  // Realm Management sections
+  ['rlm-list', 'Realms · List'], ['rlm-add', 'Realms · Add'], ['transfers', 'Realms · Transfers'],
   // Shop Ledger sections
   ['led-report', 'Ledger · Performance'], ['led-notices', 'Ledger · Notices'],
   ['led-coffer', 'Ledger · Coffers'], ['led-discounts', 'Ledger · Discounts'],

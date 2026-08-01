@@ -3,7 +3,7 @@
  * item + hold indexes, MOTD, market analytics, data backup/restore, log
  * maintenance, and the system-status snapshot.
  */
-import { requireAdmin, requireSuperAdmin, actorName, realmIdOf } from '../guards.js';
+import { requireAdmin, requireSuperAdmin, actorName, realmIdOf, isSuperAdmin } from '../guards.js';
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember } from '../users.js';
@@ -18,7 +18,7 @@ import { writeHolds } from '../holds.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, writeBranding } from '../branding.js';
 import { getFlag, setFlag } from '../db.js';
-import { listRealms, createRealm, renameRealm, deleteRealm, realmStats } from '../realm.js';
+import { listRealms, createRealm, renameRealm, deleteRealm, realmStats, getRealm } from '../realm.js';
 
 /**
  * Network Settings belong to a REALM, so these act on whichever realm the
@@ -34,9 +34,16 @@ async function saveSettings({ request, env, body }) {
   return { settings: await writeSettings(env, body.updates || [], realmIdOf(caller, env)) };
 }
 
-async function listMembers({ request, env }) {
+/**
+ * The member list for the realm being viewed. A super admin may pass ?realm= to
+ * read another realm's roster — the Transfers module needs the SOURCE realm's
+ * members, which is not necessarily the one being viewed. Ignored for anyone
+ * else, so an ordinary admin still cannot look outside their own realm.
+ */
+async function listMembers({ request, env, url }) {
   const caller = await requireAdmin(request, env);
-  return { members: await listAllUsers(env, realmIdOf(caller, env)) };
+  const realmId = await sourceRealm(env, caller, isSuperAdmin(env, caller) ? url.searchParams.get('realm') : '');
+  return { members: await listAllUsers(env, realmId) };
 }
 async function updateMemberRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
@@ -51,9 +58,11 @@ async function deleteMemberRoute({ request, env, body }) {
   return { members: await listAllUsers(env, realmIdOf(caller, env)) };
 }
 
-async function listCompaniesRoute({ request, env }) {
+/** As listMembers: ?realm= is honoured for a super admin only. */
+async function listCompaniesRoute({ request, env, url }) {
   const caller = await requireAdmin(request, env);
-  return { companies: await listCompanies(env, realmIdOf(caller, env)) };
+  const realmId = await sourceRealm(env, caller, isSuperAdmin(env, caller) ? url.searchParams.get('realm') : '');
+  return { companies: await listCompanies(env, realmId) };
 }
 async function updateCompanyRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
@@ -299,16 +308,33 @@ async function realmSelect({ request, env, body }) {
  * picked the wrong server at registration. Super admins only, since it is the
  * one operation that deliberately crosses the boundary.
  */
+/**
+ * The realm a transfer moves OUT of. Defaults to the one the caller is viewing,
+ * which is the common case; a super admin may name a different source so they
+ * can fix a misplaced account without switching realms first.
+ *
+ * This is safe for the same reason realm switching is: only a super admin gets
+ * here, and they can already view any realm. It grants no reach they lack — it
+ * just saves a round trip. The realm must exist; an unknown id falls back to the
+ * active realm rather than silently matching nothing.
+ */
+async function sourceRealm(env, caller, requested) {
+  const want = String(requested || '').trim();
+  const active = realmIdOf(caller, env);
+  if (!want || want === active) return active;
+  return (await getRealm(env, want)) ? want : active;
+}
+
 async function realmTransferMember({ request, env, body }) {
   const caller = await requireSuperAdmin(request, env);
-  const from = realmIdOf(caller, env);
+  const from = await sourceRealm(env, caller, body.fromRealm);
   const res = await transferMember(env, body.uid, body.toRealm, from);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.member.transfer', detail: body.uid + ': ' + from + ' → ' + body.toRealm, realmId: from });
   return { ...res, members: await listAllUsers(env, from) };
 }
 async function realmTransferCompany({ request, env, body }) {
   const caller = await requireSuperAdmin(request, env);
-  const from = realmIdOf(caller, env);
+  const from = await sourceRealm(env, caller, body.fromRealm);
   const res = await transferCompany(env, body.id, body.toRealm, from);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.company.transfer', detail: (res.moved || body.id) + ': ' + from + ' → ' + body.toRealm, realmId: from });
   return { ...res, companies: await listCompanies(env, from), members: await listAllUsers(env, from) };
