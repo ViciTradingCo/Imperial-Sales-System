@@ -10,8 +10,8 @@ import { setAdminActions } from '../lib/sections.js';
 import { toast } from '../lib/toast.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
-export function renderAdminSettings(container, { me }) {
-  setAdminActions(me); // keep the admin tools + realm switcher on the bar
+export function renderAdminSettings(container) {
+  setAdminActions(); // keep the admin tools on the bar across sub-pages
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Network Settings'),
@@ -206,6 +206,7 @@ const TILE_KEYS = [
   // Home — admin
   ['members', 'Members'], ['companies', 'Companies'], ['items', 'Item Index'],
   ['market', 'Market'], ['motd', 'MOTD'], ['audit', 'Audit Log'], ['settings', 'Settings'],
+  ['realms', 'Realm Management'], ['transfers', 'Transfers'],
   // Home — shop
   ['register', 'Register'], ['inventory', 'Inventory'], ['employees', 'Employees'],
   ['ledger', 'Shop Ledger'], ['restock', 'Restock'],

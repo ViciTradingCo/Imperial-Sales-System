@@ -643,13 +643,27 @@ img, table { max-width: 100%; }
 .modal-window .focal-body > .card > h3:first-child + p.note { margin-top: 0; }
 
 /* ---- Realms (multi-server) ----
-   The realm switcher sits on the same bar as the page links, so a divider and a
-   quieter button style keep "which server am I on" visually separate from
-   "which page am I on". */
-.action-sep {
-  width: 1px; align-self: stretch; margin: 0 4px;
-  background: rgba(122, 74, 31, 0.35);
+   Realm selection lives only on the Admin Panel, so it can afford to be big and
+   explicit: one button per realm, the active one unmistakable. Getting this
+   wrong means working in the wrong world, so it reads as a choice, not a link. */
+.realm-picker { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+.realm-pick {
+  font: inherit; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 180px; flex: 1 1 180px;
+  padding: 12px 14px;
+  border: 2px solid rgba(122, 74, 31, 0.3);
+  border-radius: var(--radius);
+  background: var(--paper-raised); color: inherit;
 }
+.realm-pick:hover:not(:disabled) { border-color: var(--accent); }
+.realm-pick:disabled { opacity: 0.6; cursor: default; }
+.realm-pick.is-active {
+  border-color: var(--accent);
+  background: var(--accent); color: var(--header-text);
+}
+.realm-pick-name { font-weight: bold; font-size: 15px; }
+.realm-pick-meta { font-size: 12px; opacity: 0.8; }
 
 .realm-list { display: flex; flex-direction: column; gap: 8px; }
 .realm-row {

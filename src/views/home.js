@@ -17,8 +17,13 @@ import { renderEmployees } from './employees.js';
 import { renderLedgerSettings } from './ledger-settings.js';
 import { openLowStockModal } from './low-stock.js';
 import { skeletonLines } from '../lib/skeleton.js';
+import { transferCard } from './realms.js';
+import { navigate } from '../lib/router.js';
 
 export function renderHome(container, { me, onProfileUpdated, onRealmChanged }) {
+  // Filled by the realm picker; the Transfers module reads it for its
+  // destination dropdowns, so both share one fetch.
+  let adminRealms = [];
   // Notices — the global MOTD plus any active per-business messages.
   const motdHost = el('div', {});
   api.getMotd().then((r) => {
@@ -39,16 +44,18 @@ export function renderHome(container, { me, onProfileUpdated, onRealmChanged }) 
       : el('p', { class: 'ok' }, 'Your account is active.'),
   ]);
 
-  // Admins get the network tools on the header action bar (as before the tile
-  // change). Owners/employees keep the big-button shop tools on the page.
   const isAdmin = me.role === 'admin';
   const gridHost = el('div', {});
   const nodes = [motdHost];
   if (isAdmin) {
-    // The Admin Panel is a landing page: a greeting that says plainly which
-    // realm is being shown, then the realm picker, then anything wrong.
-    setAdminActions(me);
-    nodes.push(adminWelcomeCard(me), realmPickerCard(me, onRealmChanged), errorsCard());
+    // The Admin Panel is a landing page: a greeting, the realm this session is
+    // filtered to, the tools as big buttons, then anything wrong.
+    setAdminActions();
+    nodes.push(
+      adminWelcomeCard(me),
+      realmPickerCard(me, onRealmChanged, (list) => { adminRealms = list; }),
+      el('div.card', {}, [el('h3', {}, 'Network tools'), gridHost]),
+      errorsCard());
   } else {
     nodes.push(idCard);
     nodes.push(el('div.card', {}, [el('h3', {}, 'Shop tools'), gridHost]));
@@ -56,7 +63,6 @@ export function renderHome(container, { me, onProfileUpdated, onRealmChanged }) 
   }
   mount(container, ...nodes);
 
-  if (isAdmin) return; // nothing else to draw
   // Tiles render as soon as the page does; artwork fills in when it arrives.
   drawTiles({});
   api.getTiles().then((r) => drawTiles(r.images || {})).catch(() => { /* glyphs are fine */ });
@@ -65,7 +71,34 @@ export function renderHome(container, { me, onProfileUpdated, onRealmChanged }) 
     openFocalMenu(title, (host) => render(host));
   }
 
+  /** The admin tools as big buttons — pages navigate, modules open in place. */
+  function adminTiles() {
+    return [
+      { key: 'members', label: 'Members', hint: 'Everyone registered', glyph: '🧑‍🤝‍🧑',
+        onOpen: () => navigate('/admin/members') },
+      { key: 'companies', label: 'Companies', hint: 'Shops & certification', glyph: '🏛️',
+        onOpen: () => navigate('/admin/companies') },
+      { key: 'items', label: 'Item Index', hint: 'The master item library', glyph: '📜',
+        onOpen: () => navigate('/admin/items') },
+      { key: 'market', label: 'Market Analysis', hint: 'Network economy', glyph: '📈',
+        onOpen: () => navigate('/admin/market') },
+      { key: 'motd', label: 'MOTD', hint: 'Notices & banners', glyph: '📣',
+        onOpen: () => navigate('/admin/motd') },
+      { key: 'audit', label: 'Audit Log', hint: 'Who did what', glyph: '🔎',
+        onOpen: () => navigate('/admin/audit') },
+      // Moving someone between realms is usually noticed right here, so it opens
+      // as a module rather than sending you to another page for one action.
+      me.superAdmin ? { key: 'transfers', label: 'Transfers', hint: 'Move between realms', glyph: '🔀',
+        onOpen: () => open('Move between realms', (h) => mount(h, transferCard(() => adminRealms))) } : null,
+      { key: 'realms', label: 'Realm Management', hint: 'Servers & their settings', glyph: '🌐',
+        onOpen: () => navigate('/admin/realms') },
+      { key: 'settings', label: 'Network Settings', hint: 'Branding, holds, data', glyph: '⚙️',
+        onOpen: () => navigate('/admin/settings') },
+    ].filter(Boolean);
+  }
+
   function drawTiles(images) {
+    if (isAdmin) { mount(gridHost, tileGrid(adminTiles(), images)); return; }
     const tiles = [
       { key: 'register', label: 'Register', hint: 'Ring up a sale', glyph: '🪙',
         onOpen: () => open('Register', (h) => renderPos(h, { me })) },
@@ -95,50 +128,68 @@ function adminWelcomeCard(me) {
 }
 
 /**
- * Which realm the app displays. Only a super admin can switch; a realm's own
- * admin sees their realm named here but no picker, because there is nothing for
- * them to switch to. The Worker re-checks this either way.
+ * Which realm this session is filtered to.
+ *
+ * This is the ONLY place a realm is chosen. The selection is stored on the
+ * user's record server-side, so it holds for the rest of the session and every
+ * other page — members, companies, inventory, sales, market, settings — reads
+ * that realm and nothing else. Deliberately not repeated on other pages: an
+ * accidental switch while working inside a realm is the expensive mistake here.
+ *
+ * Only a super admin can switch. A realm's own admin sees their realm named but
+ * no buttons, because there is nothing for them to switch to. The Worker
+ * re-checks either way.
  */
-function realmPickerCard(me, onRealmChanged) {
+function realmPickerCard(me, onRealmChanged, onRealmsLoaded) {
   const host = el('div', {}, skeletonLines(1));
   const card = el('div.card', {}, [
     el('h3', {}, '🌐 Realm'),
-    el('p', { class: 'note' }, 'Realms are separate servers. Switching changes what every other page shows — ' +
-      'members, companies, inventory, sales, market analysis, and settings all follow the realm you pick.'),
+    el('p', { class: 'note' }, 'Realms are separate servers with nothing shared between them. The one you pick ' +
+      'here filters the whole app for the rest of your session.'),
     host,
   ]);
 
-  api.getRealms().then((r) => {
-    const realms = r.realms || [];
-    if (!me.superAdmin || realms.length < 2) {
-      mount(host, el('p', {}, [
-        document.createTextNode('Showing '),
-        el('b', {}, me.realmName || me.activeRealm || 'the main realm'),
-        document.createTextNode(realms.length < 2 ? ' — the only realm on this deployment.' : '.'),
-      ]));
-      return;
-    }
-    const sel = el('select', {});
-    realms.forEach((x) => {
-      const o = el('option', { value: x.id }, x.name + ' (' + x.companies + ' shops, ' + x.members + ' members)');
-      if (x.id === me.activeRealm) o.selected = true;
-      sel.appendChild(o);
-    });
+  api.getRealms().then((realmsResp) => {
+    const realms = realmsResp.realms || [];
+    if (onRealmsLoaded) onRealmsLoaded(realms);
+    const current = realms.find((x) => x.id === me.activeRealm);
+    const label = el('p', {}, [
+      document.createTextNode('Showing '),
+      el('b', {}, (current && current.name) || me.realmName || 'the main realm'),
+      document.createTextNode(realms.length < 2 ? ' — the only realm on this deployment.' : '.'),
+    ]);
+
+    if (!me.superAdmin || realms.length < 2) { mount(host, label); return; }
+
     const status = el('p', {});
-    const apply = el('button.primary', { onclick: async () => {
-      if (sel.value === me.activeRealm) { status.className = ''; status.textContent = 'Already showing that realm.'; return; }
-      apply.disabled = true; status.className = ''; status.textContent = 'Switching…';
+    const buttons = realms.map((r) => {
+      const active = r.id === me.activeRealm;
+      const b = el('button', {
+        class: 'realm-pick' + (active ? ' is-active' : ''),
+        onclick: () => choose(r, b),
+      }, [
+        el('span', { class: 'realm-pick-name' }, r.name),
+        el('span', { class: 'realm-pick-meta' },
+          active ? 'Showing now' : r.companies + ' shops · ' + r.members + ' members'),
+      ]);
+      return b;
+    });
+
+    async function choose(r, btn) {
+      if (r.id === me.activeRealm) return;
+      buttons.forEach((b) => { b.disabled = true; });
+      status.className = ''; status.textContent = 'Switching to ' + r.name + '…';
       try {
-        await api.selectRealm(sel.value);
-        toast('Now showing ' + sel.options[sel.selectedIndex].textContent.replace(/ \(.*$/, ''), 'ok');
+        await api.selectRealm(r.id);
+        toast('Now showing ' + r.name, 'ok');
         if (onRealmChanged) await onRealmChanged();
-      } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
-      finally { apply.disabled = false; }
-    } }, 'Show this realm');
-    mount(host,
-      el('label', {}, 'Display data for'), sel,
-      el('div', { class: 'row-actions' }, [apply]),
-      status);
+      } catch (e) {
+        status.className = 'error'; status.textContent = e.message || String(e);
+        buttons.forEach((b) => { b.disabled = false; });
+      }
+    }
+
+    mount(host, label, el('div', { class: 'realm-picker' }, buttons), status);
   }).catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
 
   return card;

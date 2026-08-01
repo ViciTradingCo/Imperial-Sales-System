@@ -218,37 +218,37 @@ route('/pos', (container) => {
 
 route('/admin/settings', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderAdminSettings(container, { me: state.me });
+  renderAdminSettings(container);
 });
 
 route('/admin/motd', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderMotdAdmin(container, { me: state.me });
+  renderMotdAdmin(container);
 });
 
 route('/admin/audit', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderAudit(container, { me: state.me });
+  renderAudit(container);
 });
 
 route('/admin/items', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderItemIndex(container, { me: state.me });
+  renderItemIndex(container);
 });
 
 route('/admin/members', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderMembers(container, { me: state.me });
+  renderMembers(container);
 });
 
 route('/admin/companies', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderCompanies(container, { me: state.me });
+  renderCompanies(container);
 });
 
 route('/admin/realms', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderRealms(container, { me: state.me, onRealmChanged: refreshRealm });
+  renderRealms(container, { me: state.me });
 });
 
 /**

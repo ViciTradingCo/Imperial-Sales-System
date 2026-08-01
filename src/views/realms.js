@@ -3,12 +3,15 @@
  * deployment. A realm is an independent world: its own shops, members, items,
  * holds, economy settings, and MOTD, with nothing shared or cross-referenced.
  *
- * Three parts, in the order you actually use them:
- *   1. Which realm the app is showing (and how to switch).
- *   2. Creating a realm, and each realm's own settings.
- *   3. Moving a member or a shop that landed in the wrong realm.
+ * This page is for the realms themselves: creating them, naming them, editing
+ * each one's settings, and deleting them.
  *
- * Creating, renaming, deleting, and moving are SUPER-ADMIN only (an address in
+ * CHOOSING which realm to work in is not here — that happens once, on the Admin
+ * Panel, and filters the session from then on. Keeping the switch in a single
+ * place means you can't change realm by reflex while you're in the middle of
+ * editing one.
+ *
+ * Creating, renaming, and deleting are SUPER-ADMIN only (an address in
  * ADMIN_EMAILS). The Worker enforces that independently; hiding the controls
  * here is a courtesy, not the security.
  */
@@ -20,10 +23,9 @@ import { renderSettingsForm } from './settings-form.js';
 import { skeletonLines } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 
-export function renderRealms(container, { me, onRealmChanged }) {
+export function renderRealms(container, { me }) {
   const listHost = el('div', {}, skeletonLines(3));
   const createHost = el('div', {});
-  const transferHost = el('div', {});
   let realms = [];
 
   mount(container,
@@ -35,17 +37,15 @@ export function renderRealms(container, { me, onRealmChanged }) {
       el('p', { class: 'note' }, [
         document.createTextNode('The app is currently showing '),
         el('b', {}, me.realmName || me.activeRealm || 'your realm'),
-        document.createTextNode('. Everything you see elsewhere — members, companies, market, settings — belongs to it.'),
+        document.createTextNode('. Everything elsewhere — members, companies, market, settings — belongs to it. ' +
+          'To work in a different realm, pick it on the Admin Panel; to move someone who joined the wrong one, ' +
+          'use the Transfers module there.'),
       ]),
     ]),
     el('div.card', {}, [el('h3', {}, 'Realms'), listHost]),
-    createHost,
-    transferHost);
+    createHost);
 
-  if (me.superAdmin) {
-    mount(createHost, createRealmCard(refresh));
-    mount(transferHost, transferCard(() => realms));
-  }
+  if (me.superAdmin) mount(createHost, createRealmCard(refresh));
 
   refresh();
 
@@ -73,9 +73,7 @@ export function renderRealms(container, { me, onRealmChanged }) {
           ' · ' + r.members + ' member' + (r.members === 1 ? '' : 's')),
       ]),
       el('div', { class: 'realm-actions' }, [
-        active
-          ? el('span', { class: 'realm-badge' }, 'Viewing')
-          : (me.superAdmin ? el('button.secondary-btn', { onclick: () => switchTo(r) }, 'View this realm') : null),
+        active ? el('span', { class: 'realm-badge' }, 'Viewing') : null,
         me.superAdmin ? el('button.secondary-btn', { onclick: () => openRealmSettings(r) }, 'Settings') : null,
         me.superAdmin && r.id !== 'default'
           ? el('button.danger', { onclick: () => doDelete(r) }, 'Delete')
@@ -83,16 +81,6 @@ export function renderRealms(container, { me, onRealmChanged }) {
       ].filter(Boolean)),
     ]);
     return row;
-  }
-
-  async function switchTo(r) {
-    try {
-      await api.selectRealm(r.id);
-      toast('Now showing ' + r.name, 'ok');
-      // The whole app is realm-scoped, so re-read the profile and redraw rather
-      // than leaving other pages showing the realm we just left.
-      if (onRealmChanged) await onRealmChanged();
-    } catch (e) { toast(e.message || String(e), 'error'); }
   }
 
   async function doDelete(r) {
@@ -140,12 +128,9 @@ export function renderRealms(container, { me, onRealmChanged }) {
       if (r.id !== me.activeRealm) {
         mount(host, nameCard, el('div.card', {}, [
           el('h3', {}, 'Network Settings'),
-          el('p', { class: 'note' }, 'Each realm keeps its own sync cadence and market thresholds. Switch to ' +
-            esc(r.name) + ' to edit them — settings always apply to the realm you are viewing, so this avoids ' +
-            'editing one realm while looking at another.'),
-          el('div', { class: 'row-actions' }, [
-            el('button.secondary-btn', { onclick: () => switchTo(r) }, 'View this realm'),
-          ]),
+          el('p', { class: 'note' }, 'Each realm keeps its own sync cadence and market thresholds. Settings always ' +
+            'apply to the realm you are viewing, so to edit ' + esc(r.name) + '’s, select it on the Admin Panel ' +
+            'first. That way you can never edit one realm while looking at another.'),
         ]));
         return;
       }
@@ -195,15 +180,18 @@ function createRealmCard(onCreated) {
 }
 
 /**
- * Moving between realms. This is the repair tool for the most likely mistake —
- * someone picking the wrong realm when they signed up.
+ * Moving between realms — the repair tool for the most likely mistake, someone
+ * picking the wrong realm when they signed up. Lives as a module on the Admin
+ * Panel, which is also where the realm being worked in is chosen; this file owns
+ * it because it is realm machinery. `getRealms` is a function, not an array, so
+ * the caller can pass a list that is still loading.
  *
  * A member moves alone; their business is kept only if a shop of that name also
  * exists in the destination, otherwise they arrive unassigned. A company moves
  * with its whole roster, and is refused if the name (or any member's email) is
  * already taken over there.
  */
-function transferCard(getRealms) {
+export function transferCard(getRealms) {
   const memberSel = el('select', {});
   const memberTo = el('select', {});
   const companySel = el('select', {});
@@ -211,20 +199,24 @@ function transferCard(getRealms) {
   const status = el('p', {});
   function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
 
-  function fillRealms(sel) {
+  function fillRealms(sel, realms) {
     sel.innerHTML = '';
-    getRealms().forEach((r) => sel.appendChild(el('option', { value: r.id }, r.name)));
+    realms.forEach((r) => sel.appendChild(el('option', { value: r.id }, r.name)));
   }
 
   async function load() {
     try {
+      // The caller usually has the realms already; fall back to fetching them so
+      // opening this before that list arrives still gives working dropdowns.
+      let realms = (getRealms && getRealms()) || [];
+      if (!realms.length) realms = (await api.getRealms()).realms || [];
       const [m, c] = await Promise.all([api.getMembers(), api.getCompanies()]);
       memberSel.innerHTML = '';
       (m.members || []).forEach((u) => memberSel.appendChild(
         el('option', { value: u.uid }, (u.character || u.email) + (u.business ? ' — ' + u.business : ' — (no shop)'))));
       companySel.innerHTML = '';
       (c.companies || []).forEach((co) => companySel.appendChild(el('option', { value: co.id }, co.business)));
-      fillRealms(memberTo); fillRealms(companyTo);
+      fillRealms(memberTo, realms); fillRealms(companyTo, realms);
     } catch (e) { setStatus(e.message || String(e), 'error'); }
   }
   load();

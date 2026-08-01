@@ -12,8 +12,8 @@ import { pager } from '../lib/paginate.js';
 
 const PAGE_SIZE = 25;
 
-export function renderMembers(container, { me } = {}) {
-  setAdminActions(me); // keep the admin tools on the bar across sub-pages
+export function renderMembers(container) {
+  setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, skeletonRows(5));
   const search = el('input', { type: 'search', placeholder: 'Search name, business, email, role…' });
   let page = 1;

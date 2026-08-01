@@ -8,20 +8,12 @@ let actionEl = null;
 
 export function initActions(el) { actionEl = el; }
 
-/**
- * buttons: [{ label, onClick, class? } | { separator: true }]
- * A separator draws a divider instead of a button — used to set the realm
- * switcher apart from the page links it shares the bar with.
- */
+/** buttons: [{ label, onClick, class? }] */
 export function setActions(buttons) {
   if (!actionEl) return;
   actionEl.innerHTML = '';
   const list = buttons || [];
   list.forEach((b) => {
-    if (b.separator) {
-      actionEl.appendChild(Object.assign(document.createElement('span'), { className: 'action-sep' }));
-      return;
-    }
     const btn = document.createElement('button');
     btn.className = 'action-btn' + (b.class ? ' ' + b.class : '');
     btn.textContent = b.label;
