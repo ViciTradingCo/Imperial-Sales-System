@@ -19,9 +19,9 @@ export function renderAdminSettings(container) {
   ]));
 
   const sections = [
-    { key: 'set-tunables', label: 'Tunables', hint: 'Sync + market thresholds', glyph: '🎚️',
+    { key: 'set-network', label: 'Network Settings', hint: 'Sync + market thresholds', glyph: '🎚️',
       open: (host) => renderSettingsForm(host, {
-        title: 'Network tunables',
+        title: 'Network Settings',
         subtitle: 'Network-wide settings for the whole trading network.',
         load: async () => (await api.getSettings()).settings,
         save: async (updates) => (await api.saveSettings(updates)).settings,
@@ -36,10 +36,10 @@ export function renderAdminSettings(container) {
       open: (host) => mount(host, storefrontCard()) },
     { key: 'set-status', label: 'System status', hint: 'Counts + errors', glyph: '💚',
       open: (host) => mount(host, statusCard()) },
-    { key: 'set-backup', label: 'Backup', hint: 'Export / restore', glyph: '💾',
-      open: (host) => mount(host, backupCard()) },
-    { key: 'set-danger', label: 'Danger zone', hint: 'Purge & full reset', glyph: '⚠️',
-      open: (host) => mount(host, logsCard(), resetCard()) },
+    // Backup, log maintenance, and the full reset are one "data" section — they
+    // are the same job (safeguard first, then trim or wipe).
+    { key: 'set-data', label: 'Data', hint: 'Backup, purge, reset', glyph: '💾',
+      open: (host) => mount(host, backupCard(), logsCard(), resetCard()) },
   ];
 
   function draw(images) {
@@ -162,10 +162,22 @@ function holdsCard() {
  * tile. Blank falls back to the tile's glyph.
  */
 const TILE_KEYS = [
+  // Home — admin
   ['members', 'Members'], ['companies', 'Companies'], ['items', 'Item Index'],
   ['market', 'Market'], ['motd', 'MOTD'], ['audit', 'Audit Log'], ['settings', 'Settings'],
+  // Home — shop
   ['register', 'Register'], ['inventory', 'Inventory'], ['employees', 'Employees'],
   ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
+  // Network Settings sections
+  ['set-network', 'Settings · Network'], ['set-branding', 'Settings · Branding'],
+  ['set-holds', 'Settings · Holds'], ['set-tiles', 'Settings · Tile images'],
+  ['set-storefront', 'Settings · Storefronts'], ['set-status', 'Settings · System status'],
+  ['set-data', 'Settings · Data'],
+  // Shop Ledger sections
+  ['led-coffer', 'Ledger · Coffers'], ['led-discounts', 'Ledger · Discounts'],
+  ['led-style', 'Ledger · Style'], ['led-storefront', 'Ledger · Storefront'],
+  ['led-export', 'Ledger · Export'], ['led-company', 'Ledger · Company'],
+  ['led-settings', 'Ledger · Shop settings'],
 ];
 function tileImagesCard() {
   const status = el('p', {});
