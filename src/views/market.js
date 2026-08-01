@@ -54,11 +54,6 @@ function overview(d) {
         '<b>' + esc(u.business) + '</b> · ' + esc(u.item) + ' — selling at ' +
         money(u.salePrice) + ' vs. avg cost ' + money(u.avgCost)),
       'No items are priced below their purchase cost.'),
-    alertsCard('Low stock', 'warn',
-      (d.lowStock || []).map((s) =>
-        '<b>' + esc(s.business) + '</b> · ' + esc(s.item) + ' — ' + s.stock +
-        ' left (threshold ' + s.lowStock + ')'),
-      'No items are low on stock.'),
     alertsCard('⤴ Overpriced (vs base value)', 'bad',
       (d.overpriced || []).map((o) =>
         '<b>' + esc(o.business) + '</b> · ' + esc(o.item) + ' — ' + money(o.price) +

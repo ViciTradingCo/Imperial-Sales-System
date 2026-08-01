@@ -9,7 +9,6 @@
  *   • holds       — the same broken down by Skyrim hold.
  *   • underpriced — items selling BELOW their average purchase cost (a money-
  *                   losing anomaly worth flagging).
- *   • lowStock    — items at or below their own low-stock threshold.
  */
 import { getDb } from './db.js';
 import { parseSaleItems } from './sales.js';
@@ -86,12 +85,9 @@ export async function marketAnalysis(env) {
       ORDER BY (AVG(k.price_per) - i.price) DESC
       LIMIT 50`).all()).results) || [];
 
-  const lowStock = ((await db.prepare(
-    `SELECT business, item, stock, low_stock AS lowStock
-       FROM inventory
-      WHERE low_stock > 0 AND stock <= low_stock
-      ORDER BY (low_stock - stock) DESC
-      LIMIT 50`).all()).results) || [];
+  // NOTE: low stock is deliberately NOT part of network analysis — it's a
+  // per-shop operational concern, surfaced to owners as the Restock report
+  // (inventory.lowStockReport / GET /business/low-stock).
 
   const master = await listItemIndex(env);
   const saleRows = ((await db.prepare(
@@ -124,7 +120,7 @@ export async function marketAnalysis(env) {
 
   return {
     overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 },
-    businesses, holds, items, underpriced, lowStock,
+    businesses, holds, items, underpriced,
     overpriced: overpriced.slice(0, 50), undercut: undercut.slice(0, 50),
     thresholds: { over: overX, under: underX }, trends,
   };

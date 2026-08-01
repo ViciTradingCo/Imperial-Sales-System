@@ -12,7 +12,16 @@ export function navItems(me) {
   // Register / Inventory / Employees live on an action bar: on Home for
   // owners/employees, and on the Business Operations page for admins.
   if (me.role === 'admin') items.push({ path: '/operations', label: 'Business Operations' });
-  if (me.role === 'admin') items.push({ path: '/admin/market', label: 'Market Analysis' });
+  // The admin tools live in this menu (not as contextual buttons on the page).
+  if (me.role === 'admin') {
+    items.push({ path: '/admin/members', label: 'Member List' });
+    items.push({ path: '/admin/companies', label: 'Company List' });
+    items.push({ path: '/admin/items', label: 'Item Index' });
+    items.push({ path: '/admin/market', label: 'Market Analysis' });
+    items.push({ path: '/admin/motd', label: 'MOTD' });
+    items.push({ path: '/admin/audit', label: 'Audit Log' });
+    items.push({ path: '/admin/settings', label: 'Network Settings' });
+  }
   // Court businesses get a report for their own hold.
   if (me.court && me.role !== 'admin') items.push({ path: '/hold-report', label: 'Hold Report' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });

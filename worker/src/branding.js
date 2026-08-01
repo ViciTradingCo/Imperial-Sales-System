@@ -19,9 +19,15 @@ export const BRANDING_DEFAULTS = {
   faviconUrl: '',
   footerText: 'The Vici Automated Ledger · created by SmileDaemon',
   accent: '',
+  // The About page. aboutBody is free text; blank lines separate paragraphs and
+  // lines beginning with "- " render as bullets.
+  aboutTitle: '',
+  aboutBody: '',
+  aboutCredits: '',
 };
 
-const TEXT_FIELDS = ['appName', 'shortName', 'tagline', 'footerText'];
+const TEXT_FIELDS = ['appName', 'shortName', 'tagline', 'footerText', 'aboutTitle'];
+const LONG_FIELDS = ['aboutBody', 'aboutCredits'];
 const URL_FIELDS = ['logoUrl', 'faviconUrl'];
 
 export async function readBranding(env) {
@@ -38,6 +44,10 @@ export async function writeBranding(env, input) {
   TEXT_FIELDS.forEach((f) => {
     if (input[f] === undefined) return;
     next[f] = String(input[f] || '').trim().slice(0, 120);
+  });
+  LONG_FIELDS.forEach((f) => {
+    if (input[f] === undefined) return;
+    next[f] = String(input[f] || '').trim().slice(0, 4000);
   });
   URL_FIELDS.forEach((f) => {
     if (input[f] === undefined) return;

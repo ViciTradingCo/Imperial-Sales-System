@@ -28,6 +28,8 @@ export function renderAdminSettings(container) {
       }) },
     { key: 'set-branding', label: 'Branding', hint: 'Name, logo, icons', glyph: '🎨',
       open: (host) => mount(host, brandingCard()) },
+    { key: 'set-about', label: 'About page', hint: 'What visitors read', glyph: '📖',
+      open: (host) => mount(host, aboutCard()) },
     { key: 'set-holds', label: 'Holds', hint: 'The hold index', glyph: '🗺️',
       open: (host) => mount(host, holdsCard()) },
     { key: 'set-tiles', label: 'Tile images', hint: 'Home tile artwork', glyph: '🖼️',
@@ -50,6 +52,48 @@ export function renderAdminSettings(container) {
   }
   draw({});
   api.getTiles().then((r) => draw(r.images || {})).catch(() => {});
+}
+
+/** The About page's wording — what visitors read before signing in. */
+function aboutCard() {
+  const title = el('input', { type: 'text', placeholder: 'Leave blank to use the header title' });
+  const body = el('textarea', { rows: '8', placeholder:
+    'Describe your network…\n\nBlank lines start a new paragraph.\nLines starting with "- " become bullet points.' });
+  const credits = el('textarea', { rows: '4', placeholder: 'Created and managed by …' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save About page');
+
+  api.getBrandingAdmin().then((b) => {
+    title.value = b.aboutTitle || '';
+    body.value = b.aboutBody || '';
+    credits.value = b.aboutCredits || '';
+  }).catch(() => {});
+
+  async function doSave() {
+    save.disabled = true; status.className = ''; status.textContent = 'Saving…';
+    try {
+      await api.setBranding({
+        aboutTitle: title.value.trim(),
+        aboutBody: body.value.trim(),
+        aboutCredits: credits.value.trim(),
+      });
+      status.textContent = '';
+      toast('About page saved', 'ok');
+    } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
+    finally { save.disabled = false; }
+  }
+
+  return el('div.card', {}, [
+    el('h3', {}, 'About page'),
+    el('p', { class: 'note' }, 'The wording on the About / welcome page — the first thing visitors see before they ' +
+      'sign in. Leave a field blank to keep the built-in text.'),
+    el('label', {}, 'Heading'), title,
+    el('label', {}, 'Body'), body,
+    el('p', { class: 'note' }, 'Blank lines separate paragraphs; a block of lines each starting with “- ” becomes a bullet list.'),
+    el('label', {}, 'Credits'), credits,
+    el('div', { class: 'row-actions' }, [save]),
+    status,
+  ]);
 }
 
 /** Sitewide branding — app name, logo, favicon, footer, accent. */
@@ -170,6 +214,7 @@ const TILE_KEYS = [
   ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
   // Network Settings sections
   ['set-network', 'Settings · Network'], ['set-branding', 'Settings · Branding'],
+  ['set-about', 'Settings · About page'],
   ['set-holds', 'Settings · Holds'], ['set-tiles', 'Settings · Tile images'],
   ['set-storefront', 'Settings · Storefronts'], ['set-status', 'Settings · System status'],
   ['set-data', 'Settings · Data'],

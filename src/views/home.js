@@ -10,13 +10,6 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 import { subscriptionCard } from '../lib/sections.js';
-import { renderMembers } from './members.js';
-import { renderCompanies } from './companies.js';
-import { renderItemIndex } from './item-index.js';
-import { renderMotdAdmin } from './motd-admin.js';
-import { renderAudit } from './audit.js';
-import { renderAdminSettings } from './admin-settings.js';
-import { renderMarket } from './market.js';
 import { renderPos } from './pos.js';
 import { renderInventory } from './inventory.js';
 import { renderEmployees } from './employees.js';
@@ -44,14 +37,18 @@ export function renderHome(container, { me, onProfileUpdated }) {
       : el('p', { class: 'ok' }, 'Your account is active.'),
   ]);
 
+  // Admins navigate entirely from the top menu — no tiles, no action bar.
+  // Owners/employees keep the big-button shop tools here.
+  const isAdmin = me.role === 'admin';
   const gridHost = el('div', {});
-  const nodes = [motdHost, idCard, el('div.card', {}, [
-    el('h3', {}, me.role === 'admin' ? 'Network tools' : 'Shop tools'),
-    gridHost,
-  ])];
-  if (me.role !== 'admin') nodes.push(subscriptionCard(me));
+  const nodes = [motdHost, idCard];
+  if (!isAdmin) {
+    nodes.push(el('div.card', {}, [el('h3', {}, 'Shop tools'), gridHost]));
+    nodes.push(subscriptionCard(me));
+  }
   mount(container, ...nodes);
 
+  if (isAdmin) return; // nothing else to draw
   // Tiles render as soon as the page does; artwork fills in when it arrives.
   drawTiles({});
   api.getTiles().then((r) => drawTiles(r.images || {})).catch(() => { /* glyphs are fine */ });
@@ -61,22 +58,7 @@ export function renderHome(container, { me, onProfileUpdated }) {
   }
 
   function drawTiles(images) {
-    const tiles = me.role === 'admin' ? [
-      { key: 'members', label: 'Members', hint: 'People in the network', glyph: '👥',
-        onOpen: () => open('Member List', (h) => renderMembers(h)) },
-      { key: 'companies', label: 'Companies', hint: 'Shops & certification', glyph: '🏛️',
-        onOpen: () => open('Company List', (h) => renderCompanies(h)) },
-      { key: 'items', label: 'Item Index', hint: 'Canonical items', glyph: '📜',
-        onOpen: () => open('Master Item Index', (h) => renderItemIndex(h)) },
-      { key: 'market', label: 'Market', hint: 'Network analytics', glyph: '📈',
-        onOpen: () => open('Market Analysis', (h) => renderMarket(h)) },
-      { key: 'motd', label: 'MOTD', hint: 'Notices & banners', glyph: '📣',
-        onOpen: () => open('Message of the Day', (h) => renderMotdAdmin(h)) },
-      { key: 'audit', label: 'Audit Log', hint: 'What changed', glyph: '🧾',
-        onOpen: () => open('Audit Log', (h) => renderAudit(h)) },
-      { key: 'settings', label: 'Settings', hint: 'Network, backup, reset', glyph: '⚙️',
-        onOpen: () => open('Network Settings', (h) => renderAdminSettings(h)) },
-    ] : [
+    const tiles = [
       { key: 'register', label: 'Register', hint: 'Ring up a sale', glyph: '🪙',
         onOpen: () => open('Register', (h) => renderPos(h, { me })) },
       { key: 'inventory', label: 'Inventory', hint: 'Stock & intake', glyph: '📦',
