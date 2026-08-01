@@ -604,3 +604,6 @@ img, table { max-width: 100%; }
   .tile-img-row label { grid-area: l; }
   .tile-img-row input { grid-area: i; }
 }
+
+/* Sitewide branding */
+.brand-logo { height: 1.5em; width: auto; vertical-align: -0.25em; margin-right: 0.45em; }

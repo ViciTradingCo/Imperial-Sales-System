@@ -9,23 +9,46 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { navigate } from '../lib/router.js';
 import { renderSettingsForm } from './settings-form.js';
 import { money } from '../lib/format.js';
+import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
 export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
-  const formHost = el('div', {});
-  mount(container,
-    el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
-    companyCard(me, onBusinessRenamed),
-    storefrontLinkCard(me),
-    cofferCard(),
-    exportCard(),
-    discountsCard(),
-    styleCard(),
-    formHost,
-  );
+  const gridHost = el('div', {});
+  mount(container, el('div.card', {}, [
+    el('h2', {}, 'Shop Ledger'),
+    el('p', { class: 'note' }, esc(me.business || 'Your shop') + ' — pick a section to open it.'),
+    gridHost,
+  ]));
 
+  const sections = [
+    { key: 'led-coffer', label: 'Coffers', hint: 'Balance & ledger', glyph: '🪙',
+      open: (host) => mount(host, cofferCard()) },
+    { key: 'led-discounts', label: 'Discounts', hint: 'Reusable offers', glyph: '🏷️',
+      open: (host) => mount(host, discountsCard()) },
+    { key: 'led-style', label: 'Style', hint: 'Tagline & accent', glyph: '🎨',
+      open: (host) => mount(host, styleCard()) },
+    { key: 'led-storefront', label: 'Storefront', hint: 'Public share link', glyph: '🏪',
+      open: (host) => mount(host, storefrontLinkCard(me)) },
+    { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
+      open: (host) => mount(host, exportCard()) },
+    { key: 'led-company', label: 'Company', hint: 'Rename your shop', glyph: '🏛️',
+      open: (host) => mount(host, companyCard(me, onBusinessRenamed)) },
+    { key: 'led-settings', label: 'Shop settings', hint: 'Per-shop tunables', glyph: '⚙️',
+      open: (host) => renderShopSettings(host) },
+  ];
+
+  function draw(images) {
+    mount(gridHost, tileGrid(sections.map((s) => ({
+      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
+      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
+    })), images));
+  }
+  draw({});
+  api.getTiles().then((r) => draw(r.images || {})).catch(() => {});
+}
+
+function renderShopSettings(formHost) {
   renderSettingsForm(formHost, {
     title: 'Shop settings',
     subtitle: 'Tunables that apply only to your business.',

@@ -1,34 +1,101 @@
 /**
- * Admin-only Network Settings page — Master Settings, the hold index, a system
- * status snapshot, data backup (export/import), and log maintenance
- * (clear / gentle purge). The API enforces admin-only access.
+ * Admin-only Network Settings — a grid of big buttons rather than a wall of
+ * stacked cards. Each tile opens its section in a focal menu: network tunables,
+ * branding, holds, tile art, storefronts, system status, backup, and the danger
+ * zone. The API enforces admin-only access.
  */
 import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { renderSettingsForm } from './settings-form.js';
-import { setAdminActions } from '../lib/sections.js';
 import { toast } from '../lib/toast.js';
+import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
 export function renderAdminSettings(container) {
-  setAdminActions(); // keep the admin tools on the bar across sub-pages
-  const formHost = el('div', {});
-  const holdsHost = el('div', {});
-  const statusHost = el('div', {});
-  const backupHost = el('div', {});
-  const dangerHost = el('div', {});
-  mount(container, formHost, holdsHost, statusHost, backupHost, dangerHost);
+  const gridHost = el('div', {});
+  mount(container, el('div.card', {}, [
+    el('h2', {}, 'Network Settings'),
+    el('p', { class: 'note' }, 'Everything that governs the whole network. Pick a section to open it.'),
+    gridHost,
+  ]));
 
-  renderSettingsForm(formHost, {
-    title: 'Network Settings',
-    subtitle: 'Network-wide settings for the whole Vici trading network.',
-    load: async () => (await api.getSettings()).settings,
-    save: async (updates) => (await api.saveSettings(updates)).settings,
+  const sections = [
+    { key: 'set-tunables', label: 'Tunables', hint: 'Sync + market thresholds', glyph: '🎚️',
+      open: (host) => renderSettingsForm(host, {
+        title: 'Network tunables',
+        subtitle: 'Network-wide settings for the whole trading network.',
+        load: async () => (await api.getSettings()).settings,
+        save: async (updates) => (await api.saveSettings(updates)).settings,
+      }) },
+    { key: 'set-branding', label: 'Branding', hint: 'Name, logo, icons', glyph: '🎨',
+      open: (host) => mount(host, brandingCard()) },
+    { key: 'set-holds', label: 'Holds', hint: 'The hold index', glyph: '🗺️',
+      open: (host) => mount(host, holdsCard()) },
+    { key: 'set-tiles', label: 'Tile images', hint: 'Home tile artwork', glyph: '🖼️',
+      open: (host) => mount(host, tileImagesCard()) },
+    { key: 'set-storefront', label: 'Storefronts', hint: 'Public shop pages', glyph: '🏪',
+      open: (host) => mount(host, storefrontCard()) },
+    { key: 'set-status', label: 'System status', hint: 'Counts + errors', glyph: '💚',
+      open: (host) => mount(host, statusCard()) },
+    { key: 'set-backup', label: 'Backup', hint: 'Export / restore', glyph: '💾',
+      open: (host) => mount(host, backupCard()) },
+    { key: 'set-danger', label: 'Danger zone', hint: 'Purge & full reset', glyph: '⚠️',
+      open: (host) => mount(host, logsCard(), resetCard()) },
+  ];
+
+  function draw(images) {
+    mount(gridHost, tileGrid(sections.map((s) => ({
+      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
+      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
+    })), images));
+  }
+  draw({});
+  api.getTiles().then((r) => draw(r.images || {})).catch(() => {});
+}
+
+/** Sitewide branding — app name, logo, favicon, footer, accent. */
+function brandingCard() {
+  const fields = [
+    ['appName', 'App name', 'text', 'Vici Trading Co.'],
+    ['tagline', 'Header title', 'text', 'The Vici Automated Ledger'],
+    ['shortName', 'Short name (installed app)', 'text', 'Vici Ledger'],
+    ['logoUrl', 'Logo image link', 'url', 'https://… (shown in the header)'],
+    ['faviconUrl', 'Icon image link', 'url', 'https://… (browser tab icon)'],
+    ['footerText', 'Footer text', 'text', 'The Vici Automated Ledger · created by …'],
+    ['accent', 'Accent colour', 'text', '#7a4a1f'],
+  ];
+  const inputs = {};
+  const rows = fields.map(([key, label, type, ph]) => {
+    inputs[key] = el('input', { type: type === 'url' ? 'url' : 'text', placeholder: ph });
+    return el('div', {}, [el('label', {}, label), inputs[key]]);
   });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save branding');
 
-  mount(holdsHost, holdsCard(), tileImagesCard(), storefrontCard());
-  mount(statusHost, statusCard());
-  mount(backupHost, backupCard());
-  mount(dangerHost, logsCard(), resetCard());
+  api.getBrandingAdmin().then((b) => {
+    fields.forEach(([key]) => { if (b[key]) inputs[key].value = b[key]; });
+  }).catch(() => {});
+
+  async function doSave() {
+    const body = {};
+    fields.forEach(([key]) => { body[key] = inputs[key].value.trim(); });
+    save.disabled = true; status.className = ''; status.textContent = 'Saving…';
+    try {
+      await api.setBranding(body);
+      status.textContent = '';
+      toast('Branding saved — reload to see it everywhere', 'ok');
+    } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
+    finally { save.disabled = false; }
+  }
+
+  return el('div.card', {}, [
+    el('h3', {}, 'Branding'),
+    el('p', { class: 'note' }, 'The name, logo, and icon used across the whole app — header, browser tab, and ' +
+      'footer. Images are links to files hosted elsewhere (must be a direct https:// link to the image). ' +
+      'Leave a field blank to use the default.'),
+    ...rows,
+    el('div', { class: 'row-actions' }, [save]),
+    status,
+  ]);
 }
 
 /** Danger zone: full reset — wipe everything, keep only admin accounts. */

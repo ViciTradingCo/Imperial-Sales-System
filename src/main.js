@@ -10,6 +10,7 @@ import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
 import { applyLang } from './lib/i18n.js';
+import { loadBranding } from './lib/branding.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
 import { initActions, clearActions } from './lib/actions.js';
 import { renderLanding } from './views/landing.js';
@@ -307,6 +308,7 @@ async function main() {
     return;
   }
   configureApi(config.apiBaseUrl);
+  loadBranding(); // sitewide name/logo/favicon (public — also brands the landing)
   initRouter(appEl, showRoot);
   onBeforeRender(clearActions); // reset per-view action buttons before each render
 

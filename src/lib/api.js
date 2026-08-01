@@ -187,6 +187,12 @@ export const api = {
   analyzeItems: (rows) => request('POST', '/admin/items/import/analyze', { rows }),
   /** Admin: replace the hold index. */
   setHolds: (holds) => request('POST', '/admin/holds', { holds }),
+  /** Public: sitewide branding (name, logo, favicon, footer, accent). */
+  getBranding: () => request('GET', '/branding'),
+  /** Admin: read branding for editing. */
+  getBrandingAdmin: () => request('GET', '/admin/branding'),
+  /** Admin: save sitewide branding. */
+  setBranding: (b) => request('POST', '/admin/branding', b),
   /** Any registered user: tile artwork (key → image URL). */
   getTiles: () => request('GET', '/tiles'),
   /** Admin: read the tile artwork map. */

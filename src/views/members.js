@@ -6,13 +6,11 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
-import { setAdminActions } from '../lib/sections.js';
 import { pager } from '../lib/paginate.js';
 
 const PAGE_SIZE = 25;
 
 export function renderMembers(container) {
-  setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading members…'));
   const search = el('input', { type: 'search', placeholder: 'Search name, business, email, role…' });
   let page = 1;
