@@ -21,7 +21,6 @@ import { renderRegister } from './views/register.js';
 import { renderProfile } from './views/profile.js';
 import { renderEmployees } from './views/employees.js';
 import { renderInventory } from './views/inventory.js';
-import { renderOperations } from './views/operations.js';
 import { renderPos } from './views/pos.js';
 import { renderAdminSettings } from './views/admin-settings.js';
 import { renderMembers } from './views/members.js';
@@ -203,11 +202,6 @@ route('/employees', (container) => {
   const m = state.me;
   if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
   renderEmployees(container, { me: m });
-});
-
-route('/operations', (container) => {
-  if (!state.me || !state.me.registered) { navigate('/'); return; }
-  renderOperations(container, { me: state.me });
 });
 
 route('/inventory', (container) => {

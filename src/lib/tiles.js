@@ -9,7 +9,7 @@
  *
  *   tileGrid([{ key, label, hint, glyph, onOpen }], images)
  */
-import { el, mount } from './dom.js';
+import { el } from './dom.js';
 import { openModal } from './modal.js';
 
 /**
@@ -52,12 +52,4 @@ export function tileGrid(tiles, images) {
     }
     return btn;
   }));
-}
-
-/** Convenience: render a page as an intro + tile grid. */
-export function renderTilePage(container, { title, subtitle, tiles, images }) {
-  const nodes = [el('h2', {}, title)];
-  if (subtitle) nodes.push(el('p', { class: 'note' }, subtitle));
-  nodes.push(tileGrid(tiles, images));
-  mount(container, el('div.card', {}, nodes));
 }

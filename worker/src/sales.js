@@ -34,6 +34,16 @@ function stamp(d) {
     p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
 }
 
+/**
+ * A unique order number. The timestamp alone is only second-resolution, so two
+ * sales rung up in the same second at one shop used to COLLIDE — and voiding one
+ * then voided both. The random suffix keeps them distinct (the offline queue
+ * replays sales back-to-back, which made this easy to hit).
+ */
+function newOrderNo(d) {
+  return 'ORD-' + stamp(d) + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
 function mapSale(r) {
   return {
     orderNo: r.order_no, ts: r.ts, customer: r.customer, hold: r.hold,
@@ -108,12 +118,16 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
 
   const pct = Number(discountPercent);
   const discPct = isFinite(pct) && pct > 0 && pct <= 100 ? pct : 0;
-  const finalTotal = discPct ? Math.round(subtotal * (100 - discPct)) / 100 : subtotal;
+  // Always settle money to 2dp — float sums like 0.1+0.2 would otherwise store
+  // (and later refund) a value with a long fractional tail.
+  const finalTotal = discPct
+    ? Math.round(subtotal * (100 - discPct)) / 100
+    : Math.round(subtotal * 100) / 100;
   const discountLabel = discPct
     ? (String(discountName || '').trim() ? String(discountName).trim() + ' ' : '') + '(' + discPct + '%)'
     : '';
 
-  const orderNo = 'ORD-' + stamp(new Date());
+  const orderNo = newOrderNo(new Date());
   const itemSummary = lines.map((l) => l.name + ' x' + l.qty + ' @ ' + l.price + 'gp').join(', ');
   const ts = new Date().toISOString();
   const employee = caller.character || caller.email;
@@ -178,16 +192,22 @@ export async function employeePerformance(env, business) {
 export async function voidSale(env, business, orderNo) {
   const db = await getDb(env);
   const order = String(orderNo || '').trim();
-  const { results } = await db.prepare('SELECT * FROM sales WHERE business = ? AND order_no = ?').bind(business, order).all();
-  const sale = results && results[0];
-  if (!sale) throw new Error('Order not found: ' + order);
-  if (String(sale.status).toUpperCase() === 'VOIDED') throw new Error('That order is already voided.');
+  // Target the OLDEST un-voided row for this order number and act on its id, so
+  // a legacy duplicate order number can't void (and under-refund) two sales.
+  const sale = await db.prepare(
+    "SELECT * FROM sales WHERE business = ? AND order_no = ? AND upper(COALESCE(status, '')) != 'VOIDED' ORDER BY id LIMIT 1"
+  ).bind(business, order).first();
+  if (!sale) {
+    const any = await db.prepare('SELECT id FROM sales WHERE business = ? AND order_no = ? LIMIT 1').bind(business, order).first();
+    if (any) throw new Error('That order is already voided.');
+    throw new Error('Order not found: ' + order);
+  }
 
   const parsed = parseSaleItems(sale.items);
   const stmts = parsed.lines.map((l) =>
     db.prepare('UPDATE inventory SET stock = stock + ? WHERE business = ? AND item = ?').bind(l.qty, business, l.name)
   );
-  stmts.push(db.prepare("UPDATE sales SET status = 'VOIDED' WHERE business = ? AND order_no = ?").bind(business, order));
+  stmts.push(db.prepare("UPDATE sales SET status = 'VOIDED' WHERE id = ?").bind(sale.id));
   // Reverse the coffer credit from the original sale.
   stmts.push(db.prepare(
     `INSERT INTO coffer_entries (business, ts, kind, amount, note) VALUES (?, ?, 'void', ?, ?)`

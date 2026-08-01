@@ -9,9 +9,9 @@ import { navigate, currentPath } from './router.js';
 /** The nav destinations available to a given user, in order. */
 export function navItems(me) {
   const items = [{ path: '/', label: me.role === 'admin' ? 'Admin Panel' : 'Home' }];
-  // Register / Inventory / Employees live on an action bar: on Home for
-  // owners/employees, and on the Business Operations page for admins.
-  if (me.role === 'admin') items.push({ path: '/operations', label: 'Business Operations' });
+  // Register / Inventory / Employees live on an action bar on Home for
+  // owners/employees. Admins manage the network, not a shop, so they don't get
+  // the Business Operations entry.
   if (me.role === 'admin') items.push({ path: '/admin/market', label: 'Market Analysis' });
   // Court businesses get a report for their own hold.
   if (me.court && me.role !== 'admin') items.push({ path: '/hold-report', label: 'Hold Report' });
