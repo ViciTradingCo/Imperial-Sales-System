@@ -20,8 +20,9 @@ import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineT
 import { cofferSummary, adjustCoffer } from '../coffers.js';
 import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
 import { getShopStyle, setShopStyle } from '../shop-style.js';
-import { readMotd, readWarnDays, activeNoticesForBusiness } from '../motd.js';
-import { holdReport } from '../market.js';
+import { readMotd, readWarnDays, activeNoticesForBusiness,
+  listMotdsForBusiness, addMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
+import { holdReport, businessReport } from '../market.js';
 import { businessCsv } from '../export.js';
 import { publicStorefront } from '../storefront.js';
 import { readBranding } from '../branding.js';
@@ -85,6 +86,24 @@ async function employeePerformanceRoute({ request, env }) {
 async function lowStock({ request, env }) {
   const caller = await requireOwnerOrAdmin(request, env);
   return await lowStockReport(env, caller.business);
+}
+/** Owner/admin: this shop's own sales performance (totals, trend, top items). */
+async function shopReport({ request, env }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return await businessReport(env, caller.business);
+}
+/* ---- a shop's own notice board (owner posts to their staff) ---- */
+async function listShopNotices({ request, env }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return { notices: await listMotdsForBusiness(env, caller.business) };
+}
+async function addShopNotice({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return { notices: await addMotdForBusiness(env, caller.business, body) };
+}
+async function deleteShopNotice({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return { notices: await deleteMotdForBusiness(env, caller.business, body.id) };
 }
 
 /* ---- per-shop settings + rename ---- */
@@ -364,6 +383,10 @@ export const routes = [
   { method: 'POST', path: '/business/employees/note', handler: employeeNote },
   { method: 'GET', path: '/business/employees/performance', handler: employeePerformanceRoute },
   { method: 'GET', path: '/business/low-stock', handler: lowStock },
+  { method: 'GET', path: '/business/report', handler: shopReport },
+  { method: 'GET', path: '/business/notices', handler: listShopNotices },
+  { method: 'POST', path: '/business/notices', handler: addShopNotice },
+  { method: 'POST', path: '/business/notices/delete', handler: deleteShopNotice },
   { method: 'GET', path: '/business/settings', handler: getLedgerSettings },
   { method: 'POST', path: '/business/settings', handler: saveLedgerSettings },
   { method: 'POST', path: '/business/rename', handler: renameBusinessRoute },

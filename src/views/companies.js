@@ -6,6 +6,7 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { skeletonRows } from '../lib/skeleton.js';
 import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
@@ -16,7 +17,7 @@ const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 
 
 export function renderCompanies(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
-  const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading companies…'));
+  const listHost = el('div', {}, skeletonRows(5));
   const search = el('input', { type: 'search', placeholder: 'Search business, contact, hold, status…' });
   let page = 1;
   search.addEventListener('input', () => { page = 1; draw(); });

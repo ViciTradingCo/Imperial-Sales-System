@@ -7,12 +7,15 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
 import { setOpsActions } from '../lib/sections.js';
+import { emptyState } from '../lib/empty.js';
+import { toast } from '../lib/toast.js';
+import { skeletonRows, skeletonLines } from '../lib/skeleton.js';
 import { money } from '../lib/format.js';
 
 export function renderEmployees(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
-  const list = el('div', {}, el('p', { class: 'note' }, 'Loading roster…'));
-  const perfHost = el('div', {}, el('p', { class: 'note' }, 'Loading performance…'));
+  const list = el('div', {}, skeletonRows(3));
+  const perfHost = el('div', {}, skeletonLines(3));
   mount(container,
     el('div.card', {}, [
       el('h2', {}, 'Employees'),
@@ -34,13 +37,26 @@ export function renderEmployees(container, { me }) {
     try {
       const res = await api.listEmployees();
       const rows = res.employees || [];
-      if (!rows.length) { mount(list, el('p', { class: 'note' }, 'No one registered yet.')); return; }
+      if (!rows.length) {
+        mount(list, emptyState({ glyph: '🧑‍🤝‍🧑', title: 'No one registered yet',
+          hint: 'Staff who register under your business appear here for you to activate.' }));
+        return;
+      }
+      // Bulk activation — onboarding a group one row at a time is tedious.
+      const pending = rows.filter((u) => u.status === 'pending');
+      const checks = new Map();
       const items = rows.map((u) => {
         const who = u.character || u.email; // character name is the display identity
         const label = el('span', { html:
           '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(u.role) + '</span> · ' + statusBadge(u.status) +
           (u.notes ? '<br><span class="note">📝 ' + esc(u.notes) + '</span>' : '') });
-        const row = el('div.emp-row', {}, [label]);
+        const row = el('div.emp-row', {}, []);
+        if (u.status === 'pending') {
+          const cb = el('input', { type: 'checkbox', class: 'bulk-check', title: 'Select for bulk activation' });
+          checks.set(u.uid, cb);
+          row.appendChild(cb);
+        }
+        row.appendChild(label);
         const actions = el('span', { class: 'row-actions' }, []);
         if (u.status === 'pending') {
           const btn = el('button.primary.small', {
@@ -57,7 +73,33 @@ export function renderEmployees(container, { me }) {
         row.appendChild(actions);
         return row;
       });
-      mount(list, ...items);
+
+      const nodes = [];
+      if (pending.length > 1) {
+        const selectAll = el('input', { type: 'checkbox', title: 'Select all pending' });
+        selectAll.addEventListener('change', () => {
+          checks.forEach((cb) => { cb.checked = selectAll.checked; });
+        });
+        const bulkBtn = el('button.primary.small', { onclick: doBulk }, 'Activate selected');
+        nodes.push(el('div', { class: 'bulk-bar' }, [
+          selectAll,
+          el('span', { class: 'note' }, pending.length + ' pending'),
+          bulkBtn,
+        ]));
+        async function doBulk() {
+          const uids = [...checks.entries()].filter(([, cb]) => cb.checked).map(([uid]) => uid);
+          if (!uids.length) { alert('Select at least one pending account.'); return; }
+          bulkBtn.disabled = true; bulkBtn.textContent = 'Activating…';
+          let ok = 0;
+          for (const uid of uids) {
+            try { await api.activateEmployee(uid); ok++; }
+            catch (e) { /* keep going; the refresh below shows what stuck */ }
+          }
+          toast('Activated ' + ok + ' of ' + uids.length, ok === uids.length ? 'ok' : 'warn');
+          await refresh();
+        }
+      }
+      mount(list, ...nodes, ...items);
     } catch (e) {
       mount(list, el('p', { class: 'error' }, e.message || String(e)));
     }

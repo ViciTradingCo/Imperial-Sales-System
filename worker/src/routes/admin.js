@@ -4,7 +4,7 @@
  * maintenance, and the system-status snapshot.
  */
 import { requireAdmin, actorName } from '../guards.js';
-import { logAudit, listAudit } from '../audit.js';
+import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember } from '../users.js';
 import { listCompanies, updateCompany, archiveCompany } from '../registry.js';
@@ -140,9 +140,16 @@ async function deleteIndividual({ request, env, body }) {
   return { individual: await deleteIndividualMotd(env, body.id) };
 }
 
-async function audit({ request, env }) {
+async function audit({ request, env, url }) {
   await requireAdmin(request, env);
-  return { audit: await listAudit(env) };
+  const q = url.searchParams;
+  return {
+    audit: await listAudit(env, {
+      actor: q.get('actor'), action: q.get('action'),
+      from: q.get('from'), to: q.get('to'),
+    }),
+    actions: await listAuditActions(env),
+  };
 }
 
 async function upsertItemRoute({ request, env, body }) {

@@ -607,3 +607,37 @@ img, table { max-width: 100%; }
 
 /* Sitewide branding */
 .brand-logo { height: 1.5em; width: auto; vertical-align: -0.25em; margin-right: 0.45em; }
+
+/* ============================================================
+   Loading skeletons — placeholders shaped like the content
+   ============================================================ */
+.skeleton { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-1) 0; }
+.skeleton-row { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule, rgba(0,0,0,0.08)); }
+.skeleton-line {
+  height: 14px; border-radius: 6px;
+  background: linear-gradient(90deg,
+    rgba(128,128,128,0.14) 25%, rgba(128,128,128,0.26) 37%, rgba(128,128,128,0.14) 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.3s ease-in-out infinite;
+}
+.skeleton-line.skeleton-sm { height: 10px; }
+@keyframes skeleton-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .skeleton-line { animation: none; } }
+
+/* Filter row (audit log) + bulk selection bar (employees) */
+.filter-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
+.filter-row input, .filter-row select { margin: 0; flex: 1 1 140px; min-width: 0; }
+.filter-row button { flex: 0 0 auto; }
+.bulk-bar {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2);
+  background: var(--paper); border: 1px solid var(--rule, rgba(0,0,0,0.12)); border-radius: 8px;
+}
+.bulk-check { margin-right: var(--sp-2); flex: 0 0 auto; }
+
+/* Focal menus: sections written as full pages shouldn't repeat their own
+   page-level heading/intro inside the modal that already names them. */
+.modal-window .focal-body > .card > h2:first-child,
+.modal-window .focal-body > .card > h3:first-child { display: none; }
+.modal-window .focal-body > .card > h2:first-child + p.note,
+.modal-window .focal-body > .card > h3:first-child + p.note { margin-top: 0; }

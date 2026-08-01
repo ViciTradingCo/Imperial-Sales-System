@@ -127,6 +127,38 @@ export async function marketAnalysis(env) {
 }
 
 /**
+ * One shop's own performance — the owner-facing counterpart to the network
+ * market view. Scoped strictly to the caller's business: headline totals, a
+ * daily revenue trend, and their best-selling items.
+ */
+export async function businessReport(env, business) {
+  const db = await getDb(env);
+  const b = String(business || '').trim();
+  const empty = { business: b, overview: { revenue: 0, orders: 0, itemsSold: 0 }, trends: [], items: [] };
+  if (!b) return empty;
+
+  const overview = await db.prepare(
+    `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
+            COALESCE(SUM(qty_total), 0) AS itemsSold
+       FROM sales WHERE status != 'VOIDED' AND business = ?`).bind(b).first();
+
+  const trends = (((await db.prepare(
+    `SELECT substr(ts, 1, 10) AS day, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
+       FROM sales WHERE status != 'VOIDED' AND business = ?
+      GROUP BY day ORDER BY day DESC LIMIT 30`).bind(b).all()).results) || []).reverse();
+
+  const saleRows = ((await db.prepare(
+    `SELECT items FROM sales WHERE status != 'VOIDED' AND business = ?`).bind(b).all()).results) || [];
+
+  return {
+    business: b,
+    overview: overview || empty.overview,
+    trends,
+    items: itemStats(saleRows, await listItemIndex(env)).slice(0, 20),
+  };
+}
+
+/**
  * A single hold's report — the slice a Court oversees. Scoped to sales made in
  * that hold: overview, the shops trading there, and the items moving there.
  */

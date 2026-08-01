@@ -137,6 +137,14 @@ export const api = {
   getEmployeePerformance: () => request('GET', '/business/employees/performance'),
   /** Owner/admin: low + out-of-stock report ({ out, low }). */
   getLowStock: () => request('GET', '/business/low-stock'),
+  /** Owner/admin: this shop's own performance (overview, trends, top items). */
+  getShopReport: () => request('GET', '/business/report'),
+  /** Owner/admin: this shop's own notice board. */
+  getShopNotices: () => request('GET', '/business/notices'),
+  /** Owner/admin: post a notice to this shop's staff. */
+  addShopNotice: (n) => request('POST', '/business/notices', n),
+  /** Owner/admin: delete one of this shop's notices. */
+  deleteShopNotice: (id) => request('POST', '/business/notices/delete', { id }),
   /** Owner/admin: download this shop's sales or coffer ledger as a CSV Blob. */
   exportBusinessCsvBlob: async (type) => {
     const token = getIdToken();
@@ -173,8 +181,13 @@ export const api = {
   getStyle: () => request('GET', '/business/style'),
   /** Owner/admin: set this shop's style. */
   setStyle: (tagline, accent) => request('POST', '/business/style', { tagline, accent }),
-  /** Admin: the audit trail. */
-  getAudit: () => request('GET', '/admin/audit'),
+  /** Admin: the audit trail, optionally filtered ({actor, action, from, to}). */
+  getAudit: (f) => {
+    const q = new URLSearchParams();
+    Object.entries(f || {}).forEach(([k, v]) => { if (v) q.set(k, v); });
+    const s = q.toString();
+    return request('GET', '/admin/audit' + (s ? '?' + s : ''));
+  },
   /** Any registered user: the master item index (name + base value). */
   getItems: () => request('GET', '/items'),
   /** Admin: add/edit a master item (rename via oldName). */

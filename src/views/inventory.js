@@ -10,6 +10,7 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
 import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
@@ -20,7 +21,7 @@ import { emptyState } from '../lib/empty.js';
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
-  const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading inventory…'));
+  const listHost = el('div', {}, skeletonRows(4));
 
   // The Record Intake button sits between the intro and the item list.
   const firstCard = [

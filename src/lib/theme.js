@@ -21,7 +21,7 @@ export const THEMES = {
     vars: {
       '--paper': '#17130d', '--paper-raised': '#221c14', '--header-bg': '#0e0b07',
       '--header-text': '#f5e6c8', '--accent': '#c1873f', '--ink': '#eadcc2',
-      '--note': '#9a8b6e', '--good': '#6cc08a', '--warn': '#d69a5a', '--bad': '#e58484',
+      '--note': '#c0b295', '--good': '#6cc08a', '--warn': '#d69a5a', '--bad': '#e58484',
     },
   },
   slate: {
@@ -29,7 +29,7 @@ export const THEMES = {
     vars: {
       '--paper': '#12161b', '--paper-raised': '#1b212a', '--header-bg': '#0c0f13',
       '--header-text': '#e7eef7', '--accent': '#5b8fb0', '--ink': '#dbe3ec',
-      '--note': '#8b97a6', '--good': '#5bbf8a', '--warn': '#cf9a54', '--bad': '#e07b7b',
+      '--note': '#a9b6c6', '--good': '#5bbf8a', '--warn': '#cf9a54', '--bad': '#e07b7b',
     },
   },
 };

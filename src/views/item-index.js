@@ -5,6 +5,7 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { skeletonRows } from '../lib/skeleton.js';
 import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
@@ -12,7 +13,7 @@ import { money } from '../lib/format.js';
 
 export function renderItemIndex(container) {
   setAdminActions();
-  const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading items…'));
+  const listHost = el('div', {}, skeletonRows(5));
   const search = el('input', { type: 'search', placeholder: 'Search items…' });
   search.addEventListener('input', draw);
   let all = [];

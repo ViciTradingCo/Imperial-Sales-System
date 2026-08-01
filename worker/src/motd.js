@@ -89,6 +89,40 @@ export async function deleteIndividualMotd(env, id) {
   return listIndividualMotds(env);
 }
 
+/* ---- owner-scoped notices (a shop's own board, for its staff) ----
+ * Same motd_list table; these helpers are hard-scoped to ONE business so an
+ * owner can post to their own staff without touching anyone else's notices.
+ */
+export async function listMotdsForBusiness(env, business) {
+  const target = String(business || '').trim().toLowerCase();
+  if (!target) return [];
+  const db = await getDb(env);
+  const { results } = await db.prepare('SELECT * FROM motd_list WHERE lower(business) = ? ORDER BY id DESC').bind(target).all();
+  return (results || []).map(rowToMotd);
+}
+
+export async function addMotdForBusiness(env, business, { message, start, end }) {
+  const biz = String(business || '').trim();
+  const msg = String(message || '').trim();
+  if (!biz) throw new Error('No business.');
+  if (!msg) throw new Error('Enter a message.');
+  const db = await getDb(env);
+  await db.prepare('INSERT INTO motd_list (id, business, message, start_at, end_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(genId(), biz, msg, String(start || '').trim(), String(end || '').trim()).run();
+  return listMotdsForBusiness(env, biz);
+}
+
+/** Deletes one of the caller's OWN notices; the business check is the security. */
+export async function deleteMotdForBusiness(env, business, id) {
+  const biz = String(business || '').trim();
+  const db = await getDb(env);
+  const row = await db.prepare('SELECT id FROM motd_list WHERE id = ? AND lower(business) = ?')
+    .bind(String(id || '').trim(), biz.toLowerCase()).first();
+  if (!row) throw new Error('Notice not found.');
+  await db.prepare('DELETE FROM motd_list WHERE id = ?').bind(row.id).run();
+  return listMotdsForBusiness(env, biz);
+}
+
 /** Active individual messages for a business right now (respecting start/end). */
 export async function activeNoticesForBusiness(env, business) {
   const target = String(business || '').trim().toLowerCase();

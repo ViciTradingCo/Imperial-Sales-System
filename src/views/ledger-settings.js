@@ -12,6 +12,8 @@ import { api } from '../lib/api.js';
 import { renderSettingsForm } from './settings-form.js';
 import { money } from '../lib/format.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
+import { renderShopReport } from './shop-report.js';
+import { renderShopNotices } from './shop-notices.js';
 
 export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
   const gridHost = el('div', {});
@@ -22,6 +24,10 @@ export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
   ]));
 
   const sections = [
+    { key: 'led-report', label: 'Performance', hint: 'Revenue & best sellers', glyph: '📈',
+      open: (host) => renderShopReport(host) },
+    { key: 'led-notices', label: 'Notices', hint: 'Post to your staff', glyph: '📣',
+      open: (host) => renderShopNotices(host) },
     { key: 'led-coffer', label: 'Coffers', hint: 'Balance & ledger', glyph: '🪙',
       open: (host) => mount(host, cofferCard()) },
     { key: 'led-discounts', label: 'Discounts', hint: 'Reusable offers', glyph: '🏷️',

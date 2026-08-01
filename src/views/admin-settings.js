@@ -221,6 +221,7 @@ const TILE_KEYS = [
   ['set-storefront', 'Settings · Storefronts'], ['set-status', 'Settings · System status'],
   ['set-data', 'Settings · Data'],
   // Shop Ledger sections
+  ['led-report', 'Ledger · Performance'], ['led-notices', 'Ledger · Notices'],
   ['led-coffer', 'Ledger · Coffers'], ['led-discounts', 'Ledger · Discounts'],
   ['led-style', 'Ledger · Style'], ['led-storefront', 'Ledger · Storefront'],
   ['led-export', 'Ledger · Export'], ['led-company', 'Ledger · Company'],

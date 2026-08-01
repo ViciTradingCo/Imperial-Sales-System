@@ -44,6 +44,7 @@ export function renderHome(container, { me, onProfileUpdated }) {
   const nodes = [motdHost, idCard];
   if (isAdmin) {
     setAdminActions();
+    nodes.push(errorsCard());
   } else {
     nodes.push(el('div.card', {}, [el('h3', {}, 'Shop tools'), gridHost]));
     nodes.push(subscriptionCard(me));
@@ -74,6 +75,28 @@ export function renderHome(container, { me, onProfileUpdated }) {
     ];
     mount(gridHost, tileGrid(tiles.filter(Boolean), images));
   }
+}
+
+/**
+ * Admin Panel: recent internal errors only. Silent when everything is healthy,
+ * so the page stays quiet unless it has something worth saying.
+ */
+function errorsCard() {
+  const host = el('div', {}, skeletonLines(2));
+  const card = el('div.card', {}, [el('h3', {}, 'Recent errors'), host]);
+  card.hidden = true;
+  api.getStatus().then((s) => {
+    const errs = s.errors || [];
+    if (!errs.length) {
+      mount(host, el('p', { class: 'note ok' }, 'No recent errors ✓'));
+      card.hidden = false;
+      return;
+    }
+    mount(host, ...errs.slice(0, 6).map((e) => el('p', { class: 'note error' },
+      new Date(e.ts).toLocaleString() + ' · ' + e.where + ' — ' + e.message)));
+    card.hidden = false;
+  }).catch(() => { /* status is admin-only and non-critical here */ });
+  return card;
 }
 
 function roleTitle(role) {
