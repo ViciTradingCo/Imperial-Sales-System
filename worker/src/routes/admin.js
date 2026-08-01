@@ -231,6 +231,41 @@ async function setHolds({ request, env, body }) {
   return { holds };
 }
 
+/**
+ * Realm management. Creating, renaming, or destroying a realm is a super-admin
+ * act (an ADMIN_EMAILS address) — a realm's own admin stays inside their realm.
+ * Listing and stats are open to any admin, but stats only ever report the
+ * caller's OWN realm; no admin can count another realm's rows.
+ */
+async function realmsList({ request, env }) {
+  await requireAdmin(request, env);
+  return { realms: await listRealms(env) };
+}
+async function realmCreate({ request, env, body }) {
+  const caller = await requireSuperAdmin(request, env);
+  const realm = await createRealm(env, { name: body.name, slug: body.slug });
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.create', detail: realm.name + ' (' + realm.id + ')' });
+  return { realm, realms: await listRealms(env) };
+}
+async function realmRename({ request, env, body }) {
+  const caller = await requireSuperAdmin(request, env);
+  const realm = await renameRealm(env, body.id, body.name);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.rename', detail: realm.id + ' -> ' + realm.name });
+  return { realm, realms: await listRealms(env) };
+}
+async function realmDelete({ request, env, body }) {
+  const caller = await requireSuperAdmin(request, env);
+  // Destroys every row in the realm, so require the word to be typed out.
+  if (String(body.confirm || '') !== 'DELETE') throw new Error('Type DELETE to confirm removing a realm and everything in it.');
+  const result = await deleteRealm(env, body.id);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.delete', detail: result.deleted });
+  return { ...result, realms: await listRealms(env) };
+}
+async function realmStatsRoute({ request, env }) {
+  const caller = await requireAdmin(request, env);
+  return await realmStats(env, realmIdOf(caller));
+}
+
 export const routes = [
   { method: 'GET', path: '/admin/settings', handler: getSettings },
   { method: 'POST', path: '/admin/settings', handler: saveSettings },
