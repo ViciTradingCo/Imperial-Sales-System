@@ -225,11 +225,7 @@ function holdsCard() {
  * tile. Blank falls back to the tile's glyph.
  */
 const TILE_KEYS = [
-  // Home — admin
-  ['members', 'Members'], ['companies', 'Companies'], ['items', 'Item Index'],
-  ['market', 'Market'], ['motd', 'MOTD'], ['audit', 'Audit Log'], ['settings', 'Settings'],
-  ['realms', 'Realm Management'], ['transfers', 'Transfers'],
-  // Home — shop
+  // Home — shop (admins have no tiles; their tools are on the action bar)
   ['register', 'Register'], ['inventory', 'Inventory'], ['employees', 'Employees'],
   ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
   // Network Settings sections
@@ -244,9 +240,10 @@ const TILE_KEYS = [
   ['motd-warn', 'MOTD · Expiry warning'],
   // Profile sections
   ['prof-identity', 'Profile · Character'], ['prof-appearance', 'Profile · Appearance'],
-  ['prof-signout', 'Profile · Sign out'],
   // Realm Management sections
   ['rlm-list', 'Realms · List'], ['rlm-add', 'Realms · Add'], ['transfers', 'Realms · Transfers'],
+  // NOTE: every key here must be unique — the form builds one input per key, so
+  // a duplicate silently clobbers the first row's value on save.
   // Shop Ledger sections
   ['led-report', 'Ledger · Performance'], ['led-notices', 'Ledger · Notices'],
   ['led-coffer', 'Ledger · Coffers'], ['led-discounts', 'Ledger · Discounts'],

@@ -1,19 +1,20 @@
 /**
  * Market Analysis (admin) — network-wide analytics, split into sub-pages reached
- * from the action bar: Overview, Item Performance, Hold Performance, Company
- * Performance. Read-only; the API enforces admin-only access.
+ * from a tab row on the page: Overview, Item Performance, Hold Performance,
+ * Company Performance, Trends. Read-only; the API enforces admin-only access.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { money } from '../lib/format.js';
-import { setMarketActions } from '../lib/sections.js';
+import { setAdminActions, marketTabs } from '../lib/sections.js';
 
 export function renderMarket(container, { tab } = {}) {
-  setMarketActions();
+  setAdminActions(); // the admin bar stays put, as on every other admin page
   const host = el('div', {}, el('p', { class: 'note' }, 'Crunching the numbers…'));
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Market Analysis'),
-    el('p', { class: 'note' }, 'Network-wide performance across every shop. Voided sales are excluded.'),
+    el('p', { class: 'note' }, 'Performance across every shop in this realm. Voided sales are excluded.'),
+    marketTabs(),
     host,
   ]));
 

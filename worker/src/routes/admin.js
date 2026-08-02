@@ -6,7 +6,7 @@
 import { requireAdmin, requireSystemAdmin, requireOwnerOrAdmin, actorName, realmIdOf, isSystemAdmin } from '../guards.js';
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
-import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember } from '../users.js';
+import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember, findUserByUid, isConfiguredAdmin } from '../users.js';
 import { listCompanies, updateCompany, archiveCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
 import { marketAnalysis } from '../market.js';
@@ -43,10 +43,20 @@ async function saveSettings({ request, env, body }) {
 async function listMembers({ request, env, url }) {
   const caller = await requireAdmin(request, env);
   const realmId = await sourceRealm(env, caller, isSystemAdmin(env, caller) ? url.searchParams.get('realm') : '');
-  return { members: await listAllUsers(env, realmId) };
+  const members = await listAllUsers(env, realmId);
+  // System Admin is a config grant, not a stored role, so it has to be computed
+  // here for the list to be able to show (and protect) it.
+  return { members: members.map((m) => ({ ...m, systemAdmin: isConfiguredAdmin(env, m.email) })) };
 }
 async function updateMemberRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
+  // A System Admin's role is re-asserted from ADMIN_EMAILS on every sign-in, so
+  // letting it be edited here would silently do nothing. Refuse plainly instead.
+  const target = await findUserByUid(env, body.uid, realmIdOf(caller, env));
+  if (target && isConfiguredAdmin(env, target.email) && String(body.role || '') !== 'admin') {
+    throw new Error(target.email + ' is a System Admin (set by the deployment’s ADMIN_EMAILS). ' +
+      'Change that setting to alter this account’s role.');
+  }
   await updateMember(env, body, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.update', detail: 'uid ' + body.uid + ' → ' + body.role + ', ' + (body.business || ''), realmId: realmIdOf(caller, env) });
   return { members: await listAllUsers(env, realmIdOf(caller, env)) };

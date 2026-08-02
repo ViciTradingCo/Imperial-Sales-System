@@ -3,17 +3,18 @@
  * deployment. A realm is an independent world: its own shops, members, items,
  * holds, economy settings, and MOTD, with nothing shared or cross-referenced.
  *
- * This page is for the realms themselves: creating them, naming them, editing
- * each one's settings, and deleting them.
+ * Everything about realms lives here: choosing which one the session works in,
+ * creating them, naming them, editing each one's settings, deleting them, and
+ * moving members or shops between them.
  *
- * CHOOSING which realm to work in is not here — that happens once, on the Admin
- * Panel, and filters the session from then on. Keeping the switch in a single
- * place means you can't change realm by reflex while you're in the middle of
- * editing one.
+ * Choosing a realm is deliberately confined to THIS page. A switcher sitting on
+ * every admin screen invites changing realm by reflex while you're in the middle
+ * of editing one, and the mistake is expensive — you'd be editing the wrong
+ * world without noticing.
  *
- * Creating, renaming, and deleting are SUPER-ADMIN only (an address in
- * ADMIN_EMAILS). The Worker enforces that independently; hiding the controls
- * here is a courtesy, not the security.
+ * Creating, renaming, deleting, switching, and moving are SYSTEM ADMIN only (an
+ * address in ADMIN_EMAILS). The Worker enforces that independently; hiding the
+ * controls here is a courtesy, not the security.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
@@ -23,7 +24,7 @@ import { renderSettingsForm } from './settings-form.js';
 import { skeletonLines } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 
-export function renderRealms(container, { me }) {
+export function renderRealms(container, { me, onRealmChanged }) {
   const gridHost = el('div', {});
   let realms = [];
 
@@ -35,7 +36,7 @@ export function renderRealms(container, { me }) {
     el('p', { class: 'note' }, [
       document.createTextNode('You are working in '),
       el('b', {}, me.realmName || me.activeRealm || 'your realm'),
-      document.createTextNode('. To work in a different one, pick it on the Admin Panel.'),
+      document.createTextNode('. Every other page in the app shows that realm and nothing else.'),
     ]),
     gridHost,
   ]));
@@ -50,7 +51,7 @@ export function renderRealms(container, { me }) {
 
   function sections() {
     return [
-      { key: 'rlm-list', label: 'Realms', hint: 'Every server', glyph: '🌐',
+      { key: 'rlm-list', label: 'Realms', hint: 'Switch, rename, configure', glyph: '🌐',
         open: (host) => mount(host, realmListCard(me, refreshAnd(host))) },
       me.systemAdmin ? { key: 'rlm-add', label: 'Add a realm', hint: 'Start a new server', glyph: '➕',
         open: (host) => mount(host, createRealmCard(refresh)) } : null,
@@ -85,7 +86,13 @@ export function renderRealms(container, { me }) {
       if (!realms.length) { mount(listHost, emptyState('🌐', 'No realms yet', 'Add one to get started.')); return; }
       mount(listHost, el('div', { class: 'realm-list' }, realms.map((x) => realmRow(x, onChanged))));
     }).catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
-    return el('div.card', {}, [el('h3', {}, 'Realms'), listHost]);
+    return el('div.card', {}, [
+      el('h3', {}, 'Realms'),
+      el('p', { class: 'note' }, me.systemAdmin
+        ? 'Pick a realm to work in — the choice filters every page for the rest of your session.'
+        : 'The realm you administer.'),
+      listHost,
+    ]);
   }
 
   function realmRow(r, onChanged) {
@@ -98,12 +105,29 @@ export function renderRealms(container, { me }) {
       ]),
       el('div', { class: 'realm-actions' }, [
         active ? el('span', { class: 'realm-badge' }, 'Viewing') : null,
+        // Switching realms happens ONLY here — see the note at the top of the file.
+        !active && me.systemAdmin
+          ? el('button.primary', { onclick: () => switchTo(r) }, 'Work in this realm')
+          : null,
         me.systemAdmin ? el('button.secondary-btn', { onclick: () => openRealmSettings(r, onChanged) }, 'Settings') : null,
         me.systemAdmin && !r.permanent
           ? el('button.danger', { onclick: () => doDelete(r, onChanged) }, 'Delete')
           : null,
       ].filter(Boolean)),
     ]);
+  }
+
+  /**
+   * Switches which realm the session works in. Every page is scoped to it, so
+   * the caller re-reads the profile and redraws rather than leaving screens
+   * showing the realm we just left.
+   */
+  async function switchTo(r) {
+    try {
+      await api.selectRealm(r.id);
+      toast('Now working in ' + r.name, 'ok');
+      if (onRealmChanged) await onRealmChanged();
+    } catch (e) { toast(e.message || String(e), 'error'); }
   }
 
   async function doDelete(r, onChanged) {
@@ -164,8 +188,8 @@ export function renderRealms(container, { me }) {
         mount(host, nameCard, codeCard, el('div.card', {}, [
           el('h3', {}, 'Network Settings'),
           el('p', { class: 'note' }, 'Each realm keeps its own sync cadence and market thresholds. Settings always ' +
-            'apply to the realm you are viewing, so to edit ' + esc(r.name) + '’s, select it on the Admin Panel ' +
-            'first. That way you can never edit one realm while looking at another.'),
+            'apply to the realm you are working in, so use “Work in this realm” on ' + esc(r.name) + ' first. ' +
+            'That way you can never edit one realm while looking at another.'),
         ]));
         return;
       }

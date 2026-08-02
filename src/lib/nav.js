@@ -12,12 +12,9 @@ export function navItems(me) {
   // Register / Inventory / Employees live on an action bar on Home for
   // owners/employees. Admins manage the network, not a shop, so they don't get
   // the Business Operations entry.
-  if (me.role === 'admin') items.push({ path: '/admin/market', label: 'Market Analysis' });
-  // Realm Management appears only once this deployment actually runs more than
-  // one realm. Until then multi-realm is dormant and the nav says nothing about
-  // it; the way in is Network Settings → Realms. `realmCount` is set by main.js
-  // after sign-in.
-  if (me.role === 'admin' && me.realmCount > 1) items.push({ path: '/admin/realms', label: 'Realm Management' });
+  // Admin destinations (members, companies, items, market, MOTD, audit,
+  // settings, realms) all live on the admin action bar — see setAdminActions.
+  // Listing them here too meant two menus to keep in step.
   // Court businesses get a report for their own hold.
   if (me.court && me.role !== 'admin') items.push({ path: '/hold-report', label: 'Hold Report' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });

@@ -50,7 +50,7 @@ export function renderMembers(container, { me } = {}) {
     const showRealm = (me && me.realmCount > 1);
     mount(listHost, ...members.map((m) => el('div', { class: 'member-row' }, [
       el('p', { html:
-        '<b>' + esc(m.character || m.email || '—') + '</b> · <span class="role-pill">' + esc(m.role) + '</span> ' +
+        '<b>' + esc(m.character || m.email || '—') + '</b> · <span class="role-pill">' + esc(memberRole(m)) + '</span> ' +
         (showRealm && m.realmId ? '<span class="realm-pill">' + esc(m.realmId) + '</span> ' : '') +
         (m.status === 'pending' ? '<span class="warn">pending</span>' : '') + '<br>' +
         '<span class="note">' + esc(m.business || '—') + ' · ' + esc(m.email || '') + '</span><br>' +
@@ -78,15 +78,36 @@ export function renderMembers(container, { me } = {}) {
   load();
 }
 
+/** How a member's role reads in the list. */
+function memberRole(m) {
+  if (m.role === 'admin') return m.systemAdmin ? 'System Admin' : 'Realm Admin';
+  return m.role === 'owner' ? 'Shop Owner' : 'Employee';
+}
+
+/**
+ * The roles an admin can assign. System Admin is deliberately absent: it is
+ * granted by the ADMIN_EMAILS deployment var, not in the app, because it is the
+ * only role that crosses realm boundaries and should not be handable out by
+ * someone who administers a single realm.
+ */
+const ASSIGNABLE_ROLES = [
+  ['employee', 'Employee'],
+  ['owner', 'Shop Owner'],
+  ['admin', 'Realm Admin'],
+];
+
 function openEditModal(member, onSaved) {
   const character = el('input', { type: 'text', value: member.character || '' });
   const business = el('input', { type: 'text', value: member.business || '' });
   const role = el('select', {});
-  ['employee', 'owner', 'admin'].forEach((r) => {
-    const opt = el('option', { value: r }, r);
-    if (r === member.role) opt.selected = true;
+  ASSIGNABLE_ROLES.forEach(([value, label]) => {
+    const opt = el('option', { value }, label);
+    if (value === member.role) opt.selected = true;
     role.appendChild(opt);
   });
+  // A System Admin's role comes from configuration and is re-asserted on every
+  // sign-in, so offering to change it here would be a control that does nothing.
+  if (member.systemAdmin) role.disabled = true;
   const status = el('p', {});
   const save = el('button.primary', { onclick: doSave }, 'Save');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
@@ -115,6 +136,10 @@ function openEditModal(member, onSaved) {
     el('label', {}, 'Character name'), character,
     el('label', {}, 'Company'), business,
     el('label', {}, 'Role'), role,
+    member.systemAdmin
+      ? el('p', { class: 'note' }, 'This account is a System Admin, granted by the deployment’s ADMIN_EMAILS ' +
+          'setting. Its role can only be changed there.')
+      : el('span', {}),
     el('p', { class: 'note', html: 'UID: <code>' + esc(member.uid) + '</code> · ' + esc(member.email || '') }),
     save,
     status,

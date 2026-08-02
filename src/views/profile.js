@@ -4,12 +4,14 @@
  *   • Profile   — the user's character name (saved to the server) plus their
  *                 read-only registry facts (business, role, status, UID, email).
  *   • Appearance — GUI theme + accent colour, stored client-side and applied live.
- *   • Sign out.
+ *
+ * Signing out is NOT here: it already sits by the nameplate on desktop and at
+ * the bottom of the drawer on mobile, and a third copy buried behind a tile was
+ * the least discoverable of the three.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
-import { signOut } from '../lib/auth.js';
 import { THEMES, loadPrefs, savePrefs } from '../lib/theme.js';
 import { LANGS, getLang, setLang } from '../lib/i18n.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
@@ -28,8 +30,6 @@ export function renderProfile(container, { me, onProfileUpdated }) {
       open: (host) => mount(host, profileCard(me, onProfileUpdated)) },
     { key: 'prof-appearance', label: 'Appearance', hint: 'Theme, accent, language', glyph: '🎨',
       open: (host) => mount(host, appearanceCard()) },
-    { key: 'prof-signout', label: 'Sign out', hint: 'End this session', glyph: '🚪',
-      open: (host) => mount(host, signOutCard()) },
   ];
 
   function draw(images) {
@@ -119,11 +119,5 @@ function appearanceCard() {
     langSel,
     el('p', { class: 'note' }, 'Translations cover the interface; names and some ' +
       'messages stay as written.'),
-  ]);
-}
-
-function signOutCard() {
-  return el('div.card', {}, [
-    el('button.primary', { onclick: () => { signOut(); location.reload(); } }, 'Sign out'),
   ]);
 }

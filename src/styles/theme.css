@@ -708,3 +708,20 @@ img, table { max-width: 100%; }
   font-size: 20px; letter-spacing: 0.08em; text-align: center;
   padding: 12px; width: 100%;
 }
+
+/* In-page tab row (Market Analysis sub-pages). Distinct from the action bar:
+   the bar is the app's fixed menu, these belong to one page. */
+.tab-row {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 12px 0 16px;
+  border-bottom: 1px solid rgba(122, 74, 31, 0.25);
+  padding-bottom: 8px;
+}
+.tab-btn {
+  font: inherit; font-size: 13px; cursor: pointer;
+  background: transparent; color: inherit;
+  border: 1px solid rgba(122, 74, 31, 0.3);
+  border-radius: var(--radius); padding: 6px 12px;
+}
+.tab-btn:hover { border-color: var(--accent); }
+.tab-btn.is-active { background: var(--accent); color: var(--header-text); border-color: var(--accent); }
