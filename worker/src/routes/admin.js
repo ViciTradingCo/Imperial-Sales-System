@@ -3,6 +3,7 @@
  * item + hold indexes, MOTD, market analytics, data backup/restore, log
  * maintenance, and the system-status snapshot.
  */
+import { clearLogs, getFlag, purgeLogs, resetAllData, setFlag } from '../db.js';
 import { requireAdmin, requireSystemAdmin, requireOwnerOrAdmin, actorName, realmIdOf, isSystemAdmin } from '../guards.js';
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
@@ -10,15 +11,13 @@ import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMembe
 import { listCompanies, updateCompany, archiveCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
 import { marketAnalysis } from '../market.js';
-import { clearLogs, purgeLogs, resetAllData } from '../db.js';
 import { systemStatus } from '../status.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex, analyzeItemImport } from '../item-index.js';
-import { writeHolds } from '../holds.js';
+import { writeRegions } from '../regions.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, readRealmBranding, writeBranding } from '../branding.js';
 import { readRealmPrefs, writeRealmPrefs } from '../realm-prefs.js';
-import { getFlag, setFlag } from '../db.js';
 import { listRealms, createRealm, renameRealm, deleteRealm, realmStats, getRealm, regenerateRealmCode } from '../realm.js';
 
 /**
@@ -45,9 +44,17 @@ async function listMembers({ request, env, url }) {
   const caller = await requireAdmin(request, env);
   const realmId = await sourceRealm(env, caller, isSystemAdmin(env, caller) ? url.searchParams.get('realm') : '');
   const members = await listAllUsers(env, realmId);
+  const names = await realmNames(env);
   // System Admin is a config grant, not a stored role, so it has to be computed
-  // here for the list to be able to show (and protect) it.
-  return { members: members.map((m) => ({ ...m, systemAdmin: isConfiguredAdmin(env, m.email) })) };
+  // here for the list to be able to show (and protect) it. realmName spares the
+  // UI from showing a raw id like "rlm-m8x2k1-a4f9".
+  return {
+    members: members.map((m) => ({
+      ...m,
+      systemAdmin: isConfiguredAdmin(env, m.email),
+      realmName: names.get(m.realmId) || m.realmId,
+    })),
+  };
 }
 async function updateMemberRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
@@ -69,11 +76,18 @@ async function deleteMemberRoute({ request, env, body }) {
   return { members: await listAllUsers(env, realmIdOf(caller, env)) };
 }
 
-/** As listMembers: ?realm= is honoured for a super admin only. */
+/** As listMembers: ?realm= is honoured for a System Admin only. */
 async function listCompaniesRoute({ request, env, url }) {
   const caller = await requireAdmin(request, env);
   const realmId = await sourceRealm(env, caller, isSystemAdmin(env, caller) ? url.searchParams.get('realm') : '');
-  return { companies: await listCompanies(env, realmId) };
+  const companies = await listCompanies(env, realmId);
+  const names = await realmNames(env);
+  return { companies: companies.map((c) => ({ ...c, realmName: names.get(c.realmId) || c.realmId })) };
+}
+
+/** realm id -> display name, for lists that show which realm a row belongs to. */
+async function realmNames(env) {
+  return new Map((await listRealms(env)).map((r) => [r.id, r.name]));
 }
 async function updateCompanyRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
@@ -298,7 +312,7 @@ async function setStorefrontFlag({ request, env, body }) {
 }
 async function setHolds({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const holds = await writeHolds(env, body.holds, realmIdOf(caller, env));
+  const holds = await writeRegions(env, body.holds, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'regions.set', detail: holds.join(', '), realmId: realmIdOf(caller, env) });
   return { holds };
 }
@@ -466,7 +480,7 @@ export const routes = [
   { method: 'POST', path: '/admin/items/delete', handler: deleteMasterItemRoute },
   { method: 'POST', path: '/admin/items/import', handler: importMasterItems },
   { method: 'POST', path: '/admin/items/import/analyze', handler: analyzeItems },
-  { method: 'POST', path: '/admin/holds', handler: setHolds },
+  { method: 'POST', path: '/admin/regions', handler: setHolds },
   { method: 'GET', path: '/admin/realms', handler: realmsList },
   { method: 'POST', path: '/admin/realms/create', handler: realmCreate },
   { method: 'POST', path: '/admin/realms/rename', handler: realmRename },

@@ -41,6 +41,9 @@ async function request(method, path, body) {
 // Short-lived shared cache for /motd so the Home notices and the shell banner
 // (fetched near-simultaneously) collapse into one request.
 let _motd = null;
+// Tile artwork changes only when an admin edits it, but six screens ask for it
+// on every render. One promise per session; bustTiles() after a save.
+let _tiles = null;
 
 export const api = {
   health: () => request('GET', '/health'),
@@ -97,12 +100,15 @@ export const api = {
   getStatus: () => request('GET', '/admin/status'),
   /** Admin: full reset — wipe all data, keep admin accounts (requires confirm: 'ERASE'). */
   wipeData: () => request('POST', '/admin/data/wipe', { confirm: 'ERASE' }),
-  /** Court businesses: the market report for their own hold. */
-  getHoldReport: () => request('GET', '/market/hold'),
+  /** Court businesses: the market report for their own region. */
+  getRegionReport: () => request('GET', '/market/region'),
   /** Banners for the current user: { notices[], banners[] }. Deduped for ~3s. */
   getMotd: () => {
     const now = Date.now();
-    if (_motd && now - _motd.at < 3000) return _motd.p;
+    // 30s, not 3s. This fires on every page render and every banner refresh,
+    // and behind it the Worker recomputes certification, pending transfers and
+    // the low-stock scan. Notices are not time-critical to the second.
+    if (_motd && now - _motd.at < 30000) return _motd.p;
     const p = request('GET', '/motd');
     _motd = { at: now, p };
     p.catch(() => { if (_motd && _motd.p === p) _motd = null; });
@@ -202,7 +208,7 @@ export const api = {
   /** Admin: classify an item import (create/update/typos) without applying it. */
   analyzeItems: (rows) => request('POST', '/admin/items/import/analyze', { rows }),
   /** Admin: replace the hold index. */
-  setHolds: (holds) => request('POST', '/admin/holds', { holds }),
+  setRegions: (regions) => request('POST', '/admin/regions', { holds: regions }),
 
   /* ---- realms (multi-server) ----
    * Everything below acts on the realm the caller is CURRENTLY VIEWING, which
@@ -241,12 +247,26 @@ export const api = {
   getBrandingAdmin: () => request('GET', '/admin/branding'),
   /** Admin: save sitewide branding. */
   setBranding: (b) => request('POST', '/admin/branding', b),
-  /** Any registered user: tile artwork (key → image URL). */
-  getTiles: () => request('GET', '/tiles'),
+  /**
+   * Tile artwork (key → image URL), cached for the session.
+   *
+   * Six screens ask for this on every render and it only changes when an admin
+   * edits it, so the promise is shared. bustTiles() clears it after a save and
+   * a realm switch — artwork is per realm.
+   */
+  getTiles: () => {
+    if (!_tiles) {
+      _tiles = request('GET', '/tiles');
+      _tiles.catch(() => { _tiles = null; }); // don't cache a failure
+    }
+    return _tiles;
+  },
+  /** Forget the cached artwork (after an admin saves it, or a realm switch). */
+  bustTiles: () => { _tiles = null; },
   /** Admin: read the tile artwork map. */
   getTileImages: () => request('GET', '/admin/tiles'),
   /** Admin: save the tile artwork map ({ key: httpsUrl }); blank clears a tile. */
-  setTileImages: (images) => request('POST', '/admin/tiles', { images }),
+  setTileImages: async (images) => { const r = await request('POST', '/admin/tiles', { images }); _tiles = null; return r; },
   /** Admin: whether public storefronts are enabled. */
   getStorefrontFlag: () => request('GET', '/admin/storefronts'),
   /** Admin: enable/disable public storefronts. */
@@ -255,8 +275,8 @@ export const api = {
   getPublicStorefront: (business, realmId) => request('GET', '/public/storefront?b=' + encodeURIComponent(business || '') +
     (realmId ? '&realm=' + encodeURIComponent(realmId) : '')),
   /** The network hold list. */
-  /** The hold list for the caller's realm. (Sign-up gets holds from checkCode.) */
-  getHolds: () => request('GET', '/holds'),
+  /** The region list for the caller's realm. (Sign-up gets its own from checkCode.) */
+  getRegions: () => request('GET', '/regions'),
   /** Recent intake transactions for the caller's business. */
   getIntake: () => request('GET', '/intake'),
   /** Owner/admin: record a stock intake (purchase). */

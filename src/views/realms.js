@@ -138,7 +138,7 @@ export function renderRealms(container, { me, onRealmChanged }) {
 
   async function doDelete(r, onChanged) {
     if (!window.confirm('DELETE THE REALM "' + r.name + '"?\n\nThis permanently removes its ' + r.companies +
-      ' shop(s), ' + r.members + ' member(s), and every sale, intake, transfer, coffer entry, item, hold, ' +
+      ' shop(s), ' + r.members + ' member(s), and every sale, intake, transfer, coffer entry, item, region, ' +
       'setting, and notice inside it.\n\nThis CANNOT be undone. Export a backup first.')) return;
     const typed = window.prompt('Type the realm name exactly to confirm:\n' + r.name);
     if (typed !== r.name) { toast('Delete cancelled.', ''); return; }

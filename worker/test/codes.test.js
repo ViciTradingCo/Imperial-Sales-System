@@ -124,6 +124,24 @@ describe('join codes', () => {
   });
 });
 
+describe('deleting a realm', () => {
+  it('takes its sys_flags with it, so a reused id inherits nothing', async () => {
+    const other = await createRealm(env, { name: 'Second Realm' });
+    // The settings a realm accumulates, all keyed by realm in sys_flags.
+    await env.DB.prepare("INSERT INTO sys_flags (k, v) VALUES (?, 'x')").bind('realm_prefs:' + other.id).run();
+    await env.DB.prepare("INSERT INTO sys_flags (k, v) VALUES (?, 'x')").bind('motd_global:' + other.id).run();
+    await env.DB.prepare("INSERT INTO sys_flags (k, v) VALUES (?, 'x')").bind('tile_images:' + other.id).run();
+    // Another realm's key, and a deployment-wide one, must both survive.
+    await env.DB.prepare("INSERT INTO sys_flags (k, v) VALUES (?, 'x')").bind('realm_prefs:' + DEFAULT_REALM_ID).run();
+    await env.DB.prepare("INSERT INTO sys_flags (k, v) VALUES ('branding', 'x')").run();
+
+    await deleteRealm(env, other.id);
+
+    const left = ((await env.DB.prepare('SELECT k FROM sys_flags ORDER BY k').all()).results || []).map((r) => r.k);
+    expect(left).toEqual(['branding', 'realm_prefs:' + DEFAULT_REALM_ID]);
+  });
+});
+
 describe('backup scope', () => {
   it('takes and restores ONE realm without touching the others', async () => {
     const other = await createRealm(env, { name: 'Second Realm' });

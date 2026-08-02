@@ -7,8 +7,8 @@
  * buttons PERSIST as you move between sibling sub-pages, and the current page's
  * button is marked active.
  */
-import { el, mount, esc } from './dom.js';
 import { regionLabel, regionsOn } from './format.js';
+import { el, mount, esc } from './dom.js';
 import { navigate, currentPath } from './router.js';
 import { setActions } from './actions.js';
 import { api } from './api.js';
@@ -69,7 +69,7 @@ export function setMarketActions() {
     { label: 'Overview', path: '/admin/market', onClick: () => navigate('/admin/market') },
     { label: 'Item Performance', path: '/admin/market/items', onClick: () => navigate('/admin/market/items') },
     // Omitted when the realm doesn't use regions — the page would be empty.
-    ...(regionsOn() ? [{ label: regionLabel() + ' Performance', path: '/admin/market/holds', onClick: () => navigate('/admin/market/holds') }] : []),
+    ...(regionsOn() ? [{ label: regionLabel() + ' Performance', path: '/admin/market/regions', onClick: () => navigate('/admin/market/regions') }] : []),
     { label: 'Company Performance', path: '/admin/market/companies', onClick: () => navigate('/admin/market/companies') },
     { label: 'Trends', path: '/admin/market/trends', onClick: () => navigate('/admin/market/trends') },
   ]));

@@ -3,10 +3,9 @@
  * from the action bar: Overview, Item Performance, Region Performance, Company
  * Performance, Trends. Read-only; the API enforces admin-only access.
  */
+import { money, regionLabel, regionWord } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
-import { regionLabel, regionWord } from '../lib/format.js';
 import { api } from '../lib/api.js';
-import { money } from '../lib/format.js';
 import { setMarketActions } from '../lib/sections.js';
 
 export function renderMarket(container, { tab } = {}) {
@@ -25,7 +24,7 @@ export function renderMarket(container, { tab } = {}) {
 
 function renderTab(host, tab, d) {
   if (tab === 'items') return mount(host, itemPerformance(d.items || []));
-  if (tab === 'holds') return mount(host, holdPerformance(d.holds || []));
+  if (tab === 'regions') return mount(host, regionPerformance(d.holds || []));
   if (tab === 'companies') return mount(host, companyPerformance(d.businesses || []));
   if (tab === 'trends') return mount(host, trendsCard(d.trends || []));
   return mount(host, ...overview(d));
@@ -46,7 +45,7 @@ function overview(d) {
       'No sales recorded yet.'),
     tableCard('Top 5 ' + regionWord() + 's', [regionLabel(), 'Orders', 'Items', 'Revenue'],
       (d.holds || []).slice(0, 5).map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
-      'No sales with a hold recorded yet.'),
+      'No sales with a ' + regionWord() + ' recorded yet.'),
     tableCard('Top 5 items', ['Item', 'Qty sold', 'Revenue'],
       (d.items || []).slice(0, 5).map((i) => [i.item, i.qty, money(i.revenue)]),
       'No items sold yet.'),
@@ -103,10 +102,10 @@ function itemPerformance(items) {
 }
 
 /* ---- Region Performance ---- */
-function holdPerformance(holds) {
+function regionPerformance(holds) {
   return tableCard(regionLabel() + ' Performance', [regionLabel(), 'Orders', 'Items', 'Revenue'],
     holds.map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
-    'No sales with a hold recorded yet.');
+    'No sales with a ' + regionWord() + ' recorded yet.');
 }
 
 /* ---- Company Performance ---- */

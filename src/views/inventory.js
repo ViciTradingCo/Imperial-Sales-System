@@ -8,12 +8,11 @@
  * New items are created by recording intake; the edit modal only adjusts an
  * existing item's details.
  */
+import { money, regionLabel, regionWord, regionsOn } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
-import { regionLabel, regionsOn } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
-import { money } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
@@ -158,7 +157,7 @@ function openIntakeModal(onRecorded) {
   });
   api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});
   const vendor = el('input', { type: 'text', placeholder: 'Vendor (who you bought from)' });
-  const hold = el('select', {}, el('option', { value: '' }, 'Select a hold…'));
+  const hold = el('select', {}, el('option', { value: '' }, 'Select a ' + regionWord() + '…'));
   const qty = el('input', { type: 'number', step: '1', min: '1', placeholder: '# of items' });
   const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'gp per item' });
   const status = el('p', {});
@@ -167,7 +166,7 @@ function openIntakeModal(onRecorded) {
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
   // Fill the hold dropdown.
-  api.getHolds()
+  api.getRegions()
     .then((res) => (res.holds || []).forEach((h) => hold.appendChild(el('option', { value: h }, h))))
     .catch(() => { /* hold is optional */ });
 

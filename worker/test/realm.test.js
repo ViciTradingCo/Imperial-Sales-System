@@ -18,7 +18,7 @@ import { checkout, listSales } from '../src/sales.js';
 import { cofferBalance } from '../src/coffers.js';
 import { createTransfer, listTransfers, acceptTransfer } from '../src/transfers.js';
 import { listItemIndex, upsertItem as upsertMasterItem } from '../src/item-index.js';
-import { readHolds, writeHolds } from '../src/holds.js';
+import { readRegions, writeRegions } from '../src/regions.js';
 import { readSettings, writeSettings } from '../src/settings.js';
 import { readMotd, writeMotd } from '../src/motd.js';
 import { logAudit, listAudit } from '../src/audit.js';
@@ -182,10 +182,10 @@ describe('operational data is realm-scoped', () => {
     expect(await listItemIndex(env, A)).toHaveLength(1);
     expect(await listItemIndex(env, REALM_B)).toHaveLength(0);
 
-    await writeHolds(env, ['Whiterun', 'Riften'], A);
-    await writeHolds(env, ['Elsweyr'], REALM_B);
-    expect(await readHolds(env, A)).toEqual(['Whiterun', 'Riften']);
-    expect(await readHolds(env, REALM_B)).toEqual(['Elsweyr']);
+    await writeRegions(env, ['Whiterun', 'Riften'], A);
+    await writeRegions(env, ['Elsweyr'], REALM_B);
+    expect(await readRegions(env, A)).toEqual(['Whiterun', 'Riften']);
+    expect(await readRegions(env, REALM_B)).toEqual(['Elsweyr']);
 
     const label = 'Overpricing threshold (x item average)';
     await writeSettings(env, [{ label, value: 3 }], A);

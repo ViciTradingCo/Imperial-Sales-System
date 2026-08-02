@@ -1,8 +1,14 @@
 /**
- * A realm's hold index, stored in D1 (`hold_index`) so the many hold dropdowns
- * are a fast local read. If a realm has no holds yet it's seeded once from the
- * classic nine (DEFAULT_HOLDS); admins edit it from that realm's settings. Each
- * realm keeps its own map — a different server can have entirely different holds.
+ * A realm's REGIONS — the named places it trades in — stored in D1 so the many
+ * region dropdowns are a fast local read. A realm with none yet is seeded once
+ * from the classic nine Skyrim holds; admins edit the list from that realm's
+ * Network Settings. Each realm keeps its own, and names them whatever its
+ * fiction calls them (Region, Hold, Province, Sector — see realm-prefs.js).
+ *
+ * The TABLE is still `hold_index` and the column on sales is still `hold`, from
+ * when these were Skyrim holds specifically. Renaming them would be a data
+ * migration for a cosmetic gain, so the storage keeps the old name and
+ * everything above it says region.
  */
 import { getDb } from './db.js';
 import { DEFAULT_HOLDS } from './ledger.js';
@@ -14,7 +20,7 @@ async function ensureSeeded(env, realmId) {
   await db.batch(DEFAULT_HOLDS.map((h) => db.prepare('INSERT INTO hold_index (realm_id, name) VALUES (?, ?)').bind(realmId, h)));
 }
 
-export async function readHolds(env, realmId) {
+export async function readRegions(env, realmId) {
   try {
     await ensureSeeded(env, realmId);
     const db = await getDb(env);
@@ -27,7 +33,7 @@ export async function readHolds(env, realmId) {
 }
 
 /** Admin: replace the hold index with the given list (order preserved, de-duped). */
-export async function writeHolds(env, list, realmId) {
+export async function writeRegions(env, list, realmId) {
   const db = await getDb(env);
   const seen = new Set();
   const holds = [];

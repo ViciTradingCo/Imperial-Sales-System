@@ -16,7 +16,7 @@ import { requireUser, requireRegistered, publicUser, bearerToken, findBusinessMe
 import { findUserByEmail, setUserCharacter, touchLastSeen } from '../users.js';
 import { registerUser } from '../registry.js';
 import { listRealms, getRealm, resolveJoinCode } from '../realm.js';
-import { readHolds } from '../holds.js';
+import { readRegions } from '../regions.js';
 import { readBranding } from '../branding.js';
 import { readRealmPrefs } from '../realm-prefs.js';
 
@@ -75,7 +75,7 @@ async function handleCheckCode({ request, env, body }) {
     return {
       kind: 'realm',
       realmName: found.realmName,
-      holds: prefs.showRegion ? await readHolds(env, found.realmId) : [],
+      holds: prefs.showRegion ? await readRegions(env, found.realmId) : [],
       regionLabel: prefs.regionLabel,
       showRegion: prefs.showRegion,
     };

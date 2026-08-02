@@ -51,7 +51,7 @@ export function renderMembers(container, { me } = {}) {
     mount(listHost, ...members.map((m) => el('div', { class: 'member-row' }, [
       el('p', { html:
         '<b>' + esc(m.character || m.email || '—') + '</b> · <span class="role-pill">' + esc(memberRole(m)) + '</span> ' +
-        (showRealm && m.realmId ? '<span class="realm-pill">' + esc(m.realmId) + '</span> ' : '') +
+        (showRealm && m.realmId ? '<span class="realm-pill">' + esc(m.realmName || m.realmId) + '</span> ' : '') +
         (m.status === 'pending' ? '<span class="warn">pending</span>' : '') + '<br>' +
         '<span class="note">' + esc(m.business || '—') + ' · ' + esc(m.email || '') + '</span><br>' +
         '<span class="note">UID: <code>' + esc(m.uid) + '</code></span>' }),

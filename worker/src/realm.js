@@ -232,6 +232,11 @@ export async function deleteRealm(env, id) {
       ' member(s). Move or remove them first — a realm with people in it cannot be deleted outright.');
   }
   const stmts = REALM_TABLES.map((t) => db.prepare('DELETE FROM ' + t + ' WHERE realm_id = ?').bind(target));
+  // sys_flags has no realm_id column — realm-scoped values put the realm in the
+  // KEY instead ('realm_prefs:<id>', 'branding:<id>', 'tile_images:<id>',
+  // 'motd_global:<id>', …). Without this they'd outlive the realm forever, and
+  // a realm later created with the same id would silently inherit them.
+  stmts.push(db.prepare("DELETE FROM sys_flags WHERE k LIKE ?").bind('%:' + target));
   stmts.push(db.prepare('DELETE FROM realms WHERE id = ?').bind(target));
   await db.batch(stmts);
   return { deleted: target, tablesCleared: REALM_TABLES.length };

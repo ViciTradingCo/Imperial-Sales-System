@@ -86,6 +86,15 @@ key. If a flag genuinely has to live in `sys_flags`, put the realm in the KEY
 (`tile_images:<realm>`, `motd_global:<realm>`). New tables go in `REALM_TABLES`
 with a `realm_id` column and per-realm uniqueness, and every query filters on it.
 
+## Naming: regions, not holds
+
+The user-facing concept is a REGION, named per realm (Region / Hold / Province /
+Sector — `realm-prefs.js`). The storage is still `hold_index` and the `hold`
+column on sales, from when these were Skyrim holds; renaming the columns would
+be a data migration for a cosmetic gain, so the storage keeps the old name and
+everything above it says region. Module, route, and function names follow the
+UI: `regions.js`, `/regions`, `readRegions`, `/market/region`.
+
 ## Store data, present labels
 
 Never write a realm's wording into a stored value. Sale lines are JSON numbers,

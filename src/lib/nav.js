@@ -4,8 +4,8 @@
  * left drawer on mobile). Access is still enforced by the API and the route
  * guards — this only decides which buttons to show.
  */
-import { navigate, currentPath } from './router.js';
 import { regionLabel, regionsOn } from './format.js';
+import { navigate, currentPath } from './router.js';
 
 /** The nav destinations available to a given user, in order. */
 export function navItems(me) {
@@ -26,7 +26,7 @@ export function navItems(me) {
   }
   // Court businesses get a report for their own hold.
   // A realm with regions switched off has nothing for this report to show.
-  if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/hold-report', label: regionLabel() + ' Report' });
+  if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/region-report', label: regionLabel() + ' Report' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });
   items.push({ path: '/profile', label: 'Profile' });
   items.push({ path: '/patch-notes', label: 'Patch Notes' });

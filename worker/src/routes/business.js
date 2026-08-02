@@ -13,7 +13,7 @@ import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport } from '../inventory.js';
 import { recordIntake, listIntake } from '../intake.js';
-import { readHolds } from '../holds.js';
+import { readRegions } from '../regions.js';
 import { listItemIndex } from '../item-index.js';
 import { checkCertification } from '../cert.js';
 import { checkout, listSales, voidSale, employeePerformance } from '../sales.js';
@@ -301,7 +301,7 @@ async function getTiles({ request, env }) {
  *  /auth/code instead, since it has no account to derive a realm from.) */
 async function getHolds({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return { holds: await readHolds(env, realmIdOf(caller, env)) };
+  return { holds: await readRegions(env, realmIdOf(caller, env)) };
 }
 async function holdReportRoute({ request, env }) {
   const caller = await requireRegistered(request, env);
@@ -431,9 +431,9 @@ export const routes = [
   { method: 'GET', path: '/transfers/history', handler: transferHistory },
   { method: 'GET', path: '/businesses', handler: listBusinesses },
   { method: 'GET', path: '/items', handler: getItems },
-  { method: 'GET', path: '/holds', handler: getHolds },
+  { method: 'GET', path: '/regions', handler: getHolds },
   { method: 'GET', path: '/tiles', handler: getTiles },
-  { method: 'GET', path: '/market/hold', handler: holdReportRoute },
+  { method: 'GET', path: '/market/region', handler: holdReportRoute },
   { method: 'GET', path: '/motd', handler: getMotd },
   { method: 'GET', path: '/public/storefront', handler: storefront },
   { method: 'GET', path: '/branding', handler: branding },

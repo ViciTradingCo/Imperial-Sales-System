@@ -39,7 +39,7 @@ export function renderHome(container, { me, onProfileUpdated }) {
 
   if (isAdmin) {
     setAdminActions();
-    mount(container, motdHost, adminWelcomeCard(me), errorsCard());
+    mount(container, motdHost, adminWelcomeCard(me), errorsCard(me));
     return; // an admin's tools are on the action bar, not on the page
   }
 
@@ -111,7 +111,7 @@ function adminWelcomeCard(me) {
  * Admin Panel: recent internal errors only. Silent when everything is healthy,
  * so the page stays quiet unless it has something worth saying.
  */
-function errorsCard() {
+function errorsCard(me) {
   const host = el('div', {}, skeletonLines(2));
   const card = el('div.card', {}, [el('h3', {}, 'Recent errors'), host]);
   card.hidden = true;
@@ -124,7 +124,7 @@ function errorsCard() {
     }
     mount(host, ...errs.slice(0, 6).map((e) => el('p', { class: 'note error' },
       new Date(e.ts).toLocaleString() + ' · ' + e.where + ' — ' + e.message +
-      (e.realmId ? ' (realm ' + e.realmId + ')' : ''))));
+      (e.realmId && e.realmId !== me.activeRealm ? ' (realm ' + e.realmId + ')' : ''))));
     card.hidden = false;
   }).catch(() => { /* status is admin-only and non-critical here */ });
   return card;

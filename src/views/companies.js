@@ -4,8 +4,8 @@
  *   • Subscription — its own focus modal to set when the subscription expires
  *     (calendar picker OR manual entry) or mark it Perpetual.
  */
+import { regionLabel, regionWord } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
-import { regionLabel } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { setAdminActions } from '../lib/sections.js';
@@ -19,7 +19,7 @@ const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 
 export function renderCompanies(container, { me } = {}) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, skeletonRows(5));
-  const search = el('input', { type: 'search', placeholder: 'Search business, contact, hold, status…' });
+  const search = el('input', { type: 'search', placeholder: 'Search business, contact, ' + regionWord() + ', status…' });
   let page = 1;
   search.addEventListener('input', () => { page = 1; draw(); });
   mount(container, el('div.card', {}, [
@@ -54,7 +54,7 @@ export function renderCompanies(container, { me } = {}) {
       const statusCls = String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';
       const court = c.court ? ' <span class="role-pill">Court</span>' : '';
       const realmPill = (me && me.realmCount > 1 && c.realmId)
-        ? ' <span class="realm-pill">' + esc(c.realmId) + '</span>' : '';
+        ? ' <span class="realm-pill">' + esc(c.realmName || c.realmId) + '</span>' : '';
       const holdLine = c.hold ? '<br><span class="note">' + esc(regionLabel()) + ': ' + esc(c.hold) + '</span>' : '';
       return el('div', { class: 'member-row' }, [
         el('p', { html:

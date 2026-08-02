@@ -29,7 +29,7 @@ import { renderRealms } from './views/realms.js';
 import { renderMembers } from './views/members.js';
 import { renderCompanies } from './views/companies.js';
 import { renderMarket } from './views/market.js';
-import { renderHoldReport } from './views/hold-report.js';
+import { renderRegionReport } from './views/region-report.js';
 import { renderMotdAdmin } from './views/motd-admin.js';
 import { renderAudit } from './views/audit.js';
 import { renderItemIndex } from './views/item-index.js';
@@ -258,6 +258,8 @@ route('/admin/realms', (container) => {
  * Admin Panel with fresh identity rather than leave a page showing stale data.
  */
 async function refreshRealm() {
+  api.bustTiles(); // artwork is per realm
+  api.bustMotd();
   state.me = await api.me();
   if (state.me && state.me.branding) applyBranding(state.me.branding);
   if (state.me && state.me.prefs) { setCurrency(state.me.prefs.currency); setRegion(state.me.prefs); }
@@ -276,14 +278,14 @@ function adminMarket(tab) {
 }
 route('/admin/market', adminMarket('overview'));
 route('/admin/market/items', adminMarket('items'));
-route('/admin/market/holds', adminMarket('holds'));
+route('/admin/market/regions', adminMarket('regions'));
 route('/admin/market/companies', adminMarket('companies'));
 route('/admin/market/trends', adminMarket('trends'));
 
-route('/hold-report', (container) => {
+route('/region-report', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
   if (!state.me.court) { navigate('/'); return; }
-  renderHoldReport(container);
+  renderRegionReport(container);
 });
 
 route('/ledger/settings', (container) => {

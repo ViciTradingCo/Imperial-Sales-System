@@ -5,10 +5,10 @@
  * character. An expired certification blocks selling. Order lookup + void live
  * in a focus modal opened from the action bar.
  */
+import { currency, money } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
-import { money, currency } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { enqueueSale, flushSales, queuedCount, isNetworkError } from '../lib/offline-queue.js';
@@ -58,7 +58,7 @@ export function renderPos(container, { me }) {
   const cart = []; // [{ item, qty, price }]
 
   Promise.all([
-    api.getCert(), api.getInventory(), api.getHolds(),
+    api.getCert(), api.getInventory(), api.getRegions(),
     api.getDiscounts().catch(() => ({ discounts: [] })),
     api.getStyle().catch(() => ({})),
     api.getItems().catch(() => ({ items: [] })),

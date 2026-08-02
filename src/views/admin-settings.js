@@ -203,7 +203,7 @@ function regionsCard() {
   const save = el('button.primary', { onclick: doSave }, 'Save regions');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
-  api.getHolds().then((r) => { box.value = (r.holds || []).join('\n'); }).catch(() => {});
+  api.getRegions().then((r) => { box.value = (r.holds || []).join('\n'); }).catch(() => {});
   api.getRealmPrefs().then((p) => {
     showRegion.checked = p.showRegion !== false;
     label.value = p.regionLabel || '';
@@ -213,7 +213,7 @@ function regionsCard() {
     const holds = box.value.split('\n').map((h) => h.trim()).filter(Boolean);
     save.disabled = true; setStatus('Saving…', '');
     try {
-      const r = await api.setHolds(holds);
+      const r = await api.setRegions(holds);
       box.value = (r.holds || []).join('\n');
       await api.setRealmPrefs({ showRegion: showRegion.checked, regionLabel: label.value.trim() });
       setStatus('Saved ✓ — ' + (r.holds || []).length + ' regions.', 'ok');
