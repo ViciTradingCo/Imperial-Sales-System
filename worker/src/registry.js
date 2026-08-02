@@ -9,6 +9,7 @@
  * at registration.
  */
 import { getDb, renameBusinessData, moveBusinessData, countBusinessTransfers, DEFAULT_REALM_ID } from './db.js';
+import { generateCode } from './realm.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
 import { appendUser, findUserByEmail, bustUserCache } from './users.js';
 
@@ -28,6 +29,12 @@ function rowToCompany(r) {
     hold: String(r.hold || '').trim(),
     court: Number(r.court) === 1,
     priority: Number(r.priority) === 1,
+    // The staff code an owner hands to their employees. Visible to the shop's
+    // own owner and to admins; never listed to anyone else.
+    joinCode: String(r.join_code || '').trim(),
+    // Which realm this shop belongs to — shown in the admin list once more than
+    // one realm exists, so a misfiled shop is obvious at a glance.
+    realmId: String(r.realm_id || DEFAULT_REALM_ID).trim() || DEFAULT_REALM_ID,
   };
 }
 
@@ -66,6 +73,34 @@ export async function findBusinessMeta(env, name, realmId) {
     : { hold: '', court: false, priority: false };
   await cacheSet(env, 'meta:' + realm + ':' + target, res, 60000);
   return res;
+}
+
+/** A shop's staff code, for its own owner or an admin. */
+export async function businessJoinCode(env, business, realmId) {
+  const db = await getDb(env);
+  const r = await db.prepare('SELECT join_code FROM companies WHERE realm_id = ? AND lower(business) = ?')
+    .bind(String(realmId || DEFAULT_REALM_ID), String(business || '').trim().toLowerCase()).first();
+  if (!r) throw new Error('Company not found.');
+  // A shop registered before staff codes existed gets one on first look.
+  if (!r.join_code) return regenerateBusinessCode(env, business, realmId);
+  return r.join_code;
+}
+
+/**
+ * Issues a fresh staff code, invalidating the old one. The reason this exists:
+ * a code that leaked into the wrong Discord channel lets strangers register into
+ * the shop, and the fix has to be immediate.
+ */
+export async function regenerateBusinessCode(env, business, realmId) {
+  const db = await getDb(env);
+  const realm = String(realmId || DEFAULT_REALM_ID);
+  const target = String(business || '').trim().toLowerCase();
+  const existing = await db.prepare('SELECT id FROM companies WHERE realm_id = ? AND lower(business) = ?')
+    .bind(realm, target).first();
+  if (!existing) throw new Error('Company not found.');
+  const code = generateCode('SHOP');
+  await db.prepare('UPDATE companies SET join_code = ? WHERE id = ?').bind(code, existing.id).run();
+  return code;
 }
 
 /** Invalidates the cert + business-meta caches (call on any registry change). */
@@ -146,8 +181,10 @@ export async function registerUser(env, { email, name, character, businessName, 
       throw new Error('A business named "' + biz + '" is already registered. If you own it, ask an admin to link your account; otherwise choose a different name.');
     }
     const businessId = genUid('biz');
-    await db.prepare('INSERT INTO companies (id, business, point_of_contact, until, perpetual, status, hold, court, priority, realm_id) VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0, ?)')
-      .bind(businessId, biz, char, '', '', String(hold || '').trim(), realm).run();
+    // Mint the shop's staff code now: the owner needs something to hand their
+    // employees the moment the shop exists.
+    await db.prepare('INSERT INTO companies (id, business, point_of_contact, until, perpetual, status, hold, court, priority, realm_id, join_code) VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0, ?, ?)')
+      .bind(businessId, biz, char, '', '', String(hold || '').trim(), realm, generateCode('SHOP')).run();
     bustRegistryCache();
     return appendUser(env, { uid: genUid('usr'), email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active', realmId: realm });
   }

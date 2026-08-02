@@ -11,7 +11,7 @@ import { navigate } from '../lib/router.js';
 import { toast } from '../lib/toast.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 
-export function renderAdminSettings(container) {
+export function renderAdminSettings(container, { me } = {}) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
@@ -43,7 +43,7 @@ export function renderAdminSettings(container) {
     // Backup, log maintenance, and the full reset are one "data" section — they
     // are the same job (safeguard first, then trim or wipe).
     { key: 'set-data', label: 'Data', hint: 'Backup, purge, reset', glyph: '💾',
-      open: (host) => mount(host, backupCard(), logsCard(), resetCard()) },
+      open: (host) => mount(host, backupCard(me), logsCard(me), resetCard(me)) },
   ];
 
   function draw(images) {
@@ -65,7 +65,8 @@ function aboutCard() {
   const status = el('p', {});
   const save = el('button.primary', { onclick: doSave }, 'Save About page');
 
-  api.getBrandingAdmin().then((b) => {
+  api.getBrandingAdmin().then((r) => {
+    const b = r.branding || {};
     title.value = b.aboutTitle || '';
     body.value = b.aboutBody || '';
     credits.value = b.aboutCredits || '';
@@ -115,10 +116,23 @@ function brandingCard() {
     return el('div', {}, [el('label', {}, label), inputs[key]]);
   });
   const status = el('p', {});
+  const scopeNote = el('div', {});
   const save = el('button.primary', { onclick: doSave }, 'Save branding');
 
-  api.getBrandingAdmin().then((b) => {
+  // A System Admin edits the deployment's identity; a Realm Admin edits their
+  // own realm's overrides, where a blank field means "inherit". The placeholder
+  // shows what it will inherit, so blank never looks like broken.
+  api.getBrandingAdmin().then((r) => {
+    const b = r.branding || {};
     fields.forEach(([key]) => { if (b[key]) inputs[key].value = b[key]; });
+    if (r.scope === 'realm') {
+      const from = r.inherited || {};
+      fields.forEach(([key]) => {
+        if (from[key]) inputs[key].placeholder = 'Inherited: ' + from[key];
+      });
+      mount(scopeNote, el('p', { class: 'note' }, 'These are this realm’s overrides. Leave a field blank to use ' +
+        'the deployment’s own branding, shown greyed out in each box.'));
+    }
   }).catch(() => {});
 
   async function doSave() {
@@ -135,9 +149,10 @@ function brandingCard() {
 
   return el('div.card', {}, [
     el('h3', {}, 'Branding'),
-    el('p', { class: 'note' }, 'The name, logo, and icon used across the whole app — header, browser tab, and ' +
-      'footer. Images are links to files hosted elsewhere (must be a direct https:// link to the image). ' +
-      'Leave a field blank to use the default.'),
+    el('p', { class: 'note' }, 'The name, logo, and icon used across the app — header, browser tab, and footer. ' +
+      'Images are links to files hosted elsewhere (must be a direct https:// link to the image). Leave a field ' +
+      'blank to use the default.'),
+    scopeNote,
     ...rows,
     el('div', { class: 'row-actions' }, [save]),
     status,
@@ -145,15 +160,16 @@ function brandingCard() {
 }
 
 /** Danger zone: full reset — wipe everything, keep only admin accounts. */
-function resetCard() {
+function resetCard(me) {
   const status = el('p', {});
   const btn = el('button.danger', { onclick: doReset }, 'Clear ALL data (full reset)');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
   async function doReset() {
-    if (!window.confirm('FULL RESET — permanently delete: companies, members (except admins), inventory, sales, ' +
-      'intake, transfers, coffers, discounts, shop styles, the audit log, network settings, and MOTDs.\n\n' +
-      'KEPT: admin accounts, the Master Item Index, and the Holds list (reference defaults).\n\n' +
-      'This CANNOT be undone. Export a backup first.')) return;
+    const realm = (me && me.realmName) || 'this realm';
+    if (!window.confirm('FULL RESET of ' + realm + ' — permanently delete its companies, members (except ' +
+      'admins), inventory, sales, intake, transfers, coffers, discounts, shop styles, audit log, settings, ' +
+      'and MOTDs.\n\nKEPT: admin accounts, the Master Item Index, and the Holds list (reference defaults).\n\n' +
+      'Other realms are NOT affected.\n\nThis CANNOT be undone. Export a backup first.')) return;
     const typed = window.prompt('Type ERASE (all caps) to confirm the full reset:');
     if (typed !== 'ERASE') { setStatus('Reset cancelled.', ''); return; }
     btn.disabled = true; setStatus('Erasing…', '');
@@ -166,9 +182,9 @@ function resetCard() {
   }
   return el('div.card', {}, [
     el('h3', {}, 'Full reset'),
-    el('p', { class: 'note' }, 'Erase all business and transaction data and start fresh. Keeps admin accounts plus ' +
-      'the reference defaults — the Master Item Index and the Holds list. Network settings and MOTDs return to ' +
-      'defaults. Export a backup first; this cannot be undone.'),
+    el('p', { class: 'note' }, 'Erase this realm’s business and transaction data and start fresh. Keeps admin ' +
+      'accounts plus the reference defaults — the Master Item Index and the Holds list. Settings and MOTDs return ' +
+      'to defaults. Other realms are not affected. Export a backup first; this cannot be undone.'),
     el('div', { class: 'row-actions' }, [btn]),
     status,
   ]);
@@ -236,6 +252,7 @@ const TILE_KEYS = [
   ['led-coffer', 'Ledger · Coffers'], ['led-discounts', 'Ledger · Discounts'],
   ['led-style', 'Ledger · Style'], ['led-storefront', 'Ledger · Storefront'],
   ['led-export', 'Ledger · Export'], ['led-company', 'Ledger · Company'],
+  ['led-staff-code', 'Ledger · Staff code'],
   ['led-settings', 'Ledger · Shop settings'],
 ];
 function tileImagesCard() {
@@ -345,9 +362,17 @@ function statusCard() {
 }
 
 /** Data backup — download an export, or restore from one (with a preview diff). */
-function backupCard() {
+function backupCard(me) {
   const status = el('p', {});
   const diffHost = el('div', {});
+  // A Realm Admin only ever gets their own realm; the Worker enforces that, so
+  // showing them a chooser they can't act on would just be misleading.
+  const canChoose = !!(me && me.systemAdmin);
+  const scopeSel = el('select', {}, [
+    el('option', { value: 'realm' }, 'This realm only (' + ((me && me.realmName) || 'current') + ')'),
+    el('option', { value: 'all', selected: true }, 'Whole deployment (every realm)'),
+  ]);
+  function scope() { return canChoose ? scopeSel.value : 'realm'; }
   const exportBtn = el('button.primary', { onclick: doExport }, 'Export backup');
   const file = el('input', { type: 'file', accept: '.gz,application/gzip,application/json' });
   const previewBtn = el('button.secondary-btn', { onclick: doPreview }, 'Preview restore');
@@ -357,9 +382,10 @@ function backupCard() {
   async function doExport() {
     exportBtn.disabled = true; setStatus('Preparing…', '');
     try {
-      const blob = await api.exportBackupBlob();
-      downloadBlob(blob, 'eec-backup-' + new Date().toISOString().slice(0, 10) + '.json.gz');
-      setStatus('Backup downloaded — keep it somewhere safe.', 'ok');
+      const s = scope();
+      const blob = await api.exportBackupBlob(s);
+      downloadBlob(blob, 'vici-backup-' + s + '-' + new Date().toISOString().slice(0, 10) + '.json.gz');
+      setStatus('Backup downloaded (' + (s === 'realm' ? 'this realm' : 'whole deployment') + ') — keep it somewhere safe.', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { exportBtn.disabled = false; }
   }
@@ -382,14 +408,16 @@ function backupCard() {
     previewBtn.disabled = true; setStatus('Reading…', '');
     try {
       const data = await readFile();
-      const p = await api.previewBackup(data);
+      const p = await api.previewBackup(data, scope());
       const rows = Object.keys(p.diff || {}).map((t) => el('div.fact', {}, [
         el('span', { class: 'fact-label' }, t.replace(/_/g, ' ')),
         el('span', { class: 'fact-value' }, p.diff[t].current + ' → ' + p.diff[t].incoming),
       ]));
       mount(diffHost,
         el('p', { class: 'note' }, 'This file was made ' + (p.exportedAt ? new Date(p.exportedAt).toLocaleString() : 'at an unknown time') +
-          '. Restoring replaces ' + p.currentTotal + ' current rows with ' + p.incomingTotal + ' (current → incoming):'),
+          ' and covers ' + (p.fileScope === 'realm' ? 'one realm' : 'the whole deployment') + '. Restoring replaces ' +
+          p.currentTotal + ' current rows with ' + p.incomingTotal + ' in ' +
+          (p.scope === 'realm' ? 'THIS REALM ONLY' : 'EVERY REALM') + ' (current → incoming):'),
         el('div', { class: 'readonly-facts' }, rows));
       setStatus('Preview ready — review, then Restore to apply.', '');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
@@ -397,12 +425,16 @@ function backupCard() {
   }
 
   async function doImport() {
-    if (!window.confirm('Restore from this backup?\n\nThis REPLACES all current data (registry, sales, intake, ' +
-      'inventory, transfers, coffers, discounts, item index, holds, audit). This cannot be undone.')) return;
+    const s = scope();
+    const where = s === 'realm'
+      ? 'THIS REALM (' + ((me && me.realmName) || 'the current realm') + '). Other realms are untouched.'
+      : 'EVERY REALM in this deployment.';
+    if (!window.confirm('Restore from this backup?\n\nThis REPLACES the registry, sales, intake, inventory, ' +
+      'transfers, coffers, discounts, item index, holds, and audit for ' + where + '\n\nThis cannot be undone.')) return;
     importBtn.disabled = true; setStatus('Restoring…', '');
     try {
       const data = await readFile();
-      const res = await api.importBackup(data);
+      const res = await api.importBackup(data, s);
       const total = Object.values(res.restored || {}).reduce((a, b) => a + Number(b || 0), 0);
       setStatus('Restored ' + total + ' rows across ' + Object.keys(res.restored || {}).length + ' tables.', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
@@ -411,8 +443,15 @@ function backupCard() {
 
   return el('div.card', {}, [
     el('h3', {}, 'Data backup'),
-    el('p', { class: 'note' }, 'Download a compressed backup of all live data, or restore from one after a ' +
-      'failure. Do this weekly (you’ll get a reminder on Mondays).'),
+    el('p', { class: 'note' }, 'Download a compressed backup, or restore from one after a failure. Do this ' +
+      'weekly (you’ll get a reminder on Mondays).'),
+    canChoose ? el('div', {}, [
+      el('label', {}, 'Backup scope'),
+      scopeSel,
+      el('p', { class: 'note' }, 'Whole-deployment is what you want for disaster recovery. A single-realm backup ' +
+        'is what you want before a risky change to one server — restoring it cannot drag the other realms back ' +
+        'in time with it.'),
+    ]) : el('p', { class: 'note' }, 'Covers this realm only.'),
     el('div', { class: 'row-actions' }, [exportBtn]),
     el('label', {}, 'Restore from a backup file'),
     file,
@@ -432,7 +471,7 @@ function downloadBlob(blob, filename) {
 }
 
 /** Danger zone: purge old logs, or clear all of them. */
-function logsCard() {
+function logsCard(me) {
   const status = el('p', {});
   const amount = el('input', { type: 'number', min: '1', value: '6', style: 'width:5em' });
   const unit = el('select', {}, [
@@ -447,7 +486,8 @@ function logsCard() {
   async function doPurge() {
     const n = Math.floor(Number(amount.value));
     if (!n || n < 1) { setStatus('Enter a number.', 'error'); return; }
-    if (!window.confirm('Delete sales & intake older than ' + n + ' ' + unit.value + ' across the network? This cannot be undone.')) return;
+    if (!window.confirm('Delete sales & intake older than ' + n + ' ' + unit.value + ' in ' +
+      ((me && me.realmName) || 'this realm') + '? Other realms are not affected. This cannot be undone.')) return;
     purgeBtn.disabled = true; setStatus('Purging…', '');
     try {
       const r = await api.purgeLogs(n, unit.value);
@@ -457,9 +497,9 @@ function logsCard() {
   }
 
   async function doClear() {
-    if (!window.confirm('Clear ALL sales and intake logs for every shop in the network?\n\n' +
-      'This permanently deletes the transaction history (Market Analysis resets to zero). ' +
-      'Inventory catalogs are kept. This cannot be undone.')) return;
+    if (!window.confirm('Clear ALL sales and intake logs for every shop in ' + ((me && me.realmName) || 'this realm') +
+      '?\n\nThis permanently deletes that realm’s transaction history (its Market Analysis resets to zero). ' +
+      'Inventory catalogs are kept, and other realms are not affected. This cannot be undone.')) return;
     clearBtn.disabled = true; setStatus('Clearing…', '');
     try {
       const r = await api.clearLogs();
@@ -471,7 +511,8 @@ function logsCard() {
   return el('div.card', {}, [
     el('h3', {}, 'Log maintenance'),
     el('p', { class: 'note' }, 'Purge trims old history; Clear wipes it all (used to start a fresh season). ' +
-      'Inventory catalogs are always kept. Neither can be undone — export a backup first.'),
+      'Both act on this realm only. Inventory catalogs are always kept. Neither can be undone — export a ' +
+      'backup first.'),
     el('div', { class: 'row-actions' }, [amount, unit, purgeBtn]),
     el('div', { class: 'row-actions' }, [clearBtn]),
     status,

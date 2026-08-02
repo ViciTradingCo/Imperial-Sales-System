@@ -52,11 +52,11 @@ export function renderRealms(container, { me }) {
     return [
       { key: 'rlm-list', label: 'Realms', hint: 'Every server', glyph: '🌐',
         open: (host) => mount(host, realmListCard(me, refreshAnd(host))) },
-      me.superAdmin ? { key: 'rlm-add', label: 'Add a realm', hint: 'Start a new server', glyph: '➕',
+      me.systemAdmin ? { key: 'rlm-add', label: 'Add a realm', hint: 'Start a new server', glyph: '➕',
         open: (host) => mount(host, createRealmCard(refresh)) } : null,
       // Moving someone who joined the wrong realm belongs with the realms
       // themselves, not on the Admin Panel.
-      me.superAdmin ? { key: 'transfers', label: 'Transfers', hint: 'Move members & shops', glyph: '🔀',
+      me.systemAdmin ? { key: 'transfers', label: 'Transfers', hint: 'Move members & shops', glyph: '🔀',
         open: (host) => mount(host, transferCard(() => realms, me)) } : null,
     ].filter(Boolean);
   }
@@ -98,8 +98,8 @@ export function renderRealms(container, { me }) {
       ]),
       el('div', { class: 'realm-actions' }, [
         active ? el('span', { class: 'realm-badge' }, 'Viewing') : null,
-        me.superAdmin ? el('button.secondary-btn', { onclick: () => openRealmSettings(r, onChanged) }, 'Settings') : null,
-        me.superAdmin && r.id !== 'default'
+        me.systemAdmin ? el('button.secondary-btn', { onclick: () => openRealmSettings(r, onChanged) }, 'Settings') : null,
+        me.systemAdmin && !r.permanent
           ? el('button.danger', { onclick: () => doDelete(r, onChanged) }, 'Delete')
           : null,
       ].filter(Boolean)),
@@ -146,8 +146,22 @@ export function renderRealms(container, { me }) {
         } catch (e) { renameStatus.className = 'error'; renameStatus.textContent = e.message || String(e); }
       }
 
+      const codeCard = codePanel({
+        title: '🎟️ Founder code',
+        note: 'Give this to someone who should start a NEW shop in ' + r.name + '. It admits them to this realm ' +
+          'and sends them straight to Business Creation. They never see any other realm or shop.',
+        load: async () => r.joinCode || '(none yet)',
+        reset: async () => {
+          const res = await api.resetRealmCode(r.id);
+          await onChanged();
+          return res.joinCode;
+        },
+        resetWarning: 'Issue a new founder code for "' + r.name + '"?\n\nThe current code stops working ' +
+          'immediately. Anyone you already gave it to will need the new one.',
+      });
+
       if (r.id !== me.activeRealm) {
-        mount(host, nameCard, el('div.card', {}, [
+        mount(host, nameCard, codeCard, el('div.card', {}, [
           el('h3', {}, 'Network Settings'),
           el('p', { class: 'note' }, 'Each realm keeps its own sync cadence and market thresholds. Settings always ' +
             'apply to the realm you are viewing, so to edit ' + esc(r.name) + '’s, select it on the Admin Panel ' +
@@ -157,7 +171,7 @@ export function renderRealms(container, { me }) {
       }
 
       const settingsHost = el('div', {});
-      mount(host, nameCard, settingsHost);
+      mount(host, nameCard, codeCard, settingsHost);
       renderSettingsForm(settingsHost, {
         title: 'Network Settings',
         subtitle: 'Sync cadence and market anomaly thresholds for ' + r.name + ' only.',
@@ -166,6 +180,48 @@ export function renderRealms(container, { me }) {
       });
     });
   }
+}
+
+/**
+ * A join code, shown big enough to read aloud, with copy and reset.
+ *
+ * Reset exists because a leaked code is the whole risk: anyone holding it can
+ * register into the realm or shop it belongs to. Issuing a new one kills the old
+ * immediately, so the fix is one click rather than a support conversation.
+ */
+export function codePanel({ title, note, load, reset, resetWarning }) {
+  const value = el('input', { type: 'text', readonly: true, class: 'join-code', value: 'Loading…' });
+  const status = el('p', {});
+  function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
+
+  load().then((code) => { value.value = code; }).catch((e) => {
+    value.value = '';
+    setStatus(e.message || String(e), 'error');
+  });
+
+  const copy = el('button.secondary-btn', { onclick: async () => {
+    try { await navigator.clipboard.writeText(value.value); setStatus('Copied ✓', 'ok'); }
+    catch (e) { value.select(); setStatus('Press Ctrl/Cmd-C to copy.', ''); }
+  } }, 'Copy code');
+
+  const regen = el('button.danger', { onclick: async () => {
+    if (!window.confirm(resetWarning)) return;
+    regen.disabled = true; setStatus('Issuing a new code…', '');
+    try {
+      value.value = await reset();
+      setStatus('New code issued — the old one no longer works.', 'ok');
+      toast('New code issued', 'ok');
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
+    finally { regen.disabled = false; }
+  } }, 'Issue new code');
+
+  return el('div.card', {}, [
+    el('h3', {}, title),
+    el('p', { class: 'note' }, note),
+    value,
+    el('div', { class: 'row-actions' }, [copy, regen]),
+    status,
+  ]);
 }
 
 /** Create a realm: a name, and the settings it starts with (the defaults). */

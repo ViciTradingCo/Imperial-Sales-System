@@ -1,19 +1,31 @@
 /**
  * Identity routes: verify a Google sign-in, register against a business, and
  * self-service profile edits.
+ *
+ * REGISTRATION IS BY CODE. A person signing up is never shown a list of realms
+ * or shops — they type a join code and get exactly what it admits them to:
+ *
+ *   • a realm's FOUNDER code  → Business Creation, where they start a shop
+ *   • a shop's STAFF code     → straight into that shop as a pending employee
+ *
+ * That is the whole point of the design: nobody can see the network, or even
+ * learn what else is on it, before they belong to it. There is deliberately no
+ * endpoint that lists realms or businesses to an unregistered caller.
  */
-import { requireUser, requireRegistered, publicUser, bearerToken, findBusinessMeta, markPriority, realmIdOf, homeRealmOf, isSuperAdmin } from '../guards.js';
+import { requireUser, requireRegistered, publicUser, bearerToken, findBusinessMeta, markPriority, realmIdOf, homeRealmOf, isSystemAdmin } from '../guards.js';
 import { findUserByEmail, setUserCharacter, touchLastSeen } from '../users.js';
-import { registerUser, listBusinessNames } from '../registry.js';
-import { listRealms, realmOf, getRealm } from '../realm.js';
+import { registerUser } from '../registry.js';
+import { listRealms, getRealm, resolveJoinCode } from '../realm.js';
+import { readHolds } from '../holds.js';
+import { readBranding } from '../branding.js';
 
 async function handleMe({ request, env }) {
   const payload = await requireUser(request, env);
   const user = await findUserByEmail(env, payload.email);
   if (!user) return { registered: false, email: payload.email, name: payload.name || '' };
   touchLastSeen(env, user.uid); // fire-and-forget
-  // The caller's OWN shop always lives in their home realm, even while a super
-  // admin is viewing another one — so this deliberately uses homeRealmOf.
+  // The caller's OWN shop always lives in their home realm, even while a System
+  // Admin is viewing another one — so this deliberately uses homeRealmOf.
   const meta = await findBusinessMeta(env, user.business, homeRealmOf(user));
   markPriority(bearerToken(request), meta.priority); // learn this token's rate tier
   const activeRealm = realmIdOf(user, env);
@@ -25,46 +37,66 @@ async function handleMe({ request, env }) {
   return publicUser(user, {
     court: meta.court,
     hold: meta.hold,
-    // superAdmin gates the realm-management UI; the Worker still re-checks it.
-    superAdmin: isSuperAdmin(env, user),
+    // systemAdmin gates realm management; the Worker still re-checks it.
+    systemAdmin: isSystemAdmin(env, user),
     homeRealm: homeRealmOf(user),
     activeRealm,
     realmName: (realm && realm.name) || activeRealm,
     realmCount,
+    // The realm's own branding, layered over the deployment's. Sent here rather
+    // than fetched separately so the app can restyle itself the moment it knows
+    // who the user is, without a second round trip.
+    branding: await readBranding(env, activeRealm),
   });
 }
 
 /**
- * The realms someone can register into, and the shops inside one of them.
- * Both are open to any VERIFIED Google account, registered or not — a person
- * signing up has no account yet, so there is no realm to derive from. Only the
- * id and display name are exposed, which is exactly what the picker needs and
- * nothing that would reveal another realm's contents.
+ * Checks a join code and reports what it opens, WITHOUT registering anything.
+ * The sign-up form calls this to decide which second step to show.
+ *
+ * A bad code gets one message that never says whether some other code would have
+ * worked, so the endpoint can't be used to hunt for valid codes. It is also the
+ * only place holds are exposed pre-registration, and only for the realm the code
+ * belongs to.
  */
-async function handleRealmChoices({ request, env }) {
+async function handleCheckCode({ request, env, body }) {
   await requireUser(request, env);
-  const realms = await listRealms(env);
-  return { realms: realms.map((r) => ({ id: r.id, name: r.name })) };
-}
-async function handleRealmBusinesses({ request, env, url }) {
-  await requireUser(request, env);
-  return { businesses: await listBusinessNames(env, realmOf(url.searchParams.get('realm'))) };
+  const found = await resolveJoinCode(env, body.code);
+  if (!found) throw new Error("That code isn't recognised. Check it with whoever gave it to you.");
+  if (found.kind === 'realm') {
+    return {
+      kind: 'realm',
+      realmName: found.realmName,
+      holds: await readHolds(env, found.realmId),
+    };
+  }
+  return { kind: 'business', realmName: found.realmName, business: found.business };
 }
 
+/**
+ * Registers the signed-in user against the code they were given. The code is
+ * re-resolved here rather than trusting anything the check step returned — the
+ * realm and business ALWAYS come from the server's own lookup.
+ */
 async function handleRegister({ request, env, body }) {
   const payload = await requireUser(request, env);
   const existing = await findUserByEmail(env, payload.email);
   if (existing) return publicUser(existing); // idempotent
+
+  const found = await resolveJoinCode(env, body.code);
+  if (!found) throw new Error("That code isn't recognised. Check it with whoever gave it to you.");
+
+  const asOwner = found.kind === 'realm';
   const user = await registerUser(env, {
     email: payload.email,
     name: payload.name || '',
     character: body.character,
-    businessName: body.businessName,
-    asOwner: !!body.asOwner,
-    hold: body.hold,
-    // The realm is chosen at sign-up and fixed from then on; an admin moves
-    // someone who picked wrong (Realm Management → Transfers).
-    realmId: realmOf(body.realmId),
+    // A founder code lets them name their own shop; a staff code puts them in
+    // the one the code belongs to, whatever they typed.
+    businessName: asOwner ? body.businessName : found.business,
+    asOwner,
+    hold: asOwner ? body.hold : '',
+    realmId: found.realmId,
   });
   return publicUser(user);
 }
@@ -81,8 +113,7 @@ async function handleUpdateProfile({ request, env, body }) {
 
 export const routes = [
   { method: 'POST', path: '/auth/me', handler: handleMe },
+  { method: 'POST', path: '/auth/code', handler: handleCheckCode },
   { method: 'POST', path: '/auth/register', handler: handleRegister },
-  { method: 'GET', path: '/auth/realms', handler: handleRealmChoices },
-  { method: 'GET', path: '/auth/businesses', handler: handleRealmBusinesses },
   { method: 'POST', path: '/me/profile', handler: handleUpdateProfile },
 ];

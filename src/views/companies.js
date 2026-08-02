@@ -15,7 +15,7 @@ import { pager } from '../lib/paginate.js';
 const PAGE_SIZE = 25;
 const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
 
-export function renderCompanies(container) {
+export function renderCompanies(container, { me } = {}) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, skeletonRows(5));
   const search = el('input', { type: 'search', placeholder: 'Search business, contact, hold, status…' });
@@ -52,10 +52,12 @@ export function renderCompanies(container) {
       const sub = c.perpetual ? 'Perpetual' : (c.until ? 'until ' + c.until : 'no subscription');
       const statusCls = String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';
       const court = c.court ? ' <span class="role-pill">Court</span>' : '';
+      const realmPill = (me && me.realmCount > 1 && c.realmId)
+        ? ' <span class="realm-pill">' + esc(c.realmId) + '</span>' : '';
       const holdLine = c.hold ? '<br><span class="note">Hold: ' + esc(c.hold) + '</span>' : '';
       return el('div', { class: 'member-row' }, [
         el('p', { html:
-          '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(c.status || '—') + '</span>' + court + '<br>' +
+          '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(c.status || '—') + '</span>' + court + realmPill + '<br>' +
           '<span class="note">' + esc(sub) + (c.pointOfContact ? ' · ' + esc(c.pointOfContact) : '') + '</span>' + holdLine }),
         el('span', { class: 'row-actions' }, [
           el('button.primary.small', { onclick: () => openNameModal(c, load) }, 'Edit'),

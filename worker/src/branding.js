@@ -1,7 +1,14 @@
 /**
- * Sitewide branding — the app name, logo, and shared iconography an admin can
- * change without a redeploy. Stored as one JSON blob in sys_flags and served
- * PUBLICLY (the sign-in screen must be branded before anyone authenticates).
+ * Branding — the app name, logo, and shared iconography an admin can change
+ * without a redeploy. Stored as JSON blobs in sys_flags and served PUBLICLY (the
+ * sign-in screen must be branded before anyone authenticates).
+ *
+ * TWO LAYERS. Sitewide branding is the deployment's own identity and is what an
+ * anonymous visitor sees, since before sign-in there is no realm to know about.
+ * A realm may then override any field, so a second RP server hosted here can
+ * carry its own name and logo instead of inheriting the first one's. Anything a
+ * realm leaves blank falls through to sitewide, so a realm that doesn't care
+ * about branding needs to set nothing.
  *
  * Images are external https:// links (the app hosts no uploads), matching the
  * tile-image approach.
@@ -9,6 +16,10 @@
 import { getFlag, setFlag } from './db.js';
 
 const KEY = 'branding';
+/** Per-realm overrides live under their own key. */
+function realmKey(realmId) {
+  return KEY + ':' + String(realmId || '');
+}
 const HTTPS_URL = /^https:\/\/[^\s"'<>]+$/i;
 
 export const BRANDING_DEFAULTS = {
@@ -30,16 +41,44 @@ const TEXT_FIELDS = ['appName', 'shortName', 'tagline', 'footerText', 'aboutTitl
 const LONG_FIELDS = ['aboutBody', 'aboutCredits'];
 const URL_FIELDS = ['logoUrl', 'faviconUrl'];
 
-export async function readBranding(env) {
-  let stored = {};
+async function readBlob(env, key) {
   try {
-    const raw = await getFlag(env, KEY);
-    stored = raw ? JSON.parse(raw) : {};
-  } catch (e) { stored = {}; }
-  return { ...BRANDING_DEFAULTS, ...stored };
+    const raw = await getFlag(env, key);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
 }
 
-export async function writeBranding(env, input) {
+/** Drops empty values so a blank realm field falls through to sitewide. */
+function pruned(obj) {
+  const out = {};
+  Object.keys(obj || {}).forEach((k) => {
+    if (obj[k] !== '' && obj[k] != null) out[k] = obj[k];
+  });
+  return out;
+}
+
+/**
+ * The branding in force. With no realm this is the deployment's own identity
+ * (what a signed-out visitor sees); with a realm, that realm's overrides layered
+ * on top.
+ */
+export async function readBranding(env, realmId) {
+  const site = await readBlob(env, KEY);
+  const realm = realmId ? pruned(await readBlob(env, realmKey(realmId))) : {};
+  return { ...BRANDING_DEFAULTS, ...site, ...realm };
+}
+
+/** Just one realm's overrides, unmerged — what its editing form should show. */
+export async function readRealmBranding(env, realmId) {
+  return await readBlob(env, realmKey(realmId));
+}
+
+/**
+ * Saves branding. With a realmId this writes that realm's OVERRIDES — a blank
+ * field there means "inherit", so blanks are stored as empty and pruned on read
+ * rather than being merged over the sitewide value.
+ */
+export async function writeBranding(env, input, realmId) {
   const next = {};
   TEXT_FIELDS.forEach((f) => {
     if (input[f] === undefined) return;
@@ -61,7 +100,12 @@ export async function writeBranding(env, input) {
     if (a && !/^#[0-9a-f]{3,8}$/i.test(a)) throw new Error('Accent must be a hex colour like #7a4a1f.');
     next.accent = a;
   }
-  const merged = { ...(await readBranding(env)), ...next };
+  if (realmId) {
+    const merged = { ...(await readRealmBranding(env, realmId)), ...next };
+    await setFlag(env, realmKey(realmId), JSON.stringify(merged));
+    return await readBranding(env, realmId);
+  }
+  const merged = { ...(await readBlob(env, KEY)), ...next };
   await setFlag(env, KEY, JSON.stringify(merged));
-  return merged;
+  return { ...BRANDING_DEFAULTS, ...merged };
 }

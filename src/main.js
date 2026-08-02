@@ -10,7 +10,7 @@ import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
 import { applyLang } from './lib/i18n.js';
-import { loadBranding } from './lib/branding.js';
+import { loadBranding, applyBranding } from './lib/branding.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
 import { initActions, clearActions } from './lib/actions.js';
 import { renderLanding } from './views/landing.js';
@@ -218,7 +218,7 @@ route('/pos', (container) => {
 
 route('/admin/settings', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderAdminSettings(container);
+  renderAdminSettings(container, { me: state.me });
 });
 
 route('/admin/motd', (container) => {
@@ -238,12 +238,12 @@ route('/admin/items', (container) => {
 
 route('/admin/members', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderMembers(container);
+  renderMembers(container, { me: state.me });
 });
 
 route('/admin/companies', (container) => {
   if (!state.me || !state.me.registered || state.me.role !== 'admin') { navigate('/'); return; }
-  renderCompanies(container);
+  renderCompanies(container, { me: state.me });
 });
 
 route('/admin/realms', (container) => {
@@ -258,6 +258,7 @@ route('/admin/realms', (container) => {
  */
 async function refreshRealm() {
   state.me = await api.me();
+  if (state.me && state.me.branding) applyBranding(state.me.branding);
   renderBadge();
   showNav(true);
   navigate('/');
@@ -301,6 +302,10 @@ async function onSignedIn() {
     fatal(e);
     return;
   }
+  // Re-brand for the caller's realm. Before sign-in the app wears the
+  // deployment's identity (there is no realm to know about yet); now that we
+  // know who they are, a realm hosting its own server can look like itself.
+  if (state.me && state.me.branding) applyBranding(state.me.branding);
   // A public deep-link (e.g. a shared storefront) stays put — don't redirect.
   if (currentPath().split('?')[0] === '/shop') { render(); return; }
   renderBadge();

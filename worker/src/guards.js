@@ -35,7 +35,7 @@ export async function requireRegistered(request, env) {
   return user;
 }
 
-/** Requires the caller to be a registered admin (of their own realm). */
+/** Requires an admin — Realm Admin or System Admin. Scoped to their realm. */
 export async function requireAdmin(request, env) {
   const caller = await requireRegistered(request, env);
   if (caller.role !== 'admin') {
@@ -47,24 +47,35 @@ export async function requireAdmin(request, env) {
 }
 
 /**
- * A SUPER admin — an email in ADMIN_EMAILS. Only they may manage realms
- * themselves (create/rename/delete) or act across realm boundaries; a realm's
- * own admin is confined to that realm.
+ * A SYSTEM ADMIN — an email in ADMIN_EMAILS. They run the deployment: creating,
+ * renaming and deleting realms, moving people between them, and switching which
+ * realm they are viewing.
+ *
+ * The other kind is a REALM ADMIN: role 'admin' without an ADMIN_EMAILS entry.
+ * They are a full administrator of their OWN realm — members, companies, items,
+ * MOTD, audit, settings — and cannot see or touch any other. That confinement is
+ * not a UI choice: guards.realmIdOf refuses to return anything but their own
+ * realm, so every query they make is scoped to it.
+ *
+ * System Admin is granted by deployment config rather than in the app on
+ * purpose: it is the one role that can cross realm boundaries, so it should not
+ * be grantable by anyone who is merely an admin of one realm.
  */
-export async function requireSuperAdmin(request, env) {
+export async function requireSystemAdmin(request, env) {
   const caller = await requireAdmin(request, env);
   if (!isConfiguredAdmin(env, caller.email)) {
-    const e = new Error('Only a system administrator can manage realms.');
+    const e = new Error('Only a System Admin can do that. Realm Admins are confined to their own realm.');
     e.forbidden = true;
     throw e;
   }
   return caller;
 }
 
-/** True when this caller is configured as a system (super) admin. */
-export function isSuperAdmin(env, caller) {
+/** True when this caller is a System Admin (an ADMIN_EMAILS address). */
+export function isSystemAdmin(env, caller) {
   return !!caller && caller.role === 'admin' && isConfiguredAdmin(env, caller.email);
 }
+
 
 /**
  * The realm whose data a caller sees.
@@ -80,7 +91,7 @@ export function isSuperAdmin(env, caller) {
  */
 export function realmIdOf(caller, env) {
   if (!caller) return DEFAULT_REALM_ID;
-  if (env && caller.activeRealm && isSuperAdmin(env, caller)) return caller.activeRealm;
+  if (env && caller.activeRealm && isSystemAdmin(env, caller)) return caller.activeRealm;
   return caller.realmId || DEFAULT_REALM_ID;
 }
 

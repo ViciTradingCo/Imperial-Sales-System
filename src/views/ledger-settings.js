@@ -13,6 +13,7 @@ import { renderSettingsForm } from './settings-form.js';
 import { money } from '../lib/format.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 import { renderShopReport } from './shop-report.js';
+import { codePanel } from './realms.js';
 import { renderShopNotices } from './shop-notices.js';
 
 export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
@@ -38,6 +39,16 @@ export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
       open: (host) => mount(host, storefrontLinkCard(me)) },
     { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
       open: (host) => mount(host, exportCard()) },
+    { key: 'led-staff-code', label: 'Staff code', hint: 'Invite your employees', glyph: '🎟️',
+      open: (host) => mount(host, codePanel({
+        title: '🎟️ Staff code',
+        note: 'Give this to anyone who works for you. They enter it when they sign up and land straight in ' +
+          'this shop as a pending employee — you activate them from Employees. They never see any other shop.',
+        load: async () => (await api.getBusinessCode()).joinCode,
+        reset: async () => (await api.resetBusinessCode()).joinCode,
+        resetWarning: 'Issue a new staff code?\n\nThe current code stops working immediately — use this if it ' +
+          'has been shared somewhere it shouldn’t have been. Anyone still waiting to register will need the new one.',
+      })) },
     { key: 'led-company', label: 'Company', hint: 'Rename your shop', glyph: '🏛️',
       open: (host) => mount(host, companyCard(me, onBusinessRenamed)) },
     { key: 'led-settings', label: 'Shop settings', hint: 'Per-shop tunables', glyph: '⚙️',

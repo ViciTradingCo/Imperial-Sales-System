@@ -79,9 +79,36 @@ rule. It is DORMANT until a second realm exists: with one realm, the nav, the
 Admin Panel, and sign-up say nothing about realms and the app looks exactly as it
 did before the feature. The way in is Network Settings → Realms.
 
-`/auth/me` returns `realmCount`, `activeRealm`, and `superAdmin`; the UI gates on
-those. Realm selection happens in exactly ONE place (the Admin Panel) and filters
-the session from then on.
+`/auth/me` returns `realmCount`, `activeRealm`, and `systemAdmin`; the UI gates
+on those. Realm selection happens in exactly ONE place (the Admin Panel) and
+filters the session from then on.
+
+## Roles
+
+- **System Admin** — an address in the `ADMIN_EMAILS` worker var. Runs the
+  deployment: creates/renames/deletes realms, moves people between them, and
+  switches which realm they are viewing. Granted by config, never in-app, because
+  it is the only role that crosses realm boundaries.
+- **Realm Admin** — role `admin` without an `ADMIN_EMAILS` entry. A full
+  administrator of their OWN realm and nothing else; `guards.realmIdOf` refuses
+  to return any realm but theirs, so the confinement is structural, not cosmetic.
+- **Shop Owner** / **Employee** — scoped to one business, as before.
+
+## Join codes (registration)
+
+Sign-up never lists realms or shops — a new user types a **Business Code** and
+gets exactly what it admits them to:
+
+- a realm's **founder code** (`RLM-…`) → Business Creation: they name their own
+  shop and become its owner;
+- a shop's **staff code** (`SHOP-…`) → they join that shop as a pending employee.
+
+Codes are globally unique (a code arrives with no other context), case- and
+space-insensitive, and use an alphabet without I/O/0/1 since they get read aloud.
+Either kind can be reissued, which kills the old one immediately — that is the
+fix for a leaked code. `resolveJoinCode` in `worker/src/realm.js` is the only
+resolver; a bad code must never reveal whether some other code would have
+worked.
 
 ## Conventions
 

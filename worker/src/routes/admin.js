@@ -3,11 +3,11 @@
  * item + hold indexes, MOTD, market analytics, data backup/restore, log
  * maintenance, and the system-status snapshot.
  */
-import { requireAdmin, requireSuperAdmin, actorName, realmIdOf, isSuperAdmin } from '../guards.js';
+import { requireAdmin, requireSystemAdmin, requireOwnerOrAdmin, actorName, realmIdOf, isSystemAdmin } from '../guards.js';
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember } from '../users.js';
-import { listCompanies, updateCompany, archiveCompany, transferCompany } from '../registry.js';
+import { listCompanies, updateCompany, archiveCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
 import { marketAnalysis } from '../market.js';
 import { clearLogs, purgeLogs, resetAllData } from '../db.js';
@@ -16,9 +16,9 @@ import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, 
 import { upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex, analyzeItemImport } from '../item-index.js';
 import { writeHolds } from '../holds.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
-import { readBranding, writeBranding } from '../branding.js';
+import { readBranding, readRealmBranding, writeBranding } from '../branding.js';
 import { getFlag, setFlag } from '../db.js';
-import { listRealms, createRealm, renameRealm, deleteRealm, realmStats, getRealm } from '../realm.js';
+import { listRealms, createRealm, renameRealm, deleteRealm, realmStats, getRealm, regenerateRealmCode } from '../realm.js';
 
 /**
  * Network Settings belong to a REALM, so these act on whichever realm the
@@ -42,7 +42,7 @@ async function saveSettings({ request, env, body }) {
  */
 async function listMembers({ request, env, url }) {
   const caller = await requireAdmin(request, env);
-  const realmId = await sourceRealm(env, caller, isSuperAdmin(env, caller) ? url.searchParams.get('realm') : '');
+  const realmId = await sourceRealm(env, caller, isSystemAdmin(env, caller) ? url.searchParams.get('realm') : '');
   return { members: await listAllUsers(env, realmId) };
 }
 async function updateMemberRoute({ request, env, body }) {
@@ -61,7 +61,7 @@ async function deleteMemberRoute({ request, env, body }) {
 /** As listMembers: ?realm= is honoured for a super admin only. */
 async function listCompaniesRoute({ request, env, url }) {
   const caller = await requireAdmin(request, env);
-  const realmId = await sourceRealm(env, caller, isSuperAdmin(env, caller) ? url.searchParams.get('realm') : '');
+  const realmId = await sourceRealm(env, caller, isSystemAdmin(env, caller) ? url.searchParams.get('realm') : '');
   return { companies: await listCompanies(env, realmId) };
 }
 async function updateCompanyRoute({ request, env, body }) {
@@ -77,26 +77,49 @@ async function deleteCompanyRoute({ request, env, body }) {
   return { companies };
 }
 
-/** A gzipped JSON export of all D1 data (a downloadable backup). */
-async function exportData({ request, env, cors }) {
-  await requireAdmin(request, env);
-  const buf = await gzipJson(await collectExport(env));
+/**
+ * A gzipped JSON backup. ?scope=realm limits it to the realm being viewed;
+ * anything else takes the whole deployment.
+ *
+ * A Realm Admin only ever gets their own realm — a whole-deployment file would
+ * contain every other realm's rows, which is exactly what their role forbids.
+ * Only a System Admin can take the full snapshot.
+ */
+async function exportData({ request, env, url, cors }) {
+  const caller = await requireAdmin(request, env);
+  const wantsRealm = url.searchParams.get('scope') === 'realm' || !isSystemAdmin(env, caller);
+  const realmId = wantsRealm ? realmIdOf(caller, env) : '';
+  const buf = await gzipJson(await collectExport(env, realmId));
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const label = realmId ? 'realm-' + realmId : 'all';
   return new Response(buf, {
     status: 200,
-    headers: { ...cors, 'Content-Type': 'application/gzip', 'Content-Disposition': 'attachment; filename="eec-backup-' + stamp + '.json.gz"' },
+    headers: { ...cors, 'Content-Type': 'application/gzip', 'Content-Disposition': 'attachment; filename="vici-backup-' + label + '-' + stamp + '.json.gz"' },
   });
 }
 /** Dry-run: current-vs-incoming row counts per table, without changing anything. */
 async function importPreview({ request, env, body }) {
-  await requireAdmin(request, env);
-  return await previewImport(env, body);
+  const caller = await requireAdmin(request, env);
+  return await previewImport(env, body, restoreRealm(env, caller, body));
 }
 async function importData({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const res = await restoreImport(env, body);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'data.restore', detail: 'restored from backup', realmId: realmIdOf(caller, env) });
+  const realmId = restoreRealm(env, caller, body);
+  const res = await restoreImport(env, body, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'data.restore',
+    detail: 'restored from backup (' + (realmId ? 'realm ' + realmId : 'whole deployment') + ')', realmId: realmIdOf(caller, env) });
   return res;
+}
+
+/**
+ * Which realm a restore writes into. A Realm Admin is pinned to their own, so
+ * they can never restore a file over another realm — or over the whole
+ * deployment. A System Admin may take the file at its word.
+ */
+function restoreRealm(env, caller, body) {
+  if (!isSystemAdmin(env, caller)) return realmIdOf(caller, env);
+  if (body && body.scope === 'realm') return realmIdOf(caller, env);
+  return '';
 }
 
 async function market({ request, env }) {
@@ -121,7 +144,7 @@ async function status({ request, env }) {
   return await systemStatus(env, realmIdOf(caller, env));
 }
 
-/** Full reset — wipe all data, keep admin accounts. Guarded by a typed confirm. */
+/** Full reset of the CURRENT REALM — keeps admin accounts. Typed confirm. */
 async function wipeData({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   if (String(body.confirm || '') !== 'ERASE') throw new Error('Reset not confirmed.');
@@ -196,13 +219,28 @@ async function analyzeItems({ request, env, body }) {
   return await analyzeItemImport(env, body.rows, realmIdOf(caller, env));
 }
 /* ---- Sitewide branding (app name, logo, shared iconography) ---- */
+/**
+ * Branding for editing. A System Admin edits the DEPLOYMENT's identity (what a
+ * signed-out visitor sees); a Realm Admin edits their own realm's overrides,
+ * which is all their role should reach. `inherited` shows what a blank field
+ * will fall back to.
+ */
 async function getBranding({ request, env }) {
-  await requireAdmin(request, env);
-  return await readBranding(env);
+  const caller = await requireAdmin(request, env);
+  if (isSystemAdmin(env, caller)) {
+    return { scope: 'site', branding: await readBranding(env), inherited: null };
+  }
+  const realmId = realmIdOf(caller, env);
+  return {
+    scope: 'realm',
+    branding: await readRealmBranding(env, realmId),
+    inherited: await readBranding(env),
+  };
 }
 async function saveBranding({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const b = await writeBranding(env, body || {});
+  const realmId = isSystemAdmin(env, caller) ? '' : realmIdOf(caller, env);
+  const b = await writeBranding(env, body || {}, realmId);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'branding.update', detail: b.appName, realmId: realmIdOf(caller, env) });
   return b;
 }
@@ -262,25 +300,52 @@ async function realmsList({ request, env }) {
   return { realms: await listRealms(env) };
 }
 async function realmCreate({ request, env, body }) {
-  const caller = await requireSuperAdmin(request, env);
+  const caller = await requireSystemAdmin(request, env);
   const realm = await createRealm(env, { name: body.name, slug: body.slug });
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.create', detail: realm.name + ' (' + realm.id + ')', realmId: realmIdOf(caller, env) });
   return { realm, realms: await listRealms(env) };
 }
 async function realmRename({ request, env, body }) {
-  const caller = await requireSuperAdmin(request, env);
+  const caller = await requireSystemAdmin(request, env);
   const realm = await renameRealm(env, body.id, body.name);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.rename', detail: realm.id + ' -> ' + realm.name, realmId: realmIdOf(caller, env) });
   return { realm, realms: await listRealms(env) };
 }
 async function realmDelete({ request, env, body }) {
-  const caller = await requireSuperAdmin(request, env);
+  const caller = await requireSystemAdmin(request, env);
   // Destroys every row in the realm, so require the word to be typed out.
   if (String(body.confirm || '') !== 'DELETE') throw new Error('Type DELETE to confirm removing a realm and everything in it.');
   const result = await deleteRealm(env, body.id);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.delete', detail: result.deleted, realmId: realmIdOf(caller, env) });
   return { ...result, realms: await listRealms(env) };
 }
+/** Issues a new founder code for a realm, invalidating the old one. */
+async function realmCodeReset({ request, env, body }) {
+  const caller = await requireSystemAdmin(request, env);
+  const code = await regenerateRealmCode(env, body.id);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.code.reset', detail: body.id, realmId: realmIdOf(caller, env) });
+  return { joinCode: code, realms: await listRealms(env) };
+}
+
+/**
+ * A shop's staff code. Its OWN owner can read and reset it — that is the point,
+ * they hand it to their employees — and so can an admin of the realm. Anyone
+ * else asking gets nothing, since the code is what admits people to the shop.
+ */
+async function businessCode({ request, env, url }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const business = caller.role === 'admin' && url.searchParams.get('business')
+    ? url.searchParams.get('business') : caller.business;
+  return { business, joinCode: await businessJoinCode(env, business, realmIdOf(caller, env)) };
+}
+async function businessCodeReset({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const business = caller.role === 'admin' && body.business ? body.business : caller.business;
+  const code = await regenerateBusinessCode(env, business, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business, action: 'business.code.reset', detail: business, realmId: realmIdOf(caller, env) });
+  return { business, joinCode: code };
+}
+
 async function realmStatsRoute({ request, env }) {
   const caller = await requireAdmin(request, env);
   return await realmStats(env, realmIdOf(caller, env));
@@ -293,7 +358,7 @@ async function realmStatsRoute({ request, env }) {
  * route is the first of those two locks, not the only one.
  */
 async function realmSelect({ request, env, body }) {
-  const caller = await requireSuperAdmin(request, env);
+  const caller = await requireSystemAdmin(request, env);
   const target = String(body.realmId || '').trim();
   // An empty value means "back to my own realm".
   const chosen = target && target !== caller.realmId ? target : '';
@@ -326,14 +391,14 @@ async function sourceRealm(env, caller, requested) {
 }
 
 async function realmTransferMember({ request, env, body }) {
-  const caller = await requireSuperAdmin(request, env);
+  const caller = await requireSystemAdmin(request, env);
   const from = await sourceRealm(env, caller, body.fromRealm);
   const res = await transferMember(env, body.uid, body.toRealm, from);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.member.transfer', detail: body.uid + ': ' + from + ' → ' + body.toRealm, realmId: from });
   return { ...res, members: await listAllUsers(env, from) };
 }
 async function realmTransferCompany({ request, env, body }) {
-  const caller = await requireSuperAdmin(request, env);
+  const caller = await requireSystemAdmin(request, env);
   const from = await sourceRealm(env, caller, body.fromRealm);
   const res = await transferCompany(env, body.id, body.toRealm, from);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.company.transfer', detail: (res.moved || body.id) + ': ' + from + ' → ' + body.toRealm, realmId: from });
@@ -375,6 +440,9 @@ export const routes = [
   { method: 'POST', path: '/admin/realms/delete', handler: realmDelete },
   { method: 'GET', path: '/admin/realms/stats', handler: realmStatsRoute },
   { method: 'POST', path: '/admin/realms/select', handler: realmSelect },
+  { method: 'POST', path: '/admin/realms/code', handler: realmCodeReset },
+  { method: 'GET', path: '/business/code', handler: businessCode },
+  { method: 'POST', path: '/business/code/reset', handler: businessCodeReset },
   { method: 'POST', path: '/admin/realms/transfer-member', handler: realmTransferMember },
   { method: 'POST', path: '/admin/realms/transfer-company', handler: realmTransferCompany },
   { method: 'GET', path: '/admin/branding', handler: getBranding },

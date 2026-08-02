@@ -46,9 +46,11 @@ export const api = {
   health: () => request('GET', '/health'),
   /** Verifies the signed-in user and returns their profile, or {registered:false}. */
   me: () => request('POST', '/auth/me', {}),
-  /** Registers the signed-in user against a business (as owner or employee). */
-  register: (businessName, asOwner, character, hold, realmId) =>
-    request('POST', '/auth/register', { businessName, asOwner: !!asOwner, character, hold, realmId }),
+  /** Sign-up: what a Business Code opens, without registering anything. */
+  checkCode: (code) => request('POST', '/auth/code', { code }),
+  /** Sign-up: register against a Business Code. The code decides realm + role. */
+  register: (code, character, businessName, hold) =>
+    request('POST', '/auth/register', { code, character, businessName, hold }),
   /** Updates the signed-in user's own profile (character name). */
   updateProfile: (character) => request('POST', '/me/profile', { character }),
   /** Owner/admin: the roster for the caller's business. */
@@ -74,16 +76,17 @@ export const api = {
   /** Admin: archive (delete) a company — data retained, name freed. */
   deleteCompany: (id) => request('POST', '/admin/companies/delete', { id }),
   /** Admin: download a gzipped full-data backup (returns a Blob). */
-  exportBackupBlob: async () => {
+  exportBackupBlob: async (scope) => {
     const token = getIdToken();
-    const res = await fetch(baseUrl + '/admin/export', { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+    const q = scope === 'realm' ? '?scope=realm' : '';
+    const res = await fetch(baseUrl + '/admin/export' + q, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
     if (!res.ok) { throw new Error((await res.text()) || res.statusText); }
     return await res.blob();
   },
   /** Admin: dry-run a restore — current-vs-incoming row counts, no changes made. */
-  previewBackup: (data) => request('POST', '/admin/import/preview', data),
+  previewBackup: (data, scope) => request('POST', '/admin/import/preview', { ...data, scope }),
   /** Admin: restore all data from a parsed backup document. */
-  importBackup: (data) => request('POST', '/admin/import', data),
+  importBackup: (data, scope) => request('POST', '/admin/import', { ...data, scope }),
   /** Admin: network-wide market analytics. */
   getMarket: () => request('GET', '/admin/market'),
   /** Admin: wipe all sales + intake logs across the network. */
@@ -222,10 +225,12 @@ export const api = {
   transferMemberRealm: (uid, toRealm, fromRealm) => request('POST', '/admin/realms/transfer-member', { uid, toRealm, fromRealm }),
   /** Super admin: move a company (and its members) to another realm. */
   transferCompanyRealm: (id, toRealm, fromRealm) => request('POST', '/admin/realms/transfer-company', { id, toRealm, fromRealm }),
-  /** Sign-up: the realms a new user can join (verified account, not yet registered). */
-  getRealmChoices: () => request('GET', '/auth/realms'),
-  /** Sign-up: the shops inside a chosen realm. */
-  getRealmBusinesses: (realmId) => request('GET', '/auth/businesses?realm=' + encodeURIComponent(realmId || '')),
+  /** System Admin: issue a new founder code for a realm (the old one dies). */
+  resetRealmCode: (id) => request('POST', '/admin/realms/code', { id }),
+  /** Owner/admin: this shop's staff code, for handing to employees. */
+  getBusinessCode: () => request('GET', '/business/code'),
+  /** Owner/admin: issue a new staff code (the old one dies). */
+  resetBusinessCode: () => request('POST', '/business/code/reset', {}),
   /** Public: sitewide branding (name, logo, favicon, footer, accent). */
   getBranding: () => request('GET', '/branding'),
   /** Admin: read branding for editing. */
@@ -246,8 +251,8 @@ export const api = {
   getPublicStorefront: (business, realmId) => request('GET', '/public/storefront?b=' + encodeURIComponent(business || '') +
     (realmId ? '&realm=' + encodeURIComponent(realmId) : '')),
   /** The network hold list. */
-  /** The hold list. During sign-up pass the chosen realm — there's no account yet. */
-  getHolds: (realmId) => request('GET', '/holds' + (realmId ? '?realm=' + encodeURIComponent(realmId) : '')),
+  /** The hold list for the caller's realm. (Sign-up gets holds from checkCode.) */
+  getHolds: () => request('GET', '/holds'),
   /** Recent intake transactions for the caller's business. */
   getIntake: () => request('GET', '/intake'),
   /** Owner/admin: record a stock intake (purchase). */

@@ -1,164 +1,140 @@
 /**
- * Registration view — shown when a signed-in Google account isn't in the
- * registry yet. The user picks a realm, then discloses a business and whether
- * they own it:
- *   • Owner   → the business is created (the name must be free IN THAT REALM)
- *               and they become its active owner.
- *   • Employee → they join an existing business in that realm and wait for
- *               owner/admin activation (status: pending).
+ * Registration — shown when a signed-in Google account isn't in the registry yet.
  *
- * The realm comes first because everything after it depends on it: the shop
- * list, the holds, and whether a name is free are all per-realm. An account
- * belongs to exactly one realm from here on; an admin can move someone who
- * picked wrong (Realm Management → Move between realms).
+ * Registration is BY CODE, in two steps:
+ *   1. Character name + the Business Code you were given.
+ *   2. What the code opens:
+ *        • a realm's FOUNDER code → Business Creation: name your shop, pick its
+ *          hold, and you become its active owner.
+ *        • a shop's STAFF code    → confirmation only: you join that shop as a
+ *          pending employee, activated by its owner or an admin.
  *
- * The API enforces all of this; this form just collects and reports.
+ * Nothing here ever lists realms or shops. A person signing up sees only what
+ * their own code admits them to, so the network can't be browsed by anyone who
+ * doesn't already belong to it. The API enforces this; the form just collects.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 
-const DEFAULT_HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
-
 export function renderRegister(container, { profile, onRegistered }) {
   const status = el('p', { id: 'regStatus' });
+  const stepHost = el('div', {});
 
   const charInput = el('input', { type: 'text', id: 'charName', placeholder: 'e.g. Brynja Iron-Song' });
-
-  /* ---- realm ---- */
-  const realmSelect = el('select', { id: 'realmPick' });
-  const realmWrap = el('div', {}, [
-    el('label', {}, 'Realm'),
-    realmSelect,
-    el('p', { class: 'note' }, 'Which server you play on. Realms are completely separate — you will only ever ' +
-      'see the shops, items, and people of the realm you join.'),
-  ]);
-  realmWrap.hidden = true; // only worth showing when there's a choice to make
-
-  /* ---- business: a picker for employees, a free field for owners ---- */
-  const bizSelect = el('select', { id: 'bizPick' });
-  const bizInput = el('input', { type: 'text', id: 'bizName', placeholder: 'e.g. Riverwood Trader' });
-  const bizNote = el('p', { class: 'note' }, '');
-  const bizWrapEmployee = el('div', {}, [el('label', {}, 'Business'), bizSelect, bizNote]);
-  const bizWrapOwner = el('div', {}, [el('label', {}, 'Business name'), bizInput,
-    el('p', { class: 'note' }, 'The name must not already be taken in this realm.')]);
-
-  /* ---- hold (owners only — it's a property of the business) ---- */
-  const holdSelect = el('select', { id: 'bizHold' });
-  DEFAULT_HOLDS.forEach((h) => holdSelect.appendChild(el('option', { value: h }, h)));
-  const holdWrap = el('div', {}, [el('label', {}, 'Hold'), holdSelect,
-    el('p', { class: 'note' }, 'The hold your business trades in.')]);
-
-  const ownerRadio = el('input', { type: 'radio', name: 'role', value: 'owner', id: 'roleOwner' });
-  const empRadio = el('input', { type: 'radio', name: 'role', value: 'employee', id: 'roleEmp', checked: true });
-
-  function syncRole() {
-    const owner = ownerRadio.checked;
-    holdWrap.hidden = !owner;
-    bizWrapOwner.hidden = !owner;
-    bizWrapEmployee.hidden = owner;
-  }
-  ownerRadio.addEventListener('change', syncRole);
-  empRadio.addEventListener('change', syncRole);
-  syncRole();
-
-  const submit = el('button.primary', { onclick: doRegister }, 'Register');
+  const codeInput = el('input', { type: 'text', id: 'joinCode', placeholder: 'e.g. SHOP-ABCD-2345', autocomplete: 'off' });
+  const checkBtn = el('button.primary', { onclick: doCheck }, 'Continue');
 
   function setStatus(msg, cls) {
     status.className = cls || '';
     status.textContent = msg;
   }
 
-  /** The realm the form is currently working against. */
-  function realmId() {
-    return realmSelect.value || '';
-  }
+  // Codes are printed in caps; accept whatever is typed and show it that way.
+  codeInput.addEventListener('input', () => {
+    const pos = codeInput.selectionStart;
+    codeInput.value = codeInput.value.toUpperCase();
+    codeInput.setSelectionRange(pos, pos);
+  });
+  codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doCheck(); });
 
-  // Realms first; the shop list and holds follow from whichever is chosen.
-  api.getRealmChoices().then((r) => {
-    const realms = (r && r.realms) || [];
-    realmSelect.innerHTML = '';
-    realms.forEach((x) => realmSelect.appendChild(el('option', { value: x.id }, x.name)));
-    // With a single realm there is nothing to choose, so don't ask.
-    realmWrap.hidden = realms.length < 2;
-    loadRealmData();
-  }).catch(() => { loadRealmData(); });
-
-  realmSelect.addEventListener('change', loadRealmData);
-
-  /** Loads the shops and holds belonging to the selected realm. */
-  function loadRealmData() {
-    bizSelect.innerHTML = '';
-    bizNote.textContent = 'Loading shops…';
-    api.getRealmBusinesses(realmId()).then((r) => {
-      const names = (r && r.businesses) || [];
-      bizSelect.innerHTML = '';
-      if (!names.length) {
-        bizNote.textContent = 'No shops are registered in this realm yet — register as an owner to start the first one.';
-        return;
-      }
-      names.forEach((n) => bizSelect.appendChild(el('option', { value: n }, n)));
-      bizNote.textContent = 'Pick the shop you work for. Only shops in this realm are listed.';
-    }).catch(() => { bizNote.textContent = 'Could not load the shop list — try again in a moment.'; });
-
-    api.getHolds(realmId()).then((res) => {
-      const holds = (res && res.holds) || [];
-      if (!holds.length) return;
-      const prev = holdSelect.value;
-      holdSelect.innerHTML = '';
-      holds.forEach((h) => holdSelect.appendChild(el('option', { value: h }, h)));
-      if (holds.includes(prev)) holdSelect.value = prev;
-    }).catch(() => { /* keep the defaults */ });
-  }
-
-  async function doRegister() {
+  async function doCheck() {
     const character = charInput.value.trim();
     if (!character) { setStatus("Enter your character's name.", 'error'); return; }
-    const asOwner = ownerRadio.checked;
-    const businessName = asOwner ? bizInput.value.trim() : bizSelect.value;
-    if (!businessName) {
-      setStatus(asOwner ? 'Enter your business name.' : 'Pick the shop you work for.', 'error');
-      return;
-    }
-    const hold = asOwner ? holdSelect.value : '';
-    submit.disabled = true;
-    setStatus('Registering…', '');
+    const code = codeInput.value.trim();
+    if (!code) { setStatus('Enter the Business Code you were given.', 'error'); return; }
+    checkBtn.disabled = true;
+    setStatus('Checking code…', '');
     try {
-      const me = await api.register(businessName, asOwner, character, hold, realmId());
-      onRegistered(me);
+      const found = await api.checkCode(code);
+      setStatus('', '');
+      if (found.kind === 'realm') showBusinessCreation(code, character, found);
+      else showJoinShop(code, character, found);
     } catch (e) {
-      submit.disabled = false;
       setStatus(e.message || String(e), 'error');
+    } finally {
+      checkBtn.disabled = false;
     }
   }
 
-  const card = el('div.card', {}, [
+  /** Step 2a — a founder code: create your own shop inside that realm. */
+  function showBusinessCreation(code, character, found) {
+    const bizInput = el('input', { type: 'text', placeholder: 'e.g. Riverwood Trader' });
+    const holdSelect = el('select', {});
+    (found.holds || []).forEach((h) => holdSelect.appendChild(el('option', { value: h }, h)));
+    const submit = el('button.primary', { onclick: doCreate }, 'Create my business');
+
+    async function doCreate() {
+      const businessName = bizInput.value.trim();
+      if (!businessName) { setStatus('Enter your business name.', 'error'); return; }
+      submit.disabled = true;
+      setStatus('Creating your business…', '');
+      try {
+        const me = await api.register(code, character, businessName, holdSelect.value);
+        onRegistered(me);
+      } catch (e) {
+        submit.disabled = false;
+        setStatus(e.message || String(e), 'error');
+      }
+    }
+
+    mount(stepHost, el('div.card', {}, [
+      el('h3', {}, '🏛️ Create your business'),
+      el('p', { class: 'note', html: 'Your code admits you to <b>' + esc(found.realmName) + '</b> as a shop owner. ' +
+        'Name your business and pick the hold it trades in.' }),
+      el('label', {}, 'Business name'),
+      bizInput,
+      el('p', { class: 'note' }, 'This name must not already be taken in this realm.'),
+      el('label', {}, 'Hold'),
+      holdSelect,
+      el('div', { class: 'row-actions' }, [submit, backBtn()]),
+    ]));
+  }
+
+  /** Step 2b — a staff code: join the shop the code belongs to. */
+  function showJoinShop(code, character, found) {
+    const submit = el('button.primary', { onclick: doJoin }, 'Join ' + found.business);
+
+    async function doJoin() {
+      submit.disabled = true;
+      setStatus('Registering…', '');
+      try {
+        const me = await api.register(code, character);
+        onRegistered(me);
+      } catch (e) {
+        submit.disabled = false;
+        setStatus(e.message || String(e), 'error');
+      }
+    }
+
+    mount(stepHost, el('div.card', {}, [
+      el('h3', {}, '🧑‍🤝‍🧑 Join a business'),
+      el('p', { html: 'Your code is for <b>' + esc(found.business) + '</b> in <b>' + esc(found.realmName) + '</b>.' }),
+      el('p', { class: 'note' }, 'You will join as an employee. Your account stays pending until the shop’s owner ' +
+        'or an admin activates it — until then you can sign in, but not ring up sales.'),
+      el('div', { class: 'row-actions' }, [submit, backBtn()]),
+    ]));
+  }
+
+  function backBtn() {
+    return el('button.secondary-btn', { onclick: () => { mount(stepHost); setStatus('', ''); } }, 'Use a different code');
+  }
+
+  mount(container, el('div.card', {}, [
     el('h2', {}, 'Welcome, new trader'),
     el('p', { class: 'note', html:
       'Signed in as <b>' + esc(profile.email || '') + '</b>. ' +
-      'Tell the Company who you trade as, and who you trade for.' }),
+      'Tell the Company who you trade as, and enter the code you were given.' }),
 
     el('label', {}, 'Character name'),
     charInput,
     el('p', { class: 'note' }, 'Your in-character name — this is what the Company and your shop see, not your email.'),
 
-    realmWrap,
+    el('label', {}, 'Business Code'),
+    codeInput,
+    el('p', { class: 'note' }, 'The code from your shop’s owner (to join their shop) or from an admin (to start ' +
+      'a shop of your own). Ask whoever invited you if you don’t have one.'),
 
-    el('label', {}, 'Your role'),
-    el('div', { class: 'choice' }, [
-      el('label', { class: 'inline' }, [empRadio, document.createTextNode(' I work for this business (employee)')]),
-      el('label', { class: 'inline' }, [ownerRadio, document.createTextNode(' I own / am starting this business (owner)')]),
-    ]),
-    el('p', { class: 'note', html:
-      'Owners create the business (the name must be free). Employees join an ' +
-      'existing business and are activated by its owner or an admin.' }),
-
-    bizWrapEmployee,
-    bizWrapOwner,
-    holdWrap,
-
-    submit,
+    el('div', { class: 'row-actions' }, [checkBtn]),
     status,
-  ]);
-
-  mount(container, card);
+  ]), stepHost);
 }

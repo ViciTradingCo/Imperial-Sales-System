@@ -17,6 +17,9 @@
 /** The realm existing (pre-multi-realm) data belongs to. */
 export const DEFAULT_REALM_ID = 'default';
 
+/** What the built-in realm is called. It can be renamed, but never deleted. */
+export const DEFAULT_REALM_NAME = 'Test Realm';
+
 // Inlined into DDL text below; kept as its own name so the DDL reads clearly.
 const R = DEFAULT_REALM_ID;
 
@@ -110,12 +113,15 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`,
   `CREATE INDEX IF NOT EXISTS idx_users_business ON users (business)`,
   // Registered businesses + their Vici Trading Co. certification (subscription).
+  // join_code is the STAFF code: an owner hands it to their employees so they
+  // can register straight into this shop without being shown any other shop.
   `CREATE TABLE IF NOT EXISTS companies (
      id TEXT PRIMARY KEY,
      realm_id TEXT NOT NULL DEFAULT '${R}',
      business TEXT NOT NULL, point_of_contact TEXT,
      until TEXT, perpetual INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT '',
-     hold TEXT, court INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0)`,
+     hold TEXT, court INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0,
+     join_code TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_companies_business ON companies (business)`,
   // Network Master Settings (label → value) PER REALM; schema lives in settings.js.
   `CREATE TABLE IF NOT EXISTS master_settings (
@@ -137,8 +143,11 @@ const SCHEMA = [
   // One deployment can host several independent RP servers. Every data table
   // carries a realm_id and queries filter on it, so nothing is ever shared or
   // cross-referenced between realms. See realm.js.
+  // join_code is the FOUNDER code: it admits someone to this realm and sends
+  // them to Business Creation, where they start a shop of their own.
   `CREATE TABLE IF NOT EXISTS realms (
-     id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT, created TEXT)`,
+     id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT, created TEXT,
+     join_code TEXT)`,
 ];
 
 /** Every table that holds realm-owned data (all get a realm_id column). */
@@ -180,6 +189,13 @@ const MIGRATIONS = [
   "ALTER TABLE users ADD COLUMN active_realm TEXT NOT NULL DEFAULT ''",
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_realm_email ON users (realm_id, email)',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_realm_business ON companies (realm_id, business)',
+  // Join codes: added by migration for databases that predate them, and unique
+  // ACROSS realms — a code is typed with no other context, so it has to identify
+  // exactly one realm or shop on its own.
+  'ALTER TABLE realms ADD COLUMN join_code TEXT',
+  'ALTER TABLE companies ADD COLUMN join_code TEXT',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_realms_join_code ON realms (join_code) WHERE join_code IS NOT NULL',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_join_code ON companies (join_code) WHERE join_code IS NOT NULL',
 ];
 
 /**

@@ -32,7 +32,7 @@ export function renderHome(container, { me, onProfileUpdated, onRealmChanged }) 
     el('h2', {}, 'Welcome, ' + esc(me.character || 'trader')),
     el('p', { html:
       '<b>Business:</b> ' + esc(me.business || '—') + '<br>' +
-      '<b>Role:</b> ' + esc(roleTitle(me.role)) + '<br>' +
+      '<b>Role:</b> ' + esc(roleTitle(me)) + '<br>' +
       '<b>Status:</b> ' + statusBadge(me.status) }),
     me.status === 'pending'
       ? el('p', { class: 'warn', html:
@@ -139,9 +139,13 @@ export function renderHome(container, { me, onProfileUpdated, onRealmChanged }) 
 function adminWelcomeCard(me, realmCount) {
   const nodes = [
     el('h2', {}, 'Welcome, ' + esc(me.character || me.email || 'administrator')),
-    el('p', {}, 'This is the Admin Panel — the controls for the whole network. Pick a tool below, or use the ' +
-      'menu above to move between them.'),
+    el('p', { html: 'This is the Admin Panel — you are signed in as a <b>' + esc(roleTitle(me)) + '</b>. ' +
+      'Pick a tool below, or use the menu above to move between them.' }),
   ];
+  if (me.role === 'admin' && !me.systemAdmin) {
+    nodes.push(el('p', { class: 'note' }, 'As a Realm Admin your tools cover this realm only — its members, ' +
+      'shops, items, and settings. Other realms are not visible to you.'));
+  }
   if (realmCount > 1) {
     nodes.push(el('p', { class: 'note', html:
       'You are viewing <b>' + esc(me.realmName || me.activeRealm || 'the main realm') + '</b>. ' +
@@ -163,7 +167,7 @@ function adminWelcomeCard(me, realmCount) {
  * Only a super admin can switch; the Worker re-checks that regardless.
  */
 function realmPickerCard(me, realms, onRealmChanged) {
-  if (realms.length < 2 || !me.superAdmin) return null;
+  if (realms.length < 2 || !me.systemAdmin) return null;
 
   const status = el('p', {});
   const buttons = realms.map((r) => {
@@ -224,8 +228,16 @@ function errorsCard() {
   return card;
 }
 
-function roleTitle(role) {
-  return { admin: 'Administrator', owner: 'Shop Owner', employee: 'Employee' }[role] || 'Trader';
+/**
+ * What to call this account. 'admin' covers two very different jobs: a System
+ * Admin runs the deployment and can cross realms, a Realm Admin administers one
+ * realm and cannot. The distinction comes from the server (me.systemAdmin), not
+ * from the stored role.
+ */
+export function roleTitle(me) {
+  if (!me) return 'Trader';
+  if (me.role === 'admin') return me.systemAdmin ? 'System Admin' : 'Realm Admin';
+  return { owner: 'Shop Owner', employee: 'Employee' }[me.role] || 'Trader';
 }
 function statusBadge(status) {
   const cls = status === 'active' ? 'ok' : 'warn';

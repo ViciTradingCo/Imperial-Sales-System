@@ -106,19 +106,31 @@ describe('realm management', () => {
     await expect(createRealm(env, { name: 'Third Realm' })).rejects.toThrow(/already exists/i);
   });
 
-  it('reports per-realm stats and deletes a realm without touching others', async () => {
+  it('reports per-realm stats', async () => {
     const before = await realmStats(env, DEFAULT_REALM_ID);
     expect(before.counts.companies).toBe(1);
+  });
 
+  it('refuses to delete a realm that still holds shops or members', async () => {
+    // The expensive-and-irreversible guard: emptying the realm first forces a
+    // deliberate second look at what is about to be destroyed.
+    await expect(deleteRealm(env, REALM_B)).rejects.toThrow(/still holds/i);
+    expect(await listCompanies(env, REALM_B)).toHaveLength(1);
+  });
+
+  it('deletes an emptied realm without touching others', async () => {
+    await env.DB.prepare('DELETE FROM companies WHERE realm_id = ?').bind(REALM_B).run();
+    await env.DB.prepare('DELETE FROM users WHERE realm_id = ?').bind(REALM_B).run();
     await deleteRealm(env, REALM_B);
-    expect(await listCompanies(env, REALM_B)).toHaveLength(0);
-    expect(await listAllUsers(env, REALM_B)).toHaveLength(0);
+    expect((await listRealms(env)).some((r) => r.id === REALM_B)).toBe(false);
     // Realm A is untouched.
     expect(await listCompanies(env, DEFAULT_REALM_ID)).toHaveLength(1);
     expect(await listAllUsers(env, DEFAULT_REALM_ID)).toHaveLength(1);
   });
 
-  it('protects the default realm from deletion', async () => {
+  it('protects the built-in realm from deletion, however empty', async () => {
+    await env.DB.prepare('DELETE FROM companies WHERE realm_id = ?').bind(DEFAULT_REALM_ID).run();
+    await env.DB.prepare('DELETE FROM users WHERE realm_id = ?').bind(DEFAULT_REALM_ID).run();
     await expect(deleteRealm(env, DEFAULT_REALM_ID)).rejects.toThrow(/cannot be deleted/i);
   });
 });

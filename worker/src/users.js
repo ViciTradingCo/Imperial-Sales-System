@@ -184,7 +184,7 @@ export async function deleteMember(env, uid, realmId) {
 /**
  * Sets which realm a super admin is VIEWING. Passing their own realm (or an
  * empty value) clears the override. The caller must have already established
- * that this user may switch realms — see guards.requireSuperAdmin.
+ * that this user may switch realms — see guards.requireSystemAdmin.
  */
 export async function setActiveRealm(env, uid, realmId) {
   const db = await getDb(env);

@@ -15,28 +15,42 @@ const TABLES = ['inventory', 'sales', 'intake', 'transfers', 'coffer_entries',
 const ERR_KEY = 'recent_errors';
 const ERR_MAX = 25;
 
-/** Records an internal error to the rolling buffer (and, if configured, Discord). */
-export async function recordError(env, where, message) {
+/**
+ * Records an internal error to the rolling buffer (and, if configured, Discord).
+ *
+ * `realmId` is optional but worth passing: with several realms running, "which
+ * server did this come from" is the first question anyone asks, and the buffer
+ * is deployment-wide. Errors raised before a caller is resolved genuinely have
+ * no realm, so it stays optional rather than being faked.
+ */
+export async function recordError(env, where, message, realmId) {
+  const realm = String(realmId || '').trim();
   try {
     const raw = await getFlag(env, ERR_KEY);
     let list = [];
     try { list = raw ? JSON.parse(raw) : []; } catch (e) { list = []; }
-    list.unshift({ ts: new Date().toISOString(), where: String(where || '').slice(0, 120), message: String(message || '').slice(0, 300) });
+    list.unshift({
+      ts: new Date().toISOString(),
+      where: String(where || '').slice(0, 120),
+      message: String(message || '').slice(0, 300),
+      realmId: realm || null,
+    });
     if (list.length > ERR_MAX) list = list.slice(0, ERR_MAX);
     await setFlag(env, ERR_KEY, JSON.stringify(list));
   } catch (e) { /* observability must never break the request path */ }
-  await notifyDiscord(env, where, message);
+  await notifyDiscord(env, where, message, realm);
 }
 
 /** Optional: ping a Discord webhook. No-op unless DISCORD_WEBHOOK_URL is set. */
-async function notifyDiscord(env, where, message) {
+async function notifyDiscord(env, where, message, realmId) {
   const hook = String(env.DISCORD_WEBHOOK_URL || '').trim();
   if (!hook) return;
   try {
     await fetch(hook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: '⚠️ Vici API error at `' + String(where || '') + '`: ' + String(message || '').slice(0, 300) }),
+      body: JSON.stringify({ content: '⚠️ Vici API error at `' + String(where || '') + '`' +
+        (realmId ? ' (realm `' + realmId + '`)' : '') + ': ' + String(message || '').slice(0, 300) }),
     });
   } catch (e) { /* best-effort */ }
 }

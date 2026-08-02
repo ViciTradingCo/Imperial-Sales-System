@@ -12,7 +12,7 @@ import { pager } from '../lib/paginate.js';
 
 const PAGE_SIZE = 25;
 
-export function renderMembers(container) {
+export function renderMembers(container, { me } = {}) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, skeletonRows(5));
   const search = el('input', { type: 'search', placeholder: 'Search name, business, email, role…' });
@@ -45,9 +45,13 @@ export function renderMembers(container) {
   }
 
   function renderList(members) {
+    // With several realms running, showing which one a member belongs to turns
+    // "why can't they see the shop?" into something you can spot at a glance.
+    const showRealm = (me && me.realmCount > 1);
     mount(listHost, ...members.map((m) => el('div', { class: 'member-row' }, [
       el('p', { html:
         '<b>' + esc(m.character || m.email || '—') + '</b> · <span class="role-pill">' + esc(m.role) + '</span> ' +
+        (showRealm && m.realmId ? '<span class="realm-pill">' + esc(m.realmId) + '</span> ' : '') +
         (m.status === 'pending' ? '<span class="warn">pending</span>' : '') + '<br>' +
         '<span class="note">' + esc(m.business || '—') + ' · ' + esc(m.email || '') + '</span><br>' +
         '<span class="note">UID: <code>' + esc(m.uid) + '</code></span>' }),

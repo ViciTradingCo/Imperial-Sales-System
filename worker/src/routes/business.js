@@ -4,8 +4,8 @@
  * discounts / style), per-shop settings, the item + hold lookups, certification,
  * MOTD banners, the Court hold report, and the owner CSV export.
  */
-import { requireUser, requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
-import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, findUserByEmail } from '../users.js';
+import { requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
+import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid } from '../users.js';
 import { renameBusiness, listBusinessNames } from '../registry.js';
 import { realmOf } from '../realm.js';
 import { getFlag } from '../db.js';
@@ -296,17 +296,11 @@ async function getTiles({ request, env }) {
   try { images = raw ? JSON.parse(raw) : {}; } catch (e) { images = {}; }
   return { images };
 }
-/**
- * The hold list. Usable DURING registration, when the caller has no account and
- * so no realm — in that case the realm comes from the query string, which is
- * safe here because holds are public reference data and the picker needs them
- * before the account exists.
- */
-async function getHolds({ request, env, url }) {
-  const payload = await requireUser(request, env);
-  const user = await findUserByEmail(env, payload.email);
-  const realmId = user ? realmIdOf(user, env) : realmOf(url.searchParams.get('realm'));
-  return { holds: await readHolds(env, realmId) };
+/** The hold list for the caller's realm. (Sign-up gets its holds from
+ *  /auth/code instead, since it has no account to derive a realm from.) */
+async function getHolds({ request, env }) {
+  const caller = await requireRegistered(request, env);
+  return { holds: await readHolds(env, realmIdOf(caller, env)) };
 }
 async function holdReportRoute({ request, env }) {
   const caller = await requireRegistered(request, env);
@@ -318,7 +312,11 @@ async function holdReportRoute({ request, env }) {
   return await holdReport(env, meta.hold, realmIdOf(caller, env));
 }
 
-/** Public (no auth): sitewide branding — needed before sign-in. */
+/**
+ * Public (no auth): branding — needed before sign-in, so this is the DEPLOYMENT's
+ * identity. A realm's own overrides are applied once the user signs in and their
+ * realm is known (see /auth/me → realmBranding).
+ */
 async function branding({ env }) {
   return await readBranding(env);
 }
