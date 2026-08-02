@@ -1,5 +1,5 @@
 /**
- * Hold Report — available to businesses the admins have marked as a "Court".
+ * Region Report — available to businesses the admins have marked as a "Court".
  * Shows the market for the Court's own hold: overview, the shops trading there,
  * and the items moving there. The API scopes it to the caller's hold and
  * refuses non-Court callers.
@@ -14,7 +14,7 @@ export function renderHoldReport(container) {
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading your hold’s report…'));
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
-    el('h2', {}, 'Hold Report'),
+    el('h2', {}, 'Region Report'),
     el('p', { class: 'note' }, 'Commerce in your hold, as its Court. Voided sales are excluded.'),
     host,
   ]));

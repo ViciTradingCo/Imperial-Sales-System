@@ -71,6 +71,20 @@ When adding a section, give it a stable `key` and add that key to `TILE_KEYS` in
 
 Navigation stays in the header/side menu; tiles are for content within a page.
 
+## Standing rule: features are realm-wide, data is realm-local
+
+Any new capability applies to EVERY realm — build it once, and every realm gets
+it. What must never cross is DATA: one realm's rows, settings, codes, reports,
+and searches are invisible to another. A change that would let one realm read or
+alter another's data needs to be asked for explicitly (the only standing
+exceptions are the System Admin's realm switch and the transfer tools, both of
+which say so in their own comments).
+
+In practice: put new settings in `master_settings` (numeric, per realm) or
+`realm-prefs.js` (everything else, per realm) — never in a global `sys_flags`
+key. New tables go in `REALM_TABLES` with a `realm_id` column and per-realm
+uniqueness, and every query filters on it.
+
 ## Multi-realm
 
 The system can host several independent servers ("realms") from one deployment,

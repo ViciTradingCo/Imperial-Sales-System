@@ -40,56 +40,37 @@ let sessionUser = null;
 export function setSessionUser(me) { sessionUser = me || null; }
 
 /**
- * The admin tools — ONE bar holding every admin destination.
+ * The record-keeping screens — members, companies, items, audit — which are
+ * siblings you move between while doing one job, so they share a bar.
  *
- * Deliberately the only place they appear. The Admin Panel used to repeat the
- * same destinations as tiles and the side nav carried two more, which meant
- * three lists of the same links to keep in step and three places to look.
- *
- * No realm switcher here either: choosing a realm happens on Realm Management
- * and filters the session from there. A switch sitting on every admin page
- * invites changing realm by reflex while working inside another one.
+ * Market Analysis, MOTD and Realm Management are NOT here: each owns a whole
+ * screen (and Market brings its own sub-bar), so they live in the side menu.
  */
 export function setAdminActions() {
-  const me = sessionUser;
-  const items = [
+  setActions(mark([
     { label: 'Member List', path: '/admin/members', onClick: () => navigate('/admin/members') },
     { label: 'Company List', path: '/admin/companies', onClick: () => navigate('/admin/companies') },
     { label: 'Item Index', path: '/admin/items', onClick: () => navigate('/admin/items') },
-    { label: 'Market Analysis', path: '/admin/market', onClick: () => navigate('/admin/market') },
-    { label: 'MOTD', path: '/admin/motd', onClick: () => navigate('/admin/motd') },
     { label: 'Audit Log', path: '/admin/audit', onClick: () => navigate('/admin/audit') },
-    { label: 'Network Settings', path: '/admin/settings', onClick: () => navigate('/admin/settings') },
-  ];
-  // Realms stay hidden until this deployment actually runs more than one; the
-  // way in before that is Network Settings → Realms.
-  if (me && Number(me.realmCount) > 1) {
-    items.push({ label: 'Realm Management', path: '/admin/realms', onClick: () => navigate('/admin/realms') });
-  }
-  setActions(mark(items));
+  ]));
 }
 
 /**
- * Market Analysis sub-tabs, rendered IN the page rather than on the action bar.
+ * Market Analysis sub-pages, on the header bar.
  *
- * They used to replace the admin bar, which meant clicking "Market Analysis"
- * swapped the whole menu out and left no way back to the other admin pages. The
- * bar is the app's one fixed menu; a page's own sections belong to the page.
+ * Replacing the admin bar is fine here because Market Analysis is reached from
+ * the SIDE menu, which stays put — so the way back is always visible. (When
+ * Market lived on the bar itself, clicking it swapped the menu out and stranded
+ * you; that is why the two live in different menus.)
  */
-export function marketTabs() {
-  const tabs = [
-    ['Overview', '/admin/market'],
-    ['Item Performance', '/admin/market/items'],
-    ['Hold Performance', '/admin/market/holds'],
-    ['Company Performance', '/admin/market/companies'],
-    ['Trends', '/admin/market/trends'],
-  ];
-  const here = currentPath();
-  return el('div', { class: 'tab-row' }, tabs.map(([label, path]) =>
-    el('button', {
-      class: 'tab-btn' + (path === here ? ' is-active' : ''),
-      onclick: () => navigate(path),
-    }, label)));
+export function setMarketActions() {
+  setActions(mark([
+    { label: 'Overview', path: '/admin/market', onClick: () => navigate('/admin/market') },
+    { label: 'Item Performance', path: '/admin/market/items', onClick: () => navigate('/admin/market/items') },
+    { label: 'Region Performance', path: '/admin/market/holds', onClick: () => navigate('/admin/market/holds') },
+    { label: 'Company Performance', path: '/admin/market/companies', onClick: () => navigate('/admin/market/companies') },
+    { label: 'Trends', path: '/admin/market/trends', onClick: () => navigate('/admin/market/trends') },
+  ]));
 }
 
 /**

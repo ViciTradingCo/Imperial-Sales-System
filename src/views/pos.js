@@ -1,6 +1,6 @@
 /**
  * Register (POS). Build a cart (item, qty, sold-for price), pick a customer,
- * hold, and optional discount, then complete the sale — which decrements stock
+ * region, and optional discount, then complete the sale — which decrements stock
  * and logs the sale server-side. The sale is attributed to the signed-in
  * character. An expired certification blocks selling. Order lookup + void live
  * in a focus modal opened from the action bar.
@@ -8,7 +8,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
-import { money } from '../lib/format.js';
+import { money, currency } from '../lib/format.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { enqueueSale, flushSales, queuedCount, isNetworkError } from '../lib/offline-queue.js';
@@ -86,7 +86,7 @@ export function renderPos(container, { me }) {
     // canonical item, never free text, so sales can't fragment the index.
     const itemHint = el('p', { class: 'note' }, '');
     const qty = el('input', { type: 'number', min: '1', step: '1', value: '1' });
-    const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: 'Sold for per item (gp)' });
+    const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: 'Sold for per item (' + currency() + ')' });
 
     let invByNorm = new Map();
     const picker = createItemPicker({
@@ -113,8 +113,16 @@ export function renderPos(container, { me }) {
     const cartHost = el('div', {}, emptyState({ glyph: '🧺', title: 'Cart is empty', hint: 'Search the item index above and add items to build the order.' }));
 
     const customer = el('input', { type: 'text', placeholder: 'Customer name (optional)' });
-    const holdSel = el('select', {}, el('option', { value: '' }, 'Pick a hold…'));
+    // The region field is per-realm: a realm that doesn't trade regionally
+    // switches it off (Realm Management → Network Settings) and the register
+    // stops asking. `regionOn` also gates the validation below.
+    const prefs = (me && me.prefs) || {};
+    const regionOn = prefs.showRegion !== false;
+    const regionLabel = prefs.regionLabel || 'Region';
+    const holdSel = el('select', {}, el('option', { value: '' }, 'Pick a ' + regionLabel.toLowerCase() + '…'));
     holds.forEach((h) => holdSel.appendChild(el('option', { value: h }, h)));
+    const holdWrap = el('div', {}, [el('label', {}, regionLabel), holdSel]);
+    holdWrap.hidden = !regionOn;
     const discName = el('input', { type: 'text', placeholder: 'Discount name (optional)' });
     const discPct = el('input', { type: 'number', min: '0', max: '100', step: '1', placeholder: 'Discount % (optional)' });
     // Pick a saved discount to fill the fields (or leave blank for none / custom).
@@ -170,7 +178,7 @@ export function renderPos(container, { me }) {
 
     async function doCheckout() {
       if (!cart.length) { setStatus('Add at least one item.', 'error'); return; }
-      if (!holdSel.value) { setStatus('Pick a hold.', 'error'); return; }
+      if (regionOn && !holdSel.value) { setStatus('Pick a ' + regionLabel.toLowerCase() + '.', 'error'); return; }
       complete.disabled = true;
       setStatus('Completing…', '');
       // Snapshot the order so it can be queued verbatim if the network is down.
@@ -226,7 +234,7 @@ export function renderPos(container, { me }) {
       el('div.card', {}, [
         el('h3', {}, 'Customer Details'),
         el('label', {}, 'Customer'), customer,
-        el('label', {}, 'Hold'), holdSel,
+        holdWrap,
         el('label', {}, 'Discount'), discSel,
         el('label', {}, 'Discount name'), discName,
         el('label', {}, 'Discount %'), discPct,

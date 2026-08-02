@@ -5,7 +5,7 @@
  *   1. Character name + the Business Code you were given.
  *   2. What the code opens:
  *        • a realm's FOUNDER code → Business Creation: name your shop, pick its
- *          hold, and you become its active owner.
+ *          region, and you become its active owner.
  *        • a shop's STAFF code    → confirmation only: you join that shop as a
  *          pending employee, activated by its owner or an admin.
  *
@@ -80,11 +80,11 @@ export function renderRegister(container, { profile, onRegistered }) {
     mount(stepHost, el('div.card', {}, [
       el('h3', {}, '🏛️ Create your business'),
       el('p', { class: 'note', html: 'Your code admits you to <b>' + esc(found.realmName) + '</b> as a shop owner. ' +
-        'Name your business and pick the hold it trades in.' }),
+        'Name your business and pick the region it trades in.' }),
       el('label', {}, 'Business name'),
       bizInput,
       el('p', { class: 'note' }, 'This name must not already be taken in this realm.'),
-      el('label', {}, 'Hold'),
+      el('label', {}, 'Region'),
       holdSelect,
       el('div', { class: 'row-actions' }, [submit, backBtn()]),
     ]));

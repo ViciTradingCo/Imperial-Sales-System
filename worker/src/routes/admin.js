@@ -17,6 +17,7 @@ import { upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex, analy
 import { writeHolds } from '../holds.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, readRealmBranding, writeBranding } from '../branding.js';
+import { readRealmPrefs, writeRealmPrefs } from '../realm-prefs.js';
 import { getFlag, setFlag } from '../db.js';
 import { listRealms, createRealm, renameRealm, deleteRealm, realmStats, getRealm, regenerateRealmCode } from '../realm.js';
 
@@ -295,7 +296,7 @@ async function setStorefrontFlag({ request, env, body }) {
 async function setHolds({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   const holds = await writeHolds(env, body.holds, realmIdOf(caller, env));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'holds.set', detail: holds.join(', '), realmId: realmIdOf(caller, env) });
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'regions.set', detail: holds.join(', '), realmId: realmIdOf(caller, env) });
   return { holds };
 }
 
@@ -354,6 +355,22 @@ async function businessCodeReset({ request, env, body }) {
   const code = await regenerateBusinessCode(env, business, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business, action: 'business.code.reset', detail: business, realmId: realmIdOf(caller, env) });
   return { business, joinCode: code };
+}
+
+/**
+ * Realm preferences — the money's name, and whether the register asks for a
+ * region. Per realm, like everything else an admin can change.
+ */
+async function getRealmPrefs({ request, env }) {
+  const caller = await requireAdmin(request, env);
+  return await readRealmPrefs(env, realmIdOf(caller, env));
+}
+async function saveRealmPrefs({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const prefs = await writeRealmPrefs(env, body || {}, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'realm.prefs',
+    detail: prefs.currency + ', region ' + (prefs.showRegion ? 'on' : 'off'), realmId: realmIdOf(caller, env) });
+  return prefs;
 }
 
 async function realmStatsRoute({ request, env }) {
@@ -451,6 +468,8 @@ export const routes = [
   { method: 'GET', path: '/admin/realms/stats', handler: realmStatsRoute },
   { method: 'POST', path: '/admin/realms/select', handler: realmSelect },
   { method: 'POST', path: '/admin/realms/code', handler: realmCodeReset },
+  { method: 'GET', path: '/admin/realm-prefs', handler: getRealmPrefs },
+  { method: 'POST', path: '/admin/realm-prefs', handler: saveRealmPrefs },
   { method: 'GET', path: '/business/code', handler: businessCode },
   { method: 'POST', path: '/business/code/reset', handler: businessCodeReset },
   { method: 'POST', path: '/admin/realms/transfer-member', handler: realmTransferMember },

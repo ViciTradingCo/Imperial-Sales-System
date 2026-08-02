@@ -216,11 +216,24 @@ const REBUILDS = [
   { table: 'discounts', cols: ['realm_id', 'business', 'name', 'percent'] },
 ];
 
-/** True when the live table definition already carries realm_id in its key. */
+/**
+ * True when the live table still declares a GLOBAL key and must be rebuilt.
+ *
+ * The test is whether realm_id appears in the PRIMARY KEY / UNIQUE clause — NOT
+ * merely whether the column exists. That distinction is the whole point: the
+ * ALTER TABLE ... ADD COLUMN realm_id migration runs before this check and puts
+ * realm_id into the stored CREATE TABLE text, so "does the SQL mention realm_id"
+ * was true for every table and the rebuild never fired. The constraint kept its
+ * pre-realm shape, and the first import into a second realm hit
+ * "UNIQUE constraint failed: master_item.name".
+ *
+ * ALTER TABLE ADD COLUMN cannot change a constraint clause, so a clause naming
+ * realm_id can only have come from the current SCHEMA.
+ */
 async function needsRebuild(db, table) {
   const row = await db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").bind(table).first();
   if (!row || !row.sql) return false; // table absent — SCHEMA will create it correctly
-  return !/realm_id/i.test(row.sql);
+  return !/(PRIMARY\s+KEY|UNIQUE)\s*\(\s*realm_id/i.test(row.sql);
 }
 
 /**
@@ -248,6 +261,9 @@ async function rebuildTable(db, { table, cols }) {
 }
 
 let schemaReady = false;
+
+/** Tests only: forget that the schema was ensured, so a fresh DB re-runs it. */
+export function resetSchemaCache() { schemaReady = false; }
 
 /** Ensures the tables exist (once per instance). */
 export async function ensureSchema(env) {

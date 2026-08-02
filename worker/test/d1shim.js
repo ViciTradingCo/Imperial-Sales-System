@@ -19,6 +19,7 @@ export function makeD1() {
     return self;
   };
   return {
+    _db: db, // tests seed legacy schemas directly
     prepare: wrap,
     async batch(stmts) { const out = []; for (const s of stmts) out.push(await s.run()); return out; },
   };

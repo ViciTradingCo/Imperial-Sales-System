@@ -13,6 +13,7 @@ import { applyLang } from './lib/i18n.js';
 import { loadBranding, applyBranding } from './lib/branding.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
 import { initActions, clearActions } from './lib/actions.js';
+import { setCurrency } from './lib/format.js';
 import { setSessionUser } from './lib/sections.js';
 import { renderLanding } from './views/landing.js';
 import { renderHome } from './views/home.js';
@@ -259,6 +260,7 @@ route('/admin/realms', (container) => {
 async function refreshRealm() {
   state.me = await api.me();
   if (state.me && state.me.branding) applyBranding(state.me.branding);
+  if (state.me && state.me.prefs) setCurrency(state.me.prefs.currency);
   setSessionUser(state.me);
   renderBadge();
   showNav(true);
@@ -307,6 +309,7 @@ async function onSignedIn() {
   // deployment's identity (there is no realm to know about yet); now that we
   // know who they are, a realm hosting its own server can look like itself.
   if (state.me && state.me.branding) applyBranding(state.me.branding);
+  if (state.me && state.me.prefs) setCurrency(state.me.prefs.currency);
   setSessionUser(state.me);
   // A public deep-link (e.g. a shared storefront) stays put — don't redirect.
   if (currentPath().split('?')[0] === '/shop') { render(); return; }

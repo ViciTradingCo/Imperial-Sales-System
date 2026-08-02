@@ -4,8 +4,9 @@
  * holds, economy settings, and MOTD, with nothing shared or cross-referenced.
  *
  * Everything about realms lives here: choosing which one the session works in,
- * creating them, naming them, editing each one's settings, deleting them, and
- * moving members or shops between them.
+ * creating them, naming them, editing each one's settings, deleting them,
+ * moving members or shops between them, and the Network Settings of whichever
+ * realm is currently selected.
  *
  * Choosing a realm is deliberately confined to THIS page. A switcher sitting on
  * every admin screen invites changing realm by reflex while you're in the middle
@@ -21,6 +22,7 @@ import { api } from '../lib/api.js';
 import { toast } from '../lib/toast.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 import { renderSettingsForm } from './settings-form.js';
+import { navigate } from '../lib/router.js';
 import { skeletonLines } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 
@@ -59,6 +61,10 @@ export function renderRealms(container, { me, onRealmChanged }) {
       // themselves, not on the Admin Panel.
       me.systemAdmin ? { key: 'transfers', label: 'Transfers', hint: 'Move members & shops', glyph: '🔀',
         open: (host) => mount(host, transferCard(() => realms, me)) } : null,
+      // Network Settings belong to a realm, so they live here rather than as a
+      // separate top-level destination.
+      { key: 'rlm-settings', label: 'Network Settings', hint: 'Regions, money, branding, data', glyph: '⚙️',
+        open: () => navigate('/admin/settings') },
     ].filter(Boolean);
   }
 

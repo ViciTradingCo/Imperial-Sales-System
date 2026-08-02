@@ -94,7 +94,7 @@ const T = {
   'Role': { es: 'Rol', fr: 'Rôle', de: 'Rolle', it: 'Ruolo' },
   'Status': { es: 'Estado', fr: 'Statut', de: 'Status', it: 'Stato' },
   'Email': { es: 'Correo', fr: 'E-mail', de: 'E-Mail', it: 'Email' },
-  'Hold': { es: 'Feudo', fr: 'Fief', de: 'Fürstentum', it: 'Contea' },
+  'Region': { es: 'Feudo', fr: 'Fief', de: 'Fürstentum', it: 'Contea' },
   'Theme': { es: 'Tema', fr: 'Thème', de: 'Design', it: 'Tema' },
   'Customer': { es: 'Cliente', fr: 'Client', de: 'Kunde', it: 'Cliente' },
   'Quantity': { es: 'Cantidad', fr: 'Quantité', de: 'Menge', it: 'Quantità' },

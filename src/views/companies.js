@@ -54,7 +54,7 @@ export function renderCompanies(container, { me } = {}) {
       const court = c.court ? ' <span class="role-pill">Court</span>' : '';
       const realmPill = (me && me.realmCount > 1 && c.realmId)
         ? ' <span class="realm-pill">' + esc(c.realmId) + '</span>' : '';
-      const holdLine = c.hold ? '<br><span class="note">Hold: ' + esc(c.hold) + '</span>' : '';
+      const holdLine = c.hold ? '<br><span class="note">Region: ' + esc(c.hold) + '</span>' : '';
       return el('div', { class: 'member-row' }, [
         el('p', { html:
           '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(c.status || '—') + '</span>' + court + realmPill + '<br>' +
@@ -85,7 +85,7 @@ export function renderCompanies(container, { me } = {}) {
   load();
 }
 
-/** Edit modal — name, associated Hold, and the admin-only Court flag. */
+/** Edit modal — name, associated Region, and the admin-only Court flag. */
 function openNameModal(company, onSaved) {
   const name = el('input', { type: 'text', value: company.business || '' });
 
@@ -133,7 +133,7 @@ function openNameModal(company, onSaved) {
     el('label', {}, 'Company name'),
     name,
     el('p', { class: 'note' }, 'Renaming updates the company everywhere — its shop, staff, and records.'),
-    el('label', {}, 'Hold'),
+    el('label', {}, 'Region'),
     hold,
     el('label', { class: 'inline' }, [court, document.createTextNode(' Court (admin-only flag)')]),
     el('label', { class: 'inline' }, [priority, document.createTextNode(' Priority (higher rate-limit ceiling)')]),

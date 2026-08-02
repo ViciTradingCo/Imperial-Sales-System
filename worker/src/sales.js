@@ -9,6 +9,7 @@
  */
 import { getDb } from './db.js';
 import { checkCertification } from './cert.js';
+import { readRealmPrefs } from './realm-prefs.js';
 import { listItemIndex, matchMasterItem } from './item-index.js';
 import { logAudit } from './audit.js';
 
@@ -72,8 +73,14 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     throw new Error("This shop's Vici Trading Co. certification has EXPIRED — an admin must renew it before you can sell.");
   }
   if (!Array.isArray(cart) || !cart.length) throw new Error('The cart is empty.');
+  // The region is only demanded when this realm's register asks for one; a
+  // realm with the field switched off records sales with no region, and its
+  // region reports simply have nothing to group.
+  const prefs = await readRealmPrefs(env, realmId);
   const holdName = String(hold || '').trim();
-  if (!holdName) throw new Error('Pick the hold this sale happened in.');
+  if (!holdName && prefs.showRegion) {
+    throw new Error('Pick the ' + prefs.regionLabel.toLowerCase() + ' this sale happened in.');
+  }
 
   const master = await listItemIndex(env, realmId);
   const { results } = await db.prepare('SELECT item, price, stock FROM inventory WHERE realm_id = ? AND business = ?')

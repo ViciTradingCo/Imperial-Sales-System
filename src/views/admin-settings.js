@@ -15,10 +15,10 @@ export function renderAdminSettings(container, { me } = {}) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
+    el('button', { class: 'link-back', onclick: () => navigate('/admin/realms') }, '← Realm Management'),
     el('h2', {}, 'Network Settings'),
-    el('p', { class: 'note' }, 'Everything that governs the deployment. Pick a section to open it.'),
-    el('p', { class: 'note' }, 'Looking for the sync cadence and market thresholds? Those belong to a REALM now, ' +
-      'because each realm runs its own economy — find them under Realm Management, in that realm’s Settings.'),
+    el('p', { class: 'note' }, 'Settings for the realm you are working in. Each realm keeps its own — regions, ' +
+      'denomination, branding, and the rest — so changing these never affects another realm.'),
     gridHost,
   ]));
 
@@ -27,17 +27,14 @@ export function renderAdminSettings(container, { me } = {}) {
       open: (host) => mount(host, brandingCard()) },
     { key: 'set-about', label: 'About page', hint: 'What visitors read', glyph: '📖',
       open: (host) => mount(host, aboutCard()) },
-    { key: 'set-holds', label: 'Holds', hint: 'The hold index', glyph: '🗺️',
-      open: (host) => mount(host, holdsCard()) },
+    { key: 'set-holds', label: 'Regions', hint: 'The region list', glyph: '🗺️',
+      open: (host) => mount(host, regionsCard()) },
+    { key: 'set-money', label: 'Denomination', hint: 'What the money is called', glyph: '🪙',
+      open: (host) => mount(host, denominationCard()) },
     { key: 'set-tiles', label: 'Tile images', hint: 'Home tile artwork', glyph: '🖼️',
       open: (host) => mount(host, tileImagesCard()) },
     { key: 'set-storefront', label: 'Storefronts', hint: 'Public shop pages', glyph: '🏪',
       open: (host) => mount(host, storefrontCard()) },
-    // Multi-realm is dormant until a second realm exists, so this is the way in.
-    // Once there are two, Realm Management also appears in the nav and on the
-    // Admin Panel and this stays as a shortcut.
-    { key: 'set-realms', label: 'Realms', hint: 'Run more than one server', glyph: '🌐',
-      open: () => navigate('/admin/realms') },
     { key: 'set-status', label: 'System status', hint: 'Counts + errors', glyph: '💚',
       open: (host) => mount(host, statusCard()) },
     // Backup, log maintenance, and the full reset are one "data" section — they
@@ -168,7 +165,7 @@ function resetCard(me) {
     const realm = (me && me.realmName) || 'this realm';
     if (!window.confirm('FULL RESET of ' + realm + ' — permanently delete its companies, members (except ' +
       'admins), inventory, sales, intake, transfers, coffers, discounts, shop styles, audit log, settings, ' +
-      'and MOTDs.\n\nKEPT: admin accounts, the Master Item Index, and the Holds list (reference defaults).\n\n' +
+      'and MOTDs.\n\nKEPT: admin accounts, the Master Item Index, and the Regions list (reference defaults).\n\n' +
       'Other realms are NOT affected.\n\nThis CANNOT be undone. Export a backup first.')) return;
     const typed = window.prompt('Type ERASE (all caps) to confirm the full reset:');
     if (typed !== 'ERASE') { setStatus('Reset cancelled.', ''); return; }
@@ -183,21 +180,34 @@ function resetCard(me) {
   return el('div.card', {}, [
     el('h3', {}, 'Full reset'),
     el('p', { class: 'note' }, 'Erase this realm’s business and transaction data and start fresh. Keeps admin ' +
-      'accounts plus the reference defaults — the Master Item Index and the Holds list. Settings and MOTDs return ' +
+      'accounts plus the reference defaults — the Master Item Index and the Regions list. Settings and MOTDs return ' +
       'to defaults. Other realms are not affected. Export a backup first; this cannot be undone.'),
     el('div', { class: 'row-actions' }, [btn]),
     status,
   ]);
 }
 
-/** Editor for this realm's hold index (one hold per line). */
-function holdsCard() {
+/**
+ * Regions — the named places this realm trades in, plus whether the register
+ * asks which one a sale happened in.
+ *
+ * (Stored as `hold_index` / the `hold` column, from when these were Skyrim
+ * holds. The name is cosmetic and per realm; renaming the columns would be a
+ * data migration for no gain.)
+ */
+function regionsCard() {
   const box = el('textarea', { rows: '10' });
+  const showRegion = el('input', { type: 'checkbox' });
+  const label = el('input', { type: 'text', placeholder: 'Region' });
   const status = el('p', {});
-  const save = el('button.primary', { onclick: doSave }, 'Save holds');
+  const save = el('button.primary', { onclick: doSave }, 'Save regions');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
   api.getHolds().then((r) => { box.value = (r.holds || []).join('\n'); }).catch(() => {});
+  api.getRealmPrefs().then((p) => {
+    showRegion.checked = p.showRegion !== false;
+    label.value = p.regionLabel || '';
+  }).catch(() => { showRegion.checked = true; });
 
   async function doSave() {
     const holds = box.value.split('\n').map((h) => h.trim()).filter(Boolean);
@@ -205,17 +215,58 @@ function holdsCard() {
     try {
       const r = await api.setHolds(holds);
       box.value = (r.holds || []).join('\n');
-      setStatus('Saved ✓ — ' + (r.holds || []).length + ' holds.', 'ok');
+      await api.setRealmPrefs({ showRegion: showRegion.checked, regionLabel: label.value.trim() });
+      setStatus('Saved ✓ — ' + (r.holds || []).length + ' regions.', 'ok');
+      toast('Regions saved — reload to apply the register change', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { save.disabled = false; }
   }
 
   return el('div.card', {}, [
-    el('h3', {}, 'Holds'),
-    el('p', { class: 'note' }, 'This realm’s hold names, one per line, in order. Used by every hold dropdown. ' +
-      'Each realm keeps its own list.'),
+    el('h3', {}, 'Regions'),
+    el('p', { class: 'note' }, 'The places this realm trades in, one per line, in order. Each realm keeps its ' +
+      'own list — changing one never affects another.'),
     box,
-    save,
+    el('label', {}, 'What to call them'),
+    label,
+    el('p', { class: 'note' }, 'Singular, as it appears on forms — Region, Hold, Province, Sector. Blank uses “Region”.'),
+    el('label', { class: 'inline' }, [showRegion, document.createTextNode(' Ask for a region on the register')]),
+    el('p', { class: 'note' }, 'Off hides the field and stops requiring it. Past sales keep whatever region they ' +
+      'were recorded with; new ones simply have none, and the region reports have nothing to group.'),
+    el('div', { class: 'row-actions' }, [save]),
+    status,
+  ]);
+}
+
+/** The denomination every amount in this realm is shown in. */
+function denominationCard() {
+  const input = el('input', { type: 'text', placeholder: 'gp' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save denomination');
+  const sample = el('p', { class: 'note' }, '');
+  function paint() { sample.textContent = 'Amounts will read: 12.50' + (input.value.trim() || 'gp'); }
+  input.addEventListener('input', paint);
+
+  api.getRealmPrefs().then((p) => { input.value = p.currency || ''; paint(); }).catch(paint);
+
+  async function doSave() {
+    save.disabled = true; status.className = ''; status.textContent = 'Saving…';
+    try {
+      await api.setRealmPrefs({ currency: input.value.trim() });
+      status.textContent = '';
+      toast('Denomination saved — reload to see it everywhere', 'ok');
+    } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
+    finally { save.disabled = false; }
+  }
+
+  return el('div.card', {}, [
+    el('h3', {}, 'Denomination'),
+    el('p', { class: 'note' }, 'What this realm’s money is called. It follows every amount shown in the app — ' +
+      'the register, coffers, inventory, reports, and exports. Each realm sets its own.'),
+    el('label', {}, 'Denomination'),
+    input,
+    sample,
+    el('div', { class: 'row-actions' }, [save]),
     status,
   ]);
 }
@@ -231,9 +282,9 @@ const TILE_KEYS = [
   // Network Settings sections
   ['set-branding', 'Settings · Branding'],
   ['set-about', 'Settings · About page'],
-  ['set-holds', 'Settings · Holds'], ['set-tiles', 'Settings · Tile images'],
+  ['set-holds', 'Settings · Regions'], ['set-money', 'Settings · Denomination'],
+  ['set-tiles', 'Settings · Tile images'],
   ['set-storefront', 'Settings · Storefronts'], ['set-status', 'Settings · System status'],
-  ['set-realms', 'Settings · Realms'],
   ['set-data', 'Settings · Data'],
   // MOTD sections
   ['motd-global', 'MOTD · Global notice'], ['motd-individual', 'MOTD · Individual'],
@@ -242,6 +293,7 @@ const TILE_KEYS = [
   ['prof-identity', 'Profile · Character'], ['prof-appearance', 'Profile · Appearance'],
   // Realm Management sections
   ['rlm-list', 'Realms · List'], ['rlm-add', 'Realms · Add'], ['transfers', 'Realms · Transfers'],
+  ['rlm-settings', 'Realms · Network Settings'],
   // NOTE: every key here must be unique — the form builds one input per key, so
   // a duplicate silently clobbers the first row's value on save.
   // Shop Ledger sections

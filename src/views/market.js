@@ -1,20 +1,19 @@
 /**
- * Market Analysis (admin) — network-wide analytics, split into sub-pages reached
- * from a tab row on the page: Overview, Item Performance, Hold Performance,
- * Company Performance, Trends. Read-only; the API enforces admin-only access.
+ * Market Analysis (admin) — realm-wide analytics, split into sub-pages reached
+ * from the action bar: Overview, Item Performance, Region Performance, Company
+ * Performance, Trends. Read-only; the API enforces admin-only access.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { money } from '../lib/format.js';
-import { setAdminActions, marketTabs } from '../lib/sections.js';
+import { setMarketActions } from '../lib/sections.js';
 
 export function renderMarket(container, { tab } = {}) {
-  setAdminActions(); // the admin bar stays put, as on every other admin page
+  setMarketActions(); // Market's own sub-pages; the side menu is the way back
   const host = el('div', {}, el('p', { class: 'note' }, 'Crunching the numbers…'));
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Market Analysis'),
     el('p', { class: 'note' }, 'Performance across every shop in this realm. Voided sales are excluded.'),
-    marketTabs(),
     host,
   ]));
 
@@ -44,7 +43,7 @@ function overview(d) {
     tableCard('Top 5 companies', ['Company', 'Orders', 'Items', 'Revenue'],
       (d.businesses || []).slice(0, 5).map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
       'No sales recorded yet.'),
-    tableCard('Top 5 holds', ['Hold', 'Orders', 'Items', 'Revenue'],
+    tableCard('Top 5 regions', ['Region', 'Orders', 'Items', 'Revenue'],
       (d.holds || []).slice(0, 5).map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
       'No sales with a hold recorded yet.'),
     tableCard('Top 5 items', ['Item', 'Qty sold', 'Revenue'],
@@ -102,9 +101,9 @@ function itemPerformance(items) {
   return el('div.card', {}, [el('h3', {}, 'Item Performance'), search, tableHost]);
 }
 
-/* ---- Hold Performance ---- */
+/* ---- Region Performance ---- */
 function holdPerformance(holds) {
-  return tableCard('Hold Performance', ['Hold', 'Orders', 'Items', 'Revenue'],
+  return tableCard('Region Performance', ['Region', 'Orders', 'Items', 'Revenue'],
     holds.map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
     'No sales with a hold recorded yet.');
 }

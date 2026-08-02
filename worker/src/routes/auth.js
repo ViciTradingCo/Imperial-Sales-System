@@ -18,6 +18,7 @@ import { registerUser } from '../registry.js';
 import { listRealms, getRealm, resolveJoinCode } from '../realm.js';
 import { readHolds } from '../holds.js';
 import { readBranding } from '../branding.js';
+import { readRealmPrefs } from '../realm-prefs.js';
 
 async function handleMe({ request, env }) {
   const payload = await requireUser(request, env);
@@ -47,6 +48,10 @@ async function handleMe({ request, env }) {
     // than fetched separately so the app can restyle itself the moment it knows
     // who the user is, without a second round trip.
     branding: await readBranding(env, activeRealm),
+    // The realm's money name and whether its register asks for a region. Sent
+    // with the profile so every screen can render amounts correctly without
+    // each one fetching settings of its own.
+    prefs: await readRealmPrefs(env, activeRealm),
   });
 }
 

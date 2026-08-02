@@ -198,7 +198,7 @@ function openIntakeModal(onRecorded) {
     el('p', { class: 'note' }, 'Log a purchase — this adds the stock and records what you paid and where. Pick the item from the index.'),
     el('label', {}, 'Item'), picker.el,
     el('label', {}, 'Vendor'), vendor,
-    el('label', {}, 'Hold purchased in'), hold,
+    el('label', {}, 'Region purchased in'), hold,
     el('label', {}, '# of items'), qty,
     el('label', {}, 'Price per item (gp)'), per,
     save,

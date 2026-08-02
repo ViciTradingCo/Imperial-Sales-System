@@ -225,6 +225,10 @@ export const api = {
   transferMemberRealm: (uid, toRealm, fromRealm) => request('POST', '/admin/realms/transfer-member', { uid, toRealm, fromRealm }),
   /** Super admin: move a company (and its members) to another realm. */
   transferCompanyRealm: (id, toRealm, fromRealm) => request('POST', '/admin/realms/transfer-company', { id, toRealm, fromRealm }),
+  /** Admin: this realm's preferences (denomination, region field). */
+  getRealmPrefs: () => request('GET', '/admin/realm-prefs'),
+  /** Admin: save this realm's preferences. */
+  setRealmPrefs: (prefs) => request('POST', '/admin/realm-prefs', prefs),
   /** System Admin: issue a new founder code for a realm (the old one dies). */
   resetRealmCode: (id) => request('POST', '/admin/realms/code', { id }),
   /** Owner/admin: this shop's staff code, for handing to employees. */
