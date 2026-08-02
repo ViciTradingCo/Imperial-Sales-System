@@ -4,6 +4,7 @@
  * to the caller's business by the API.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
 import { setOpsActions } from '../lib/sections.js';
@@ -16,18 +17,37 @@ export function renderEmployees(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
   const list = el('div', {}, skeletonRows(3));
   const perfHost = el('div', {}, skeletonLines(3));
-  mount(container,
-    el('div.card', {}, [
-      el('h2', {}, 'Employees'),
-      el('p', { class: 'note' }, 'Everyone registered under ' + esc(me.business || 'your business') +
-        '. Activate pending accounts to let them ring up sales. Notes are private to you.'),
-      list,
-    ]),
-    el('div.card', {}, [
-      el('h3', {}, 'Employee performance'),
-      el('p', { class: 'note' }, 'Sales rung up per employee (voided sales excluded).'),
-      perfHost,
-    ]));
+  const gridHost = el('div', {});
+  mount(container, el('div.card', {}, [
+    el('h2', {}, 'Employees'),
+    el('p', { class: 'note' }, 'Your roster at ' + esc(me.business || 'your business') + '. Pick a section to open it.'),
+    gridHost,
+  ]));
+
+  const sections = [
+    { key: 'emp-roster', label: 'Roster', hint: 'Activate & annotate', glyph: '🧑‍🤝‍🧑',
+      open: (host) => mount(host, el('div.card', {}, [
+        el('h3', {}, 'Roster'),
+        el('p', { class: 'note' }, 'Everyone registered under ' + esc(me.business || 'your business') +
+          '. Activate pending accounts to let them ring up sales. Notes are private to you.'),
+        list,
+      ])) },
+    { key: 'emp-performance', label: 'Performance', hint: 'Sales per employee', glyph: '📈',
+      open: (host) => mount(host, el('div.card', {}, [
+        el('h3', {}, 'Employee performance'),
+        el('p', { class: 'note' }, 'Sales rung up per employee (voided sales excluded).'),
+        perfHost,
+      ])) },
+  ];
+
+  function draw(images) {
+    mount(gridHost, tileGrid(sections.map((s) => ({
+      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
+      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
+    })), images));
+  }
+  draw({});
+  api.getTiles().then((r) => draw(r.images || {})).catch(() => {});
 
   api.getEmployeePerformance()
     .then((r) => renderPerformance(perfHost, r.performance || []))

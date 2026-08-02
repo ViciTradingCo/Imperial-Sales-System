@@ -5,6 +5,7 @@
  * guards — this only decides which buttons to show.
  */
 import { navigate, currentPath } from './router.js';
+import { regionLabel, regionsOn } from './format.js';
 
 /** The nav destinations available to a given user, in order. */
 export function navItems(me) {
@@ -24,7 +25,8 @@ export function navItems(me) {
     items.push({ path: '/admin/realms', label: 'Realm Management' });
   }
   // Court businesses get a report for their own hold.
-  if (me.court && me.role !== 'admin') items.push({ path: '/hold-report', label: 'Region Report' });
+  // A realm with regions switched off has nothing for this report to show.
+  if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/hold-report', label: regionLabel() + ' Report' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });
   items.push({ path: '/profile', label: 'Profile' });
   items.push({ path: '/patch-notes', label: 'Patch Notes' });

@@ -290,8 +290,9 @@ async function getItems({ request, env }) {
 }
 /** Any registered user: the admin-assigned tile artwork (key → image URL). */
 async function getTiles({ request, env }) {
-  await requireRegistered(request, env);
-  const raw = await getFlag(env, 'tile_images');
+  const caller = await requireRegistered(request, env);
+  // Per realm — see the note on tileKey in routes/admin.js.
+  const raw = await getFlag(env, 'tile_images:' + realmIdOf(caller, env));
   let images = {};
   try { images = raw ? JSON.parse(raw) : {}; } catch (e) { images = {}; }
   return { images };

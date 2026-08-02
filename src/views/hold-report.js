@@ -5,6 +5,7 @@
  * refuses non-Court callers.
  */
 import { el, mount } from '../lib/dom.js';
+import { regionLabel } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { money } from '../lib/format.js';
@@ -14,7 +15,7 @@ export function renderHoldReport(container) {
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading your hold’s report…'));
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
-    el('h2', {}, 'Region Report'),
+    el('h2', {}, regionLabel() + ' Report'),
     el('p', { class: 'note' }, 'Commerce in your hold, as its Court. Voided sales are excluded.'),
     host,
   ]));

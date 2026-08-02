@@ -4,6 +4,7 @@
  * sees and edits their OWN shop's board.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { tileGrid, openFocalMenu } from '../lib/tiles.js';
 import { api } from '../lib/api.js';
 import { toast } from '../lib/toast.js';
 import { skeletonRows } from '../lib/skeleton.js';
@@ -17,19 +18,37 @@ export function renderShopNotices(container) {
   const status = el('p', {});
   const post = el('button.primary', { onclick: doPost }, 'Post notice');
 
-  mount(container,
-    el('div.card', {}, [
-      el('h3', {}, 'Post a notice'),
-      el('p', { class: 'note' }, 'Shown on your staff’s Home page. Leave the dates blank to show it immediately ' +
-        'and indefinitely.'),
-      message,
-      el('label', {}, 'Show from (optional)'), start,
-      el('label', {}, 'Until (optional)'), end,
-      el('div', { class: 'row-actions' }, [post]),
-      status,
-    ]),
-    el('div.card', {}, [el('h3', {}, 'Your notices'), listHost]),
-  );
+  const gridHost = el('div', {});
+  mount(container, el('div.card', {}, [
+    el('h3', {}, 'Notices'),
+    el('p', { class: 'note' }, 'Messages shown on your staff’s Home page.'),
+    gridHost,
+  ]));
+
+  const sections = [
+    { key: 'not-post', label: 'Post a notice', hint: 'Write a new one', glyph: '✍️',
+      open: (host) => mount(host, el('div.card', {}, [
+        el('h3', {}, 'Post a notice'),
+        el('p', { class: 'note' }, 'Shown on your staff’s Home page. Leave the dates blank to show it immediately ' +
+          'and indefinitely.'),
+        message,
+        el('label', {}, 'Show from (optional)'), start,
+        el('label', {}, 'Until (optional)'), end,
+        el('div', { class: 'row-actions' }, [post]),
+        status,
+      ])) },
+    { key: 'not-list', label: 'Your notices', hint: 'What staff can see', glyph: '📣',
+      open: (host) => mount(host, el('div.card', {}, [el('h3', {}, 'Your notices'), listHost])) },
+  ];
+
+  function drawTiles(images) {
+    mount(gridHost, tileGrid(sections.map((s) => ({
+      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
+      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
+    })), images));
+  }
+  drawTiles({});
+  api.getTiles().then((r) => drawTiles(r.images || {})).catch(() => {});
 
   function draw(notices) {
     if (!notices.length) {

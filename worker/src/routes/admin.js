@@ -256,17 +256,20 @@ async function saveBranding({ request, env, body }) {
   return b;
 }
 
-/* ---- Tile images (admin-assigned artwork for the big-button grids) ---- */
+/* ---- Tile images (admin-assigned artwork for the big-button grids) ----
+ * PER REALM: a Realm Admin dressing their own server must not restyle anyone
+ * else's. sys_flags has no realm_id column, so the realm is part of the key. */
 const TILE_IMAGES_KEY = 'tile_images';
+function tileKey(realmId) { return TILE_IMAGES_KEY + ':' + String(realmId || 'default'); }
 const HTTPS_URL = /^https:\/\/[^\s"'<>]+$/i;
 
-async function readTileImages(env) {
-  const raw = await getFlag(env, TILE_IMAGES_KEY);
+async function readTileImages(env, realmId) {
+  const raw = await getFlag(env, tileKey(realmId));
   try { return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; }
 }
 async function getTileImages({ request, env }) {
-  await requireAdmin(request, env);
-  return { images: await readTileImages(env) };
+  const caller = await requireAdmin(request, env);
+  return { images: await readTileImages(env, realmIdOf(caller, env)) };
 }
 async function setTileImages({ request, env, body }) {
   const caller = await requireAdmin(request, env);
@@ -278,7 +281,7 @@ async function setTileImages({ request, env, body }) {
     if (!HTTPS_URL.test(url)) throw new Error('Image links must be full https:// URLs (' + k + ').');
     next[String(k).slice(0, 40)] = url.slice(0, 500);
   });
-  await setFlag(env, TILE_IMAGES_KEY, JSON.stringify(next));
+  await setFlag(env, tileKey(realmIdOf(caller, env)), JSON.stringify(next));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'tiles.images', detail: Object.keys(next).length + ' image(s) set', realmId: realmIdOf(caller, env) });
   return { images: next };
 }
@@ -401,20 +404,23 @@ async function realmSelect({ request, env, body }) {
  * one operation that deliberately crosses the boundary.
  */
 /**
- * The realm a transfer moves OUT of. Defaults to the one the caller is viewing,
- * which is the common case; a super admin may name a different source so they
- * can fix a misplaced account without switching realms first.
+ * The realm a transfer (or a scoped list) acts on. Defaults to the one the
+ * caller is viewing; a System Admin may name a different source so they can fix
+ * a misplaced account without switching realms first.
  *
- * This is safe for the same reason realm switching is: only a super admin gets
- * here, and they can already view any realm. It grants no reach they lack — it
- * just saves a round trip. The realm must exist; an unknown id falls back to the
- * active realm rather than silently matching nothing.
+ * Safe for the same reason realm switching is: only a System Admin can name one,
+ * and they can already view any realm — it saves a round trip rather than
+ * granting reach. An unknown id THROWS. It used to fall back to the active
+ * realm, which meant picking a realm that had just been deleted quietly acted
+ * on whichever realm you happened to be in — the one silent failure that can
+ * move data into the wrong world.
  */
 async function sourceRealm(env, caller, requested) {
   const want = String(requested || '').trim();
   const active = realmIdOf(caller, env);
   if (!want || want === active) return active;
-  return (await getRealm(env, want)) ? want : active;
+  if (!(await getRealm(env, want))) throw new Error('That realm no longer exists — reload and try again.');
+  return want;
 }
 
 async function realmTransferMember({ request, env, body }) {

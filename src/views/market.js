@@ -4,6 +4,7 @@
  * Performance, Trends. Read-only; the API enforces admin-only access.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { regionLabel, regionWord } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { money } from '../lib/format.js';
 import { setMarketActions } from '../lib/sections.js';
@@ -43,7 +44,7 @@ function overview(d) {
     tableCard('Top 5 companies', ['Company', 'Orders', 'Items', 'Revenue'],
       (d.businesses || []).slice(0, 5).map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
       'No sales recorded yet.'),
-    tableCard('Top 5 regions', ['Region', 'Orders', 'Items', 'Revenue'],
+    tableCard('Top 5 ' + regionWord() + 's', [regionLabel(), 'Orders', 'Items', 'Revenue'],
       (d.holds || []).slice(0, 5).map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
       'No sales with a hold recorded yet.'),
     tableCard('Top 5 items', ['Item', 'Qty sold', 'Revenue'],
@@ -103,7 +104,7 @@ function itemPerformance(items) {
 
 /* ---- Region Performance ---- */
 function holdPerformance(holds) {
-  return tableCard('Region Performance', ['Region', 'Orders', 'Items', 'Revenue'],
+  return tableCard(regionLabel() + ' Performance', [regionLabel(), 'Orders', 'Items', 'Revenue'],
     holds.map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
     'No sales with a hold recorded yet.');
 }

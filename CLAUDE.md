@@ -82,8 +82,21 @@ which say so in their own comments).
 
 In practice: put new settings in `master_settings` (numeric, per realm) or
 `realm-prefs.js` (everything else, per realm) — never in a global `sys_flags`
-key. New tables go in `REALM_TABLES` with a `realm_id` column and per-realm
-uniqueness, and every query filters on it.
+key. If a flag genuinely has to live in `sys_flags`, put the realm in the KEY
+(`tile_images:<realm>`, `motd_global:<realm>`). New tables go in `REALM_TABLES`
+with a `realm_id` column and per-realm uniqueness, and every query filters on it.
+
+## Store data, present labels
+
+Never write a realm's wording into a stored value. Sale lines are JSON numbers,
+not "Iron Sword x2 @ 25gp"; the denomination and the region wording are applied
+when something is DISPLAYED (`src/lib/format.js` — `money`, `regionLabel`,
+`regionsOn`). A realm renaming its money or its regions must re-render its
+history, never invalidate it.
+
+Presentation settings are set once at sign-in from `/auth/me`'s `prefs`, not
+fetched per screen. Threading them through every render function is how the
+register ended up the only place that honoured them.
 
 ## Multi-realm
 

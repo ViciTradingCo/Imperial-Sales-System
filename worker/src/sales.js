@@ -14,19 +14,54 @@ import { listItemIndex, matchMasterItem } from './item-index.js';
 import { logAudit } from './audit.js';
 
 /**
- * "Name x2 @ 30gp, Other x1 @ 5gp" -> [{name, qty, price}], counting failures.
- * Tolerant of the legacy "@ $30" form too, so older rows still void correctly.
+ * A sale's lines, as DATA: [{name, qty, price}].
+ *
+ * New sales store JSON. That is the whole point — the numbers are the record and
+ * the denomination is presentation, so a realm renaming its money (or a shop
+ * being read by a realm that calls it something else) can never make old rows
+ * wrong or unparseable.
+ *
+ * Older rows are a formatted string — "Iron Sword x2 @ 30gp" — from when the
+ * unit was baked in. They're still read here, tolerating the even older "@ $30"
+ * form, so history keeps voiding and reporting correctly. Nothing rewrites them;
+ * they simply parse.
  */
 export function parseSaleItems(field) {
   const out = { lines: [], unparsed: 0 };
-  String(field || '').split(',').forEach((seg) => {
+  const raw = String(field || '').trim();
+  if (!raw) return out;
+
+  // Current form: a JSON array of lines.
+  if (raw.startsWith('[')) {
+    try {
+      const rows = JSON.parse(raw);
+      if (Array.isArray(rows)) {
+        rows.forEach((r) => {
+          const name = String((r && r.name) || '').trim();
+          const qty = Number(r && r.qty);
+          const price = Number(r && r.price);
+          if (name && isFinite(qty) && isFinite(price)) out.lines.push({ name, qty, price });
+          else out.unparsed++;
+        });
+        return out;
+      }
+    } catch (e) { /* fall through to the legacy reader */ }
+  }
+
+  // Legacy form: "Name x2 @ 30gp, Other x1 @ 5".
+  raw.split(',').forEach((seg) => {
     seg = seg.trim();
     if (!seg) return;
-    const m = seg.match(/^(.*) x(\d+) @ \$?([0-9]+(?:\.[0-9]+)?)(?:gp)?$/);
+    const m = seg.match(/^(.*) x(\d+) @ \$?([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]*)$/);
     if (m) { out.lines.push({ name: m[1].trim(), qty: Number(m[2]), price: Number(m[3]) }); return; }
     out.unparsed++;
   });
   return out;
+}
+
+/** Serializes a sale's lines for storage. Numbers only — no unit. */
+export function encodeSaleItems(lines) {
+  return JSON.stringify((lines || []).map((l) => ({ name: l.name, qty: l.qty, price: l.price })));
 }
 
 function stamp(d) {
@@ -48,6 +83,9 @@ function newOrderNo(d) {
 function mapSale(r) {
   return {
     orderNo: r.order_no, ts: r.ts, customer: r.customer, hold: r.hold,
+    // `lines` is the structured form the UI renders; `items` stays as stored so
+    // exports and anything reading raw rows keep working.
+    lines: parseSaleItems(r.items).lines,
     items: r.items, qtyTotal: r.qty_total, total: r.total,
     employee: r.employee, discount: r.discount, status: r.status || '',
   };
@@ -137,7 +175,9 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     : '';
 
   const orderNo = newOrderNo(new Date());
-  const itemSummary = lines.map((l) => l.name + ' x' + l.qty + ' @ ' + l.price + 'gp').join(', ');
+  // Stored as data, not as a sentence: the denomination is applied when it is
+  // shown, so renaming a realm's money never invalidates its history.
+  const itemSummary = encodeSaleItems(lines);
   const ts = new Date().toISOString();
   const employee = caller.character || caller.email;
 

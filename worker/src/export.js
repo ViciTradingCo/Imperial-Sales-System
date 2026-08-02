@@ -8,6 +8,8 @@
  * owner-facing per-shop CSV export.
  */
 import { getDb, REALM_TABLES } from './db.js';
+import { parseSaleItems } from './sales.js';
+import { readRealmPrefs } from './realm-prefs.js';
 
 // Order matters only cosmetically; each table is independent. Includes the
 // registry tables (users, companies, settings, MOTD) now that D1 is the sole
@@ -149,6 +151,14 @@ export async function businessCsv(env, business, type, realmId) {
   } else {
     cols = ['order_no', 'ts', 'customer', 'hold', 'items', 'qty_total', 'total', 'employee', 'discount', 'status'];
     ({ results: rows } = await db.prepare('SELECT order_no, ts, customer, hold, items, qty_total, total, employee, discount, status FROM sales WHERE realm_id = ? AND business = ? ORDER BY id').bind(realmId, business).all());
+    // Sale lines are stored as data; a spreadsheet wants them readable, so they
+    // are rendered here in this realm's denomination.
+    const { currency } = await readRealmPrefs(env, realmId);
+    rows = (rows || []).map((r) => ({
+      ...r,
+      items: parseSaleItems(r.items).lines.map((l) => l.name + ' x' + l.qty + ' @ ' + l.price + currency).join(', ')
+        || r.items,
+    }));
   }
   const lines = [cols.join(',')];
   (rows || []).forEach((r) => lines.push(cols.map((c) => csvCell(r[c])).join(',')));

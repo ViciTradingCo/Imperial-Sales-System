@@ -188,6 +188,11 @@ const MIGRATIONS = [
   // The realm a super admin is currently viewing (empty = their own).
   "ALTER TABLE users ADD COLUMN active_realm TEXT NOT NULL DEFAULT ''",
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_realm_email ON users (realm_id, email)',
+  // The idempotency lookups filter on realm as well as business, so the indexes
+  // should too — otherwise they scan every realm's rows for that shop name.
+  'CREATE INDEX IF NOT EXISTS idx_sales_idem_realm ON sales (realm_id, business, idem)',
+  'CREATE INDEX IF NOT EXISTS idx_intake_idem_realm ON intake (realm_id, business, idem)',
+  'CREATE INDEX IF NOT EXISTS idx_transfers_idem_realm ON transfers (realm_id, from_business, idem)',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_realm_business ON companies (realm_id, business)',
   // Join codes: added by migration for databases that predate them, and unique
   // ACROSS realms — a code is typed with no other context, so it has to identify

@@ -69,10 +69,15 @@ async function handleCheckCode({ request, env, body }) {
   const found = await resolveJoinCode(env, body.code);
   if (!found) throw new Error("That code isn't recognised. Check it with whoever gave it to you.");
   if (found.kind === 'realm') {
+    // Business Creation needs the realm's region wording and whether it uses
+    // regions at all — the signer-up has no profile to read prefs from yet.
+    const prefs = await readRealmPrefs(env, found.realmId);
     return {
       kind: 'realm',
       realmName: found.realmName,
-      holds: await readHolds(env, found.realmId),
+      holds: prefs.showRegion ? await readHolds(env, found.realmId) : [],
+      regionLabel: prefs.regionLabel,
+      showRegion: prefs.showRegion,
     };
   }
   return { kind: 'business', realmName: found.realmName, business: found.business };

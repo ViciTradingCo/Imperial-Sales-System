@@ -303,6 +303,9 @@ const TILE_KEYS = [
   ['led-export', 'Ledger · Export'], ['led-company', 'Ledger · Company'],
   ['led-staff-code', 'Ledger · Staff code'],
   ['led-settings', 'Ledger · Shop settings'],
+  // Employees + Notices sections
+  ['emp-roster', 'Employees · Roster'], ['emp-performance', 'Employees · Performance'],
+  ['not-post', 'Notices · Post'], ['not-list', 'Notices · List'],
 ];
 function tileImagesCard() {
   const status = el('p', {});

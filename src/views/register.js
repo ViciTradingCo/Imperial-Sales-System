@@ -61,6 +61,9 @@ export function renderRegister(container, { profile, onRegistered }) {
     const bizInput = el('input', { type: 'text', placeholder: 'e.g. Riverwood Trader' });
     const holdSelect = el('select', {});
     (found.holds || []).forEach((h) => holdSelect.appendChild(el('option', { value: h }, h)));
+    // The realm decides both the wording and whether regions exist at all.
+    const regionWrap = el('div', {}, [el('label', {}, found.regionLabel || 'Region'), holdSelect]);
+    regionWrap.hidden = found.showRegion === false;
     const submit = el('button.primary', { onclick: doCreate }, 'Create my business');
 
     async function doCreate() {
@@ -80,12 +83,11 @@ export function renderRegister(container, { profile, onRegistered }) {
     mount(stepHost, el('div.card', {}, [
       el('h3', {}, '🏛️ Create your business'),
       el('p', { class: 'note', html: 'Your code admits you to <b>' + esc(found.realmName) + '</b> as a shop owner. ' +
-        'Name your business and pick the region it trades in.' }),
+        'Name your business' + (found.showRegion === false ? '.' : ' and pick the ' + (found.regionLabel || 'region').toLowerCase() + ' it trades in.') }),
       el('label', {}, 'Business name'),
       bizInput,
       el('p', { class: 'note' }, 'This name must not already be taken in this realm.'),
-      el('label', {}, 'Region'),
-      holdSelect,
+      regionWrap,
       el('div', { class: 'row-actions' }, [submit, backBtn()]),
     ]));
   }

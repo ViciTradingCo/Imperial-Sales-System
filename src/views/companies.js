@@ -5,6 +5,7 @@
  *     (calendar picker OR manual entry) or mark it Perpetual.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { regionLabel } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { setAdminActions } from '../lib/sections.js';
@@ -54,7 +55,7 @@ export function renderCompanies(container, { me } = {}) {
       const court = c.court ? ' <span class="role-pill">Court</span>' : '';
       const realmPill = (me && me.realmCount > 1 && c.realmId)
         ? ' <span class="realm-pill">' + esc(c.realmId) + '</span>' : '';
-      const holdLine = c.hold ? '<br><span class="note">Region: ' + esc(c.hold) + '</span>' : '';
+      const holdLine = c.hold ? '<br><span class="note">' + esc(regionLabel()) + ': ' + esc(c.hold) + '</span>' : '';
       return el('div', { class: 'member-row' }, [
         el('p', { html:
           '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(c.status || '—') + '</span>' + court + realmPill + '<br>' +
@@ -133,7 +134,7 @@ function openNameModal(company, onSaved) {
     el('label', {}, 'Company name'),
     name,
     el('p', { class: 'note' }, 'Renaming updates the company everywhere — its shop, staff, and records.'),
-    el('label', {}, 'Region'),
+    el('label', {}, regionLabel()),
     hold,
     el('label', { class: 'inline' }, [court, document.createTextNode(' Court (admin-only flag)')]),
     el('label', { class: 'inline' }, [priority, document.createTextNode(' Priority (higher rate-limit ceiling)')]),

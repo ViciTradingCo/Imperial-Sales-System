@@ -38,8 +38,13 @@ export function renderPos(container, { me }) {
   }
   async function syncQueue(manual) {
     if (!queuedCount()) { if (manual) renderOfflineBar('Nothing to sync.'); return; }
-    const res = await flushSales((sale) => api.checkout(sale));
-    renderOfflineBar(res.flushed ? 'Synced ' + res.flushed + ' sale' + (res.flushed === 1 ? '' : 's') + '.' : '');
+    const res = await flushSales((sale) => api.checkout(sale), me);
+    const parts = [];
+    if (res.flushed) parts.push('Synced ' + res.flushed + ' sale' + (res.flushed === 1 ? '' : 's') + '.');
+    // Held sales were rung up in a different realm or shop; they belong there,
+    // and flush when that account next signs in.
+    if (res.held) parts.push(res.held + ' held for another shop or realm.');
+    renderOfflineBar(parts.join(' '));
   }
   if (!renderPos._online) { renderPos._online = true; window.addEventListener('online', () => syncQueue(false)); }
   renderOfflineBar();
@@ -209,7 +214,7 @@ export function renderPos(container, { me }) {
         complete.disabled = false;
         if (isNetworkError(e)) {
           // Offline — stash the sale (with its idem key) to replay on reconnect.
-          enqueueSale(sale);
+          enqueueSale(sale, me);
           idemKey = null; cart.length = 0; renderCart();
           customer.value = ''; discName.value = ''; discPct.value = '';
           setStatus('📴 No connection — sale saved offline and will sync automatically.', 'ok');
@@ -281,7 +286,7 @@ function openLookupModal() {
         el('p', { html:
           '<b>' + esc(s.orderNo) + '</b>' + (voided ? ' <span class="bad">VOIDED</span>' : '') + '<br>' +
           money(s.total) + ' · ' + esc(s.customer || 'Walk-in') + ' · ' + esc(s.hold || '') + '<br>' +
-          '<span class="note">' + esc(s.items || '') + '</span><br>' +
+          '<span class="note">' + esc(saleLines(s)) + '</span><br>' +
           '<span class="note">by ' + esc(s.employee || '') + (s.discount ? ' · ' + esc(s.discount) : '') + '</span>' }),
       ]);
       if (!voided) {
@@ -303,4 +308,16 @@ function openLookupModal() {
     q, search, results,
   ]);
   run();
+}
+
+/**
+ * A sale's lines, rendered in THIS realm's denomination. The server sends the
+ * numbers; the unit is applied here, so renaming the money re-renders history
+ * rather than invalidating it. Falls back to the stored text for any row too
+ * old or too damaged to parse.
+ */
+function saleLines(s) {
+  const lines = (s && s.lines) || [];
+  if (!lines.length) return String((s && s.items) || '');
+  return lines.map((l) => l.name + ' x' + l.qty + ' @ ' + money(l.price)).join(', ');
 }

@@ -9,6 +9,7 @@
  * existing item's details.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { regionLabel, regionsOn } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
@@ -198,7 +199,7 @@ function openIntakeModal(onRecorded) {
     el('p', { class: 'note' }, 'Log a purchase — this adds the stock and records what you paid and where. Pick the item from the index.'),
     el('label', {}, 'Item'), picker.el,
     el('label', {}, 'Vendor'), vendor,
-    el('label', {}, 'Region purchased in'), hold,
+    ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
     el('label', {}, '# of items'), qty,
     el('label', {}, 'Price per item (gp)'), per,
     save,
