@@ -15,7 +15,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
-import { setAdminActions, subscriptionCard } from '../lib/sections.js';
+import { setAdminActions, subscriptionCard, recentErrorsPanel } from '../lib/sections.js';
 import { renderPos } from './pos.js';
 import { renderInventory } from './inventory.js';
 import { renderEmployees } from './employees.js';
@@ -115,16 +115,9 @@ function errorsCard(me) {
   const host = el('div', {}, skeletonLines(2));
   const card = el('div.card', {}, [el('h3', {}, 'Recent errors'), host]);
   card.hidden = true;
+  const show = (errs) => mount(host, recentErrorsPanel(errs, me, show));
   api.getStatus().then((s) => {
-    const errs = s.errors || [];
-    if (!errs.length) {
-      mount(host, el('p', { class: 'note ok' }, 'No recent errors ✓'));
-      card.hidden = false;
-      return;
-    }
-    mount(host, ...errs.slice(0, 6).map((e) => el('p', { class: 'note error' },
-      new Date(e.ts).toLocaleString() + ' · ' + e.where + ' — ' + e.message +
-      (e.realmId && e.realmId !== me.activeRealm ? ' (realm ' + e.realmId + ')' : ''))));
+    show(s.errors || []);
     card.hidden = false;
   }).catch(() => { /* status is admin-only and non-critical here */ });
   return card;

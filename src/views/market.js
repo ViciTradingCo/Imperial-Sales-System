@@ -4,7 +4,7 @@
  * Performance, Trends. Read-only; the API enforces admin-only access.
  */
 import { money, regionLabel, regionWord } from '../lib/format.js';
-import { el, mount, esc } from '../lib/dom.js';
+import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setMarketActions } from '../lib/sections.js';
 
@@ -129,12 +129,6 @@ export function tableCard(title, headers, rows, emptyMsg) {
     ? el('div', { class: 'table-scroll' }, tableEl(headers, rows))
     : el('p', { class: 'note' }, emptyMsg);
   return el('div.card', {}, [el('h3', {}, title), body]);
-}
-
-export function tableEl(headers, rows) {
-  const thead = el('tr', {}, headers.map((h) => el('th', {}, h)));
-  const trs = rows.map((r) => el('tr', {}, r.map((c) => el('td', {}, String(c)))));
-  return el('table', { class: 'data-table' }, [el('thead', {}, thead), el('tbody', {}, trs)]);
 }
 
 function alertsCard(title, cls, lines, emptyMsg) {

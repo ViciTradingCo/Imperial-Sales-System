@@ -98,6 +98,11 @@ export const api = {
   purgeLogs: (amount, unit) => request('POST', '/admin/logs/purge', { amount, unit }),
   /** Admin: D1 status snapshot. */
   getStatus: () => request('GET', '/admin/status'),
+  /**
+   * Admin: dismiss recent errors. A System Admin clears the buffer; a Realm
+   * Admin clears only the entries stamped with their own realm.
+   */
+  clearErrors: () => request('POST', '/admin/status/errors/clear', {}),
   /** Admin: full reset — wipe all data, keep admin accounts (requires confirm: 'ERASE'). */
   wipeData: () => request('POST', '/admin/data/wipe', { confirm: 'ERASE' }),
   /** Court businesses: the market report for their own region. */
@@ -205,6 +210,8 @@ export const api = {
   purgeItems: (category) => request('POST', '/admin/items/purge', { confirm: 'PURGE', category: category || '' }),
   /** Admin: delete a master item. */
   deleteMasterItem: (name) => request('POST', '/admin/items/delete', { name }),
+  /** Admin: re-file a selection of items into one table. */
+  moveItems: (names, category) => request('POST', '/admin/items/move', { names, category }),
   /**
    * Admin: bulk import master items [{name, baseValue, type}]. Recognized names
    * update, not duplicate. `into` is the table unflagged rows land in — omit it

@@ -416,6 +416,19 @@ button.danger.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto;
 .member-row:last-child { border-bottom: none; }
 .member-row p { margin: 0; }
 
+/* Bulk selection: a tick box per row, and the bar that acts on the selection. */
+.member-row .row-pick { flex: 0 0 auto; padding-top: 2px; }
+.member-row .row-pick input { width: auto; margin: 0; }
+.bulk-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0; border-bottom: 1px solid rgba(122, 74, 31, 0.2);
+}
+.bulk-bar .bulk-all { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 600; }
+.bulk-bar .bulk-all input { width: auto; margin: 0; }
+/* The move target sits inline with its label and button rather than filling the row. */
+.bulk-bar select { width: auto; margin: 0; }
+
 button.link-back {
   background: none; border: none; color: var(--accent); cursor: pointer;
   font: inherit; padding: 0; margin: 0 0 8px; width: auto;

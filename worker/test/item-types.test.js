@@ -11,7 +11,7 @@ import { makeD1 } from './d1shim.js';
 import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
 import {
   listItemIndex, upsertItem, importItemIndex, analyzeItemImport, purgeItemIndex,
-  listItemTypes, addItemType, updateItemType, deleteItemType, matchItemType, UNSORTED,
+  listItemTypes, addItemType, updateItemType, deleteItemType, matchItemType, moveItems, UNSORTED,
 } from '../src/item-index.js';
 
 /** Type lists are records; most assertions only care about the names. */
@@ -241,6 +241,48 @@ describe('importing into one table', () => {
     await importItemIndex(env, [{ name: 'Iron Sword', baseValue: 30 }], A, 'Nonexistent');
     expect((await listItemIndex(env, A))[0].category).toBe(UNSORTED);
     expect(await names(A)).toEqual([UNSORTED]);
+  });
+});
+
+describe('moving a selection between tables', () => {
+  beforeEach(async () => {
+    await addItemType(env, 'Weapons', A);
+    await importItemIndex(env, [
+      { name: 'Iron Sword', baseValue: 30 },
+      { name: 'Steel Dagger', baseValue: 20 },
+      { name: 'Health Potion', baseValue: 5 },
+    ], A);
+  });
+
+  it('re-files only the items named', async () => {
+    const res = await moveItems(env, ['Iron Sword', 'Steel Dagger'], 'Weapons', A);
+    expect(res.moved).toBe(2);
+    expect(res.category).toBe('Weapons');
+    const by = new Map(res.items.map((i) => [i.name, i.category]));
+    expect(by.get('Iron Sword')).toBe('Weapons');
+    expect(by.get('Steel Dagger')).toBe('Weapons');
+    expect(by.get('Health Potion')).toBe(UNSORTED);
+  });
+
+  it('accepts a flag or loose spelling as the destination', async () => {
+    await updateItemType(env, { name: 'Weapons', flags: 'wep' }, A);
+    await moveItems(env, ['iron sword'], 'wep', A);
+    expect((await listItemIndex(env, A)).find((i) => i.name === 'Iron Sword').category).toBe('Weapons');
+  });
+
+  it('refuses an unknown destination instead of dumping into Unsorted', async () => {
+    await expect(moveItems(env, ['Iron Sword'], 'Nonexistent', A)).rejects.toThrow(/No table called/i);
+    expect((await listItemIndex(env, A)).every((i) => i.category === UNSORTED)).toBe(true);
+  });
+
+  it('refuses an empty selection', async () => {
+    await expect(moveItems(env, [], 'Weapons', A)).rejects.toThrow(/at least one/i);
+  });
+
+  it('cannot reach another realm\'s item of the same name', async () => {
+    await importItemIndex(env, [{ name: 'Iron Sword', baseValue: 99 }], B);
+    await moveItems(env, ['Iron Sword'], 'Weapons', A);
+    expect((await listItemIndex(env, B))[0].category).toBe(UNSORTED);
   });
 });
 

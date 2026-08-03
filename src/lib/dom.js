@@ -30,3 +30,18 @@ export function mount(container, ...nodes) {
   container.innerHTML = '';
   nodes.forEach((n) => container.appendChild(n));
 }
+
+/**
+ * A data table from headers + rows of cells.
+ *
+ * A cell may be a NODE as well as a value, so a table can carry a control (a
+ * checkbox, a dropdown) in a column instead of only text — which is what lets a
+ * review screen be one table rather than a summary plus a list of widgets.
+ */
+export function tableEl(headers, rows) {
+  const cell = (tag, c) => el(tag, {}, c && c.nodeType ? c : String(c == null ? '' : c));
+  return el('table', { class: 'data-table' }, [
+    el('thead', {}, el('tr', {}, headers.map((h) => cell('th', h)))),
+    el('tbody', {}, rows.map((r) => el('tr', {}, r.map((c) => cell('td', c))))),
+  ]);
+}

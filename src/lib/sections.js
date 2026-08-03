@@ -11,6 +11,7 @@ import { regionLabel, regionsOn } from './format.js';
 import { el, mount, esc } from './dom.js';
 import { navigate, currentPath } from './router.js';
 import { setActions } from './actions.js';
+import { toast } from './toast.js';
 import { api } from './api.js';
 
 /** Marks the button whose `path` matches the current route as active. */
@@ -73,6 +74,52 @@ export function setMarketActions() {
     { label: 'Company Performance', path: '/admin/market/companies', onClick: () => navigate('/admin/market/companies') },
     { label: 'Trends', path: '/admin/market/trends', onClick: () => navigate('/admin/market/trends') },
   ]));
+}
+
+/**
+ * The recent-errors list, with a way to dismiss it.
+ *
+ * Shared by the Admin Panel and System Status so the two can't disagree about
+ * what an error looks like or who may clear it. Without dismissal the panel only
+ * ever said "something went wrong at some point"; with it, a non-empty list
+ * means something is wrong NOW.
+ *
+ * The buffer is deployment-wide, so what "clear" means depends on the role: a
+ * System Admin empties it, a Realm Admin drops only the entries stamped with
+ * their own realm. The Worker decides that — this only words the button to
+ * match, so nobody clicks expecting the other behaviour.
+ */
+export function recentErrorsPanel(errors, me, onCleared) {
+  const errs = errors || [];
+  const host = el('div', {});
+  if (!errs.length) return el('div', {}, el('p', { class: 'note ok' }, 'No recent errors ✓'));
+
+  const sys = !!(me && me.systemAdmin);
+  const mine = errs.filter((e) => !e.realmId || !me || e.realmId === me.activeRealm);
+  const clearable = sys ? errs.length : mine.length;
+  const btn = el('button.small', { onclick: doClear },
+    sys ? 'Dismiss all' : 'Dismiss this realm’s (' + clearable + ')');
+  btn.disabled = !clearable;
+
+  async function doClear() {
+    btn.disabled = true;
+    try {
+      const r = await api.clearErrors();
+      toast(r.cleared ? r.cleared + ' error(s) dismissed.' : 'Nothing to dismiss.', 'ok');
+      if (onCleared) onCleared(r.errors || []);
+    } catch (e) { btn.disabled = false; toast(e.message || String(e), 'error'); }
+  }
+
+  mount(host,
+    el('div', { class: 'row-actions' }, [
+      el('h4', {}, 'Recent errors (' + errs.length + ')'),
+      btn,
+    ]),
+    ...errs.slice(0, 8).map((e) => el('p', { class: 'note error' },
+      new Date(e.ts).toLocaleString() + ' · ' + e.where + ' — ' + e.message +
+      // Which server it came from, when that isn't the one being viewed.
+      (e.realmId && me && e.realmId !== me.activeRealm ? ' (realm ' + e.realmId + ')' : ''))));
+  return host;
 }
 
 /**

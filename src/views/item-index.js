@@ -19,7 +19,7 @@
  * once and shows one flat result list, because "where did I file that?" is the
  * question the search is being asked.
  */
-import { el, mount, esc } from '../lib/dom.js';
+import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { toast } from '../lib/toast.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
@@ -127,8 +127,9 @@ export function renderItemIndex(container) {
   function drawSearch(q) {
     const hits = all.filter((it) => it.name.toLowerCase().includes(q));
     if (!hits.length) { mount(listHost, el('p', { class: 'note' }, 'No matches in any table.')); return; }
+    const list = itemList(hits, { showType: true, redraw: () => drawSearch(q) });
     mount(listHost, el('p', { class: 'note' }, hits.length + ' match(es) across ' +
-      new Set(hits.map((h) => h.category || UNSORTED)).size + ' table(s).'), ...hits.map((it) => itemRow(it, true)));
+      new Set(hits.map((h) => h.category || UNSORTED)).size + ' table(s).'), list);
   }
 
   /** One table, opened as a focal menu — the whole index screen in miniature. */
@@ -137,14 +138,14 @@ export function renderItemIndex(container) {
       const rows = el('div', {});
       const redraw = () => {
         const items = itemsIn(type);
-        mount(rows, ...(items.length
-          ? items.map((it) => itemRow(it, false, redraw))
-          : [el('p', { class: 'note' }, 'This table is empty.')]));
+        mount(rows, items.length
+          ? itemList(items, { redraw })
+          : el('p', { class: 'note' }, 'This table is empty.'));
       };
       mount(host,
         el('p', { class: 'note' }, type === UNSORTED
-          ? 'The default table — everything not filed under a type. Edit an item, or import into another ' +
-            'table, to move it out.'
+          ? 'The default table — everything not filed under a type. Tick items and move them to sort this ' +
+            'table out.'
           : 'Items filed as ' + type + '.'),
         el('div', { class: 'row-actions' }, [
           el('button.primary', { onclick: () => openItemModal(null, type, redraw) }, 'Add item'),
@@ -156,15 +157,71 @@ export function renderItemIndex(container) {
     });
   }
 
-  function itemRow(it, showType, redraw) {
-    const cat = it.category || UNSORTED;
-    return el('div', { class: 'member-row' }, [
-      el('p', { html: '<b>' + esc(it.name) + '</b> · <span class="note">base ' + esc(money(it.baseValue)) +
-        (showType ? ' · ' + esc(cat) : '') + '</span>' }),
-      el('span', { class: 'row-actions' }, [
-        el('button.primary.small', { onclick: () => openItemModal(it, cat, redraw) }, 'Edit'),
-        el('button.danger.small', { onclick: () => remove(it, redraw) }, 'Delete'),
+  /**
+   * A list of items with a tick box each and a "move selected to…" bar.
+   *
+   * Bulk re-filing is the operation the type split makes most likely: a realm
+   * that imported everything before setting its tables up has one enormous
+   * Unsorted table, and moving it item by item is the same work the import was
+   * meant to save.
+   */
+  function itemList(items, opts) {
+    const options = opts || {};
+    const boxes = new Map();
+    const dest = el('select', {});
+    typeNames().forEach((t) => dest.appendChild(el('option', { value: t }, t)));
+    const moveBtn = el('button.primary.small', { onclick: doMove }, 'Move selected');
+    const count = el('span', { class: 'note' }, '');
+    const all$ = el('input', { type: 'checkbox' });
+
+    function selected() {
+      return [...boxes.entries()].filter(([, b]) => b.checked).map(([name]) => name);
+    }
+    function sync() {
+      const n = selected().length;
+      count.textContent = n ? n + ' selected' : '';
+      moveBtn.disabled = !n;
+      all$.checked = n > 0 && n === boxes.size;
+    }
+    all$.addEventListener('change', () => { boxes.forEach((b) => { b.checked = all$.checked; }); sync(); });
+
+    async function doMove() {
+      const names = selected();
+      if (!names.length) return;
+      moveBtn.disabled = true;
+      try {
+        const r = await api.moveItems(names, dest.value);
+        all = r.items || all;
+        toast(r.moved + ' item(s) moved to ' + r.category + '.', 'ok');
+        if (options.redraw) options.redraw();
+        draw();
+      } catch (e) { moveBtn.disabled = false; toast(e.message || String(e), 'error'); }
+    }
+
+    const rows = items.map((it) => {
+      const cat = it.category || UNSORTED;
+      const box = el('input', { type: 'checkbox' });
+      box.addEventListener('change', sync);
+      boxes.set(it.name, box);
+      return el('div', { class: 'member-row' }, [
+        el('span', { class: 'row-pick' }, [box]),
+        el('p', { html: '<b>' + esc(it.name) + '</b> · <span class="note">base ' + esc(money(it.baseValue)) +
+          (options.showType ? ' · ' + esc(cat) : '') + '</span>' }),
+        el('span', { class: 'row-actions' }, [
+          el('button.primary.small', { onclick: () => openItemModal(it, cat, options.redraw) }, 'Edit'),
+          el('button.danger.small', { onclick: () => remove(it, options.redraw) }, 'Delete'),
+        ]),
+      ]);
+    });
+
+    sync();
+    return el('div', {}, [
+      el('div', { class: 'bulk-bar' }, [
+        el('label', { class: 'bulk-all' }, [all$, el('span', {}, 'Select all')]),
+        count,
+        el('span', { class: 'row-actions' }, [el('span', { class: 'note' }, 'Move to'), dest, moveBtn]),
       ]),
+      ...rows,
     ]);
   }
 
@@ -294,33 +351,43 @@ export function renderItemIndex(container) {
       finally { previewBtn.disabled = false; }
     }
 
+    /**
+     * The whole import as ONE table: a row per line, saying where it lands and
+     * what will happen to it. This used to be three summary counts plus a
+     * separate widget per suspected typo, which meant the numbers and the
+     * decisions were read in different places and neither showed a line's
+     * destination.
+     */
     function renderReport(a) {
       const create = a.create || [], update = a.update || [], typos = a.typos || [], newTypes = a.newTypes || [];
-      const nodes = [el('p', { html: '<b>' + create.length + '</b> new · <b>' + update.length +
-        '</b> to update · <b>' + typos.length + '</b> possible typo(s).' })];
-      if (newTypes.length) {
-        nodes.push(el('p', { class: 'note', html: 'New table(s) this import will create: <b>' +
-          newTypes.map(esc).join('</b>, <b>') + '</b>.' }));
-      }
-      // What the flags are actually sorting — the counts per destination table.
-      const byType = new Map();
-      [...create, ...update, ...typos].forEach((r) => byType.set(r.type, (byType.get(r.type) || 0) + 1));
-      if (byType.size) {
-        nodes.push(el('p', { class: 'note' }, 'Filing: ' +
-          [...byType].map(([t, n]) => n + ' → ' + t).join(' · ')));
-      }
-      const choices = typos.map((t) => {
-        const sel = el('select', {});
-        sel.appendChild(el('option', { value: 'fix' }, 'Fix → update “' + t.suggestion + '”'));
-        sel.appendChild(el('option', { value: 'new' }, 'Add as new “' + t.name + '”'));
-        nodes.push(el('div.member-row', {}, [
-          el('p', { html: '<b>' + esc(t.name) + '</b> (' + money(t.baseValue) + ') — did you mean <b>' + esc(t.suggestion) + '</b>?' }),
-          sel,
-        ]));
-        return { t, sel };
-      });
-      nodes.push(el('button.primary', { onclick: () => doApply(a, choices) }, 'Apply import'));
-      mount(reportHost, ...nodes);
+      const fresh = new Set(newTypes);
+      const choices = [];
+
+      const rowFor = (r, action) => [r.name, money(r.baseValue),
+        r.type + (fresh.has(r.type) ? ' (new table)' : ''), action];
+
+      const rows = [
+        ...create.map((r) => rowFor(r, el('span', { class: 'ok' }, 'Add'))),
+        ...update.map((r) => rowFor(r, el('span', {}, r.currentType && r.currentType !== r.type
+          ? 'Update · move from ' + r.currentType
+          : 'Update'))),
+        // A suspected typo is the only row with a decision to make, so its
+        // action cell is the control rather than a label.
+        ...typos.map((t) => {
+          const sel = el('select', {});
+          sel.appendChild(el('option', { value: 'fix' }, 'Fix → “' + t.suggestion + '”'));
+          sel.appendChild(el('option', { value: 'new' }, 'Add as new'));
+          choices.push({ t, sel });
+          return rowFor(t, sel);
+        }),
+      ];
+
+      mount(reportHost,
+        el('p', { html: '<b>' + rows.length + '</b> line(s): ' + create.length + ' new · ' + update.length +
+          ' to update · ' + typos.length + ' possible typo(s)' +
+          (newTypes.length ? ' · ' + newTypes.length + ' new table(s)' : '') + '.' }),
+        el('div', { class: 'table-scroll' }, tableEl(['Item', 'Base value', 'Table', 'Action'], rows)),
+        el('button.primary', { onclick: () => doApply(a, choices) }, 'Apply import'));
     }
 
     async function doApply(a, choices) {

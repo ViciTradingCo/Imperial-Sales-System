@@ -62,6 +62,24 @@ export async function recentErrors(env) {
 }
 
 /**
+ * Dismisses recent errors once they've been dealt with, so the panel means
+ * "something is wrong now" rather than "something went wrong at some point".
+ *
+ * The buffer is deployment-wide, which makes clearing it the one place this
+ * feature could cross realms. It doesn't: `realmId` clears only the entries
+ * stamped with that realm, and only a System Admin — who runs the deployment —
+ * passes nothing and clears the lot. A Realm Admin cannot wipe another realm's
+ * diagnostics, or the unstamped errors that belong to the deployment itself.
+ */
+export async function clearErrors(env, realmId) {
+  const list = await recentErrors(env);
+  const realm = String(realmId || '').trim();
+  const kept = realm ? list.filter((e) => String(e.realmId || '') !== realm) : [];
+  await setFlag(env, ERR_KEY, JSON.stringify(kept));
+  return { cleared: list.length - kept.length, errors: kept };
+}
+
+/**
  * System status for the realm the caller is viewing. The counts and the "last
  * activity" stamps are per realm — an admin looking at realm B should see how
  * busy realm B is, not a total across servers. Worker errors are genuinely

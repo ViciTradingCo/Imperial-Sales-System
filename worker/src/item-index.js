@@ -398,6 +398,31 @@ export async function purgeItemIndex(env, realmId, category) {
   return { purged: (before && before.n) || 0, category: cat, items: await listItemIndex(env, realmId) };
 }
 
+/**
+ * Re-files a set of items into one table.
+ *
+ * The way OUT of Unsorted for a realm that imported everything before setting
+ * its tables up: without this, moving fifty items means fifty edits or an
+ * export/re-import round trip.
+ *
+ * An unknown destination is an ERROR here, unlike a hand edit (which falls back
+ * to Unsorted). A bulk move comes from a picker of real tables, so a name that
+ * doesn't resolve means the screen is stale — and silently dumping a selection
+ * into Unsorted would be the opposite of what was asked.
+ */
+export async function moveItems(env, names, category, realmId) {
+  const wanted = (names || []).map((n) => String(n || '').trim()).filter(Boolean);
+  if (!wanted.length) throw new Error('Select at least one item to move.');
+  const types = await listItemTypes(env, realmId);
+  const dest = matchItemType(category, types);
+  if (!dest) throw new Error('No table called "' + String(category || '') + '".');
+  const db = await getDb(env);
+  await db.batch(wanted.map((n) => db
+    .prepare('UPDATE master_item SET category = ? WHERE realm_id = ? AND lower(name) = ?')
+    .bind(dest, realmId, n.toLowerCase())));
+  return { moved: wanted.length, category: dest, items: await listItemIndex(env, realmId) };
+}
+
 export async function deleteItemIndex(env, name, realmId) {
   const db = await getDb(env);
   await db.prepare('DELETE FROM master_item WHERE realm_id = ? AND lower(name) = ?').bind(realmId, String(name || '').trim().toLowerCase()).run();

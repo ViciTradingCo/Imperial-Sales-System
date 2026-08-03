@@ -6,7 +6,7 @@
  */
 import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { setAdminActions } from '../lib/sections.js';
+import { setAdminActions, recentErrorsPanel } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { toast } from '../lib/toast.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
@@ -38,7 +38,7 @@ export function renderAdminSettings(container, { me } = {}) {
     { key: 'set-storefront', label: 'Storefronts', hint: 'Public shop pages', glyph: '🏪',
       open: (host) => mount(host, storefrontCard()) },
     { key: 'set-status', label: 'System status', hint: 'Counts + errors', glyph: '💚',
-      open: (host) => mount(host, statusCard()) },
+      open: (host) => mount(host, statusCard(me)) },
     // Backup, log maintenance, and the full reset are one "data" section — they
     // are the same job (safeguard first, then trim or wipe).
     { key: 'set-data', label: 'Data', hint: 'Backup, purge, reset', glyph: '💾',
@@ -435,7 +435,7 @@ function storefrontCard() {
 }
 
 /** System status — D1 row counts, recent activity, and recent internal errors. */
-function statusCard() {
+function statusCard(me) {
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
   api.getStatus().then((s) => {
     const c = s.counts || {};
@@ -443,19 +443,14 @@ function statusCard() {
       el('span', { class: 'fact-label' }, k.replace(/_/g, ' ')),
       el('span', { class: 'fact-value' }, String(c[k])),
     ]));
-    const errs = s.errors || [];
-    const errorSection = errs.length
-      ? el('div', {}, [
-          el('h4', {}, 'Recent errors (' + errs.length + ')'),
-          ...errs.slice(0, 8).map((e) => el('p', { class: 'note error' },
-            new Date(e.ts).toLocaleString() + ' · ' + e.where + ' — ' + e.message)),
-        ])
-      : el('p', { class: 'note ok' }, 'No recent errors ✓');
+    const errorHost = el('div', {});
+    const showErrors = (errs) => mount(errorHost, recentErrorsPanel(errs, me, showErrors));
+    showErrors(s.errors || []);
     mount(host,
       el('div', { class: 'readonly-facts' }, facts),
       el('p', { class: 'note' }, 'Last sale: ' + (s.lastSale ? new Date(s.lastSale).toLocaleString() : '—')),
       el('p', { class: 'note' }, 'Error alerts to Discord: ' + (s.discordConfigured ? 'on' : 'off (set DISCORD_WEBHOOK_URL to enable)')),
-      errorSection);
+      errorHost);
   }).catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
   return el('div.card', {}, [el('h3', {}, 'System status'), host]);
 }

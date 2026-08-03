@@ -11,10 +11,10 @@ import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMembe
 import { listCompanies, updateCompany, archiveCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
 import { marketAnalysis } from '../market.js';
-import { systemStatus } from '../status.js';
+import { systemStatus, clearErrors } from '../status.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport,
-  listItemIndex, addItemType, updateItemType, deleteItemType } from '../item-index.js';
+  listItemIndex, moveItems, addItemType, updateItemType, deleteItemType } from '../item-index.js';
 import { writeRegions } from '../regions.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, readRealmBranding, writeBranding } from '../branding.js';
@@ -169,6 +169,20 @@ async function status({ request, env }) {
   const caller = await requireAdmin(request, env);
   return await systemStatus(env, realmIdOf(caller, env));
 }
+/**
+ * Dismisses recent errors. A System Admin clears the whole buffer; a Realm
+ * Admin clears only the entries stamped with their own realm — the buffer is
+ * deployment-wide, and clearing must not be the way one realm reaches another's
+ * data.
+ */
+async function clearErrorsRoute({ request, env }) {
+  const caller = await requireAdmin(request, env);
+  const scope = isSystemAdmin(env, caller) ? '' : realmIdOf(caller, env);
+  const res = await clearErrors(env, scope);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'status.errors.clear',
+    detail: res.cleared + ' error(s) dismissed', realmId: realmIdOf(caller, env) });
+  return res;
+}
 
 /** Full reset of the CURRENT REALM — keeps admin accounts. Typed confirm. */
 async function wipeData({ request, env, body }) {
@@ -244,6 +258,16 @@ async function purgeMasterItems({ request, env, body }) {
   const res = await purgeItemIndex(env, realmIdOf(caller, env), body.category);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.purge',
     detail: res.purged + ' items' + (res.category ? ' from ' + res.category : ''), realmId: realmIdOf(caller, env) });
+  return res;
+}
+
+/** Re-files a selection of items into one table — the bulk way out of Unsorted. */
+async function moveItemsRoute({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await moveItems(env, body.names, body.category, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.move',
+    detail: res.moved + ' item(s) → ' + res.category, realmId });
   return res;
 }
 
@@ -519,6 +543,7 @@ export const routes = [
   { method: 'POST', path: '/admin/logs/clear', handler: clearLogsRoute },
   { method: 'POST', path: '/admin/logs/purge', handler: purgeLogsRoute },
   { method: 'GET', path: '/admin/status', handler: status },
+  { method: 'POST', path: '/admin/status/errors/clear', handler: clearErrorsRoute },
   { method: 'POST', path: '/admin/data/wipe', handler: wipeData },
   { method: 'GET', path: '/admin/motd', handler: motdConfig },
   { method: 'POST', path: '/admin/motd', handler: setMotd },
@@ -530,6 +555,7 @@ export const routes = [
   { method: 'POST', path: '/admin/items', handler: upsertItemRoute },
   { method: 'POST', path: '/admin/items/delete', handler: deleteMasterItemRoute },
   { method: 'POST', path: '/admin/items/purge', handler: purgeMasterItems },
+  { method: 'POST', path: '/admin/items/move', handler: moveItemsRoute },
   { method: 'POST', path: '/admin/items/import', handler: importMasterItems },
   { method: 'POST', path: '/admin/items/import/analyze', handler: analyzeItems },
   { method: 'POST', path: '/admin/item-types', handler: addItemTypeRoute },
