@@ -30,6 +30,11 @@ const saleAt = (day, region, lines, status) => env.DB.prepare(
     lines.reduce((n, l) => n + l.qty, 0),
     lines.reduce((n, l) => n + l.qty * l.price, 0), status || 'OK').run();
 const sale = (lines, status) => saleAt('2026-01-01', '', lines, status);
+/** Stock left the shelf, nothing was charged — must count nowhere. */
+const staffSale = (lines) => env.DB.prepare(
+  `INSERT INTO sales (realm_id, business, ts, order_no, items, qty_total, total, status, staff_purchase)
+   VALUES (?, 'Alpha', '2026-01-01T00:00:00Z', ?, ?, ?, 0, 'OK', 1)`)
+  .bind(R, 'S-' + (++orderNo), encodeSaleItems(lines), lines.reduce((n, l) => n + l.qty, 0)).run();
 const saleOn = (day, lines) => saleAt(day, '', lines);
 const saleIn = (region, lines) => saleAt('2026-01-01', region, lines);
 
@@ -158,18 +163,63 @@ describe('the per-item trend', () => {
   });
 });
 
+/**
+ * Best region means where the item is WORTH most — the region with the highest
+ * average value, measured the same way the realm-wide valuation is. Not where
+ * the most of it moved.
+ */
 describe('best region', () => {
-  it('is where the most units moved', async () => {
-    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 2, price: 10 }]);
-    await saleIn('The Rift', [{ name: 'Iron Sword', qty: 9, price: 10 }]);
-    await saleIn('Falkreath', [{ name: 'Iron Sword', qty: 1, price: 500 }]);
-    // Units, not takings: Falkreath brought in the most gold from one sale.
-    expect((await itemRow()).bestRegion).toEqual({ region: 'The Rift', qty: 9, revenue: 90 });
+  it('is the region with the highest average value, not the busiest', async () => {
+    await saleIn('The Rift', [{ name: 'Iron Sword', qty: 20, price: 10 }]);   // busy, cheap
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 3, price: 45 }]);    // quiet, dear
+    const b = (await itemRow()).bestRegion;
+    expect(b.region).toBe('Whiterun');
+    expect(b.value).toBe(45);
+    expect(b.qty).toBe(3);
+  });
+
+  it('resists an outlier the same way the realm-wide value does', async () => {
+    // Whiterun's one absurd sale must not make it the best region.
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 5, price: 10 }]);
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 5, price: 11 }]);
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 5, price: 12 }]);
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 1, price: 9000 }]);
+    await saleIn('The Rift', [{ name: 'Iron Sword', qty: 4, price: 40 }]);
+    expect((await itemRow()).bestRegion.region).toBe('The Rift');
+  });
+
+  it('breaks a tie on volume — the busier market of two paying the same', async () => {
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 2, price: 30 }]);
+    await saleIn('The Rift', [{ name: 'Iron Sword', qty: 9, price: 30 }]);
+    expect((await itemRow()).bestRegion.region).toBe('The Rift');
   });
 
   it('is null when no sale recorded a region', async () => {
     await sale([{ name: 'Iron Sword', qty: 1, price: 10 }]);
     expect((await itemRow()).bestRegion).toBeNull();
+  });
+});
+
+describe('employee purchases', () => {
+  it('count nowhere — not in volume, value, or takings', async () => {
+    await sale([{ name: 'Iron Sword', qty: 2, price: 40 }]);
+    await staffSale([{ name: 'Iron Sword', qty: 8, price: 40 }]);
+    const i = await itemRow();
+    expect(i.qty).toBe(2);              // the 8 taken by staff are not sales
+    expect(i.avgValue).toBe(40);        // and cannot drag the value toward 0
+    expect(i.revenue).toBe(80);
+  });
+
+  it('leave an item out of the market entirely if that is all it ever had', async () => {
+    await staffSale([{ name: 'Iron Sword', qty: 5, price: 40 }]);
+    expect((await marketAnalysis(env, R)).items).toEqual([]);
+  });
+
+  it('are excluded from the shop and region breakdowns too', async () => {
+    await staffSale([{ name: 'Iron Sword', qty: 5, price: 40 }]);
+    const d = await marketAnalysis(env, R);
+    expect(d.businesses).toEqual([]);
+    expect(d.trends).toEqual([]);
   });
 });
 

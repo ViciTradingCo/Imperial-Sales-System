@@ -1,7 +1,13 @@
 /**
  * Market Analysis (admin) — network-wide read-only analytics over the D1
  * transactional store. Aggregation happens in SQL so the Worker ships small
- * summaries, never raw rows. Voided sales are excluded from revenue/volume.
+ * summaries, never raw rows.
+ *
+ * EXCLUDED from every figure here: voided sales, and EMPLOYEE PURCHASES — stock
+ * a shop let a member of staff take without charge. The goods moved, so the
+ * sale is in the history, but it is not trade: counting it would drag the
+ * item's average price toward zero and make the shop look like it was giving
+ * stock away.
  *
  * Sections:
  *   • businesses  — performance per shop (orders / items / revenue).
@@ -91,12 +97,22 @@ function trendOf(dayMap) {
     .slice(-TREND_DAYS);
 }
 
-/** Where the item moves best: most units, revenue breaking a tie. */
+/**
+ * Where the item is worth most: the region with the highest AVERAGE VALUE,
+ * measured exactly as the realm-wide valuation is (see salesValue) so the two
+ * figures are comparable — "best" here means the item fetches more there, not
+ * that more of it moves there.
+ *
+ * Volume breaks a tie, because between two regions paying the same the busier
+ * one is the better market.
+ */
 function bestRegionOf(regionMap) {
   let best = null;
   regionMap.forEach((v, name) => {
-    if (!best || v.qty > best.qty || (v.qty === best.qty && v.revenue > best.revenue)) {
-      best = { region: name, qty: v.qty, revenue: v.revenue };
+    const value = salesValue(v.lines);
+    if (value == null) return;
+    if (!best || value > best.value || (value === best.value && v.qty > best.qty)) {
+      best = { region: name, value, qty: v.qty, revenue: v.revenue };
     }
   });
   return best;
@@ -117,7 +133,8 @@ function bestRegionOf(regionMap) {
  *                 salesValue). Robust to the one absurd sale that a mean is not.
  *   • valueSamples — units of sales behind avgValue, so a valuation resting on
  *                 two units can be read as the guess it is.
- *   • bestRegion — where it moves best, by units.
+ *   • bestRegion — where the item is worth most, by that region's own
+ *                 average value.
  *   • trend      — its daily series, for the graph.
  *
  * `revenue` stays on the row: it is the ranking key here, and the shop and
@@ -154,8 +171,11 @@ function itemStats(saleRows, master, intakeRows) {
         m.days.set(day, d);
       }
       if (region) {
-        const g = m.regions.get(region) || { qty: 0, revenue: 0 };
-        g.qty += l.qty; g.revenue += value;
+        // The price lines are kept per region as well as overall, so a region's
+        // value is the same kind of figure as the realm's — a weighted median
+        // with outliers fenced, not a mean that one sale can define.
+        const g = m.regions.get(region) || { qty: 0, revenue: 0, lines: [] };
+        g.qty += l.qty; g.revenue += value; g.lines.push({ price: l.price, qty: l.qty });
         m.regions.set(region, g);
       }
     });
@@ -206,7 +226,7 @@ export async function marketAnalysis(env, realmId) {
             COALESCE(SUM(qty_total), 0) AS items,
             COALESCE(SUM(total), 0) AS revenue
        FROM sales
-      WHERE realm_id = ? AND status != 'VOIDED'
+      WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0
       GROUP BY business
       ORDER BY revenue DESC
       LIMIT 200`).bind(realmId).all()).results) || [];
@@ -217,7 +237,7 @@ export async function marketAnalysis(env, realmId) {
             COALESCE(SUM(qty_total), 0) AS items,
             COALESCE(SUM(total), 0) AS revenue
        FROM sales
-      WHERE realm_id = ? AND status != 'VOIDED' AND hold IS NOT NULL AND hold != ''
+      WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold IS NOT NULL AND hold != ''
       GROUP BY hold
       ORDER BY revenue DESC`).bind(realmId).all()).results) || [];
 
@@ -240,7 +260,7 @@ export async function marketAnalysis(env, realmId) {
   // ts and hold come along so one pass can build the per-item daily series and
   // regional split as well as the totals.
   const saleRows = ((await db.prepare(
-    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).all()).results) || [];
+    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
   // Intake is the buy side of the same items — what a shop paid to stock them.
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
@@ -271,7 +291,7 @@ export async function marketAnalysis(env, realmId) {
   // Daily revenue trend (last 30 days with activity), oldest → newest.
   const trends = (((await db.prepare(
     `SELECT substr(ts, 1, 10) AS day, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED'
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0
       GROUP BY day ORDER BY day DESC LIMIT 30`).bind(realmId).all()).results) || []).reverse();
 
   return {
@@ -304,7 +324,7 @@ export async function itemReport(env, name, realmId) {
   if (!hit) throw new Error('No item called "' + wanted + '" in this realm\'s index.');
 
   const saleRows = ((await db.prepare(
-    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).all()).results) || [];
+    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
   const found = itemStats(saleRows, master, intakeRows).find((r) => r.item === hit.name);
@@ -335,15 +355,15 @@ export async function businessReport(env, business, realmId) {
   const overview = await db.prepare(
     `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS itemsSold
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND business = ?`).bind(realmId, b).first();
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?`).bind(realmId, b).first();
 
   const trends = (((await db.prepare(
     `SELECT substr(ts, 1, 10) AS day, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND business = ?
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?
       GROUP BY day ORDER BY day DESC LIMIT 30`).bind(realmId, b).all()).results) || []).reverse();
 
   const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND business = ?`).bind(realmId, b).all()).results) || [];
+    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?`).bind(realmId, b).all()).results) || [];
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per FROM intake WHERE realm_id = ? AND business = ?`).bind(realmId, b).all()).results) || [];
 
@@ -367,16 +387,16 @@ export async function holdReport(env, hold, realmId) {
   const overview = await db.prepare(
     `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS itemsSold, COUNT(DISTINCT business) AS activeShops
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND hold = ?`).bind(realmId, h).first();
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`).bind(realmId, h).first();
 
   const businesses = ((await db.prepare(
     `SELECT business, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND hold = ?
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?
       GROUP BY business ORDER BY revenue DESC LIMIT 200`).bind(realmId, h).all()).results) || [];
 
   const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND hold = ?`).bind(realmId, h).all()).results) || [];
+    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`).bind(realmId, h).all()).results) || [];
 
   // No intake side here: a region's report covers sales MADE in that region, and
   // intake records where goods came FROM, which is a different question.

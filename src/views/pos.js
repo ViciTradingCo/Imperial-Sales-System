@@ -142,9 +142,33 @@ export function renderPos(container, { me }) {
       discPct.value = d ? String(d.percent) : '';
     });
 
+    /**
+     * Employee purchase — staff taking stock, at no charge.
+     *
+     * It still rings up: the goods leave the shelf and the shop needs the
+     * record. What it does NOT do is take money, credit the coffers, or count
+     * toward anyone's figures — a free item priced at 0 would drag the item's
+     * average down and make the shop look like it gave its stock away.
+     *
+     * Discounts are meaningless against it, so they are switched off while it
+     * is ticked rather than silently ignored at the server.
+     */
+    const staffBox = el('input', { type: 'checkbox' });
+    const staffWrap = el('label', { class: 'check-row' }, [
+      staffBox,
+      el('span', {}, 'Employee purchase — no charge'),
+    ]);
     const status = el('p', {});
     const complete = el('button.primary', { onclick: doCheckout }, 'Complete sale');
     if (!canSell) complete.disabled = true;
+    // Registered after `complete` exists, since it renames the button.
+    staffBox.addEventListener('change', () => {
+      const on = staffBox.checked;
+      [discSel, discName, discPct].forEach((f) => { f.disabled = on; });
+      if (on) { discSel.value = ''; discName.value = ''; discPct.value = ''; }
+      complete.textContent = on ? 'Record employee purchase' : 'Complete sale';
+      renderCart();
+    });
 
     // One idempotency key per order-in-progress, so a retried submit can't
     // ring the same sale up twice. Reset after a successful checkout.
@@ -160,7 +184,12 @@ export function renderPos(container, { me }) {
         el('button.secondary-btn.small', { onclick: () => { cart.splice(i, 1); renderCart(); } }, 'Remove'),
       ]));
       const total = cart.reduce((s, l) => s + l.qty * l.price, 0);
-      rows.push(el('p', { html: '<b>Subtotal: ' + money(total) + '</b>' }));
+      // On an employee purchase the line prices still say what the goods are
+      // worth; the total is what will actually be taken, which is nothing.
+      rows.push(staffBox.checked
+        ? el('p', { html: '<b>No charge</b> <span class="note">— employee purchase (would be ' +
+            esc(money(total)) + ')</span>' })
+        : el('p', { html: '<b>Subtotal: ' + money(total) + '</b>' }));
       mount(cartHost, ...rows);
     }
 
@@ -193,16 +222,23 @@ export function renderPos(container, { me }) {
       const sale = {
         cart: cart.slice(), customer: customer.value.trim(), hold: holdSel.value,
         discountName: discName.value.trim(), discountPercent: discPct.value,
+        staffPurchase: staffBox.checked,
         idempotencyKey: idemKey,
       };
       try {
         const res = await api.checkout(sale);
         idemKey = null; // next order gets a fresh key
         cart.length = 0;
-        renderCart();
         customer.value = ''; discName.value = ''; discPct.value = '';
+        // Deliberately reset: the next order is a normal sale unless someone
+        // says otherwise. A sticky "no charge" is the expensive kind of bug.
+        staffBox.checked = false;
+        staffBox.dispatchEvent(new Event('change'));
+        renderCart();
         // Keep the hold selected for quick back-to-back sales.
-        toast('Sale complete — ' + res.orderNo + ' · ' + money(res.total), 'ok');
+        toast(res.staffPurchase
+          ? 'Employee purchase recorded — ' + res.orderNo + ' · no charge'
+          : 'Sale complete — ' + res.orderNo + ' · ' + money(res.total), 'ok');
         let msg = '';
         if (res.offInventory && res.offInventory.length) msg += 'Off-inventory: ' + res.offInventory.join(', ') + '. ';
         if (res.newItems && res.newItems.length) msg += 'New item flagged: ' + res.newItems.join(', ') + '.';
@@ -218,8 +254,11 @@ export function renderPos(container, { me }) {
         if (isNetworkError(e)) {
           // Offline — stash the sale (with its idem key) to replay on reconnect.
           enqueueSale(sale, me);
-          idemKey = null; cart.length = 0; renderCart();
+          idemKey = null; cart.length = 0;
           customer.value = ''; discName.value = ''; discPct.value = '';
+          staffBox.checked = false;
+          staffBox.dispatchEvent(new Event('change'));
+          renderCart();
           setStatus('📴 No connection — sale saved offline and will sync automatically.', 'ok');
           renderOfflineBar();
         } else {
@@ -243,6 +282,7 @@ export function renderPos(container, { me }) {
         el('h3', {}, 'Customer Details'),
         el('label', {}, 'Customer'), customer,
         holdWrap,
+        staffWrap,
         el('label', {}, 'Discount'), discSel,
         el('label', {}, 'Discount name'), discName,
         el('label', {}, 'Discount %'), discPct,
@@ -287,8 +327,9 @@ function openLookupModal() {
       const voided = String(s.status).toUpperCase() === 'VOIDED';
       const card = el('div', { class: 'lookup-card' }, [
         el('p', { html:
-          '<b>' + esc(s.orderNo) + '</b>' + (voided ? ' <span class="bad">VOIDED</span>' : '') + '<br>' +
-          money(s.total) + ' · ' + esc(s.customer || 'Walk-in') + ' · ' + esc(s.hold || '') + '<br>' +
+          '<b>' + esc(s.orderNo) + '</b>' + (voided ? ' <span class="bad">VOIDED</span>' : '') +
+          (s.staffPurchase ? ' <span class="role-pill">Employee purchase</span>' : '') + '<br>' +
+          (s.staffPurchase ? 'No charge' : money(s.total)) + ' · ' + esc(s.customer || 'Walk-in') + ' · ' + esc(s.hold || '') + '<br>' +
           '<span class="note">' + esc(saleLines(s)) + '</span><br>' +
           '<span class="note">by ' + esc(s.employee || '') + (s.discount ? ' · ' + esc(s.discount) : '') + '</span>' }),
       ]);

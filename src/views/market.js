@@ -16,7 +16,8 @@ export function renderMarket(container, { tab } = {}) {
   const host = el('div', {}, el('p', { class: 'note' }, 'Crunching the numbers…'));
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Market Analysis'),
-    el('p', { class: 'note' }, 'Performance across every shop in this realm. Voided sales are excluded.'),
+    el('p', { class: 'note' }, 'Performance across every shop in this realm. Voided sales and employee ' +
+      'purchases are excluded — neither is trade.'),
     host,
   ]));
 
@@ -65,9 +66,21 @@ const ITEM_COLS = {
     // dashes explaining a concept this realm has switched off.
     .concat(regionsOn() ? ['Best ' + regionWord()] : []),
   row: (i) => [i.item, i.qty, i.orders, avg(i.avgBought), avg(i.avgSold), valueCell(i)]
-    .concat(regionsOn() ? [i.bestRegion ? i.bestRegion.region : '—'] : []),
+    .concat(regionsOn() ? [regionCell(i)] : []),
 };
 function avg(v) { return v == null ? '—' : money(v); }
+/**
+ * Where the item is worth most — the region with the highest average value,
+ * measured the same way the realm-wide valuation is. The figure is shown
+ * beside the name: "best" is a comparison, and a comparison with the number
+ * hidden is just an assertion.
+ */
+function regionCell(i) {
+  const b = i.bestRegion;
+  if (!b) return el('span', {}, '—');
+  return el('span', { title: b.qty + ' sold there' }, b.region + ' · ' + money(b.value));
+}
+
 /**
  * The valuation, carrying how much trade it rests on. A figure from two units
  * and one from two hundred read identically in a table, and they should not.

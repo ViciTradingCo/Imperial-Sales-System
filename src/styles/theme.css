@@ -141,6 +141,14 @@ body {
 .trend-fill { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
 .trend-day { font-size: 10px; color: var(--note); white-space: nowrap; }
 
+/* A checkbox and its label on one line, rather than the label stacked above
+   the control the way the text fields are. */
+.check-row {
+  display: flex; align-items: center; gap: 8px;
+  margin: var(--sp-3) 0 var(--sp-2); font-weight: bold; cursor: pointer;
+}
+.check-row input { width: auto; margin: 0; }
+
 /* Line chart (per-item trends) */
 .line-chart-wrap { margin: var(--sp-2) 0 0; }
 .line-chart {

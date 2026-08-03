@@ -38,7 +38,8 @@ const SCHEMA = [
      business TEXT NOT NULL, ts TEXT NOT NULL, order_no TEXT NOT NULL,
      customer TEXT, hold TEXT, items TEXT,
      qty_total INTEGER NOT NULL DEFAULT 0, total REAL NOT NULL DEFAULT 0,
-     employee TEXT, discount TEXT, status TEXT NOT NULL DEFAULT '', idem TEXT)`,
+     employee TEXT, discount TEXT, status TEXT NOT NULL DEFAULT '', idem TEXT,
+     staff_purchase INTEGER NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS idx_sales_business ON sales (business)`,
   // NOTE: the idx_sales_idem index references the `idem` column, which is added
   // by an ALTER migration on pre-existing DBs — so it's created in MIGRATIONS,
@@ -238,6 +239,12 @@ const MIGRATIONS = [
   // in "Unsorted" — the DEFAULT does the backfill, and no row is lost.
   "ALTER TABLE master_item ADD COLUMN category TEXT NOT NULL DEFAULT 'Unsorted'",
   'CREATE INDEX IF NOT EXISTS idx_master_item_category ON master_item (realm_id, category)',
+  // Employee purchases: goods leave, no money changes hands. A separate column
+  // rather than a status, because `status` is what VOIDED lives in and every
+  // stats query filters on it — overloading it would have made an employee
+  // purchase either count as a sale or count as voided, and it is neither.
+  'ALTER TABLE sales ADD COLUMN staff_purchase INTEGER NOT NULL DEFAULT 0',
+  'CREATE INDEX IF NOT EXISTS idx_sales_counted ON sales (realm_id, status, staff_purchase)',
 ];
 
 /**
