@@ -31,6 +31,8 @@ export function renderAdminSettings(container, { me } = {}) {
       open: (host) => mount(host, regionsCard()) },
     { key: 'set-money', label: 'Denomination', hint: 'What the money is called', glyph: '🪙',
       open: (host) => mount(host, denominationCard()) },
+    { key: 'set-trial', label: 'New shops', hint: 'Opening trial length', glyph: '🎁',
+      open: (host) => mount(host, trialCard()) },
     { key: 'set-tiles', label: 'Tile images', hint: 'Home tile artwork', glyph: '🖼️',
       open: (host) => mount(host, tileImagesCard()) },
     { key: 'set-storefront', label: 'Storefronts', hint: 'Public shop pages', glyph: '🏪',
@@ -238,6 +240,53 @@ function regionsCard() {
   ]);
 }
 
+/**
+ * How long a newly founded shop is certified for.
+ *
+ * A founder code should mean the holder can trade at once, so a new shop opens
+ * certified rather than expired. How much grace that is — or none at all — is a
+ * realm's own policy.
+ */
+function trialCard() {
+  const days = el('input', { type: 'number', min: '0', max: '365', step: '1' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save trial length');
+  const sample = el('p', { class: 'note' }, '');
+  function paint() {
+    const n = Math.floor(Number(days.value));
+    sample.textContent = !isFinite(n) || n <= 0
+      ? 'New shops open EXPIRED — an admin must certify each one by hand before it can sell.'
+      : 'A shop founded today would be certified until ' +
+        new Date(Date.now() + n * 86400000).toISOString().slice(0, 10) + '.';
+  }
+  days.addEventListener('input', paint);
+
+  api.getRealmPrefs().then((p) => { days.value = String(p.trialDays != null ? p.trialDays : 7); paint(); }).catch(paint);
+
+  async function doSave() {
+    save.disabled = true; status.className = ''; status.textContent = 'Saving…';
+    try {
+      await api.setRealmPrefs({ trialDays: days.value });
+      status.textContent = '';
+      toast('Trial length saved', 'ok');
+    } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
+    finally { save.disabled = false; }
+  }
+
+  return el('div.card', {}, [
+    el('h3', {}, 'New shops'),
+    el('p', { class: 'note' }, 'Days of certification a shop gets when it is founded with this realm’s founder ' +
+      'code. Set 0 to certify every new shop by hand instead. Existing shops are unaffected.'),
+    el('label', {}, 'Opening trial (days)'),
+    days,
+    sample,
+    el('p', { class: 'note' }, 'The expiry banner warns owners before this runs out — set that lead time in ' +
+      'MOTD → Expiry warning.'),
+    el('div', { class: 'row-actions' }, [save]),
+    status,
+  ]);
+}
+
 /** The denomination every amount in this realm is shown in. */
 function denominationCard() {
   const input = el('input', { type: 'text', placeholder: 'gp' });
@@ -283,6 +332,7 @@ const TILE_KEYS = [
   ['set-branding', 'Settings · Branding'],
   ['set-about', 'Settings · About page'],
   ['set-holds', 'Settings · Regions'], ['set-money', 'Settings · Denomination'],
+  ['set-trial', 'Settings · New shops'],
   ['set-tiles', 'Settings · Tile images'],
   ['set-storefront', 'Settings · Storefronts'], ['set-status', 'Settings · System status'],
   ['set-data', 'Settings · Data'],

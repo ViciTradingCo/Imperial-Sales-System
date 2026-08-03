@@ -89,6 +89,22 @@ export async function analyzeItemImport(env, rows, realmId) {
   return { create, update, typos };
 }
 
+/**
+ * Empties this realm's item index. Other realms keep theirs — the index is per
+ * realm like everything else.
+ *
+ * Inventory rows are NOT touched: a shop's stock is its own record, and an item
+ * missing from the index simply stops being offered by the picker and stops
+ * counting toward market analysis. Returns how many were removed so the caller
+ * can say so.
+ */
+export async function purgeItemIndex(env, realmId) {
+  const db = await getDb(env);
+  const before = await db.prepare('SELECT COUNT(*) AS n FROM master_item WHERE realm_id = ?').bind(realmId).first();
+  await db.prepare('DELETE FROM master_item WHERE realm_id = ?').bind(realmId).run();
+  return { purged: (before && before.n) || 0, items: [] };
+}
+
 export async function deleteItemIndex(env, name, realmId) {
   const db = await getDb(env);
   await db.prepare('DELETE FROM master_item WHERE realm_id = ? AND lower(name) = ?').bind(realmId, String(name || '').trim().toLowerCase()).run();
@@ -102,39 +118,84 @@ export function normalizeItem(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function levenshtein(a, b) {
+/**
+ * Edit distance counting a TRANSPOSITION as one edit (Damerau-Levenshtein).
+ *
+ * That matters here: "Swrod" for "Sword" is the single most common way to
+ * mistype a word, but plain Levenshtein scores it 2 — the same as two unrelated
+ * letters — so a one-edit tolerance would reject the typo it most needs to
+ * catch.
+ */
+function editDistance(a, b) {
   if (a === b) return 0;
   const m = a.length, n = b.length;
   if (!m) return n; if (!n) return m;
+  // Three rolling rows: two back for the transposition case.
+  let prev2 = null;
   let prev = Array.from({ length: n + 1 }, (_, i) => i);
   for (let i = 1; i <= m; i++) {
     const cur = [i];
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        cur[j] = Math.min(cur[j], prev2[j - 2] + 1);
+      }
     }
-    prev = cur;
+    prev2 = prev; prev = cur;
   }
   return prev[n];
 }
 
 /**
- * Resolves a typed item name to its canonical master entry, tolerating typos and
- * spacing/grammar drift. Returns the master {name, baseValue} or null if there's
- * no confident match (i.e. a genuinely new item).
+ * The forms a name could be the singular of. English pluralisation is ambiguous
+ * from the outside — "axes" is axe+s, "boxes" is box+es — so rather than guess,
+ * every plausible form is generated and two names match if their sets overlap.
+ * Grammar tolerance only; deliberately not a stemmer, since over-reaching here
+ * merges genuinely different items.
  */
+function singularForms(s) {
+  const out = new Set([s]);
+  if (/[^s]s$/.test(s)) out.add(s.slice(0, -1));            // potions -> potion
+  if (/(ches|shes|sses|xes|zes)$/.test(s)) out.add(s.slice(0, -2)); // boxes -> box
+  if (/[^aeiou]ies$/.test(s)) out.add(s.slice(0, -3) + 'y'); // berries -> berry
+  return out;
+}
+function sameWordForm(a, b) {
+  const A = singularForms(a);
+  for (const f of singularForms(b)) if (A.has(f)) return true;
+  return false;
+}
+
+/**
+ * Resolves a typed item name to its canonical master entry.
+ *
+ * A match means the two names are the SAME ITEM written differently — case,
+ * punctuation, spacing (handled by normalizeItem), a plural, or a single
+ * mistyped character. Anything beyond that is a DIFFERENT item and returns null,
+ * so an import adds it rather than folding it into something else.
+ *
+ * The tolerance used to scale with length, allowing up to three edits on a long
+ * name. That quietly merged real pairs: "Health Potion" / "Healing Potion" are
+ * three edits apart, as are "Iron Sword" / "Iron Sworp"… and the first pair is
+ * two different potions. One edit is the most that can be a typo rather than a
+ * distinction, and even that is only allowed on names long enough for a single
+ * letter not to change the meaning ("axe" vs "are").
+ */
+const TYPO_MIN_LENGTH = 6;
+
 export function matchMasterItem(name, master) {
   const target = normalizeItem(name);
   if (!target) return null;
   let best = null, bestDist = Infinity;
   for (const it of master) {
     const cand = normalizeItem(it.name);
-    if (cand === target) return it; // exact (normalized) hit
-    const d = levenshtein(target, cand);
+    if (cand === target) return it;              // same after normalizing
+    if (sameWordForm(cand, target)) return it;   // same but for a plural
+    const d = editDistance(target, cand);
     if (d < bestDist) { bestDist = d; best = it; }
   }
   if (!best) return null;
-  const L = target.length;
-  const allowed = L <= 4 ? 1 : L <= 8 ? 2 : 3;
-  return bestDist <= allowed ? best : null;
+  // One typo, and only on a name long enough that one letter isn't the whole word.
+  return (bestDist <= 1 && target.length >= TYPO_MIN_LENGTH) ? best : null;
 }

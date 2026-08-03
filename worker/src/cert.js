@@ -16,9 +16,14 @@ function startOfToday() {
 export async function checkCertification(env, business, realmId) {
   const target = String(business || '').trim().toLowerCase();
   if (!target) return { status: 'EXPIRED', until: '' };
-  const cached = await cacheGet(env, 'cert:' + target);
+  // The realm belongs in the KEY. Without it two realms holding a shop of the
+  // same name shared one cached answer, so one realm's expiry decided whether
+  // the other could sell — for up to 30 seconds, intermittently, which is the
+  // worst kind of bug to chase.
+  const key = 'cert:' + String(realmId || 'default') + ':' + target;
+  const cached = await cacheGet(env, key);
   if (cached) return cached;
-  const put = async (r) => { await cacheSet(env, 'cert:' + target, r, 30000); return r; };
+  const put = async (r) => { await cacheSet(env, key, r, 30000); return r; };
 
   let row;
   try {

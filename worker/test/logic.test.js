@@ -38,6 +38,32 @@ describe('matchMasterItem', () => {
     expect(matchMasterItem('', master)).toBeNull();
   });
 
+  /**
+   * The important half. An import must ADD a name that isn't very close to
+   * something already there — the tolerance used to scale with length and
+   * allowed three edits, which quietly folded real pairs together.
+   */
+  it('treats a genuinely different item as new, however similar it looks', () => {
+    expect(matchMasterItem('Healing Potion', master)).toBeNull();   // vs Health Potion
+    expect(matchMasterItem('Steel Sword', master)).toBeNull();      // vs Iron Sword / Steel Dagger
+    expect(matchMasterItem('Iron Dagger', master)).toBeNull();      // vs Iron Sword
+    expect(matchMasterItem('Iron Shield', master)).toBeNull();
+    expect(matchMasterItem('Health Poison', master)).toBeNull();
+  });
+
+  it('accepts a plural as the same item', () => {
+    expect(matchMasterItem('Iron Swords', master).name).toBe('Iron Sword');
+    expect(matchMasterItem('Health Potions', master).name).toBe('Health Potion');
+    const m = [{ name: 'Berry', baseValue: 1 }, { name: 'Box', baseValue: 2 }];
+    expect(matchMasterItem('Berries', m).name).toBe('Berry');
+    expect(matchMasterItem('Boxes', m).name).toBe('Box');
+  });
+
+  it('accepts a transposed pair of letters — the commonest typo', () => {
+    expect(matchMasterItem('Iron Swrod', master).name).toBe('Iron Sword');
+    expect(matchMasterItem('Steel Dagegr', master).name).toBe('Steel Dagger');
+  });
+
   it('holds short names to a tight tolerance', () => {
     const m = [{ name: 'Axe', baseValue: 10 }];
     expect(matchMasterItem('Axes', m).name).toBe('Axe'); // 1 edit, allowed

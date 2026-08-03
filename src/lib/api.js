@@ -202,6 +202,8 @@ export const api = {
   /** Admin: add/edit a master item (rename via oldName). */
   saveMasterItem: (item) => request('POST', '/admin/items', item),
   /** Admin: delete a master item. */
+  /** Admin: empty this realm's item index (requires confirm: 'PURGE'). */
+  purgeItems: () => request('POST', '/admin/items/purge', { confirm: 'PURGE' }),
   deleteMasterItem: (name) => request('POST', '/admin/items/delete', { name }),
   /** Admin: bulk import master items [{name, baseValue}] (recognized names update, not duplicate). */
   importMasterItems: (rows) => request('POST', '/admin/items/import', { rows }),

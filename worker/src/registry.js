@@ -10,21 +10,24 @@
  */
 import { getDb, renameBusinessData, moveBusinessData, countBusinessTransfers, DEFAULT_REALM_ID } from './db.js';
 import { generateCode } from './realm.js';
+import { readRealmPrefs } from './realm-prefs.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
 import { appendUser, findUserByEmail, bustUserCache } from './users.js';
 
 /**
- * How long a newly founded shop is certified for, in days. A new owner should be
- * able to trade the moment they register rather than waiting on an admin, so the
- * shop opens with a trial and the expiry banner nudges them before it lapses.
+ * The date a new shop's trial runs until, as YYYY-MM-DD — or '' when the realm
+ * has set a zero-day trial, which means an admin certifies by hand.
+ *
+ * The length is a realm setting (Network Settings → New shops), because how much
+ * grace a new trader gets is a policy each server decides for itself.
  */
-export const NEW_SHOP_TRIAL_DAYS = 7;
-
-/** The date a trial starting today would run until, as YYYY-MM-DD. */
-function trialUntil() {
+async function trialUntil(env, realmId) {
+  const { trialDays } = await readRealmPrefs(env, realmId);
+  const days = Math.max(0, Math.floor(Number(trialDays) || 0));
+  if (!days) return '';
   const d = new Date();
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + NEW_SHOP_TRIAL_DAYS);
+  d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
@@ -200,7 +203,7 @@ export async function registerUser(env, { email, name, character, businessName, 
     // employees the moment the shop exists. The shop also opens certified for a
     // short trial, so a new owner can trade immediately.
     await db.prepare('INSERT INTO companies (id, business, point_of_contact, until, perpetual, status, hold, court, priority, realm_id, join_code) VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0, ?, ?)')
-      .bind(businessId, biz, char, trialUntil(), '', String(hold || '').trim(), realm, generateCode('SHOP')).run();
+      .bind(businessId, biz, char, await trialUntil(env, realm), '', String(hold || '').trim(), realm, generateCode('SHOP')).run();
     bustRegistryCache();
     return appendUser(env, { uid: genUid('usr'), email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active', realmId: realm });
   }

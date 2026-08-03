@@ -13,7 +13,7 @@ import { collectExport, restoreImport, previewImport, gzipJson } from '../export
 import { marketAnalysis } from '../market.js';
 import { systemStatus } from '../status.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
-import { upsertItem as upsertMasterItem, deleteItemIndex, importItemIndex, analyzeItemImport } from '../item-index.js';
+import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport } from '../item-index.js';
 import { writeRegions } from '../regions.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, readRealmBranding, writeBranding } from '../branding.js';
@@ -233,6 +233,16 @@ async function deleteMasterItemRoute({ request, env, body }) {
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.delete', detail: body.name, realmId: realmIdOf(caller, env) });
   return { items };
 }
+/** Empties this realm's item index. Typed confirm — there is no undo. */
+async function purgeMasterItems({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  if (String(body.confirm || '') !== 'PURGE') throw new Error('Type PURGE to confirm emptying the item index.');
+  const res = await purgeItemIndex(env, realmIdOf(caller, env));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.purge',
+    detail: res.purged + ' items', realmId: realmIdOf(caller, env) });
+  return res;
+}
+
 async function importMasterItems({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   const res = await importItemIndex(env, body.rows, realmIdOf(caller, env));
@@ -478,6 +488,7 @@ export const routes = [
   { method: 'GET', path: '/admin/audit', handler: audit },
   { method: 'POST', path: '/admin/items', handler: upsertItemRoute },
   { method: 'POST', path: '/admin/items/delete', handler: deleteMasterItemRoute },
+  { method: 'POST', path: '/admin/items/purge', handler: purgeMasterItems },
   { method: 'POST', path: '/admin/items/import', handler: importMasterItems },
   { method: 'POST', path: '/admin/items/import/analyze', handler: analyzeItems },
   { method: 'POST', path: '/admin/regions', handler: setHolds },

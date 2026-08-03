@@ -25,6 +25,14 @@ export const PREFS_DEFAULTS = {
   showRegion: true,
   /** What a "region" is called in this realm's fiction (Hold, Province, Sector…). */
   regionLabel: 'Region',
+  /**
+   * Days of certification a newly founded shop opens with.
+   *
+   * A founder code should mean you can trade immediately, so a new shop starts
+   * certified rather than EXPIRED. How long that grace lasts is a realm's own
+   * call: 0 means no trial at all (an admin must certify by hand).
+   */
+  trialDays: 7,
 };
 
 function key(realmId) {
@@ -53,6 +61,11 @@ export async function writeRealmPrefs(env, input, realmId) {
     next.regionLabel = r || PREFS_DEFAULTS.regionLabel;
   }
   if (input.showRegion !== undefined) next.showRegion = !!input.showRegion;
+  if (input.trialDays !== undefined) {
+    const d = Math.floor(Number(input.trialDays));
+    if (!isFinite(d) || d < 0 || d > 365) throw new Error('New-shop trial must be between 0 and 365 days.');
+    next.trialDays = d;
+  }
   await setFlag(env, key(realmId), JSON.stringify(next));
   return next;
 }

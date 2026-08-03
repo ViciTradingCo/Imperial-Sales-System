@@ -4,6 +4,7 @@
  * items; search filters the list. Backed by the Core's index_Items_Master tab.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { toast } from '../lib/toast.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { setAdminActions } from '../lib/sections.js';
@@ -25,10 +26,34 @@ export function renderItemIndex(container) {
       'and Market Analysis measure against these.'),
     el('div', { class: 'row-actions' }, [
       el('button.primary', { onclick: () => openImportExportModal(load) }, 'Import/Export'),
+      el('button.danger', { onclick: doPurge }, 'Purge index'),
     ]),
     search,
     listHost,
   ]));
+
+  /**
+   * Empties this realm's index. Deliberately a typed confirm rather than a
+   * dialog: it removes every item at once and there is no undo, and the count
+   * in the prompt is the last chance to notice you're in the wrong realm.
+   *
+   * Shop inventories are untouched — a shop's stock is its own record. Items
+   * missing from the index just stop being offered by the picker and stop
+   * counting toward Market Analysis.
+   */
+  async function doPurge() {
+    if (!all.length) { toast('The index is already empty.', ''); return; }
+    if (!window.confirm('PURGE THE ITEM INDEX?\n\nThis removes all ' + all.length + ' item(s) from this ' +
+      'realm\'s index. Shop inventories and sales history are NOT affected — but the register will stop ' +
+      'offering these items until the index is rebuilt.\n\nExport a copy first if you might want them back.')) return;
+    const typed = window.prompt('Type PURGE (all caps) to confirm:');
+    if (typed !== 'PURGE') { toast('Purge cancelled.', ''); return; }
+    try {
+      const r = await api.purgeItems();
+      toast('Removed ' + r.purged + ' item(s) from the index.', 'ok');
+      load();
+    } catch (e) { toast(e.message || String(e), 'error'); }
+  }
 
   function load() {
     api.getItems().then((r) => { all = r.items || []; draw(); })
