@@ -100,6 +100,15 @@ export const api = {
   purgeLogs: (amount, unit) => request('POST', '/admin/logs/purge', { amount, unit }),
   /** Admin: D1 status snapshot. */
   getStatus: () => request('GET', '/admin/status'),
+  /* ---- feedback on the app ---- */
+  /** Any registered user: the subject list + their own past submissions. */
+  getFeedback: () => request('GET', '/feedback'),
+  /** Any registered user: file feedback. Identity is stamped in by the server. */
+  sendFeedback: (subject, body) => request('POST', '/feedback', { subject, body }),
+  /** System Admin: every submission, split into active and archive. */
+  getAllFeedback: () => request('GET', '/admin/feedback'),
+  /** System Admin: mark complete (Active → Archive), or reopen with false. */
+  completeFeedback: (id, complete) => request('POST', '/admin/feedback/complete', { id, complete }),
   /**
    * Admin: dismiss recent errors. A System Admin clears the buffer; a Realm
    * Admin clears only the entries stamped with their own realm.

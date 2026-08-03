@@ -15,6 +15,7 @@ import { systemStatus, clearErrors } from '../status.js';
 import { cofferSummary } from '../coffers.js';
 import { listDiscounts } from '../discounts.js';
 import { getShopStyle } from '../shop-style.js';
+import { listAllFeedback, setFeedbackComplete } from '../feedback.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport,
   listItemIndex, moveItems, addItemType, updateItemType, deleteItemType } from '../item-index.js';
@@ -311,6 +312,27 @@ async function moveItemsRoute({ request, env, body }) {
   return res;
 }
 
+/* ---- Feedback on the app (System Admin only) ---- */
+/**
+ * Feedback is about the SOFTWARE, so it goes to whoever runs the deployment
+ * rather than to each realm's own admin — hence requireSystemAdmin, and hence
+ * the list not being realm-filtered. Rows carry their realm so the page can say
+ * where each came from.
+ */
+async function listFeedbackRoute({ request, env }) {
+  await requireSystemAdmin(request, env);
+  return await listAllFeedback(env);
+}
+/** Marks feedback complete (Active → Archive), or reopens it. */
+async function completeFeedbackRoute({ request, env, body }) {
+  const caller = await requireSystemAdmin(request, env);
+  const res = await setFeedbackComplete(env, body.id, body.complete, actorName(caller));
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: body.complete === false ? 'feedback.reopen' : 'feedback.complete',
+    detail: String(body.id || ''), realmId: realmIdOf(caller, env) });
+  return res;
+}
+
 /* ---- Item types: the tables the index is divided into (per realm) ---- */
 async function addItemTypeRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
@@ -584,6 +606,8 @@ export const routes = [
   { method: 'POST', path: '/admin/logs/clear', handler: clearLogsRoute },
   { method: 'POST', path: '/admin/logs/purge', handler: purgeLogsRoute },
   { method: 'GET', path: '/admin/status', handler: status },
+  { method: 'GET', path: '/admin/feedback', handler: listFeedbackRoute },
+  { method: 'POST', path: '/admin/feedback/complete', handler: completeFeedbackRoute },
   { method: 'POST', path: '/admin/status/errors/clear', handler: clearErrorsRoute },
   { method: 'POST', path: '/admin/data/wipe', handler: wipeData },
   { method: 'GET', path: '/admin/motd', handler: motdConfig },

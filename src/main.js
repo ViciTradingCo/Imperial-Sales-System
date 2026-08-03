@@ -12,6 +12,8 @@ import { applyPrefs } from './lib/theme.js';
 import { applyLang } from './lib/i18n.js';
 import { loadBranding, applyBranding } from './lib/branding.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
+import { renderFeedback } from './views/feedback.js';
+import { renderFeedbackAdmin } from './views/feedback-admin.js';
 import { initActions, clearActions } from './lib/actions.js';
 import { setCurrency, setRegion } from './lib/format.js';
 import { setSessionUser } from './lib/sections.js';
@@ -191,6 +193,18 @@ route('/patch-notes', (container) => {
     host,
   ]));
   renderPatchNotes(host);
+});
+
+route('/feedback', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  renderFeedback(container, { me: state.me });
+});
+
+route('/admin/feedback', (container) => {
+  // Guarded again server-side; this only keeps the page out of the way of
+  // someone who typed the URL.
+  if (!state.me || !state.me.systemAdmin) { navigate('/'); return; }
+  renderFeedbackAdmin(container, { me: state.me });
 });
 
 route('/profile', (container) => {

@@ -156,6 +156,22 @@ const SCHEMA = [
      id TEXT PRIMARY KEY,
      realm_id TEXT NOT NULL DEFAULT '${R}',
      business TEXT, message TEXT, start_at TEXT, end_at TEXT)`,
+  // Feedback on the app itself, submitted by owners and employees.
+  //
+  // The submitter's identity is COPIED IN at submit time (who, which shop,
+  // what role/status, which realm) rather than joined on read: feedback is a
+  // record of what someone said and who they were WHEN they said it, and a
+  // report that reads "an employee of a shop that no longer exists" is more
+  // useful than one whose author silently changed job.
+  //
+  // `completed` is the Active/Archive split.
+  `CREATE TABLE IF NOT EXISTS feedback (
+     id TEXT PRIMARY KEY,
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     ts TEXT NOT NULL, uid TEXT, email TEXT, char_name TEXT, business TEXT,
+     role TEXT, status TEXT, subject TEXT NOT NULL, body TEXT NOT NULL,
+     completed INTEGER NOT NULL DEFAULT 0, completed_at TEXT, completed_by TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_feedback_open ON feedback (completed, ts DESC)`,
   // ---- Realms (multi-tenancy) ----
   // One deployment can host several independent RP servers. Every data table
   // carries a realm_id and queries filter on it, so nothing is ever shared or
@@ -171,7 +187,7 @@ const SCHEMA = [
 export const REALM_TABLES = [
   'inventory', 'sales', 'intake', 'transfers', 'coffer_entries', 'discounts',
   'shop_style', 'audit', 'master_item', 'item_type', 'hold_index', 'users', 'companies',
-  'master_settings', 'business_settings', 'motd_list',
+  'master_settings', 'business_settings', 'motd_list', 'feedback',
 ];
 
 /**

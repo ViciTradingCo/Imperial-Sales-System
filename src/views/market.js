@@ -58,9 +58,19 @@ const REGION_COLS = {
  */
 const ITEM_COLS = {
   headers: () => ['Item', 'Qty sold', 'Orders', 'Avg bought', 'Avg sold', 'Avg value'],
-  row: (i) => [i.item, i.qty, i.orders, avg(i.avgBought), avg(i.avgSold), avg(i.avgValue)],
+  row: (i) => [i.item, i.qty, i.orders, avg(i.avgBought), avg(i.avgSold), valueCell(i)],
 };
 function avg(v) { return v == null ? '—' : money(v); }
+/**
+ * The valuation, carrying how much trade it rests on. A figure from two units
+ * and one from two hundred read identically in a table, and they should not.
+ */
+function valueCell(i) {
+  if (i.avgValue == null) return el('span', {}, '—');
+  const n = i.valueSamples || 0;
+  return el('span', { title: 'From ' + n + ' unit' + (n === 1 ? '' : 's') + ' sold' },
+    money(i.avgValue) + (n < 4 ? ' ?' : ''));
+}
 
 /**
  * Overview: the top 5 of each category, plus the pricing alerts.
@@ -131,9 +141,10 @@ function itemPerformance(items) {
   draw();
   return el('div.card', {}, [
     el('h3', {}, 'Item Performance'),
-    el('p', { class: 'note' }, 'Average bought is what shops paid on intake, average sold is what customers ' +
-      'paid, and average value is both together weighted by quantity — what the realm actually trades this ' +
-      'item at, as opposed to its base value in the index.'),
+    el('p', { class: 'note' }, 'Average bought is what shops paid on intake; average sold is the mean price ' +
+      'customers paid. Average value is a valuation from the sales themselves — the middle price by units ' +
+      'sold, with outliers fenced off — so one collector overpaying does not become the item’s worth. ' +
+      'Hover a value to see how many units it rests on.'),
     search,
     tableHost,
   ]);

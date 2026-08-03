@@ -75,23 +75,59 @@ describe('average bought', () => {
   });
 });
 
+/**
+ * The valuation is a SALES analysis: the weighted median of what the item
+ * actually sold at, with outliers fenced off. Not the mean, and not blended
+ * with what shops paid suppliers.
+ */
 describe('average value', () => {
-  it('is both sides together, weighted by quantity', async () => {
-    await intake(3, 10);                                    // 30 over 3
-    await sale([{ name: 'Iron Sword', qty: 1, price: 50 }]); // 50 over 1
-    expect((await itemRow()).avgValue).toBe(80 / 4);
+  it('is the weighted median, so one dear sale does not become the value', async () => {
+    await sale([{ name: 'Iron Sword', qty: 10, price: 10 }]);
+    await sale([{ name: 'Iron Sword', qty: 1, price: 100 }]);
+    const i = await itemRow();
+    expect(i.avgValue).toBe(10);              // where the units actually went
+    expect(i.avgSold).toBeCloseTo(200 / 11);  // the mean is dragged upward
   });
 
-  it('falls back to whichever side has data', async () => {
+  it('fences off an outlier once there is a spread to measure', async () => {
+    await sale([{ name: 'Iron Sword', qty: 5, price: 30 }]);
+    await sale([{ name: 'Iron Sword', qty: 5, price: 31 }]);
+    await sale([{ name: 'Iron Sword', qty: 5, price: 32 }]);
+    await sale([{ name: 'Iron Sword', qty: 1, price: 5000 }]); // a collector
+    const i = await itemRow();
+    expect(i.avgValue).toBe(31);
+    expect(i.avgSold).toBeGreaterThan(300);   // the mean is useless here
+  });
+
+  it('holds the line on too few prices to fence, where the median alone must do', async () => {
+    await sale([{ name: 'Iron Sword', qty: 1, price: 30 }]);
+    await sale([{ name: 'Iron Sword', qty: 1, price: 40 }]);
+    await sale([{ name: 'Iron Sword', qty: 1, price: 5000 }]);
+    expect((await itemRow()).avgValue).toBe(40);
+  });
+
+  it('ignores intake — what a shop paid a supplier is cost, not value', async () => {
+    await intake(100, 999);
     await sale([{ name: 'Iron Sword', qty: 2, price: 40 }]);
     const i = await itemRow();
     expect(i.avgValue).toBe(40);
-    expect(i.avgValue).toBe(i.avgSold);
+    expect(i.avgBought).toBe(999);
   });
 
-  it('is null for an indexed item with no trade at all', async () => {
-    const items = (await marketAnalysis(env, R)).items;
-    expect(items).toEqual([]);  // an item is only listed once it has moved
+  it('is null when the item has only ever been bought in, never sold', async () => {
+    await intake(5, 20);
+    const i = await itemRow();
+    expect(i.avgValue).toBeNull();
+    expect(i.valueSamples).toBe(0);
+  });
+
+  it('reports how many units the valuation rests on', async () => {
+    await sale([{ name: 'Iron Sword', qty: 7, price: 40 }]);
+    expect((await itemRow()).valueSamples).toBe(7);
+  });
+
+  it('lists nothing for an indexed item with no trade at all', async () => {
+    expect((await marketAnalysis(env, R)).items).toEqual([]);
   });
 });
 

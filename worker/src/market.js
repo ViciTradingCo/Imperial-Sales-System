@@ -20,21 +20,82 @@ function settingVal(settings, label, dflt) {
 }
 
 /**
+ * The quantity-weighted value at a quantile of a price distribution.
+ *
+ * Weighted, because a sale of twenty is twenty pieces of evidence about the
+ * price and a sale of one is one. `prices` must be sorted ascending.
+ */
+function weightedQuantile(prices, q) {
+  const total = prices.reduce((n, p) => n + p.qty, 0);
+  if (!total) return null;
+  const target = total * q;
+  let seen = 0;
+  for (const p of prices) {
+    seen += p.qty;
+    if (seen >= target) return p.price;
+  }
+  return prices[prices.length - 1].price;
+}
+
+/**
+ * What the market actually values an item at, from its SALES.
+ *
+ * The mean sale price is not that number. One collector paying 5,000 for a
+ * sword that normally moves at 30 drags the mean far above any price the item
+ * has ever repeatedly fetched, and a single mispriced sale at 1 drags it under.
+ * A realm's trade is exactly where those happen.
+ *
+ * So this does what a valuation normally does with observed transactions:
+ *
+ *   1. Build the distribution of prices the item SOLD at, each weighted by how
+ *      many units went at that price.
+ *   2. Fence off outliers with the interquartile rule (Q1 − 1.5·IQR to
+ *      Q3 + 1.5·IQR), the standard test for "this is not from the same
+ *      population as the rest".
+ *   3. Take the weighted MEDIAN of what survives — the price the middle unit
+ *      sold at, which is what "worth about this much" means.
+ *
+ * Fencing needs a spread to measure, so it is skipped below four distinct
+ * prices: with two or three sales an "outlier" is just as likely to be the real
+ * price, and throwing it away would be inventing confidence.
+ *
+ * Intake is deliberately NOT part of this. What a shop paid a supplier is its
+ * cost, not the item's value — mixing the two produces a number that is neither.
+ * It stays available on its own as avgBought.
+ */
+function salesValue(lines) {
+  if (!lines.length) return null;
+  const byPrice = new Map();
+  lines.forEach((l) => byPrice.set(l.price, (byPrice.get(l.price) || 0) + l.qty));
+  let prices = [...byPrice.entries()].map(([price, qty]) => ({ price, qty }))
+    .sort((a, b) => a.price - b.price);
+
+  if (prices.length >= 4) {
+    const q1 = weightedQuantile(prices, 0.25);
+    const q3 = weightedQuantile(prices, 0.75);
+    const iqr = q3 - q1;
+    const lo = q1 - 1.5 * iqr;
+    const hi = q3 + 1.5 * iqr;
+    const kept = prices.filter((p) => p.price >= lo && p.price <= hi);
+    if (kept.length) prices = kept;
+  }
+  return weightedQuantile(prices, 0.5);
+}
+
+/**
  * Aggregates per-item activity, but ONLY for items in the master index
  * (new/off-index items are kept out of the market so the data stays clean).
  * Names are canonicalized to their master spelling.
  *
- * Both SIDES of the trade are aggregated: what shops sold the item for, and
- * what they paid for it on intake. That gives three prices the register's base
- * value can't:
+ * Both SIDES of the trade are reported, plus a valuation:
  *
- *   • avgSold   — quantity-weighted mean of what it actually went for.
- *   • avgBought — the same for intake, i.e. what it costs to stock.
- *   • avgValue  — both sides together, quantity-weighted. The item's observed
- *                 worth across the realm: not what an admin typed into the
- *                 index, but what the market has actually been paying. With
- *                 only one side recorded it IS that side's average, which is
- *                 the honest answer rather than a half-figure.
+ *   • avgSold   — quantity-weighted MEAN of what it went for. "On average we
+ *                 charged this", takings divided by units.
+ *   • avgBought — the same for intake: what it costs to stock.
+ *   • avgValue  — what the item is WORTH, from a sales analysis (see
+ *                 salesValue). Robust to the one absurd sale that a mean is not.
+ *   • valueSamples — units of sales behind avgValue, so a valuation resting on
+ *                 two units can be read as the guess it is.
  *
  * `revenue` stays on the row: it is the ranking key here, and the shop and
  * region reports display it.
@@ -45,7 +106,7 @@ function itemStats(saleRows, master, intakeRows) {
   const map = {};
   const canon = (name) => exact.get(normalizeItem(name)) || matchMasterItem(name, master);
   const row = (key) => map[key] || (map[key] = {
-    item: key, qty: 0, revenue: 0, orders: 0, boughtQty: 0, boughtValue: 0,
+    item: key, qty: 0, revenue: 0, orders: 0, boughtQty: 0, boughtValue: 0, lines: [],
   });
 
   (saleRows || []).forEach((r) => {
@@ -56,6 +117,7 @@ function itemStats(saleRows, master, intakeRows) {
       m.qty += l.qty;
       m.revenue += l.qty * l.price;
       m.orders += 1;
+      m.lines.push({ price: l.price, qty: l.qty });
     });
   });
 
@@ -71,12 +133,13 @@ function itemStats(saleRows, master, intakeRows) {
   });
 
   return Object.values(map).map((m) => {
-    const totalQty = m.qty + m.boughtQty;
+    const { lines, ...rest } = m; // the raw lines are working data, not payload
     return {
-      ...m,
+      ...rest,
       avgSold: m.qty > 0 ? m.revenue / m.qty : null,
       avgBought: m.boughtQty > 0 ? m.boughtValue / m.boughtQty : null,
-      avgValue: totalQty > 0 ? (m.revenue + m.boughtValue) / totalQty : null,
+      avgValue: salesValue(lines),
+      valueSamples: m.qty,
     };
   }).sort((a, b) => b.revenue - a.revenue);
 }

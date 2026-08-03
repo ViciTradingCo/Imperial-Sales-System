@@ -23,11 +23,17 @@ export function navItems(me) {
     // Realm Management also holds Network Settings, so it is always reachable —
     // not gated on realm count the way the realm-specific controls inside it are.
     items.push({ path: '/admin/realms', label: 'Realm Management' });
+    // Feedback is about the SOFTWARE, so only the person who runs the
+    // deployment gets the review screen; a Realm Admin cannot act on it.
+    if (me.systemAdmin) items.push({ path: '/admin/feedback', label: 'Feedback' });
   }
   // Court businesses get a report for their own hold.
   // A realm with regions switched off has nothing for this report to show.
   if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/region-report', label: regionLabel() + ' Report' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });
+  // The people who use the app every day are the ones with something to say
+  // about it; an admin has the review screen instead.
+  if (me.role === 'owner' || me.role === 'employee') items.push({ path: '/feedback', label: 'Feedback' });
   items.push({ path: '/profile', label: 'Profile' });
   items.push({ path: '/patch-notes', label: 'Patch Notes' });
   items.push({ path: '/about', label: 'About' });

@@ -27,6 +27,7 @@ import { holdReport, businessReport } from '../market.js';
 import { businessCsv } from '../export.js';
 import { publicStorefront } from '../storefront.js';
 import { readBranding } from '../branding.js';
+import { FEEDBACK_SUBJECTS, submitFeedback, listOwnFeedback } from '../feedback.js';
 
 /* ---- employees ---- */
 async function listEmployees({ request, env, url }) {
@@ -105,6 +106,31 @@ async function addShopNotice({ request, env, body }) {
 async function deleteShopNotice({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
   return { notices: await deleteMotdForBusiness(env, caller.business, body.id, realmIdOf(caller, env)) };
+}
+
+/* ---- feedback on the app ---- */
+/**
+ * The Feedback page's own data: the subject list (served rather than duplicated
+ * in the client, so the dropdown and the validation can't disagree) plus this
+ * user's past submissions, marked read or not.
+ */
+async function getFeedback({ request, env }) {
+  const caller = await requireRegistered(request, env);
+  return {
+    subjects: FEEDBACK_SUBJECTS,
+    mine: await listOwnFeedback(env, caller.uid, realmIdOf(caller, env)),
+  };
+}
+/**
+ * Files feedback. Only the subject and body come from the form — who submitted
+ * it, from which shop, in what role and realm, and when, are all taken from the
+ * authenticated caller here.
+ */
+async function postFeedback({ request, env, body }) {
+  const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
+  await submitFeedback(env, caller, body, realmId);
+  return { ok: true, mine: await listOwnFeedback(env, caller.uid, realmId) };
 }
 
 /* ---- per-shop settings + rename ---- */
@@ -443,6 +469,8 @@ export const routes = [
   { method: 'GET', path: '/tiles', handler: getTiles },
   { method: 'GET', path: '/market/region', handler: holdReportRoute },
   { method: 'GET', path: '/motd', handler: getMotd },
+  { method: 'GET', path: '/feedback', handler: getFeedback },
+  { method: 'POST', path: '/feedback', handler: postFeedback },
   { method: 'GET', path: '/public/storefront', handler: storefront },
   { method: 'GET', path: '/branding', handler: branding },
 ];
