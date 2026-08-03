@@ -15,7 +15,9 @@
  */
 import { getDb, getFlag, setFlag, DEFAULT_REALM_ID } from './db.js';
 
-const DEFAULT_WARN_DAYS = 7;
+// How many days before expiry the certification banner starts warning.
+// Admins can change it per realm (MOTD → Expiry warning).
+const DEFAULT_WARN_DAYS = 3;
 
 /** sys_flags key for a per-realm value. */
 function rk(base, realmId) {

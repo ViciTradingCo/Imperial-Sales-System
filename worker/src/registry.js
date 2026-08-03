@@ -13,6 +13,21 @@ import { generateCode } from './realm.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
 import { appendUser, findUserByEmail, bustUserCache } from './users.js';
 
+/**
+ * How long a newly founded shop is certified for, in days. A new owner should be
+ * able to trade the moment they register rather than waiting on an admin, so the
+ * shop opens with a trial and the expiry banner nudges them before it lapses.
+ */
+export const NEW_SHOP_TRIAL_DAYS = 7;
+
+/** The date a trial starting today would run until, as YYYY-MM-DD. */
+function trialUntil() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + NEW_SHOP_TRIAL_DAYS);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Short, collision-resistant application id. */
 export function genUid(prefix) {
   return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
@@ -182,9 +197,10 @@ export async function registerUser(env, { email, name, character, businessName, 
     }
     const businessId = genUid('biz');
     // Mint the shop's staff code now: the owner needs something to hand their
-    // employees the moment the shop exists.
+    // employees the moment the shop exists. The shop also opens certified for a
+    // short trial, so a new owner can trade immediately.
     await db.prepare('INSERT INTO companies (id, business, point_of_contact, until, perpetual, status, hold, court, priority, realm_id, join_code) VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0, ?, ?)')
-      .bind(businessId, biz, char, '', '', String(hold || '').trim(), realm, generateCode('SHOP')).run();
+      .bind(businessId, biz, char, trialUntil(), '', String(hold || '').trim(), realm, generateCode('SHOP')).run();
     bustRegistryCache();
     return appendUser(env, { uid: genUid('usr'), email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active', realmId: realm });
   }

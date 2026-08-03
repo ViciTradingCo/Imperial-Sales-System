@@ -185,7 +185,10 @@ function globalCard(cfg) {
 }
 
 function warnCard(cfg) {
-  const days = el('input', { type: 'number', min: '0', step: '1', value: String((cfg && cfg.warnDays != null) ? cfg.warnDays : 7) });
+  // No local default: the server owns it, and hardcoding one here would show a
+  // number that disagrees with what the banner actually uses.
+  const days = el('input', { type: 'number', min: '0', step: '1',
+    value: (cfg && cfg.warnDays != null) ? String(cfg.warnDays) : '' });
   const status = el('p', {});
   const save = el('button.primary', { onclick: doSave }, 'Save' );
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
