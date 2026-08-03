@@ -21,26 +21,65 @@ function settingVal(settings, label, dflt) {
 }
 
 /**
- * Aggregates per-item sales from the stored summaries, but ONLY for items in the
- * master index (new/off-index items are kept out of the market so the data stays
- * clean). Names are canonicalized to their master spelling.
+ * Aggregates per-item activity, but ONLY for items in the master index
+ * (new/off-index items are kept out of the market so the data stays clean).
+ * Names are canonicalized to their master spelling.
+ *
+ * Both SIDES of the trade are aggregated: what shops sold the item for, and
+ * what they paid for it on intake. That gives three prices the register's base
+ * value can't:
+ *
+ *   • avgSold   — quantity-weighted mean of what it actually went for.
+ *   • avgBought — the same for intake, i.e. what it costs to stock.
+ *   • avgValue  — both sides together, quantity-weighted. The item's observed
+ *                 worth across the realm: not what an admin typed into the
+ *                 index, but what the market has actually been paying. With
+ *                 only one side recorded it IS that side's average, which is
+ *                 the honest answer rather than a half-figure.
+ *
+ * `revenue` stays on the row: it is the ranking key here, and the shop and
+ * region reports display it.
  */
-function itemStats(saleRows, master) {
+function itemStats(saleRows, master, intakeRows) {
   const exact = new Map();
   master.forEach((it) => exact.set(normalizeItem(it.name), it));
   const map = {};
+  const canon = (name) => exact.get(normalizeItem(name)) || matchMasterItem(name, master);
+  const row = (key) => map[key] || (map[key] = {
+    item: key, qty: 0, revenue: 0, orders: 0, boughtQty: 0, boughtValue: 0,
+  });
+
   (saleRows || []).forEach((r) => {
     parseSaleItems(r.items).lines.forEach((l) => {
-      const hit = exact.get(normalizeItem(l.name)) || matchMasterItem(l.name, master);
+      const hit = canon(l.name);
       if (!hit) return; // not in the master index → excluded from market
-      const key = hit.name;
-      const m = map[key] || (map[key] = { item: key, qty: 0, revenue: 0, orders: 0 });
+      const m = row(hit.name);
       m.qty += l.qty;
       m.revenue += l.qty * l.price;
       m.orders += 1;
     });
   });
-  return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+
+  (intakeRows || []).forEach((r) => {
+    const hit = canon(r.item);
+    if (!hit) return;
+    const qty = Number(r.num_items) || 0;
+    const per = Number(r.price_per) || 0;
+    if (qty <= 0) return;
+    const m = row(hit.name);
+    m.boughtQty += qty;
+    m.boughtValue += qty * per;
+  });
+
+  return Object.values(map).map((m) => {
+    const totalQty = m.qty + m.boughtQty;
+    return {
+      ...m,
+      avgSold: m.qty > 0 ? m.revenue / m.qty : null,
+      avgBought: m.boughtQty > 0 ? m.boughtValue / m.boughtQty : null,
+      avgValue: totalQty > 0 ? (m.revenue + m.boughtValue) / totalQty : null,
+    };
+  }).sort((a, b) => b.revenue - a.revenue);
 }
 
 export async function marketAnalysis(env, realmId) {
@@ -93,7 +132,10 @@ export async function marketAnalysis(env, realmId) {
   const master = await listItemIndex(env, realmId);
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).all()).results) || [];
-  const items = itemStats(saleRows, master);
+  // Intake is the buy side of the same items — what a shop paid to stock them.
+  const intakeRows = ((await db.prepare(
+    `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
+  const items = itemStats(saleRows, master, intakeRows);
 
   // Pricing anomalies vs the master base values, using the network thresholds.
   const settings = await readSettings(env, realmId);
@@ -150,12 +192,14 @@ export async function businessReport(env, business, realmId) {
 
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND business = ?`).bind(realmId, b).all()).results) || [];
+  const intakeRows = ((await db.prepare(
+    `SELECT item, num_items, price_per FROM intake WHERE realm_id = ? AND business = ?`).bind(realmId, b).all()).results) || [];
 
   return {
     business: b,
     overview: overview || empty.overview,
     trends,
-    items: itemStats(saleRows, await listItemIndex(env, realmId)).slice(0, 20),
+    items: itemStats(saleRows, await listItemIndex(env, realmId), intakeRows).slice(0, 20),
   };
 }
 
@@ -182,5 +226,7 @@ export async function holdReport(env, hold, realmId) {
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND hold = ?`).bind(realmId, h).all()).results) || [];
 
+  // No intake side here: a region's report covers sales MADE in that region, and
+  // intake records where goods came FROM, which is a different question.
   return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: itemStats(saleRows, await listItemIndex(env, realmId)) };
 }

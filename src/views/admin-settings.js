@@ -538,7 +538,7 @@ function backupCard(me) {
   return el('div.card', {}, [
     el('h3', {}, 'Data backup'),
     el('p', { class: 'note' }, 'Download a compressed backup, or restore from one after a failure. Do this ' +
-      'weekly (you’ll get a reminder on Mondays).'),
+      'weekly (you’ll get a reminder on Sundays).'),
     canChoose ? el('div', {}, [
       el('label', {}, 'Backup scope'),
       scopeSel,

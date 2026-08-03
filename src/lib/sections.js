@@ -97,7 +97,9 @@ export function recentErrorsPanel(errors, me, onCleared) {
   const sys = !!(me && me.systemAdmin);
   const mine = errs.filter((e) => !e.realmId || !me || e.realmId === me.activeRealm);
   const clearable = sys ? errs.length : mine.length;
-  const btn = el('button.small', { onclick: doClear },
+  // secondary-btn.small is the app's outline style for a non-destructive
+  // action beside a heading; a bare <button> has no rule and renders unstyled.
+  const btn = el('button.secondary-btn.small', { onclick: doClear },
     sys ? 'Dismiss all' : 'Dismiss this realm’s (' + clearable + ')');
   btn.disabled = !clearable;
 
@@ -111,7 +113,7 @@ export function recentErrorsPanel(errors, me, onCleared) {
   }
 
   mount(host,
-    el('div', { class: 'row-actions' }, [
+    el('div', { class: 'panel-head' }, [
       el('h4', {}, 'Recent errors (' + errs.length + ')'),
       btn,
     ]),

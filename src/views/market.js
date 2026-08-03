@@ -30,24 +30,57 @@ function renderTab(host, tab, d) {
   return mount(host, ...overview(d));
 }
 
+/**
+ * The columns for each subject, defined ONCE.
+ *
+ * Overview's "Top 5" tables are previews of the pages below them, so they use
+ * these too — a column added to Item Performance appears in its Top 5 without
+ * anyone remembering to. They used to be written out separately and had already
+ * drifted.
+ *
+ * Region headers are functions because a realm names its regions itself.
+ */
+const COMPANY_COLS = {
+  headers: () => ['Company', 'Orders', 'Items', 'Revenue'],
+  row: (b) => [b.business || '—', b.orders, b.items, money(b.revenue)],
+};
+const REGION_COLS = {
+  headers: () => [regionLabel(), 'Orders', 'Items', 'Revenue'],
+  row: (h) => [h.hold, h.orders, h.items, money(h.revenue)],
+};
+/**
+ * Item Performance reports PRICES, not takings. What an admin needs from an
+ * item is what it changes hands for — the total gold it has generated says more
+ * about how often it sold than about the item.
+ *
+ * A dash means that side has no records yet; 0 would claim the item was traded
+ * for nothing.
+ */
+const ITEM_COLS = {
+  headers: () => ['Item', 'Qty sold', 'Orders', 'Avg bought', 'Avg sold', 'Avg value'],
+  row: (i) => [i.item, i.qty, i.orders, avg(i.avgBought), avg(i.avgSold), avg(i.avgValue)],
+};
+function avg(v) { return v == null ? '—' : money(v); }
+
 /* ---- Overview: top 5 of each category + alerts ---- */
 function overview(d) {
   const o = d.overview || {};
   return [
+    // No revenue tile: the headline figure people act on is activity, and the
+    // gold total was the one number that made every other panel look secondary.
     statTiles([
-      ['Revenue', money(o.revenue)],
       ['Orders', String(o.orders || 0)],
       ['Items sold', String(o.itemsSold || 0)],
       ['Active shops', String(o.activeShops || 0)],
     ]),
-    tableCard('Top 5 companies', ['Company', 'Orders', 'Items', 'Revenue'],
-      (d.businesses || []).slice(0, 5).map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
+    tableCard('Top 5 companies', COMPANY_COLS.headers(),
+      (d.businesses || []).slice(0, 5).map(COMPANY_COLS.row),
       'No sales recorded yet.'),
-    tableCard('Top 5 ' + regionWord() + 's', [regionLabel(), 'Orders', 'Items', 'Revenue'],
-      (d.holds || []).slice(0, 5).map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
+    tableCard('Top 5 ' + regionWord() + 's', REGION_COLS.headers(),
+      (d.holds || []).slice(0, 5).map(REGION_COLS.row),
       'No sales with a ' + regionWord() + ' recorded yet.'),
-    tableCard('Top 5 items', ['Item', 'Qty sold', 'Revenue'],
-      (d.items || []).slice(0, 5).map((i) => [i.item, i.qty, money(i.revenue)]),
+    tableCard('Top 5 items', ITEM_COLS.headers(),
+      (d.items || []).slice(0, 5).map(ITEM_COLS.row),
       'No items sold yet.'),
     alertsCard('⚠ Priced below cost', 'bad',
       (d.underpriced || []).map((u) =>
@@ -92,26 +125,32 @@ function itemPerformance(items) {
     const q = search.value.trim().toLowerCase();
     const rows = items.filter((i) => !q || i.item.toLowerCase().includes(q));
     mount(tableHost, rows.length
-      ? el('div', { class: 'table-scroll' }, tableEl(['Item', 'Qty sold', 'Orders', 'Revenue'],
-          rows.map((i) => [i.item, i.qty, i.orders, money(i.revenue)])))
+      ? el('div', { class: 'table-scroll' }, tableEl(ITEM_COLS.headers(), rows.map(ITEM_COLS.row)))
       : el('p', { class: 'note' }, items.length ? 'No items match your search.' : 'No items sold yet.'));
   }
   search.addEventListener('input', draw);
   draw();
-  return el('div.card', {}, [el('h3', {}, 'Item Performance'), search, tableHost]);
+  return el('div.card', {}, [
+    el('h3', {}, 'Item Performance'),
+    el('p', { class: 'note' }, 'Average bought is what shops paid on intake, average sold is what customers ' +
+      'paid, and average value is both together weighted by quantity — what the realm actually trades this ' +
+      'item at, as opposed to its base value in the index.'),
+    search,
+    tableHost,
+  ]);
 }
 
 /* ---- Region Performance ---- */
 function regionPerformance(holds) {
-  return tableCard(regionLabel() + ' Performance', [regionLabel(), 'Orders', 'Items', 'Revenue'],
-    holds.map((h) => [h.hold, h.orders, h.items, money(h.revenue)]),
+  return tableCard(regionLabel() + ' Performance', REGION_COLS.headers(),
+    holds.map(REGION_COLS.row),
     'No sales with a ' + regionWord() + ' recorded yet.');
 }
 
 /* ---- Company Performance ---- */
 function companyPerformance(businesses) {
-  return tableCard('Company Performance', ['Company', 'Orders', 'Items', 'Revenue'],
-    businesses.map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
+  return tableCard('Company Performance', COMPANY_COLS.headers(),
+    businesses.map(COMPANY_COLS.row),
     'No sales recorded yet.');
 }
 

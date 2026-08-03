@@ -376,9 +376,11 @@ async function getMotd({ request, env }) {
       }
     } catch (e) { /* D1 optional */ }
   }
-  if (caller.role === 'admin' && new Date().getUTCDay() === 1) {
+  // Sunday only: a weekly nudge that shows every day is one nobody reads, and
+  // Sunday is when a week's trading is complete rather than half-done.
+  if (caller.role === 'admin' && new Date().getUTCDay() === 0) {
     banners.push({
-      text: '🗓️ Start of the week — download a fresh data backup.',
+      text: '🗓️ End of the week — download a fresh data backup.',
       action: { label: 'Backup', route: '/admin/settings' },
     });
   }

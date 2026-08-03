@@ -59,7 +59,7 @@ export function renderItemIndex(container) {
       'and Market Analysis measure against these.'),
     el('div', { class: 'row-actions' }, [
       el('button.primary', { onclick: () => openImportExport('') }, 'Import/Export all'),
-      el('button', { onclick: openTypesModal }, 'Manage tables'),
+      el('button.secondary-btn', { onclick: openTypesModal }, 'Manage tables'),
       el('button.danger', { onclick: () => doPurge('') }, 'Purge index'),
     ]),
     search,
@@ -149,7 +149,7 @@ export function renderItemIndex(container) {
           : 'Items filed as ' + type + '.'),
         el('div', { class: 'row-actions' }, [
           el('button.primary', { onclick: () => openItemModal(null, type, redraw) }, 'Add item'),
-          el('button', { onclick: () => openImportExport(type, redraw) }, 'Import/Export'),
+          el('button.secondary-btn', { onclick: () => openImportExport(type, redraw) }, 'Import/Export'),
           el('button.danger', { onclick: () => doPurge(type) }, 'Empty this table'),
         ]),
         rows);
@@ -261,7 +261,7 @@ export function renderItemIndex(container) {
             el('span', { class: 'row-actions' }, [
               el('button.primary.small', { onclick: () => editFlags(t) }, 'Flags'),
               ...(locked ? [] : [
-                el('button.small', { onclick: () => rename(t.name) }, 'Rename'),
+                el('button.secondary-btn.small', { onclick: () => rename(t.name) }, 'Rename'),
                 el('button.danger.small', { onclick: () => drop(t.name, n) }, 'Remove'),
               ]),
             ]),
