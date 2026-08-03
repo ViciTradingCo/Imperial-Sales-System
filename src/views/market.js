@@ -62,17 +62,16 @@ const ITEM_COLS = {
 };
 function avg(v) { return v == null ? '—' : money(v); }
 
-/* ---- Overview: top 5 of each category + alerts ---- */
+/**
+ * Overview: the top 5 of each category, plus the pricing alerts.
+ *
+ * No headline stat tiles. Network totals — gold taken, orders, items, shops
+ * open — say how BUSY the realm is, which is not a thing an admin acts on; the
+ * panels below say what to do about a specific shop, region, or item. The tiles
+ * took the top of the screen to answer a question nobody was asking.
+ */
 function overview(d) {
-  const o = d.overview || {};
   return [
-    // No revenue tile: the headline figure people act on is activity, and the
-    // gold total was the one number that made every other panel look secondary.
-    statTiles([
-      ['Orders', String(o.orders || 0)],
-      ['Items sold', String(o.itemsSold || 0)],
-      ['Active shops', String(o.activeShops || 0)],
-    ]),
     tableCard('Top 5 companies', COMPANY_COLS.headers(),
       (d.businesses || []).slice(0, 5).map(COMPANY_COLS.row),
       'No sales recorded yet.'),
@@ -155,14 +154,6 @@ function companyPerformance(businesses) {
 }
 
 /* ---- shared bits ---- */
-export function statTiles(pairs) {
-  return el('div', { class: 'stat-row' }, pairs.map(([label, value]) =>
-    el('div', { class: 'stat-tile' }, [
-      el('div', { class: 'stat-value' }, value),
-      el('div', { class: 'stat-label' }, label),
-    ])));
-}
-
 export function tableCard(title, headers, rows, emptyMsg) {
   const body = rows.length
     ? el('div', { class: 'table-scroll' }, tableEl(headers, rows))

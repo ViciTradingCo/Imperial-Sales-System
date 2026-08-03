@@ -4,14 +4,17 @@
  * maintenance, and the system-status snapshot.
  */
 import { clearLogs, getFlag, purgeLogs, resetAllData, setFlag } from '../db.js';
-import { requireAdmin, requireSystemAdmin, requireOwnerOrAdmin, actorName, realmIdOf, isSystemAdmin } from '../guards.js';
+import { requireAdmin, requireSystemAdmin, requireOwnerOrAdmin, actorName, realmIdOf, isSystemAdmin, findBusinessMeta } from '../guards.js';
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember, findUserByUid, isConfiguredAdmin } from '../users.js';
 import { listCompanies, updateCompany, archiveCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
-import { marketAnalysis } from '../market.js';
+import { marketAnalysis, businessReport } from '../market.js';
 import { systemStatus, clearErrors } from '../status.js';
+import { cofferSummary } from '../coffers.js';
+import { listDiscounts } from '../discounts.js';
+import { getShopStyle } from '../shop-style.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport,
   listItemIndex, moveItems, addItemType, updateItemType, deleteItemType } from '../item-index.js';
@@ -75,6 +78,43 @@ async function deleteMemberRoute({ request, env, body }) {
   await deleteMember(env, body.uid, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'member.delete', detail: 'uid ' + body.uid, realmId: realmIdOf(caller, env) });
   return { members: await listAllUsers(env, realmIdOf(caller, env)) };
+}
+
+/**
+ * One company's ledger, for an admin looking in from the Company List.
+ *
+ * READ ONLY, deliberately. An owner runs their own shop: the write paths
+ * (adjust the coffer, add a discount, set the style) stay bound to the caller's
+ * OWN business, so an admin viewing a company can see its books without an
+ * accidental click moving someone else's money. Renaming and certification —
+ * the things an admin is actually responsible for — already have their own
+ * buttons on that screen.
+ *
+ * Realm-scoped like every other admin read: `realmIdOf` refuses to return any
+ * realm but the caller's, so a Realm Admin cannot name a shop in another realm
+ * and read its coffers.
+ */
+async function companyLedger({ request, env, url }) {
+  const caller = await requireAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const business = String(url.searchParams.get('business') || '').trim();
+  if (!business) throw new Error('Which company?');
+  const meta = await findBusinessMeta(env, business, realmId);
+  if (!meta) throw new Error('No company called "' + business + '" in this realm.');
+  const [coffer, discounts, style, report] = await Promise.all([
+    cofferSummary(env, business, realmId),
+    listDiscounts(env, business, realmId),
+    getShopStyle(env, business, realmId),
+    businessReport(env, business, realmId),
+  ]);
+  return {
+    business,
+    coffer,
+    discounts,
+    style,
+    overview: report.overview,
+    items: (report.items || []).slice(0, 10),
+  };
 }
 
 /** As listMembers: ?realm= is honoured for a System Admin only. */
@@ -534,6 +574,7 @@ export const routes = [
   { method: 'POST', path: '/admin/members/update', handler: updateMemberRoute },
   { method: 'POST', path: '/admin/members/delete', handler: deleteMemberRoute },
   { method: 'GET', path: '/admin/companies', handler: listCompaniesRoute },
+  { method: 'GET', path: '/admin/companies/ledger', handler: companyLedger },
   { method: 'POST', path: '/admin/companies/update', handler: updateCompanyRoute },
   { method: 'POST', path: '/admin/companies/delete', handler: deleteCompanyRoute },
   { method: 'GET', path: '/admin/export', handler: exportData },

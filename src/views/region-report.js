@@ -5,10 +5,10 @@
  * refuses non-Court callers.
  */
 import { money, regionLabel, regionWord } from '../lib/format.js';
-import { el, mount } from '../lib/dom.js';
+import { el, mount, statTiles } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
-import { statTiles, tableCard } from './market.js';
+import { tableCard } from './market.js';
 
 export function renderRegionReport(container) {
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading your ' + regionWord() + '’s report…'));

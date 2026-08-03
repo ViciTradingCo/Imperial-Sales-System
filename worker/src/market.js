@@ -4,7 +4,6 @@
  * summaries, never raw rows. Voided sales are excluded from revenue/volume.
  *
  * Sections:
- *   • overview    — totals across the whole network.
  *   • businesses  — performance per shop (orders / items / revenue).
  *   • holds       — the same broken down by Skyrim hold.
  *   • underpriced — items selling BELOW their average purchase cost (a money-
@@ -85,14 +84,9 @@ function itemStats(saleRows, master, intakeRows) {
 export async function marketAnalysis(env, realmId) {
   const db = await getDb(env);
 
-  const overview = await db.prepare(
-    `SELECT COALESCE(SUM(total), 0) AS revenue,
-            COUNT(*) AS orders,
-            COALESCE(SUM(qty_total), 0) AS itemsSold,
-            COUNT(DISTINCT business) AS activeShops
-       FROM sales
-      WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).first();
-
+  // No network-totals block: Overview stopped showing headline tiles, and a
+  // summary nothing renders is a query run on every load for nobody. The shop
+  // and region reports keep their own overviews — those ARE displayed.
   const businesses = ((await db.prepare(
     `SELECT business,
             COUNT(*) AS orders,
@@ -162,7 +156,6 @@ export async function marketAnalysis(env, realmId) {
       GROUP BY day ORDER BY day DESC LIMIT 30`).bind(realmId).all()).results) || []).reverse();
 
   return {
-    overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 },
     businesses, holds, items, underpriced,
     overpriced: overpriced.slice(0, 50), undercut: undercut.slice(0, 50),
     thresholds: { over: overX, under: underX }, trends,

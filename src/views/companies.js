@@ -3,15 +3,18 @@
  *   • Edit — a focus modal to rename the company (propagated everywhere).
  *   • Subscription — its own focus modal to set when the subscription expires
  *     (calendar picker OR manual entry) or mark it Perpetual.
+ *   • Ledger — a READ-ONLY look at the shop's books: coffer, discounts, style,
+ *     and what it sells. Admins look; owners keep them.
  */
-import { regionLabel, regionWord } from '../lib/format.js';
-import { el, mount, esc } from '../lib/dom.js';
+import { regionLabel, regionWord, money } from '../lib/format.js';
+import { el, mount, esc, tableEl, statTiles } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { pager } from '../lib/paginate.js';
+import { openFocalMenu } from '../lib/tiles.js';
 
 const PAGE_SIZE = 25;
 const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
@@ -25,7 +28,8 @@ export function renderCompanies(container, { me } = {}) {
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Company List'),
-    el('p', { class: 'note' }, 'Every registered business. Edit renames a company; Subscription sets its certification.'),
+    el('p', { class: 'note' }, 'Every registered business. Edit renames a company, Subscription sets its ' +
+      'certification, and Ledger opens a read-only view of its books.'),
     search,
     listHost,
   ]));
@@ -63,6 +67,7 @@ export function renderCompanies(container, { me } = {}) {
         el('span', { class: 'row-actions' }, [
           el('button.primary.small', { onclick: () => openNameModal(c, load) }, 'Edit'),
           el('button.secondary-btn.small', { onclick: () => openSubscriptionModal(c, load) }, 'Subscription'),
+          el('button.secondary-btn.small', { onclick: () => openLedgerModal(c) }, 'Ledger'),
           el('button.danger.small', { onclick: () => remove(c) }, 'Delete'),
         ]),
       ]);
@@ -84,6 +89,73 @@ export function renderCompanies(container, { me } = {}) {
   }
 
   load();
+}
+
+/**
+ * A company's ledger, as an admin sees it: coffer balance and recent movements,
+ * the shop's own discounts and style, its headline performance, and what it
+ * sells most.
+ *
+ * READ ONLY. An admin's job here is to look — the write paths (adjusting the
+ * coffer, editing discounts) belong to the owner running that shop, and an
+ * admin who moved someone else's gold from a list screen would have no way to
+ * explain it. Renaming and certification, which ARE the admin's job, are the
+ * two buttons beside this one.
+ */
+function openLedgerModal(company) {
+  const name = company.business || 'this company';
+  openFocalMenu(name + " — ledger", (host) => {
+    mount(host, el('p', { class: 'note' }, 'Loading…'));
+    api.getCompanyLedger(name)
+      .then((d) => mount(host, ...ledgerBody(d)))
+      .catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
+  });
+}
+
+function ledgerBody(d) {
+  const o = d.overview || {};
+  const coffer = d.coffer || {};
+  const entries = coffer.entries || [];
+  const discounts = d.discounts || [];
+  const style = d.style || {};
+  const items = d.items || [];
+
+  const nodes = [
+    el('p', { class: 'note' }, 'Read only — an admin views a shop\'s books; the owner keeps them.'),
+    statTiles([
+      ['Coffer', money(coffer.balance || 0)],
+      ['Revenue', money(o.revenue || 0)],
+      ['Orders', String(o.orders || 0)],
+      ['Items sold', String(o.itemsSold || 0)],
+    ]),
+    el('h4', {}, 'Recent coffer activity'),
+  ];
+
+  nodes.push(entries.length
+    ? el('div', {}, entries.slice(0, 15).map((e) => el('div.emp-row', {}, [
+        el('span', { html: '<b>' + (Number(e.amount) >= 0 ? '+' : '') + esc(money(e.amount)) + '</b> ' +
+          '<span class="note">' + esc(e.kind) + (e.note ? ' · ' + esc(e.note) : '') + ' · ' +
+          esc(String(e.ts || '').slice(0, 10)) + '</span>' }),
+      ])))
+    : el('p', { class: 'note' }, 'No coffer activity yet.'));
+
+  nodes.push(el('h4', {}, 'Top items'));
+  nodes.push(items.length
+    ? el('div', { class: 'table-scroll' }, tableEl(['Item', 'Qty sold', 'Revenue'],
+        items.map((i) => [i.item, i.qty, money(i.revenue)])))
+    : el('p', { class: 'note' }, 'Nothing sold yet.'));
+
+  nodes.push(el('h4', {}, 'Discounts'));
+  nodes.push(discounts.length
+    ? el('div', {}, discounts.map((x) => el('p', { class: 'note' }, x.name + ' — ' + x.percent + '%')))
+    : el('p', { class: 'note' }, 'No named discounts.'));
+
+  if (style.tagline || style.accent) {
+    nodes.push(el('h4', {}, 'Shop style'));
+    nodes.push(el('p', { class: 'note' }, (style.tagline || 'No tagline') +
+      (style.accent ? ' · accent ' + style.accent : '')));
+  }
+  return nodes;
 }
 
 /** Edit modal — name, associated Region, and the admin-only Court flag. */

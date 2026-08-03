@@ -32,6 +32,21 @@ export function mount(container, ...nodes) {
 }
 
 /**
+ * A row of headline figures — [label, value] pairs as big tiles.
+ *
+ * Presentation, not analysis: it lived in views/market.js, which meant any
+ * other screen wanting headline numbers had to import a whole page module for
+ * one helper.
+ */
+export function statTiles(pairs) {
+  return el('div', { class: 'stat-row' }, pairs.map(([label, value]) =>
+    el('div', { class: 'stat-tile' }, [
+      el('div', { class: 'stat-value' }, value),
+      el('div', { class: 'stat-label' }, label),
+    ])));
+}
+
+/**
  * A data table from headers + rows of cells.
  *
  * A cell may be a NODE as well as a value, so a table can carry a control (a

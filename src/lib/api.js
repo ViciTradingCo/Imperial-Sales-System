@@ -74,6 +74,8 @@ export const api = {
   deleteMember: (uid) => request('POST', '/admin/members/delete', { uid }),
   /** Admin: every registered company. */
   getCompanies: (realmId) => request('GET', '/admin/companies' + (realmId ? '?realm=' + encodeURIComponent(realmId) : '')),
+  /** Admin: read one company's ledger (coffer, discounts, style, performance). */
+  getCompanyLedger: (business) => request('GET', '/admin/companies/ledger?business=' + encodeURIComponent(business)),
   /** Admin: edit a company (name + subscription). */
   updateCompany: (company) => request('POST', '/admin/companies/update', company),
   /** Admin: archive (delete) a company — data retained, name freed. */

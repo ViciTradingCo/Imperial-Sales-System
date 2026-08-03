@@ -43,4 +43,17 @@ describe('route wiring', () => {
     expect(paths).toContain('POST /admin/realms/delete');
     expect(paths).toContain('GET /admin/realms/stats');
   });
+
+  /**
+   * A shop's books are the OWNER's to keep. The admin surface reads one
+   * company's ledger and nothing more — if a write path for someone else's
+   * coffer, discounts, or style ever appears under /admin/companies, that is a
+   * decision to make deliberately, not to notice after it ships.
+   */
+  it('exposes only a read path into another company\'s ledger', () => {
+    const paths = all.map((r) => r.method + ' ' + r.path);
+    expect(paths).toContain('GET /admin/companies/ledger');
+    const writes = all.filter((r) => r.method === 'POST' && /^\/admin\/companies\/(ledger|coffer|discounts|style)/.test(r.path));
+    expect(writes.map((r) => r.path)).toEqual([]);
+  });
 });
