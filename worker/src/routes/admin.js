@@ -10,7 +10,7 @@ import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember, findUserByUid, isConfiguredAdmin } from '../users.js';
 import { listCompanies, updateCompany, archiveCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
-import { marketAnalysis, businessReport } from '../market.js';
+import { marketAnalysis, businessReport, itemReport } from '../market.js';
 import { systemStatus, clearErrors } from '../status.js';
 import { cofferSummary } from '../coffers.js';
 import { listDiscounts } from '../discounts.js';
@@ -205,6 +205,11 @@ async function purgeLogsRoute({ request, env, body }) {
   const res = await purgeLogs(env, body.amount != null ? body.amount : body.months, body.unit, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'logs.purge', detail: 'older than ' + res.cutoff + ': ' + res.sales + ' sales, ' + res.intake + ' intake', realmId: realmIdOf(caller, env) });
   return res;
+}
+/** One item in full, for the Item Performance search box. */
+async function marketItem({ request, env, url }) {
+  const caller = await requireAdmin(request, env);
+  return await itemReport(env, url.searchParams.get('name'), realmIdOf(caller, env));
 }
 async function status({ request, env }) {
   const caller = await requireAdmin(request, env);
@@ -603,6 +608,7 @@ export const routes = [
   { method: 'POST', path: '/admin/import/preview', handler: importPreview },
   { method: 'POST', path: '/admin/import', handler: importData },
   { method: 'GET', path: '/admin/market', handler: market },
+  { method: 'GET', path: '/admin/market/item', handler: marketItem },
   { method: 'POST', path: '/admin/logs/clear', handler: clearLogsRoute },
   { method: 'POST', path: '/admin/logs/purge', handler: purgeLogsRoute },
   { method: 'GET', path: '/admin/status', handler: status },

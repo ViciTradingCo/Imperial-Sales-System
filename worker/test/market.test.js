@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { makeD1 } from './d1shim.js';
 import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
-import { marketAnalysis } from '../src/market.js';
+import { marketAnalysis, itemReport } from '../src/market.js';
 import { importItemIndex } from '../src/item-index.js';
 import { encodeSaleItems } from '../src/sales.js';
 
@@ -22,11 +22,16 @@ beforeEach(async () => {
 });
 
 let orderNo = 0;
-const sale = (lines, status) => env.DB.prepare(
-  `INSERT INTO sales (realm_id, business, ts, order_no, items, qty_total, total, status)
-   VALUES (?, 'Alpha', '2026-01-01T00:00:00Z', ?, ?, ?, ?, ?)`)
-  .bind(R, 'S-' + (++orderNo), encodeSaleItems(lines), lines.reduce((n, l) => n + l.qty, 0),
+/** A sale on a given day, in a given region — the three axes these tests vary. */
+const saleAt = (day, region, lines, status) => env.DB.prepare(
+  `INSERT INTO sales (realm_id, business, ts, order_no, hold, items, qty_total, total, status)
+   VALUES (?, 'Alpha', ?, ?, ?, ?, ?, ?, ?)`)
+  .bind(R, day + 'T00:00:00Z', 'S-' + (++orderNo), region, encodeSaleItems(lines),
+    lines.reduce((n, l) => n + l.qty, 0),
     lines.reduce((n, l) => n + l.qty * l.price, 0), status || 'OK').run();
+const sale = (lines, status) => saleAt('2026-01-01', '', lines, status);
+const saleOn = (day, lines) => saleAt(day, '', lines);
+const saleIn = (region, lines) => saleAt('2026-01-01', region, lines);
 
 const intake = (qty, per) => env.DB.prepare(
   `INSERT INTO intake (realm_id, business, ts, item, num_items, price_per)
@@ -128,6 +133,79 @@ describe('average value', () => {
 
   it('lists nothing for an indexed item with no trade at all', async () => {
     expect((await marketAnalysis(env, R)).items).toEqual([]);
+  });
+});
+
+describe('the per-item trend', () => {
+  it('is a daily series, oldest first, for the top items only', async () => {
+    await saleOn('2026-01-02', [{ name: 'Iron Sword', qty: 2, price: 10 }]);
+    await saleOn('2026-01-01', [{ name: 'Iron Sword', qty: 5, price: 10 }]);
+    await saleOn('2026-01-02', [{ name: 'Iron Sword', qty: 1, price: 10 }]);
+    const d = await marketAnalysis(env, R);
+    expect(d.topItems[0].trend).toEqual([
+      { day: '2026-01-01', qty: 5, revenue: 50, orders: 1 },
+      { day: '2026-01-02', qty: 3, revenue: 30, orders: 2 },
+    ]);
+    // The full list carries the figures but not the series — it would dwarf them.
+    expect(d.items[0].trend).toBeUndefined();
+    expect(d.items[0].qty).toBe(8);
+  });
+
+  it('is empty for an item bought in but never sold', async () => {
+    await intake(5, 20);
+    const d = await marketAnalysis(env, R);
+    expect(d.topItems[0].trend).toEqual([]);
+  });
+});
+
+describe('best region', () => {
+  it('is where the most units moved', async () => {
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 2, price: 10 }]);
+    await saleIn('The Rift', [{ name: 'Iron Sword', qty: 9, price: 10 }]);
+    await saleIn('Falkreath', [{ name: 'Iron Sword', qty: 1, price: 500 }]);
+    // Units, not takings: Falkreath brought in the most gold from one sale.
+    expect((await itemRow()).bestRegion).toEqual({ region: 'The Rift', qty: 9, revenue: 90 });
+  });
+
+  it('is null when no sale recorded a region', async () => {
+    await sale([{ name: 'Iron Sword', qty: 1, price: 10 }]);
+    expect((await itemRow()).bestRegion).toBeNull();
+  });
+});
+
+describe('one item on demand', () => {
+  it('returns the same figures as the list, plus the trend', async () => {
+    await saleOn('2026-01-01', [{ name: 'Iron Sword', qty: 4, price: 25 }]);
+    await intake(2, 10);
+    const d = await itemReport(env, 'Iron Sword', R);
+    const listed = (await marketAnalysis(env, R)).items[0];
+    expect(d.item.qty).toBe(listed.qty);
+    expect(d.item.avgValue).toBe(listed.avgValue);
+    expect(d.item.avgBought).toBe(listed.avgBought);
+    expect(d.item.trend).toEqual([{ day: '2026-01-01', qty: 4, revenue: 100, orders: 1 }]);
+    expect(d.baseValue).toBe(30);
+  });
+
+  it('resolves a name loosely, the way the index does', async () => {
+    await sale([{ name: 'Iron Sword', qty: 1, price: 10 }]);
+    expect((await itemReport(env, '  iron   SWORD ', R)).item.item).toBe('Iron Sword');
+  });
+
+  it('answers with zeroes for an indexed item that has never traded', async () => {
+    const d = await itemReport(env, 'Iron Sword', R);
+    expect(d.item).toMatchObject({ item: 'Iron Sword', qty: 0, avgValue: null, bestRegion: null, trend: [] });
+  });
+
+  it('refuses an item that is not in this realm\'s index', async () => {
+    await expect(itemReport(env, 'Dragonbone Warhammer', R)).rejects.toThrow(/no item called/i);
+    await expect(itemReport(env, '', R)).rejects.toThrow(/which item/i);
+  });
+
+  it('cannot read another realm\'s trade for the same item', async () => {
+    await importItemIndex(env, [{ name: 'Iron Sword', baseValue: 30 }], 'rlm-other');
+    await sale([{ name: 'Iron Sword', qty: 3, price: 10 }]); // realm R only
+    expect((await itemReport(env, 'Iron Sword', 'rlm-other')).item.qty).toBe(0);
+    expect((await itemReport(env, 'Iron Sword', R)).item.qty).toBe(3);
   });
 });
 

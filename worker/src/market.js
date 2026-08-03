@@ -82,12 +82,33 @@ function salesValue(lines) {
   return weightedQuantile(prices, 0.5);
 }
 
+/** Trend points, oldest → newest, capped to the most recent `days` with sales. */
+const TREND_DAYS = 30;
+function trendOf(dayMap) {
+  return [...dayMap.entries()]
+    .map(([day, v]) => ({ day, qty: v.qty, revenue: v.revenue, orders: v.orders }))
+    .sort((a, b) => (a.day < b.day ? -1 : 1))
+    .slice(-TREND_DAYS);
+}
+
+/** Where the item moves best: most units, revenue breaking a tie. */
+function bestRegionOf(regionMap) {
+  let best = null;
+  regionMap.forEach((v, name) => {
+    if (!best || v.qty > best.qty || (v.qty === best.qty && v.revenue > best.revenue)) {
+      best = { region: name, qty: v.qty, revenue: v.revenue };
+    }
+  });
+  return best;
+}
+
 /**
  * Aggregates per-item activity, but ONLY for items in the master index
  * (new/off-index items are kept out of the market so the data stays clean).
  * Names are canonicalized to their master spelling.
  *
- * Both SIDES of the trade are reported, plus a valuation:
+ * Both SIDES of the trade are reported, plus a valuation and two views of where
+ * and when the item moves:
  *
  *   • avgSold   — quantity-weighted MEAN of what it went for. "On average we
  *                 charged this", takings divided by units.
@@ -96,6 +117,8 @@ function salesValue(lines) {
  *                 salesValue). Robust to the one absurd sale that a mean is not.
  *   • valueSamples — units of sales behind avgValue, so a valuation resting on
  *                 two units can be read as the guess it is.
+ *   • bestRegion — where it moves best, by units.
+ *   • trend      — its daily series, for the graph.
  *
  * `revenue` stays on the row: it is the ranking key here, and the shop and
  * region reports display it.
@@ -106,18 +129,35 @@ function itemStats(saleRows, master, intakeRows) {
   const map = {};
   const canon = (name) => exact.get(normalizeItem(name)) || matchMasterItem(name, master);
   const row = (key) => map[key] || (map[key] = {
-    item: key, qty: 0, revenue: 0, orders: 0, boughtQty: 0, boughtValue: 0, lines: [],
+    item: key, qty: 0, revenue: 0, orders: 0, boughtQty: 0, boughtValue: 0,
+    lines: [], days: new Map(), regions: new Map(),
   });
 
   (saleRows || []).forEach((r) => {
+    // One pass builds the totals, the daily series and the regional split
+    // together: re-reading and re-parsing every sale three times to get them
+    // separately is the expensive part of this whole module.
+    const day = String(r.ts || '').slice(0, 10);
+    const region = String(r.hold || '').trim();
     parseSaleItems(r.items).lines.forEach((l) => {
       const hit = canon(l.name);
       if (!hit) return; // not in the master index → excluded from market
       const m = row(hit.name);
+      const value = l.qty * l.price;
       m.qty += l.qty;
-      m.revenue += l.qty * l.price;
+      m.revenue += value;
       m.orders += 1;
       m.lines.push({ price: l.price, qty: l.qty });
+      if (day) {
+        const d = m.days.get(day) || { qty: 0, revenue: 0, orders: 0 };
+        d.qty += l.qty; d.revenue += value; d.orders += 1;
+        m.days.set(day, d);
+      }
+      if (region) {
+        const g = m.regions.get(region) || { qty: 0, revenue: 0 };
+        g.qty += l.qty; g.revenue += value;
+        m.regions.set(region, g);
+      }
     });
   });
 
@@ -133,15 +173,25 @@ function itemStats(saleRows, master, intakeRows) {
   });
 
   return Object.values(map).map((m) => {
-    const { lines, ...rest } = m; // the raw lines are working data, not payload
+    // The raw lines and the accumulator maps are working data, not payload.
+    const { lines, days, regions, ...rest } = m;
     return {
       ...rest,
       avgSold: m.qty > 0 ? m.revenue / m.qty : null,
       avgBought: m.boughtQty > 0 ? m.boughtValue / m.boughtQty : null,
       avgValue: salesValue(lines),
       valueSamples: m.qty,
+      bestRegion: bestRegionOf(regions),
+      // withoutTrend() strips this for list responses: a 30-point series per
+      // item would dwarf everything else in them.
+      trend: trendOf(days),
     };
   }).sort((a, b) => b.revenue - a.revenue);
+}
+
+/** The list shape: everything except the per-item series. */
+function withoutTrend(rows) {
+  return rows.map(({ trend, ...rest }) => rest);
 }
 
 export async function marketAnalysis(env, realmId) {
@@ -187,12 +237,18 @@ export async function marketAnalysis(env, realmId) {
   // (inventory.lowStockReport / GET /business/low-stock).
 
   const master = await listItemIndex(env, realmId);
+  // ts and hold come along so one pass can build the per-item daily series and
+  // regional split as well as the totals.
   const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).all()).results) || [];
+    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).all()).results) || [];
   // Intake is the buy side of the same items — what a shop paid to stock them.
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
-  const items = itemStats(saleRows, master, intakeRows);
+  const ranked = itemStats(saleRows, master, intakeRows);
+  // Only the five on screen carry a trend; the rest of the list would multiply
+  // the response size for series nothing draws.
+  const items = withoutTrend(ranked);
+  const topItems = ranked.slice(0, TOP_ITEMS);
 
   // Pricing anomalies vs the master base values, using the network thresholds.
   const settings = await readSettings(env, realmId);
@@ -219,9 +275,49 @@ export async function marketAnalysis(env, realmId) {
       GROUP BY day ORDER BY day DESC LIMIT 30`).bind(realmId).all()).results) || []).reverse();
 
   return {
-    businesses, holds, items, underpriced,
+    businesses, holds, items, topItems, underpriced,
     overpriced: overpriced.slice(0, 50), undercut: undercut.slice(0, 50),
     thresholds: { over: overX, under: underX }, trends,
+  };
+}
+
+/** How many items Item Performance leads with. */
+export const TOP_ITEMS = 5;
+
+/**
+ * One item, in full — the same figures the top five show, plus its trend.
+ *
+ * Backs the search box: the list response deliberately omits per-item series,
+ * so looking one up fetches it on demand rather than shipping every item's
+ * series to everyone on the chance one is opened.
+ *
+ * Filtering happens in JS rather than SQL because a sale's items are a JSON
+ * blob in one column — there is nothing to put in a WHERE clause. The read is
+ * the same one the whole page already does.
+ */
+export async function itemReport(env, name, realmId) {
+  const wanted = String(name || '').trim();
+  if (!wanted) throw new Error('Which item?');
+  const db = await getDb(env);
+  const master = await listItemIndex(env, realmId);
+  const hit = master.find((m) => normalizeItem(m.name) === normalizeItem(wanted));
+  if (!hit) throw new Error('No item called "' + wanted + '" in this realm\'s index.');
+
+  const saleRows = ((await db.prepare(
+    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED'`).bind(realmId).all()).results) || [];
+  const intakeRows = ((await db.prepare(
+    `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
+  const found = itemStats(saleRows, master, intakeRows).find((r) => r.item === hit.name);
+
+  // An indexed item that has never traded is a valid answer, not an error.
+  return {
+    item: found || {
+      item: hit.name, qty: 0, revenue: 0, orders: 0, boughtQty: 0, boughtValue: 0,
+      avgSold: null, avgBought: null, avgValue: null, valueSamples: 0,
+      bestRegion: null, trend: [],
+    },
+    baseValue: hit.baseValue,
+    category: hit.category,
   };
 }
 
@@ -255,7 +351,7 @@ export async function businessReport(env, business, realmId) {
     business: b,
     overview: overview || empty.overview,
     trends,
-    items: itemStats(saleRows, await listItemIndex(env, realmId), intakeRows).slice(0, 20),
+    items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId), intakeRows)).slice(0, 20),
   };
 }
 
@@ -284,5 +380,5 @@ export async function holdReport(env, hold, realmId) {
 
   // No intake side here: a region's report covers sales MADE in that region, and
   // intake records where goods came FROM, which is a different question.
-  return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: itemStats(saleRows, await listItemIndex(env, realmId)) };
+  return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId))) };
 }

@@ -3,10 +3,13 @@
  * from the action bar: Overview, Item Performance, Region Performance, Company
  * Performance, Trends. Read-only; the API enforces admin-only access.
  */
-import { money, regionLabel, regionWord } from '../lib/format.js';
+import { money, regionLabel, regionWord, regionsOn } from '../lib/format.js';
 import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setMarketActions } from '../lib/sections.js';
+import { createItemPicker } from '../lib/item-picker.js';
+import { openFocalMenu } from '../lib/tiles.js';
+import { lineChart } from '../lib/chart.js';
 
 export function renderMarket(container, { tab } = {}) {
   setMarketActions(); // Market's own sub-pages; the side menu is the way back
@@ -23,7 +26,7 @@ export function renderMarket(container, { tab } = {}) {
 }
 
 function renderTab(host, tab, d) {
-  if (tab === 'items') return mount(host, itemPerformance(d.items || []));
+  if (tab === 'items') return mount(host, itemPerformance(d));
   if (tab === 'regions') return mount(host, regionPerformance(d.holds || []));
   if (tab === 'companies') return mount(host, companyPerformance(d.businesses || []));
   if (tab === 'trends') return mount(host, trendsCard(d.trends || []));
@@ -57,8 +60,12 @@ const REGION_COLS = {
  * for nothing.
  */
 const ITEM_COLS = {
-  headers: () => ['Item', 'Qty sold', 'Orders', 'Avg bought', 'Avg sold', 'Avg value'],
-  row: (i) => [i.item, i.qty, i.orders, avg(i.avgBought), avg(i.avgSold), valueCell(i)],
+  headers: () => ['Item', 'Qty sold', 'Orders', 'Avg bought', 'Avg sold', 'Avg value']
+    // Only when the realm uses regions — otherwise the column would be a row of
+    // dashes explaining a concept this realm has switched off.
+    .concat(regionsOn() ? ['Best ' + regionWord()] : []),
+  row: (i) => [i.item, i.qty, i.orders, avg(i.avgBought), avg(i.avgSold), valueCell(i)]
+    .concat(regionsOn() ? [i.bestRegion ? i.bestRegion.region : '—'] : []),
 };
 function avg(v) { return v == null ? '—' : money(v); }
 /**
@@ -126,28 +133,71 @@ function trendsCard(trends) {
   ]);
 }
 
-/* ---- Item Performance: searchable ---- */
-function itemPerformance(items) {
-  const search = el('input', { type: 'text', placeholder: 'Search items…' });
-  const tableHost = el('div', {});
-  function draw() {
-    const q = search.value.trim().toLowerCase();
-    const rows = items.filter((i) => !q || i.item.toLowerCase().includes(q));
-    mount(tableHost, rows.length
-      ? el('div', { class: 'table-scroll' }, tableEl(ITEM_COLS.headers(), rows.map(ITEM_COLS.row)))
-      : el('p', { class: 'note' }, items.length ? 'No items match your search.' : 'No items sold yet.'));
-  }
-  search.addEventListener('input', draw);
-  draw();
+/* ---- Item Performance ---- */
+/**
+ * The five items carrying the realm, each as its own figures-over-a-graph
+ * block, then a picker for looking up any other.
+ *
+ * It used to be one long table of every item, which answered "what exists"
+ * rather than "what is happening" — the numbers were there but nothing showed
+ * movement, and finding one item meant filtering a list of hundreds. The five
+ * that matter now come with their trend; everything else is one search away.
+ */
+function itemPerformance(d) {
+  const top = d.topItems || [];
+  const picker = createItemPicker({
+    placeholder: 'Look up any item…',
+    meta: (it) => 'base ' + money(it.baseValue) +
+      (it.category && it.category !== 'Unsorted' ? ' · ' + it.category : ''),
+    onPick: (it) => { picker.clear(); openItemDetail(it.name); },
+  });
+  // The same index the register picks from, so a name typed here is a real item.
+  api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});
+
   return el('div.card', {}, [
     el('h3', {}, 'Item Performance'),
     el('p', { class: 'note' }, 'Average bought is what shops paid on intake; average sold is the mean price ' +
       'customers paid. Average value is a valuation from the sales themselves — the middle price by units ' +
       'sold, with outliers fenced off — so one collector overpaying does not become the item’s worth. ' +
       'Hover a value to see how many units it rests on.'),
-    search,
-    tableHost,
+    top.length
+      ? el('div', {}, top.map((i) => itemBlock(i)))
+      : el('p', { class: 'note' }, 'No items sold yet.'),
+    el('h4', {}, 'Look up an item'),
+    el('p', { class: 'note' }, 'Any item in the index, whether or not it made the top five.'),
+    picker.el,
   ]);
+}
+
+/**
+ * One item: its figures as a table, with its trend graph directly beneath.
+ *
+ * The table is the SAME column set the lists use, so a column added anywhere
+ * appears here too — and a reader moving between Overview and this page is
+ * reading the same row twice, not two different summaries.
+ */
+function itemBlock(i) {
+  return el('div', { class: 'item-block' }, [
+    el('div', { class: 'table-scroll' }, tableEl(ITEM_COLS.headers(), [ITEM_COLS.row(i)])),
+    lineChart((i.trend || []).map((p) => ({ day: p.day, value: p.qty })), {
+      label: i.item + ' units sold per day',
+      format: (v) => v + ' sold',
+      emptyMsg: 'No sales in the last 30 days.',
+    }),
+  ]);
+}
+
+/** A searched item, shown exactly as the top five are. */
+function openItemDetail(name) {
+  openFocalMenu(name, (host) => {
+    mount(host, el('p', { class: 'note' }, 'Loading…'));
+    api.getMarketItem(name)
+      .then((d) => mount(host,
+        el('p', { class: 'note' }, 'Base value ' + money(d.baseValue) +
+          (d.category ? ' · ' + d.category : '')),
+        itemBlock(d.item)))
+      .catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
+  });
 }
 
 /* ---- Region Performance ---- */

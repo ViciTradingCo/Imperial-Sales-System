@@ -94,6 +94,8 @@ export const api = {
   importBackup: (data, scope) => request('POST', '/admin/import', { ...data, scope }),
   /** Admin: network-wide market analytics. */
   getMarket: () => request('GET', '/admin/market'),
+  /** Admin: one item's full performance, including its daily trend. */
+  getMarketItem: (name) => request('GET', '/admin/market/item?name=' + encodeURIComponent(name)),
   /** Admin: wipe all sales + intake logs across the network. */
   clearLogs: () => request('POST', '/admin/logs/clear', {}),
   /** Admin: delete sales + intake older than N days/weeks/months. */
