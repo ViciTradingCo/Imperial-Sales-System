@@ -28,6 +28,27 @@ export function openFocalMenu(title, build, opts) {
   return modal;
 }
 
+/**
+ * Builds the tile list for a page's sections.
+ *
+ * A section either OPENS its content in a focal menu (`open`) or GOES to a whole
+ * page (`goto`) — never both. Every caller used to wrap sections in a focal menu
+ * unconditionally, so a section that navigated showed an empty modal over the
+ * page it had just moved to. Declaring the two cases separately makes that
+ * impossible to write by accident.
+ */
+export function sectionTiles(sections, navigate) {
+  return (sections || []).filter(Boolean).map((s) => ({
+    key: s.key,
+    label: s.label,
+    hint: s.hint,
+    glyph: s.glyph,
+    onOpen: s.goto
+      ? () => navigate(s.goto)
+      : () => openFocalMenu(s.label, (host) => s.open(host)),
+  }));
+}
+
 /** Builds the tile grid element. `images` maps tile key → image URL. */
 export function tileGrid(tiles, images) {
   const imgs = images || {};

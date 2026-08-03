@@ -11,7 +11,7 @@ import { api } from '../lib/api.js';
 import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
-import { tileGrid, openFocalMenu } from '../lib/tiles.js';
+import { tileGrid, sectionTiles } from '../lib/tiles.js';
 
 export function renderMotdAdmin(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
@@ -46,10 +46,7 @@ export function renderMotdAdmin(container) {
   ];
 
   function drawTiles(images) {
-    mount(gridHost, tileGrid(sections.map((s) => ({
-      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
-      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
-    })), images));
+    mount(gridHost, tileGrid(sectionTiles(sections, navigate), images));
   }
   drawTiles({});
   api.getTiles().then((r) => drawTiles(r.images || {})).catch(() => {});

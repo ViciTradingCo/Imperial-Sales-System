@@ -14,7 +14,7 @@ import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { THEMES, loadPrefs, savePrefs } from '../lib/theme.js';
 import { LANGS, getLang, setLang } from '../lib/i18n.js';
-import { tileGrid, openFocalMenu } from '../lib/tiles.js';
+import { tileGrid, sectionTiles } from '../lib/tiles.js';
 
 export function renderProfile(container, { me, onProfileUpdated }) {
   const gridHost = el('div', {});
@@ -33,10 +33,7 @@ export function renderProfile(container, { me, onProfileUpdated }) {
   ];
 
   function draw(images) {
-    mount(gridHost, tileGrid(sections.map((s) => ({
-      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
-      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
-    })), images));
+    mount(gridHost, tileGrid(sectionTiles(sections, navigate), images));
   }
   draw({});
   api.getTiles().then((r) => draw(r.images || {})).catch(() => {});

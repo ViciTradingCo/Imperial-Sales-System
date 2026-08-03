@@ -4,7 +4,8 @@
  * sees and edits their OWN shop's board.
  */
 import { el, mount, esc } from '../lib/dom.js';
-import { tileGrid, openFocalMenu } from '../lib/tiles.js';
+import { navigate } from '../lib/router.js';
+import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { api } from '../lib/api.js';
 import { toast } from '../lib/toast.js';
 import { skeletonRows } from '../lib/skeleton.js';
@@ -42,10 +43,7 @@ export function renderShopNotices(container) {
   ];
 
   function drawTiles(images) {
-    mount(gridHost, tileGrid(sections.map((s) => ({
-      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
-      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
-    })), images));
+    mount(gridHost, tileGrid(sectionTiles(sections, navigate), images));
   }
   drawTiles({});
   api.getTiles().then((r) => drawTiles(r.images || {})).catch(() => {});

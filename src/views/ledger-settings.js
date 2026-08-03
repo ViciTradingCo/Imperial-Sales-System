@@ -8,10 +8,11 @@
  * Scoped to the caller's business by the API.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { navigate } from '../lib/router.js';
 import { api } from '../lib/api.js';
 import { renderSettingsForm } from './settings-form.js';
 import { money } from '../lib/format.js';
-import { tileGrid, openFocalMenu } from '../lib/tiles.js';
+import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { renderShopReport } from './shop-report.js';
 import { codePanel } from './realms.js';
 import { renderShopNotices } from './shop-notices.js';
@@ -56,10 +57,7 @@ export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
   ];
 
   function draw(images) {
-    mount(gridHost, tileGrid(sections.map((s) => ({
-      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
-      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
-    })), images));
+    mount(gridHost, tileGrid(sectionTiles(sections, navigate), images));
   }
   draw({});
   api.getTiles().then((r) => draw(r.images || {})).catch(() => {});

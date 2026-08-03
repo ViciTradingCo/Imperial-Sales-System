@@ -20,7 +20,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { toast } from '../lib/toast.js';
-import { tileGrid, openFocalMenu } from '../lib/tiles.js';
+import { tileGrid, sectionTiles, openFocalMenu } from '../lib/tiles.js';
 import { renderSettingsForm } from './settings-form.js';
 import { navigate } from '../lib/router.js';
 import { skeletonLines } from '../lib/skeleton.js';
@@ -62,9 +62,10 @@ export function renderRealms(container, { me, onRealmChanged }) {
       me.systemAdmin ? { key: 'transfers', label: 'Transfers', hint: 'Move members & shops', glyph: '🔀',
         open: (host) => mount(host, transferCard(() => realms, me)) } : null,
       // Network Settings belong to a realm, so they live here rather than as a
-      // separate top-level destination.
+      // separate top-level destination. `goto` rather than `open`: it is a whole
+      // page, not a section to show in place.
       { key: 'rlm-settings', label: 'Network Settings', hint: 'Regions, money, branding, data', glyph: '⚙️',
-        open: () => navigate('/admin/settings') },
+        goto: '/admin/settings' },
     ].filter(Boolean);
   }
 
@@ -77,11 +78,13 @@ export function renderRealms(container, { me, onRealmChanged }) {
     };
   }
 
+  /**
+   * A tile either OPENS a section in place or GOES to a page. Wrapping both in a
+   * focal menu left the navigating one showing an empty modal over the page it
+   * had just moved to.
+   */
   function draw(images) {
-    mount(gridHost, tileGrid(sections().map((s) => ({
-      key: s.key, label: s.label, hint: s.hint, glyph: s.glyph,
-      onOpen: () => openFocalMenu(s.label, (host) => s.open(host)),
-    })), images));
+    mount(gridHost, tileGrid(sectionTiles(sections(), navigate), images));
   }
 
   /** The realm list, with each realm's own settings and deletion. */
