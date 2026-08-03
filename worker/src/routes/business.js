@@ -14,7 +14,7 @@ import { readBusinessSettings, writeBusinessSettings } from '../business-setting
 import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport } from '../inventory.js';
 import { recordIntake, listIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
-import { listItemIndex } from '../item-index.js';
+import { listItemIndex, listItemTypes } from '../item-index.js';
 import { checkCertification } from '../cert.js';
 import { checkout, listSales, voidSale, employeePerformance } from '../sales.js';
 import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory } from '../transfers.js';
@@ -284,9 +284,15 @@ async function listBusinesses({ request, env }) {
   const caller = await requireRegistered(request, env);
   return { businesses: await listBusinessNames(env, realmIdOf(caller, env)) };
 }
+/**
+ * The item index plus the type tables it is divided into. Both in one call: the
+ * index screen renders a table per type, and the register's picker groups by
+ * type, so a second round-trip would only ever be for the same page load.
+ */
 async function getItems({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return { items: await listItemIndex(env, realmIdOf(caller, env)) };
+  const realmId = realmIdOf(caller, env);
+  return { items: await listItemIndex(env, realmId), types: await listItemTypes(env, realmId) };
 }
 /** Any registered user: the admin-assigned tile artwork (key → image URL). */
 async function getTiles({ request, env }) {

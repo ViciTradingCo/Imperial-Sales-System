@@ -95,6 +95,24 @@ be a data migration for a cosmetic gain, so the storage keeps the old name and
 everything above it says region. Module, route, and function names follow the
 UI: `regions.js`, `/regions`, `readRegions`, `/market/region`.
 
+## The item index is one table per type
+
+The Master Item Index is divided into TABLES BY TYPE (Weapons, Potions, …). Those
+are rows in `item_type` plus a `category` column on `master_item` — not one D1
+table per type, which could not be admin-editable per realm and would turn the
+register's picker into a growing UNION.
+
+`Unsorted` is the DEFAULT table: where pre-split items live, where the
+whole-index import puts unflagged rows, and where a removed table's items go. It
+always exists and cannot be renamed or deleted. Removing a table never removes
+items.
+
+Each table also carries `flags` — words an import line may use instead of the
+table's name. A table's own name beats any flag, and creating a table strips that
+word from other tables' flags so no stored flag can ever be dead. Import
+destinations come from one shared planner (`destinationPlanner`) so the preview
+and the apply cannot disagree.
+
 ## Store data, present labels
 
 Never write a realm's wording into a stored value. Sale lines are JSON numbers,

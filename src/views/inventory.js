@@ -152,7 +152,8 @@ function openIntakeModal(onRecorded) {
   // Items must be chosen from the master index so stock never lands under a typo.
   const picker = createItemPicker({
     placeholder: 'Search the item index…',
-    meta: (it) => 'base ' + money(it.baseValue),
+    meta: (it) => 'base ' + money(it.baseValue) +
+      (it.category && it.category !== 'Unsorted' ? ' · ' + it.category : ''),
     onPick: (it) => { if (!per.value) per.value = String(it.baseValue); },
   });
   api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});

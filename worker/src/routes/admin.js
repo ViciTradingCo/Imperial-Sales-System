@@ -13,7 +13,8 @@ import { collectExport, restoreImport, previewImport, gzipJson } from '../export
 import { marketAnalysis } from '../market.js';
 import { systemStatus } from '../status.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
-import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport } from '../item-index.js';
+import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport,
+  listItemIndex, addItemType, updateItemType, deleteItemType } from '../item-index.js';
 import { writeRegions } from '../regions.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, readRealmBranding, writeBranding } from '../branding.js';
@@ -233,25 +234,65 @@ async function deleteMasterItemRoute({ request, env, body }) {
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.delete', detail: body.name, realmId: realmIdOf(caller, env) });
   return { items };
 }
-/** Empties this realm's item index. Typed confirm — there is no undo. */
+/**
+ * Empties this realm's item index, or one table of it (body.category). Typed
+ * confirm — there is no undo.
+ */
 async function purgeMasterItems({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   if (String(body.confirm || '') !== 'PURGE') throw new Error('Type PURGE to confirm emptying the item index.');
-  const res = await purgeItemIndex(env, realmIdOf(caller, env));
+  const res = await purgeItemIndex(env, realmIdOf(caller, env), body.category);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.purge',
-    detail: res.purged + ' items', realmId: realmIdOf(caller, env) });
+    detail: res.purged + ' items' + (res.category ? ' from ' + res.category : ''), realmId: realmIdOf(caller, env) });
   return res;
 }
 
+/* ---- Item types: the tables the index is divided into (per realm) ---- */
+async function addItemTypeRoute({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const types = await addItemType(env, body.name, realmIdOf(caller, env), body.flags);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.type.add',
+    detail: String(body.name || ''), realmId: realmIdOf(caller, env) });
+  return { types };
+}
+/** Rename a table and/or replace its sorting flags. */
+async function updateItemTypeRoute({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const types = await updateItemType(env, body, realmId);
+  const renamed = body.newName !== undefined && body.newName !== body.name;
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.type.update',
+    detail: String(body.name || '') + (renamed ? ' → ' + String(body.newName || '') : '') +
+      (body.flags !== undefined ? ' · flags updated' : ''), realmId });
+  // A rename re-files the items under it, so the screen needs both back.
+  return { types, items: renamed ? await listItemIndex(env, realmId) : undefined };
+}
+/** Removing a table re-files its items as Unsorted; nothing is deleted. */
+async function deleteItemTypeRoute({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await deleteItemType(env, body.name, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.type.delete',
+    detail: String(body.name || '') + ' (' + res.moved + ' items → Unsorted)', realmId });
+  // The re-filed items come back with it: the screen has to redraw both tables.
+  return { ...res, items: await listItemIndex(env, realmId) };
+}
+
+/**
+ * Bulk import. `into` is the table an unflagged row lands in — a table's own
+ * Import/Export passes its name; the whole-index one passes nothing, so those
+ * rows go to Unsorted.
+ */
 async function importMasterItems({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const res = await importItemIndex(env, body.rows, realmIdOf(caller, env));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.import', detail: (res.imported || 0) + ' items', realmId: realmIdOf(caller, env) });
+  const res = await importItemIndex(env, body.rows, realmIdOf(caller, env), body.into);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.import',
+    detail: (res.imported || 0) + ' items' + (body.into ? ' into ' + body.into : ''), realmId: realmIdOf(caller, env) });
   return res;
 }
 async function analyzeItems({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  return await analyzeItemImport(env, body.rows, realmIdOf(caller, env));
+  return await analyzeItemImport(env, body.rows, realmIdOf(caller, env), body.into);
 }
 /* ---- Sitewide branding (app name, logo, shared iconography) ---- */
 /**
@@ -491,6 +532,9 @@ export const routes = [
   { method: 'POST', path: '/admin/items/purge', handler: purgeMasterItems },
   { method: 'POST', path: '/admin/items/import', handler: importMasterItems },
   { method: 'POST', path: '/admin/items/import/analyze', handler: analyzeItems },
+  { method: 'POST', path: '/admin/item-types', handler: addItemTypeRoute },
+  { method: 'POST', path: '/admin/item-types/update', handler: updateItemTypeRoute },
+  { method: 'POST', path: '/admin/item-types/delete', handler: deleteItemTypeRoute },
   { method: 'POST', path: '/admin/regions', handler: setHolds },
   { method: 'GET', path: '/admin/realms', handler: realmsList },
   { method: 'POST', path: '/admin/realms/create', handler: realmCreate },

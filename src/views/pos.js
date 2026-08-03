@@ -98,7 +98,10 @@ export function renderPos(container, { me }) {
       placeholder: 'Search the item index…',
       meta: (it) => {
         const inv = invByNorm.get(norm(it.name));
-        return inv ? inv.stock + ' in stock · ' + money(inv.price) : 'base ' + money(it.baseValue);
+        // The type disambiguates similarly named entries; Unsorted says nothing,
+        // so it is left off rather than added to every row.
+        const type = it.category && it.category !== 'Unsorted' ? ' · ' + it.category : '';
+        return (inv ? inv.stock + ' in stock · ' + money(inv.price) : 'base ' + money(it.baseValue)) + type;
       },
       onPick: (it) => {
         const inv = invByNorm.get(norm(it.name));

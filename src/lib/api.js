@@ -197,18 +197,28 @@ export const api = {
     const s = q.toString();
     return request('GET', '/admin/audit' + (s ? '?' + s : ''));
   },
-  /** Any registered user: the master item index (name + base value). */
+  /** Any registered user: the item index ({items, types} — name, base value, type). */
   getItems: () => request('GET', '/items'),
-  /** Admin: add/edit a master item (rename via oldName). */
+  /** Admin: add/edit a master item (rename via oldName; `category` files it). */
   saveMasterItem: (item) => request('POST', '/admin/items', item),
+  /** Admin: empty this realm's index, or one type table (requires confirm: 'PURGE'). */
+  purgeItems: (category) => request('POST', '/admin/items/purge', { confirm: 'PURGE', category: category || '' }),
   /** Admin: delete a master item. */
-  /** Admin: empty this realm's item index (requires confirm: 'PURGE'). */
-  purgeItems: () => request('POST', '/admin/items/purge', { confirm: 'PURGE' }),
   deleteMasterItem: (name) => request('POST', '/admin/items/delete', { name }),
-  /** Admin: bulk import master items [{name, baseValue}] (recognized names update, not duplicate). */
-  importMasterItems: (rows) => request('POST', '/admin/items/import', { rows }),
-  /** Admin: classify an item import (create/update/typos) without applying it. */
-  analyzeItems: (rows) => request('POST', '/admin/items/import/analyze', { rows }),
+  /**
+   * Admin: bulk import master items [{name, baseValue, type}]. Recognized names
+   * update, not duplicate. `into` is the table unflagged rows land in — omit it
+   * (the whole-index import) and they go to Unsorted.
+   */
+  importMasterItems: (rows, into) => request('POST', '/admin/items/import', { rows, into: into || '' }),
+  /** Admin: classify an item import (create/update/typos/newTypes) without applying it. */
+  analyzeItems: (rows, into) => request('POST', '/admin/items/import/analyze', { rows, into: into || '' }),
+  /** Admin: add a type table (flags: extra words that sort an import into it). */
+  addItemType: (name, flags) => request('POST', '/admin/item-types', { name, flags: flags || [] }),
+  /** Admin: rename a type table (its items move with it) and/or replace its flags. */
+  updateItemType: (name, patch) => request('POST', '/admin/item-types/update', { name, ...patch }),
+  /** Admin: remove a type table — its items are re-filed as Unsorted, not deleted. */
+  deleteItemType: (name) => request('POST', '/admin/item-types/delete', { name }),
   /** Admin: replace the hold index. */
   setRegions: (regions) => request('POST', '/admin/regions', { holds: regions }),
 

@@ -64,7 +64,10 @@ describe('pre-realm database upgrade', () => {
   });
 
   it('keeps the existing rows, in the default realm', async () => {
-    expect(await listItemIndex(env, DEFAULT_REALM_ID)).toEqual([{ name: 'Iron Sword', baseValue: 30 }]);
+    // Rows that predate the type split land in Unsorted — the whole point of
+    // that table. The rebuild must fill it from the column DEFAULT, not from
+    // the realm id it substitutes for a missing realm_id.
+    expect(await listItemIndex(env, DEFAULT_REALM_ID)).toEqual([{ name: 'Iron Sword', baseValue: 30, category: 'Unsorted' }]);
     const inv = await listInventory(env, 'Alpha', DEFAULT_REALM_ID);
     expect(inv).toHaveLength(1);
     expect(inv[0].stock).toBe(5);
@@ -75,9 +78,9 @@ describe('pre-realm database upgrade', () => {
     // "UNIQUE constraint failed: master_item.name".
     const res = await importItemIndex(env, [{ name: 'Iron Sword', baseValue: 99 }], OTHER);
     expect(res.imported).toBe(1);
-    expect(await listItemIndex(env, OTHER)).toEqual([{ name: 'Iron Sword', baseValue: 99 }]);
+    expect(await listItemIndex(env, OTHER)).toEqual([{ name: 'Iron Sword', baseValue: 99, category: 'Unsorted' }]);
     // The original realm's value is untouched.
-    expect(await listItemIndex(env, DEFAULT_REALM_ID)).toEqual([{ name: 'Iron Sword', baseValue: 30 }]);
+    expect(await listItemIndex(env, DEFAULT_REALM_ID)).toEqual([{ name: 'Iron Sword', baseValue: 30, category: 'Unsorted' }]);
   });
 
   it('lets two realms stock the same item in a same-named shop', async () => {

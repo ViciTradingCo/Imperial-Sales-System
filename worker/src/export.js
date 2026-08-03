@@ -15,7 +15,7 @@ import { readRealmPrefs } from './realm-prefs.js';
 // registry tables (users, companies, settings, MOTD) now that D1 is the sole
 // source of truth — a backup captures the whole system.
 const TABLES = ['inventory', 'sales', 'intake', 'transfers', 'coffer_entries',
-  'discounts', 'shop_style', 'audit', 'master_item', 'hold_index', 'sys_flags',
+  'discounts', 'shop_style', 'audit', 'master_item', 'item_type', 'hold_index', 'sys_flags',
   'users', 'companies', 'master_settings', 'business_settings', 'motd_list'];
 
 const SAFE_COL = /^[a-z_][a-z0-9_]*$/i;

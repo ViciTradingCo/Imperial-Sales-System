@@ -88,9 +88,26 @@ const SCHEMA = [
   // Config indexes moved off Sheets onto D1 (hot paths: checkout, market, hold
   // dropdowns). Seeded once from the Core's index tabs (see item-index.js /
   // holds.js), then D1 is the source of truth.
+  // The index is divided into one table per TYPE of item (Weapons, Potions, …).
+  // `category` is which of those an item belongs to; the type list itself lives
+  // in item_type. An item's NAME is still unique realm-wide, not per type: the
+  // register picks by name, so two "Iron Sword" rows filed under different types
+  // would be an ambiguity, not a distinction.
   `CREATE TABLE IF NOT EXISTS master_item (
      realm_id TEXT NOT NULL DEFAULT '${R}',
      name TEXT NOT NULL, base_value REAL NOT NULL DEFAULT 0,
+     category TEXT NOT NULL DEFAULT 'Unsorted',
+     PRIMARY KEY (realm_id, name))`,
+  // The realm's item types, in display order. Every realm starts with (and can
+  // never lose) "Unsorted" — the table anything unflagged lands in.
+  //
+  // `flags` is a JSON array of extra words an import line may carry to be sorted
+  // into this table: the sheet a realm actually keeps says "wep" or "1H" where
+  // the table is called Weapons, and renaming the table to match the sheet is
+  // the wrong way round. The table's own name always sorts into it too.
+  `CREATE TABLE IF NOT EXISTS item_type (
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     name TEXT NOT NULL, ord INTEGER NOT NULL DEFAULT 0, flags TEXT NOT NULL DEFAULT '[]',
      PRIMARY KEY (realm_id, name))`,
   `CREATE TABLE IF NOT EXISTS hold_index (
      ord INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,7 +170,7 @@ const SCHEMA = [
 /** Every table that holds realm-owned data (all get a realm_id column). */
 export const REALM_TABLES = [
   'inventory', 'sales', 'intake', 'transfers', 'coffer_entries', 'discounts',
-  'shop_style', 'audit', 'master_item', 'hold_index', 'users', 'companies',
+  'shop_style', 'audit', 'master_item', 'item_type', 'hold_index', 'users', 'companies',
   'master_settings', 'business_settings', 'motd_list',
 ];
 
@@ -201,6 +218,10 @@ const MIGRATIONS = [
   'ALTER TABLE companies ADD COLUMN join_code TEXT',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_realms_join_code ON realms (join_code) WHERE join_code IS NOT NULL',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_join_code ON companies (join_code) WHERE join_code IS NOT NULL',
+  // Item types: everything already in the index predates the split, so it lands
+  // in "Unsorted" — the DEFAULT does the backfill, and no row is lost.
+  "ALTER TABLE master_item ADD COLUMN category TEXT NOT NULL DEFAULT 'Unsorted'",
+  'CREATE INDEX IF NOT EXISTS idx_master_item_category ON master_item (realm_id, category)',
 ];
 
 /**
@@ -216,7 +237,7 @@ const REBUILDS = [
   { table: 'master_settings', cols: ['realm_id', 'label', 'value'] },
   { table: 'business_settings', cols: ['realm_id', 'business', 'label', 'value'] },
   { table: 'shop_style', cols: ['realm_id', 'business', 'tagline', 'accent'] },
-  { table: 'master_item', cols: ['realm_id', 'name', 'base_value'] },
+  { table: 'master_item', cols: ['realm_id', 'name', 'base_value', 'category'], defaults: { category: 'Unsorted' } },
   { table: 'inventory', cols: ['realm_id', 'business', 'item', 'price', 'stock', 'low_stock'] },
   { table: 'discounts', cols: ['realm_id', 'business', 'name', 'percent'] },
 ];
@@ -247,16 +268,22 @@ async function needsRebuild(db, table) {
  * realm_id defaulting to the default realm (which is where all pre-realm data
  * belongs). Best-effort — a failure leaves the original table untouched.
  */
-async function rebuildTable(db, { table, cols }) {
+async function rebuildTable(db, { table, cols, defaults }) {
   const create = SCHEMA.find((s) => new RegExp('CREATE TABLE IF NOT EXISTS ' + table + '\\b').test(s));
   if (!create) return;
   const tmp = table + '_realm_new';
   const ddl = create.replace('CREATE TABLE IF NOT EXISTS ' + table, 'CREATE TABLE ' + tmp);
-  // Only copy columns the OLD table actually has; realm_id gets the default.
+  // Only copy columns the OLD table actually has. A column the old table lacks
+  // is filled from the spec's `defaults` (realm_id always gets the default
+  // realm). This used to substitute the realm id for ANY missing column, which
+  // was only ever correct because realm_id was the sole one — the moment a
+  // second new column appeared it would have written "default" into it.
   const info = await db.prepare('PRAGMA table_info(' + table + ')').all();
   const have = new Set((info.results || []).map((c) => String(c.name)));
+  const fill = { realm_id: R, ...(defaults || {}) };
   const copy = cols.filter((c) => have.has(c));
-  const select = cols.map((c) => (have.has(c) ? c : `'${R}' AS ${c}`)).join(', ');
+  const select = cols.map((c) => (have.has(c) ? c
+    : (fill[c] !== undefined ? `'${fill[c]}' AS ${c}` : `NULL AS ${c}`))).join(', ');
   if (!copy.length) return;
   await db.prepare('DROP TABLE IF EXISTS ' + tmp).run();
   await db.prepare(ddl).run();
@@ -351,8 +378,9 @@ export async function purgeLogs(env, amount, unit, realmId) {
  * accounts and the reference DEFAULTS. Used to clear test/launch data for a
  * clean start. Irreversible (export a backup first).
  *
- * PRESERVED on purpose: `master_item` (the Master Item Index) and `hold_index`
- * (the Holds list). Those are curated reference data, not per-season records —
+ * PRESERVED on purpose: `master_item` + `item_type` (the Master Item Index and
+ * the tables it is divided into) and `hold_index` (the region list). Those are
+ * curated reference data, not per-season records —
  * rebuilding them by hand after every reset would be painful, so a reset leaves
  * them intact. Clear them individually from their own admin screens if needed.
  *
