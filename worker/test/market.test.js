@@ -65,6 +65,13 @@ describe('average sold', () => {
   });
 });
 
+/** A transfer accepted from another company: goods in, paid for at its price. */
+let transferNo = 0;
+const transferIn = (qty, price, status) => env.DB.prepare(
+  `INSERT INTO transfers (realm_id, from_business, to_business, item, qty, price, status, ts)
+   VALUES (?, 'Rival Traders', 'Alpha', 'Iron Sword', ?, ?, ?, '2026-01-01T00:00:00Z')`)
+  .bind(R, qty, price, status || 'accepted').run();
+
 describe('average bought', () => {
   it('weights intake by quantity', async () => {
     await intake(10, 5);
@@ -81,6 +88,38 @@ describe('average bought', () => {
   it('skips intake rows with no quantity', async () => {
     await intake(0, 999);
     await intake(2, 10);
+    expect((await itemRow()).avgBought).toBe(10);
+  });
+
+  it('counts stock taken in from another company — that is buying too', async () => {
+    await transferIn(4, 25);
+    expect((await itemRow()).avgBought).toBe(25);
+  });
+
+  it('weights intake and transfers together', async () => {
+    await intake(3, 10);       // 30 over 3
+    await transferIn(1, 50);   // 50 over 1
+    expect((await itemRow()).avgBought).toBe(80 / 4);
+  });
+
+  it('ignores a transfer that was never accepted', async () => {
+    await intake(2, 10);
+    await transferIn(10, 999, 'pending');
+    await transferIn(10, 999, 'declined');
+    expect((await itemRow()).avgBought).toBe(10);
+  });
+
+  it('ignores a gifted transfer — a price of nothing is not a purchase', async () => {
+    await intake(2, 10);
+    await transferIn(50, 0);
+    expect((await itemRow()).avgBought).toBe(10);
+  });
+
+  it('does not read another realm\'s transfers', async () => {
+    await intake(2, 10);
+    await env.DB.prepare(
+      `INSERT INTO transfers (realm_id, from_business, to_business, item, qty, price, status, ts)
+       VALUES ('rlm-other', 'X', 'Alpha', 'Iron Sword', 99, 999, 'accepted', '2026-01-01T00:00:00Z')`).run();
     expect((await itemRow()).avgBought).toBe(10);
   });
 });

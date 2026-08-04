@@ -23,7 +23,7 @@ import { renderLedgerSettings } from './ledger-settings.js';
 import { openLowStockModal } from './low-stock.js';
 import { skeletonLines } from '../lib/skeleton.js';
 
-export function renderHome(container, { me, onProfileUpdated }) {
+export function renderHome(container, { me }) {
   // Notices — the global MOTD plus any active per-business messages.
   const motdHost = el('div', {});
   api.getMotd().then((r) => {
@@ -75,8 +75,8 @@ export function renderHome(container, { me, onProfileUpdated }) {
         onOpen: () => open('Inventory', (h) => renderInventory(h, { me })) },
       me.role === 'owner' ? { key: 'employees', label: 'Employees', hint: 'Your roster', glyph: '🧑‍🤝‍🧑',
         onOpen: () => open('Employees', (h) => renderEmployees(h, { me })) } : null,
-      me.role === 'owner' ? { key: 'ledger', label: 'Shop Ledger', hint: 'Coffers, discounts, style', glyph: '📖',
-        onOpen: () => open('Shop Ledger', (h) => renderLedgerSettings(h, { me, onBusinessRenamed: onProfileUpdated || (() => {}) })) } : null,
+      me.role === 'owner' ? { key: 'ledger', label: 'Shop Ledger', hint: 'Performance, notices, coffers', glyph: '📖',
+        onOpen: () => open('Shop Ledger', (h) => renderLedgerSettings(h, { me })) } : null,
       me.role === 'owner' ? { key: 'restock', label: 'Restock', hint: 'Low & out of stock', glyph: '🔔',
         onOpen: () => openLowStockModal() } : null,
     ];

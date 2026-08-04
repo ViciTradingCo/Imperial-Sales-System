@@ -215,6 +215,9 @@ export const api = {
     const s = q.toString();
     return request('GET', '/admin/audit' + (s ? '?' + s : ''));
   },
+  /** Owner/admin: craft — consume ingredients from stock, produce another item. */
+  convertInventory: (inputs, output, idempotencyKey) =>
+    request('POST', '/business/inventory/convert', { inputs, output, idempotencyKey }),
   /** Any registered user: the item index ({items, types} — name, base value, type). */
   getItems: () => request('GET', '/items'),
   /** Admin: add/edit a master item (rename via oldName; `category` files it). */

@@ -1,10 +1,16 @@
 /**
- * Shop Ledger (owner) — the owner's control room for one shop:
- *   • Company name
- *   • Coffers — treasury balance, ledger, and manual deposit/withdraw
- *   • Discounts — reusable named discounts for the register
- *   • Style — the shop's tagline + accent shown on its register
- *   • Shop settings — the per-shop tunables (min priced units, …)
+ * The owner's two screens for their own shop, sharing the cards below.
+ *
+ *   • Shop Ledger (Home tile)  — what an owner checks while TRADING:
+ *     performance, notices to staff, and the coffer.
+ *   • Shop Settings (side menu) — what they SET UP and rarely touch again:
+ *     discounts, the storefront link, exports, the staff code, and the shop's
+ *     own name, style and tunables.
+ *
+ * They were one screen of ten tiles, which meant the coffer — looked at daily —
+ * sat beside the accent colour, looked at once. Splitting by how often a thing
+ * is used is what makes the daily screen short.
+ *
  * Scoped to the caller's business by the API.
  */
 import { el, mount, esc } from '../lib/dom.js';
@@ -17,50 +23,69 @@ import { renderShopReport } from './shop-report.js';
 import { codePanel } from './realms.js';
 import { renderShopNotices } from './shop-notices.js';
 
-export function renderLedgerSettings(container, { me, onBusinessRenamed }) {
+/** Renders a tile page, with the admin-assigned artwork once it arrives. */
+function tilePage(container, { title, note, sections }) {
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
-    el('h2', {}, 'Shop Ledger'),
-    el('p', { class: 'note' }, esc(me.business || 'Your shop') + ' — pick a section to open it.'),
+    el('h2', {}, title),
+    el('p', { class: 'note' }, note),
     gridHost,
   ]));
-
-  const sections = [
-    { key: 'led-report', label: 'Performance', hint: 'Revenue & best sellers', glyph: '📈',
-      open: (host) => renderShopReport(host) },
-    { key: 'led-notices', label: 'Notices', hint: 'Post to your staff', glyph: '📣',
-      open: (host) => renderShopNotices(host) },
-    { key: 'led-coffer', label: 'Coffers', hint: 'Balance & ledger', glyph: '🪙',
-      open: (host) => mount(host, cofferCard()) },
-    { key: 'led-discounts', label: 'Discounts', hint: 'Reusable offers', glyph: '🏷️',
-      open: (host) => mount(host, discountsCard()) },
-    { key: 'led-style', label: 'Style', hint: 'Tagline & accent', glyph: '🎨',
-      open: (host) => mount(host, styleCard()) },
-    { key: 'led-storefront', label: 'Storefront', hint: 'Public share link', glyph: '🏪',
-      open: (host) => mount(host, storefrontLinkCard(me)) },
-    { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
-      open: (host) => mount(host, exportCard()) },
-    { key: 'led-staff-code', label: 'Staff code', hint: 'Invite your employees', glyph: '🎟️',
-      open: (host) => mount(host, codePanel({
-        title: '🎟️ Staff code',
-        note: 'Give this to anyone who works for you. They enter it when they sign up and land straight in ' +
-          'this shop as a pending employee — you activate them from Employees. They never see any other shop.',
-        load: async () => (await api.getBusinessCode()).joinCode,
-        reset: async () => (await api.resetBusinessCode()).joinCode,
-        resetWarning: 'Issue a new staff code?\n\nThe current code stops working immediately — use this if it ' +
-          'has been shared somewhere it shouldn’t have been. Anyone still waiting to register will need the new one.',
-      })) },
-    { key: 'led-company', label: 'Company', hint: 'Rename your shop', glyph: '🏛️',
-      open: (host) => mount(host, companyCard(me, onBusinessRenamed)) },
-    { key: 'led-settings', label: 'Shop settings', hint: 'Per-shop tunables', glyph: '⚙️',
-      open: (host) => renderShopSettings(host) },
-  ];
-
-  function draw(images) {
-    mount(gridHost, tileGrid(sectionTiles(sections, navigate), images));
-  }
+  const draw = (images) => mount(gridHost, tileGrid(sectionTiles(sections, navigate), images));
   draw({});
-  api.getTiles().then((r) => draw(r.images || {})).catch(() => {});
+  api.getTiles().then((r) => draw(r.images || {})).catch(() => { /* glyphs are fine */ });
+}
+
+/** Shop Ledger — the daily three. */
+export function renderLedgerSettings(container, { me }) {
+  tilePage(container, {
+    title: 'Shop Ledger',
+    note: esc(me.business || 'Your shop') + ' — how the shop is doing, day to day. ' +
+      'Discounts, style, and the rest are under Shop Settings in the menu.',
+    sections: [
+      { key: 'led-report', label: 'Performance', hint: 'Revenue & best sellers', glyph: '📈',
+        open: (host) => renderShopReport(host) },
+      { key: 'led-notices', label: 'Notices', hint: 'Post to your staff', glyph: '📣',
+        open: (host) => renderShopNotices(host) },
+      { key: 'led-coffer', label: 'Coffers', hint: 'Balance & ledger', glyph: '🪙',
+        open: (host) => mount(host, cofferCard()) },
+    ],
+  });
+}
+
+/** Shop Settings — everything an owner configures. */
+export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
+  tilePage(container, {
+    title: 'Shop Settings',
+    note: esc(me.business || 'Your shop') + ' — how your shop is set up. Day-to-day figures are on the ' +
+      'Shop Ledger tile at home.',
+    sections: [
+      { key: 'led-discounts', label: 'Discounts', hint: 'Reusable offers', glyph: '🏷️',
+        open: (host) => mount(host, discountsCard()) },
+      { key: 'led-storefront', label: 'Storefront', hint: 'Public share link', glyph: '🏪',
+        open: (host) => mount(host, storefrontLinkCard(me)) },
+      { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
+        open: (host) => mount(host, exportCard()) },
+      { key: 'led-staff-code', label: 'Staff code', hint: 'Invite your employees', glyph: '🎟️',
+        open: (host) => mount(host, codePanel({
+          title: '🎟️ Staff code',
+          note: 'Give this to anyone who works for you. They enter it when they sign up and land straight in ' +
+            'this shop as a pending employee — you activate them from Employees. They never see any other shop.',
+          load: async () => (await api.getBusinessCode()).joinCode,
+          reset: async () => (await api.resetBusinessCode()).joinCode,
+          resetWarning: 'Issue a new staff code?\n\nThe current code stops working immediately — use this if it ' +
+            'has been shared somewhere it shouldn\u2019t have been. Anyone still waiting to register will need the new one.',
+        })) },
+      // Name, look, and tunables are one job — "set my shop up" — and were three
+      // tiles you had to visit in turn to do it.
+      { key: 'led-settings', label: 'Settings', hint: 'Name, style & tunables', glyph: '⚙️',
+        open: (host) => {
+          const formHost = el('div', {});
+          mount(host, companyCard(me, onBusinessRenamed), styleCard(), formHost);
+          renderShopSettings(formHost);
+        } },
+    ],
+  });
 }
 
 function renderShopSettings(formHost) {

@@ -11,7 +11,7 @@ import { realmOf } from '../realm.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
-import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport } from '../inventory.js';
+import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport, convertItems } from '../inventory.js';
 import { recordIntake, listIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
 import { listItemIndex, listItemTypes } from '../item-index.js';
@@ -106,6 +106,22 @@ async function addShopNotice({ request, env, body }) {
 async function deleteShopNotice({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
   return { notices: await deleteMotdForBusiness(env, caller.business, body.id, realmIdOf(caller, env)) };
+}
+
+/**
+ * Crafting: consume ingredients from this shop's stock, produce something else.
+ * Owner/admin only — it destroys stock, which an employee ringing up sales has
+ * no reason to do.
+ */
+async function convertInventory({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await convertItems(env, caller.business, body, realmId);
+  if (!res.duplicate) {
+    await logAudit(env, { actor: actorName(caller), business: caller.business,
+      action: 'inventory.craft', detail: res.detail, realmId });
+  }
+  return res;
 }
 
 /* ---- feedback on the app ---- */
@@ -469,6 +485,7 @@ export const routes = [
   { method: 'GET', path: '/tiles', handler: getTiles },
   { method: 'GET', path: '/market/region', handler: holdReportRoute },
   { method: 'GET', path: '/motd', handler: getMotd },
+  { method: 'POST', path: '/business/inventory/convert', handler: convertInventory },
   { method: 'GET', path: '/feedback', handler: getFeedback },
   { method: 'POST', path: '/feedback', handler: postFeedback },
   { method: 'GET', path: '/public/storefront', handler: storefront },

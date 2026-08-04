@@ -141,6 +141,15 @@ body {
 .trend-fill { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
 .trend-day { font-size: 10px; color: var(--note); white-space: nowrap; }
 
+/* An ingredient line: the picker takes the room, quantity and Remove sit tight
+   beside it rather than each claiming a full-width row. */
+.craft-row {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: var(--sp-2);
+}
+.craft-row .item-picker { flex: 1 1 auto; min-width: 0; }
+.craft-row input[type="number"] { flex: 0 0 84px; width: 84px; margin: 0; }
+.craft-row button { flex: 0 0 auto; margin: 0; }
+
 /* A checkbox and its label on one line, rather than the label stacked above
    the control the way the text fields are. */
 .check-row {

@@ -30,7 +30,7 @@ export function navItems(me) {
   // Court businesses get a report for their own hold.
   // A realm with regions switched off has nothing for this report to show.
   if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/region-report', label: regionLabel() + ' Report' });
-  if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Ledger Settings' });
+  if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Shop Settings' });
   // The people who use the app every day are the ones with something to say
   // about it; an admin has the review screen instead.
   if (me.role === 'owner' || me.role === 'employee') items.push({ path: '/feedback', label: 'Feedback' });

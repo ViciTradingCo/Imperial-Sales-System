@@ -17,6 +17,7 @@ import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
+import { toast } from '../lib/toast.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = me.role === 'owner' || me.role === 'admin';
@@ -32,6 +33,7 @@ export function renderInventory(container, { me }) {
   if (canEdit) {
     firstCard.push(el('div', { class: 'row-actions' }, [
       el('button.primary', { onclick: () => openIntakeModal(refreshAll) }, 'Record Intake'),
+      el('button.secondary-btn', { onclick: () => openCraftModal(refreshAll) }, 'Craft'),
       el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshAll) }, 'Transfer'),
       el('button.secondary-btn', { onclick: () => openImportExportModal(refreshInventory) }, 'Import/Export'),
     ]));
@@ -52,9 +54,12 @@ export function renderInventory(container, { me }) {
 
   function renderList(items) {
     if (!items.length) {
+      // No action button here: Record Intake is in the toolbar a few pixels
+      // above, and the empty state was rendering a second one right under it.
       mount(listHost, emptyState({ glyph: '📦', title: 'No items yet',
-        hint: 'Record an intake to stock your first item — it will appear here with its price and stock.',
-        actionLabel: canEdit ? 'Record Intake' : null, onAction: canEdit ? () => openIntakeModal(refreshAll) : null }));
+        hint: canEdit
+          ? 'Record an intake above to stock your first item — it will appear here with its price and stock.'
+          : 'Nothing stocked yet.' }));
       return;
     }
     const rows = items.map((it) => {
@@ -141,6 +146,117 @@ function openItemModal(it, onSaved) {
     el('p', { class: 'note' }, 'Stock (' + it.stock + ') is set by intake and sales, not here.'),
     el('label', {}, 'Sale price'), price,
     el('label', {}, 'Low stock threshold'), low,
+    save,
+    status,
+  ]);
+}
+
+/**
+ * Crafting — turn stock you hold into something else.
+ *
+ * Ingredients are chosen from what the shop ACTUALLY HAS (with its stock shown),
+ * because you cannot craft with what you do not hold; the output is chosen from
+ * the master index, because you can make something you have never stocked. Both
+ * are pickers rather than free text, for the same reason the register is: a
+ * typo here would silently invent an item.
+ *
+ * Nothing is charged — no gold changed hands, so no coffer entry and no effect
+ * on what items are worth.
+ */
+function openCraftModal(onDone) {
+  const idem = newIdem(); // a retry must not eat the ingredients twice
+  let stock = [];   // what this shop holds
+  let master = [];  // what can be made
+
+  const rowsHost = el('div', {});
+  const rows = [];  // [{ el, picker, qty }]
+
+  const outPicker = createItemPicker({
+    placeholder: 'What are you making?',
+    meta: (it) => 'base ' + money(it.baseValue) +
+      (it.category && it.category !== 'Unsorted' ? ' · ' + it.category : ''),
+  });
+  const outQty = el('input', { type: 'number', step: '1', min: '1', value: '1' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doCraft }, 'Craft');
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  Promise.all([
+    api.getInventory().catch(() => ({ inventory: [] })),
+    api.getItems().catch(() => ({ items: [] })),
+  ]).then(([inv, idx]) => {
+    // Only items with stock left: offering an ingredient you have none of is
+    // offering a craft that cannot succeed.
+    stock = (inv.inventory || []).filter((it) => it.stock > 0)
+      .map((it) => ({ name: it.item, stock: it.stock }));
+    master = idx.items || [];
+    outPicker.setItems(master);
+    rows.forEach((r) => r.picker.setItems(stock));
+    if (!stock.length) setStatus('You have nothing in stock to craft with.', 'warn');
+  });
+
+  function addRow() {
+    const picker = createItemPicker({
+      placeholder: 'Ingredient…',
+      meta: (it) => it.stock + ' in stock',
+      items: stock,
+    });
+    const qty = el('input', { type: 'number', step: '1', min: '1', value: '1' });
+    const remove = el('button.secondary-btn.small', { onclick: () => {
+      const i = rows.findIndex((r) => r.picker === picker);
+      if (i >= 0) { rows.splice(i, 1); draw(); }
+    } }, 'Remove');
+    const node = el('div', { class: 'craft-row' }, [picker.el, qty, remove]);
+    rows.push({ node, picker, qty, remove });
+    draw();
+  }
+
+  function draw() {
+    // The last remaining row keeps no Remove button — a craft with no
+    // ingredients is not a state worth being able to reach.
+    rows.forEach((r) => { r.remove.hidden = rows.length < 2; });
+    mount(rowsHost, ...rows.map((r) => r.node));
+  }
+
+  async function doCraft() {
+    const inputs = [];
+    for (const r of rows) {
+      const name = r.picker.value();
+      if (!name) { setStatus('Pick each ingredient from your stock.', 'error'); return; }
+      const q = Math.floor(Number(r.qty.value));
+      if (!q || q < 1) { setStatus('Each ingredient needs a quantity.', 'error'); return; }
+      inputs.push({ item: name, qty: q });
+    }
+    const outName = outPicker.value();
+    if (!outName) { setStatus('Pick what you are making.', 'error'); return; }
+    const oq = Math.floor(Number(outQty.value));
+    if (!oq || oq < 1) { setStatus('How many are you making?', 'error'); return; }
+
+    save.disabled = true;
+    setStatus('Crafting…', '');
+    try {
+      const res = await api.convertInventory(inputs, { item: outName, qty: oq }, idem);
+      onDone();
+      modal.close();
+      toast(res.duplicate
+        ? 'Already crafted.'
+        : 'Made ' + res.made.qty + ' × ' + res.made.item + '.', 'ok');
+    } catch (e) {
+      save.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  addRow();
+  const modal = openModal([
+    el('h3', {}, 'Craft'),
+    el('p', { class: 'note' }, 'Turn stock you hold into something else. The ingredients are removed and what ' +
+      'you make is added. No money changes hands.'),
+    el('label', {}, 'Ingredients — item and how many'),
+    rowsHost,
+    el('button.secondary-btn.small', { onclick: addRow }, '+ Add ingredient'),
+    el('label', {}, 'Makes'),
+    el('div', { class: 'craft-row' }, [outPicker.el, outQty]),
     save,
     status,
   ]);

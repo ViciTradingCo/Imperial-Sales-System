@@ -128,7 +128,9 @@ function bestRegionOf(regionMap) {
  *
  *   • avgSold   — quantity-weighted MEAN of what it went for. "On average we
  *                 charged this", takings divided by units.
- *   • avgBought — the same for intake: what it costs to stock.
+ *   • avgBought — what it costs to STOCK: intake bought from vendors, plus
+ *                 accepted transfers bought from other companies. A price of 0
+ *                 is a gift, not a purchase, and is left out.
  *   • avgValue  — what the item is WORTH, from a sales analysis (see
  *                 salesValue). Robust to the one absurd sale that a mean is not.
  *   • valueSamples — units of sales behind avgValue, so a valuation resting on
@@ -140,7 +142,7 @@ function bestRegionOf(regionMap) {
  * `revenue` stays on the row: it is the ranking key here, and the shop and
  * region reports display it.
  */
-function itemStats(saleRows, master, intakeRows) {
+function itemStats(saleRows, master, intakeRows, transferRows) {
   const exact = new Map();
   master.forEach((it) => exact.set(normalizeItem(it.name), it));
   const map = {};
@@ -181,16 +183,23 @@ function itemStats(saleRows, master, intakeRows) {
     });
   });
 
-  (intakeRows || []).forEach((r) => {
-    const hit = canon(r.item);
-    if (!hit) return;
-    const qty = Number(r.num_items) || 0;
-    const per = Number(r.price_per) || 0;
-    if (qty <= 0) return;
+  // The BUY side: every way a company takes stock in and pays for it.
+  const bought = (name, qty, per) => {
+    const hit = canon(name);
+    // A price of 0 is a gift, not a purchase, and averaging it in would drag
+    // the cost of stocking an item toward nothing — the same reason an employee
+    // purchase is not a sale.
+    if (!hit || !(qty > 0) || !(per > 0)) return;
     const m = row(hit.name);
     m.boughtQty += qty;
     m.boughtValue += qty * per;
-  });
+  };
+  // Intake: bought from a vendor outside the network.
+  (intakeRows || []).forEach((r) => bought(r.item, Number(r.num_items) || 0, Number(r.price_per) || 0));
+  // Accepted transfers: bought from another company INSIDE the network. The
+  // goods arrived and were paid for at the transfer's price, so leaving these
+  // out understated what it costs to stock anything a realm trades internally.
+  (transferRows || []).forEach((r) => bought(r.item, Number(r.qty) || 0, Number(r.price) || 0));
 
   return Object.values(map).map((m) => {
     // The raw lines and the accumulator maps are working data, not payload.
@@ -264,7 +273,9 @@ export async function marketAnalysis(env, realmId) {
   // Intake is the buy side of the same items — what a shop paid to stock them.
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
-  const ranked = itemStats(saleRows, master, intakeRows);
+  const transferRows = ((await db.prepare(
+    `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
+  const ranked = itemStats(saleRows, master, intakeRows, transferRows);
   // Only the five on screen carry a trend; the rest of the list would multiply
   // the response size for series nothing draws.
   const items = withoutTrend(ranked);
@@ -327,7 +338,9 @@ export async function itemReport(env, name, realmId) {
     `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
-  const found = itemStats(saleRows, master, intakeRows).find((r) => r.item === hit.name);
+  const transferRows = ((await db.prepare(
+    `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
+  const found = itemStats(saleRows, master, intakeRows, transferRows).find((r) => r.item === hit.name);
 
   // An indexed item that has never traded is a valid answer, not an error.
   return {
@@ -366,12 +379,16 @@ export async function businessReport(env, business, realmId) {
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?`).bind(realmId, b).all()).results) || [];
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per FROM intake WHERE realm_id = ? AND business = ?`).bind(realmId, b).all()).results) || [];
+  // What this shop took IN from other companies counts as its buying too.
+  const transferRows = ((await db.prepare(
+    `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted' AND to_business = ?`)
+    .bind(realmId, b).all()).results) || [];
 
   return {
     business: b,
     overview: overview || empty.overview,
     trends,
-    items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId), intakeRows)).slice(0, 20),
+    items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId), intakeRows, transferRows)).slice(0, 20),
   };
 }
 

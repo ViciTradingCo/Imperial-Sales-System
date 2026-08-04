@@ -35,7 +35,7 @@ import { renderRegionReport } from './views/region-report.js';
 import { renderMotdAdmin } from './views/motd-admin.js';
 import { renderAudit } from './views/audit.js';
 import { renderItemIndex } from './views/item-index.js';
-import { renderLedgerSettings } from './views/ledger-settings.js';
+import { renderShopSettingsPage } from './views/ledger-settings.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
@@ -158,10 +158,7 @@ function renderSignedOutLanding(container) {
 // ---- routes --------------------------------------------------------------
 function showRoot(container) {
   if (!state.me) { renderSignedOutLanding(container); return; }
-  if (state.me.registered) renderHome(container, {
-    me: state.me,
-    onProfileUpdated: (me) => { state.me = me; renderBadge(); render(); },
-  });
+  if (state.me.registered) renderHome(container, { me: state.me });
   else navigate('/register');
 }
 route('/', showRoot);
@@ -305,7 +302,7 @@ route('/region-report', (container) => {
 route('/ledger/settings', (container) => {
   const m = state.me;
   if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
-  renderLedgerSettings(container, {
+  renderShopSettingsPage(container, {
     me: m,
     onBusinessRenamed: (me) => { state.me = me; renderBadge(); render(); },
   });
