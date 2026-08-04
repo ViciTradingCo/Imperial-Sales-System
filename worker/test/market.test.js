@@ -38,9 +38,11 @@ const staffSale = (lines) => env.DB.prepare(
 const saleOn = (day, lines) => saleAt(day, '', lines);
 const saleIn = (region, lines) => saleAt('2026-01-01', region, lines);
 
-const intake = (qty, per) => env.DB.prepare(
-  `INSERT INTO intake (realm_id, business, ts, item, num_items, price_per)
-   VALUES (?, 'Alpha', '2026-01-01T00:00:00Z', 'Iron Sword', ?, ?)`).bind(R, qty, per).run();
+/** `from` is the region the goods came FROM — somebody there sold them. */
+const intakeFrom = (qty, per, from) => env.DB.prepare(
+  `INSERT INTO intake (realm_id, business, ts, item, source_hold, num_items, price_per)
+   VALUES (?, 'Alpha', '2026-01-01T00:00:00Z', 'Iron Sword', ?, ?, ?)`).bind(R, from || '', qty, per).run();
+const intake = (qty, per) => intakeFrom(qty, per, '');
 
 const itemRow = async () => (await marketAnalysis(env, R)).items[0];
 
@@ -190,6 +192,55 @@ describe('best region', () => {
   it('is null when no sale recorded a region', async () => {
     await sale([{ name: 'Iron Sword', qty: 1, price: 10 }]);
     expect((await itemRow()).bestRegion).toBeNull();
+  });
+
+  it('counts intake as trade in the region it came FROM', async () => {
+    // Nobody sold this anywhere; a shop bought it from Markarth, which is
+    // somebody in Markarth selling.
+    await intakeFrom(6, 45, 'Markarth');
+    const b = (await itemRow()).bestRegion;
+    expect(b.region).toBe('Markarth');
+    expect(b.value).toBe(45);
+    expect(b.qty).toBe(6);
+  });
+
+  it('weighs a region\'s sales and its supply together', async () => {
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 1, price: 60 }]);
+    await intakeFrom(9, 10, 'Whiterun');
+    // Nine units at 10 against one at 60: Whiterun trades this at 10.
+    expect((await itemRow()).bestRegion).toMatchObject({ region: 'Whiterun', value: 10, qty: 10 });
+  });
+});
+
+/**
+ * A region's totals cover everything that changed hands there: sales rung up in
+ * it, and intake sourced from it. Counting only the register's side would
+ * credit a region for what it buys and nothing for what it supplies.
+ */
+describe('region totals', () => {
+  const regionRow = async (name) => ((await marketAnalysis(env, R)).holds || []).find((h) => h.hold === name);
+
+  it('adds intake sourced from a region to that region', async () => {
+    await saleIn('Whiterun', [{ name: 'Iron Sword', qty: 2, price: 30 }]);   // 60 over 2, 1 order
+    await intakeFrom(4, 10, 'Whiterun');                                     // 40 over 4, 1 order
+    expect(await regionRow('Whiterun')).toEqual({ hold: 'Whiterun', orders: 2, items: 6, revenue: 100 });
+  });
+
+  it('lists a region that has only ever supplied', async () => {
+    await intakeFrom(3, 20, 'Markarth');
+    expect(await regionRow('Markarth')).toEqual({ hold: 'Markarth', orders: 1, items: 3, revenue: 60 });
+  });
+
+  it('does not invent a region for intake with no source recorded', async () => {
+    await intake(5, 10);
+    expect((await marketAnalysis(env, R)).holds).toEqual([]);
+  });
+
+  it('keeps the two regions of one intake apart from a sale elsewhere', async () => {
+    await saleIn('The Rift', [{ name: 'Iron Sword', qty: 1, price: 50 }]);
+    await intakeFrom(2, 15, 'Markarth');
+    expect(await regionRow('The Rift')).toMatchObject({ revenue: 50 });
+    expect(await regionRow('Markarth')).toMatchObject({ revenue: 30 });
   });
 });
 

@@ -131,9 +131,9 @@ function bestRegionOf(regionMap) {
  *   • valueSamples — units of trade behind avgValue, both directions, so a
  *                 valuation resting on two changes of hands reads as the guess
  *                 it is.
- *   • bestRegion — where the item is worth most. Measured on SALES only: a
- *                 region is where something sold, and intake records where
- *                 goods came from, which is a different question.
+ *   • bestRegion — where the item is worth most, over the trade recorded in
+ *                 each region: sales rung up there, and intake sourced from
+ *                 there, which is somebody there selling.
  *   • trend      — its daily series of units sold, for the graph.
  *
  * `revenue` stays on the row: it is the ranking key here, and the shop and
@@ -181,7 +181,7 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
   });
 
   // The BUY side: every way a company takes stock in and pays for it.
-  const bought = (name, qty, per) => {
+  const bought = (name, qty, per, region) => {
     const hit = canon(name);
     // A price of 0 is a gift, not a transaction at a price, and averaging it in
     // would drag the item's value toward nothing — the same reason an employee
@@ -192,13 +192,22 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
     m.boughtValue += qty * per;
     // A buy is a transaction too, so it is evidence of what the item is worth.
     m.lines.push({ price: per, qty });
+    // And it counts as trade in the region the goods CAME FROM: someone there
+    // sold them. Intake records that region; a sale records where it was rung
+    // up. Both are the item changing hands in that place.
+    if (region) {
+      const g = m.regions.get(region) || { qty: 0, revenue: 0, lines: [] };
+      g.qty += qty; g.revenue += qty * per; g.lines.push({ price: per, qty });
+      m.regions.set(region, g);
+    }
   };
-  // Intake: bought from a vendor outside the network.
-  (intakeRows || []).forEach((r) => bought(r.item, Number(r.num_items) || 0, Number(r.price_per) || 0));
+  // Intake: bought from a vendor outside the network, in a stated region.
+  (intakeRows || []).forEach((r) =>
+    bought(r.item, Number(r.num_items) || 0, Number(r.price_per) || 0, String(r.source_hold || '').trim()));
   // Accepted transfers: bought from another company INSIDE the network. The
-  // goods arrived and were paid for at the transfer's price, so leaving these
-  // out understated what it costs to stock anything a realm trades internally.
-  (transferRows || []).forEach((r) => bought(r.item, Number(r.qty) || 0, Number(r.price) || 0));
+  // goods arrived and were paid for at the transfer's price. No region: a
+  // transfer records two companies, not a place.
+  (transferRows || []).forEach((r) => bought(r.item, Number(r.qty) || 0, Number(r.price) || 0, ''));
 
   return Object.values(map).map((m) => {
     // The raw lines and the accumulator maps are working data, not payload.
@@ -216,6 +225,25 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
       trend: trendOf(days),
     };
   }).sort((a, b) => b.revenue - a.revenue);
+}
+
+/**
+ * Folds the two sides of a region's trade together, keyed by region name.
+ * `hold` is kept as the field name because every caller and view already reads
+ * it — see the naming note in CLAUDE.md.
+ */
+function mergeRegionTrade(...groups) {
+  const byRegion = new Map();
+  groups.forEach((rows) => (rows || []).forEach((r) => {
+    const name = String(r.region || '').trim();
+    if (!name) return;
+    const cur = byRegion.get(name) || { hold: name, orders: 0, items: 0, revenue: 0 };
+    cur.orders += Number(r.orders) || 0;
+    cur.items += Number(r.items) || 0;
+    cur.revenue += Number(r.revenue) || 0;
+    byRegion.set(name, cur);
+  }));
+  return [...byRegion.values()].sort((a, b) => b.revenue - a.revenue);
 }
 
 /** The list shape: everything except the per-item series. */
@@ -240,15 +268,29 @@ export async function marketAnalysis(env, realmId) {
       ORDER BY revenue DESC
       LIMIT 200`).bind(realmId).all()).results) || [];
 
-  const holds = ((await db.prepare(
-    `SELECT hold,
-            COUNT(*) AS orders,
-            COALESCE(SUM(qty_total), 0) AS items,
-            COALESCE(SUM(total), 0) AS revenue
-       FROM sales
-      WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold IS NOT NULL AND hold != ''
-      GROUP BY hold
-      ORDER BY revenue DESC`).bind(realmId).all()).results) || [];
+  /**
+   * A region's trade is everything that changed hands THERE — sales rung up in
+   * it, and intake sourced from it, which is somebody in that region selling to
+   * a shop. Counting only the register's side would credit a region for what it
+   * buys and nothing for what it supplies.
+   */
+  const holds = mergeRegionTrade(
+    ((await db.prepare(
+      `SELECT hold AS region,
+              COUNT(*) AS orders,
+              COALESCE(SUM(qty_total), 0) AS items,
+              COALESCE(SUM(total), 0) AS revenue
+         FROM sales
+        WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold IS NOT NULL AND hold != ''
+        GROUP BY hold`).bind(realmId).all()).results) || [],
+    ((await db.prepare(
+      `SELECT source_hold AS region,
+              COUNT(*) AS orders,
+              COALESCE(SUM(num_items), 0) AS items,
+              COALESCE(SUM(num_items * price_per), 0) AS revenue
+         FROM intake
+        WHERE realm_id = ? AND source_hold IS NOT NULL AND source_hold != ''
+        GROUP BY source_hold`).bind(realmId).all()).results) || []);
 
   const underpriced = ((await db.prepare(
     `SELECT i.business AS business, i.item AS item,
@@ -272,7 +314,7 @@ export async function marketAnalysis(env, realmId) {
     `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
   // Intake is the buy side of the same items — what a shop paid to stock them.
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
   const transferRows = ((await db.prepare(
     `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
   const ranked = itemStats(saleRows, master, intakeRows, transferRows);
@@ -355,7 +397,7 @@ export async function itemReport(env, name, realmId) {
   const saleRows = ((await db.prepare(
     `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
   const transferRows = ((await db.prepare(
     `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
   const found = itemStats(saleRows, master, intakeRows, transferRows).find((r) => r.item === hit.name);
@@ -396,7 +438,7 @@ export async function businessReport(env, business, realmId) {
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?`).bind(realmId, b).all()).results) || [];
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per FROM intake WHERE realm_id = ? AND business = ?`).bind(realmId, b).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND business = ?`).bind(realmId, b).all()).results) || [];
   // What this shop took IN from other companies counts as its buying too.
   const transferRows = ((await db.prepare(
     `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted' AND to_business = ?`)
@@ -419,10 +461,24 @@ export async function holdReport(env, hold, realmId) {
   const h = String(hold || '').trim();
   if (!h) return { hold: '', overview: { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses: [], items: [] };
 
-  const overview = await db.prepare(
+  // Sales rung up here, plus what shops bought FROM here — both are trade in
+  // this region, and a Court judging its own economy needs both.
+  const sold = await db.prepare(
     `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS itemsSold, COUNT(DISTINCT business) AS activeShops
        FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`).bind(realmId, h).first();
+  const supplied = await db.prepare(
+    `SELECT COALESCE(SUM(num_items * price_per), 0) AS revenue, COUNT(*) AS orders,
+            COALESCE(SUM(num_items), 0) AS itemsSold
+       FROM intake WHERE realm_id = ? AND source_hold = ?`).bind(realmId, h).first();
+  const overview = {
+    revenue: (sold ? sold.revenue : 0) + (supplied ? supplied.revenue : 0),
+    orders: (sold ? sold.orders : 0) + (supplied ? supplied.orders : 0),
+    itemsSold: (sold ? sold.itemsSold : 0) + (supplied ? supplied.itemsSold : 0),
+    // Shops TRADING here. Intake names a vendor, not a registered company, so
+    // the supply side has nobody to count.
+    activeShops: sold ? sold.activeShops : 0,
+  };
 
   const businesses = ((await db.prepare(
     `SELECT business, COUNT(*) AS orders,
@@ -432,8 +488,10 @@ export async function holdReport(env, hold, realmId) {
 
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`).bind(realmId, h).all()).results) || [];
+  const intakeRows = ((await db.prepare(
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?`)
+    .bind(realmId, h).all()).results) || [];
 
-  // No intake side here: a region's report covers sales MADE in that region, and
-  // intake records where goods came FROM, which is a different question.
-  return { hold: h, overview: overview || { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses, items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId))) };
+  return { hold: h, overview, businesses,
+    items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId), intakeRows)) };
 }

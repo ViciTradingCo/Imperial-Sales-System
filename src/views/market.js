@@ -216,9 +216,13 @@ function openItemDetail(name) {
 
 /* ---- Region Performance ---- */
 function regionPerformance(holds) {
-  return tableCard(regionLabel() + ' Performance', REGION_COLS.headers(),
-    holds.map(REGION_COLS.row),
-    'No sales with a ' + regionWord() + ' recorded yet.');
+  return el('div', {}, [
+    tableCard(regionLabel() + ' Performance', REGION_COLS.headers(),
+      holds.map(REGION_COLS.row),
+      'No trade with a ' + regionWord() + ' recorded yet.'),
+    el('p', { class: 'note' }, 'Counts everything that changed hands in a ' + regionWord() + ': sales rung up ' +
+      'there, and stock bought FROM there — somebody in that ' + regionWord() + ' selling to a shop.'),
+  ]);
 }
 
 /* ---- Company Performance ---- */

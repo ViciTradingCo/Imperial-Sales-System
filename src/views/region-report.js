@@ -18,8 +18,8 @@ import { tableCard } from './market.js';
 export function renderRegionReport(container) {
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading your ' + regionWord() + '’s report…'));
   mount(container,
-    el('p', { class: 'note' }, 'Commerce in your ' + regionWord() + ', as its Court. Voided sales and ' +
-      'employee purchases are excluded.'),
+    el('p', { class: 'note' }, 'Commerce in your ' + regionWord() + ', as its Court — sales rung up here, and ' +
+      'stock bought from here. Voided sales and employee purchases are excluded.'),
     host);
 
   api.getRegionReport()
@@ -33,7 +33,9 @@ export function renderRegionReport(container) {
           ['Items sold', String(o.itemsSold || 0)],
           ['Shops', String(o.activeShops || 0)],
         ]),
-        tableCard('Shops trading in your ' + regionWord(), ['Company', 'Orders', 'Items', 'Revenue'],
+        // Shops that SOLD here: intake names a vendor rather than a registered
+        // company, so the supply side has nobody to credit.
+        tableCard('Shops selling in your ' + regionWord(), ['Company', 'Orders', 'Items', 'Revenue'],
           (d.businesses || []).map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
           'No sales recorded in your ' + regionWord() + ' yet.'),
         tableCard('Items moving in your ' + regionWord(), ['Item', 'Qty sold', 'Revenue'],

@@ -11,6 +11,7 @@ import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
 import { ensureDefaultRealm } from '../src/realm.js';
 import { registerUser, updateCompany, listCompanies } from '../src/registry.js';
 import { requireCourt, courtCompanies, courtShop, shopRoster, shopOverview } from '../src/oversight.js';
+import { holdReport } from '../src/market.js';
 import { cacheBust } from '../src/cache.js';
 
 let env;
@@ -116,5 +117,32 @@ describe('the shared shop snapshot', () => {
   it('is the same shape an admin reads, and carries no staff code', async () => {
     const d = await shopOverview(env, NEIGHBOUR, R);
     expect(Object.keys(d).sort()).toEqual(['business', 'coffer', 'discounts', 'items', 'overview', 'style'].sort());
+  });
+});
+
+/**
+ * The Court's own market report covers everything traded in its region — sales
+ * rung up there, and what shops bought FROM there.
+ */
+describe('the region\'s market report', () => {
+  it('counts supply into the region as trade there', async () => {
+    await env.DB.prepare(
+      `INSERT INTO intake (realm_id, business, ts, item, source_hold, num_items, price_per)
+       VALUES (?, ?, '2026-01-01T00:00:00Z', 'Iron Sword', 'Whiterun', 4, 25)`).bind(R, NEIGHBOUR).run();
+    const d = await holdReport(env, 'Whiterun', R);
+    expect(d.overview.revenue).toBe(100);
+    expect(d.overview.itemsSold).toBe(4);
+    expect(d.overview.orders).toBe(1);
+    // Intake names a vendor, not a registered company, so the supply side has
+    // no shop to credit.
+    expect(d.overview.activeShops).toBe(0);
+  });
+
+  it('ignores supply sourced from another region', async () => {
+    await env.DB.prepare(
+      `INSERT INTO intake (realm_id, business, ts, item, source_hold, num_items, price_per)
+       VALUES (?, ?, '2026-01-01T00:00:00Z', 'Iron Sword', 'The Rift', 9, 99)`).bind(R, NEIGHBOUR).run();
+    const d = await holdReport(env, 'Whiterun', R);
+    expect(d.overview.revenue).toBe(0);
   });
 });
