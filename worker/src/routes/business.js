@@ -24,6 +24,7 @@ import { getShopStyle, setShopStyle } from '../shop-style.js';
 import { readMotd, readWarnDays, activeNoticesForBusiness,
   listMotdsForBusiness, addMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
 import { holdReport, businessReport } from '../market.js';
+import { requireCourt, courtCompanies, courtShop } from '../oversight.js';
 import { businessCsv } from '../export.js';
 import { publicStorefront } from '../storefront.js';
 import { readBranding } from '../branding.js';
@@ -376,6 +377,28 @@ async function holdReportRoute({ request, env }) {
 }
 
 /**
+ * Court oversight: the shops trading in this Court's region.
+ *
+ * A Court sees more of its neighbours than an ordinary shop does — rosters and
+ * ledgers — which is the point of the flag. What bounds it is the REGION: the
+ * gate resolves the caller's own region and every read is scoped to it, so a
+ * Court cannot reach a shop trading anywhere else.
+ */
+async function courtCompaniesRoute({ request, env }) {
+  const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
+  const hold = await requireCourt(env, caller.business, realmId);
+  return { hold, companies: await courtCompanies(env, hold, realmId) };
+}
+/** One of those shops in full — roster, coffer, discounts, style, performance. */
+async function courtShopRoute({ request, env, url }) {
+  const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
+  const hold = await requireCourt(env, caller.business, realmId);
+  return await courtShop(env, hold, url.searchParams.get('business'), realmId);
+}
+
+/**
  * Public (no auth): branding — needed before sign-in, so this is the DEPLOYMENT's
  * identity. A realm's own overrides are applied once the user signs in and their
  * realm is known (see /auth/me → realmBranding).
@@ -498,6 +521,8 @@ export const routes = [
   { method: 'GET', path: '/regions', handler: getHolds },
   { method: 'GET', path: '/tiles', handler: getTiles },
   { method: 'GET', path: '/market/region', handler: holdReportRoute },
+  { method: 'GET', path: '/court/companies', handler: courtCompaniesRoute },
+  { method: 'GET', path: '/court/company', handler: courtShopRoute },
   { method: 'GET', path: '/motd', handler: getMotd },
   { method: 'POST', path: '/business/intake/delete', handler: deleteIntakeRoute },
   { method: 'POST', path: '/business/inventory/convert', handler: convertInventory },

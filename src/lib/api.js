@@ -120,6 +120,10 @@ export const api = {
   wipeData: () => request('POST', '/admin/data/wipe', { confirm: 'ERASE' }),
   /** Court businesses: the market report for their own region. */
   getRegionReport: () => request('GET', '/market/region'),
+  /** Court businesses: every shop trading in their region. */
+  getCourtCompanies: () => request('GET', '/court/companies'),
+  /** Court businesses: one of those shops in full — roster, coffer, performance. */
+  getCourtCompany: (business) => request('GET', '/court/company?business=' + encodeURIComponent(business)),
   /** Banners for the current user: { notices[], banners[] }. Deduped for ~3s. */
   getMotd: () => {
     const now = Date.now();

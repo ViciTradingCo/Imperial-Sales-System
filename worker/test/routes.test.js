@@ -56,4 +56,15 @@ describe('route wiring', () => {
     const writes = all.filter((r) => r.method === 'POST' && /^\/admin\/companies\/(ledger|coffer|discounts|style)/.test(r.path));
     expect(writes.map((r) => r.path)).toEqual([]);
   });
+
+  /**
+   * A Court reads its region's shops. It is an overseer AND a rival trader, so
+   * a write path here would let it act on a competitor's books — the same
+   * reasoning as the admin ledger, with more at stake.
+   */
+  it('gives a Court reads only', () => {
+    const court = all.filter((r) => r.path.startsWith('/court/'));
+    expect(court.length).toBeGreaterThan(0);
+    expect(court.every((r) => r.method === 'GET')).toBe(true);
+  });
 });

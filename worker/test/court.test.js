@@ -1,0 +1,120 @@
+/**
+ * Court oversight.
+ *
+ * A Court sees more of its neighbours than an ordinary shop does — rosters and
+ * ledgers — so what bounds it is the whole feature: its own REGION, and its own
+ * realm. These tests are that boundary.
+ */
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { makeD1 } from './d1shim.js';
+import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
+import { ensureDefaultRealm } from '../src/realm.js';
+import { registerUser, updateCompany, listCompanies } from '../src/registry.js';
+import { requireCourt, courtCompanies, courtShop, shopRoster, shopOverview } from '../src/oversight.js';
+import { cacheBust } from '../src/cache.js';
+
+let env;
+const R = DEFAULT_REALM_ID;
+const OTHER = 'rlm-court-b';
+
+const COURT = 'Whiterun Court';
+const NEIGHBOUR = 'Iron Hearth';
+const OUTSIDER = 'Rift Traders';
+
+beforeAll(async () => { env = { DB: makeD1(), ADMIN_EMAILS: '' }; await ensureSchema(env); });
+beforeEach(async () => {
+  for (const t of [...REALM_TABLES, 'realms']) await env.DB.prepare('DELETE FROM ' + t).run();
+  cacheBust('');
+  await ensureDefaultRealm(env);
+  await env.DB.prepare("INSERT INTO realms (id, name, slug, created) VALUES (?, 'Realm B', 'b', '2026-01-01')")
+    .bind(OTHER).run();
+
+  await registerUser(env, { email: 'court@x.test', character: 'Jarl', businessName: COURT, asOwner: true, hold: 'Whiterun', realmId: R });
+  await registerUser(env, { email: 'smith@x.test', character: 'Adrianne', businessName: NEIGHBOUR, asOwner: true, hold: 'Whiterun', realmId: R });
+  await registerUser(env, { email: 'rift@x.test', character: 'Bersi', businessName: OUTSIDER, asOwner: true, hold: 'The Rift', realmId: R });
+  // Same shop name, same region, another realm — the worst case for scoping.
+  await registerUser(env, { email: 'other@x.test', character: 'Twin', businessName: NEIGHBOUR, asOwner: true, hold: 'Whiterun', realmId: OTHER });
+
+  const co = (await listCompanies(env, R)).find((c) => c.business === COURT);
+  await updateCompany(env, { id: co.id, name: COURT, hold: 'Whiterun', court: true, perpetual: true }, R);
+});
+
+describe('who is a Court', () => {
+  it('resolves the region a Court oversees', async () => {
+    expect(await requireCourt(env, COURT, R)).toBe('Whiterun');
+  });
+
+  it('refuses a company that is not one', async () => {
+    await expect(requireCourt(env, NEIGHBOUR, R)).rejects.toThrow(/court businesses only/i);
+    await expect(requireCourt(env, 'No Such Shop', R)).rejects.toThrow(/court businesses only/i);
+  });
+
+  it('refuses a Court with no region assigned rather than showing it everything', async () => {
+    const co = (await listCompanies(env, R)).find((c) => c.business === COURT);
+    await updateCompany(env, { id: co.id, name: COURT, hold: '', court: true }, R);
+    await expect(requireCourt(env, COURT, R)).rejects.toThrow(/no region assigned/i);
+  });
+});
+
+describe('the companies a Court sees', () => {
+  it('is every shop in its region, including its own', async () => {
+    const list = await courtCompanies(env, 'Whiterun', R);
+    expect(list.map((c) => c.business).sort()).toEqual([NEIGHBOUR, COURT].sort());
+  });
+
+  it('leaves out shops in another region', async () => {
+    const list = await courtCompanies(env, 'Whiterun', R);
+    expect(list.some((c) => c.business === OUTSIDER)).toBe(false);
+  });
+
+  it('leaves out another realm\'s shop of the same name in the same region', async () => {
+    const list = await courtCompanies(env, 'Whiterun', R);
+    expect(list.filter((c) => c.business === NEIGHBOUR)).toHaveLength(1);
+    expect(list.every((c) => c.realmId === R)).toBe(true);
+  });
+
+  it('never carries another shop\'s staff code', async () => {
+    const list = await courtCompanies(env, 'Whiterun', R);
+    // Holding it would let a Court recruit into a rival's roster.
+    expect(list.every((c) => !('joinCode' in c))).toBe(true);
+  });
+});
+
+describe('opening one shop', () => {
+  it('returns its roster and its books', async () => {
+    const d = await courtShop(env, 'Whiterun', NEIGHBOUR, R);
+    expect(d.business).toBe(NEIGHBOUR);
+    expect(d.roster.map((p) => p.character)).toEqual(['Adrianne']);
+    expect(d.coffer).toBeDefined();
+    expect(d.overview).toBeDefined();
+  });
+
+  it('refuses a shop outside the region even when named directly', async () => {
+    await expect(courtShop(env, 'Whiterun', OUTSIDER, R)).rejects.toThrow(/does not trade in your region/i);
+  });
+
+  it('refuses a shop in another realm named directly', async () => {
+    // Same name, same region, wrong realm: the realm scope has to hold.
+    const d = await courtShop(env, 'Whiterun', NEIGHBOUR, R);
+    expect(d.roster.map((p) => p.character)).toEqual(['Adrianne']);   // not 'Twin'
+  });
+
+  it('refuses an empty name rather than guessing', async () => {
+    await expect(courtShop(env, 'Whiterun', '', R)).rejects.toThrow(/which company/i);
+  });
+});
+
+describe('what a roster shows an outsider', () => {
+  it('names and roles, never email addresses', async () => {
+    const roster = await shopRoster(env, NEIGHBOUR, R);
+    expect(roster[0]).toEqual({ character: 'Adrianne', role: 'owner', isOwner: true, status: 'active' });
+    expect(roster.every((p) => !('email' in p))).toBe(true);
+  });
+});
+
+describe('the shared shop snapshot', () => {
+  it('is the same shape an admin reads, and carries no staff code', async () => {
+    const d = await shopOverview(env, NEIGHBOUR, R);
+    expect(Object.keys(d).sort()).toEqual(['business', 'coffer', 'discounts', 'items', 'overview', 'style'].sort());
+  });
+});

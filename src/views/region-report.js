@@ -10,14 +10,23 @@ import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { tableCard } from './market.js';
 
-export function renderRegionReport(container) {
+/**
+ * `embedded` drops the page chrome — the heading and the Back link — for when
+ * this is opened inside a focal menu from Home. A "← Back" that navigated would
+ * close the modal AND leave the page, which is not what the word means there.
+ */
+export function renderRegionReport(container, { embedded } = {}) {
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading your ' + regionWord() + '’s report…'));
-  mount(container, el('div.card', {}, [
-    el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
-    el('h2', {}, regionLabel() + ' Report'),
-    el('p', { class: 'note' }, 'Commerce in your ' + regionWord() + ', as its Court. Voided sales are excluded.'),
-    host,
-  ]));
+  const intro = el('p', { class: 'note' }, 'Commerce in your ' + regionWord() + ', as its Court. Voided sales ' +
+    'and employee purchases are excluded.');
+  mount(container, embedded
+    ? el('div', {}, [intro, host])
+    : el('div.card', {}, [
+        el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
+        el('h2', {}, regionLabel() + ' Report'),
+        intro,
+        host,
+      ]));
 
   api.getRegionReport()
     .then((d) => {

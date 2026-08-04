@@ -10,11 +10,9 @@ import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember, findUserByUid, isConfiguredAdmin } from '../users.js';
 import { listCompanies, updateCompany, archiveCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
-import { marketAnalysis, businessReport, itemReport } from '../market.js';
+import { marketAnalysis, itemReport } from '../market.js';
 import { systemStatus, clearErrors } from '../status.js';
-import { cofferSummary } from '../coffers.js';
-import { listDiscounts } from '../discounts.js';
-import { getShopStyle } from '../shop-style.js';
+import { shopOverview } from '../oversight.js';
 import { listAllFeedback, setFeedbackComplete } from '../feedback.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport,
@@ -102,20 +100,9 @@ async function companyLedger({ request, env, url }) {
   if (!business) throw new Error('Which company?');
   const meta = await findBusinessMeta(env, business, realmId);
   if (!meta) throw new Error('No company called "' + business + '" in this realm.');
-  const [coffer, discounts, style, report] = await Promise.all([
-    cofferSummary(env, business, realmId),
-    listDiscounts(env, business, realmId),
-    getShopStyle(env, business, realmId),
-    businessReport(env, business, realmId),
-  ]);
-  return {
-    business,
-    coffer,
-    discounts,
-    style,
-    overview: report.overview,
-    items: (report.items || []).slice(0, 10),
-  };
+  // The same snapshot a Court reads of a shop in its region — one idea of what
+  // a shop's books are, however you arrived at them.
+  return await shopOverview(env, business, realmId);
 }
 
 /** As listMembers: ?realm= is honoured for a System Admin only. */
