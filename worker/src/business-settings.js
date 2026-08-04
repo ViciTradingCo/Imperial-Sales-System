@@ -6,10 +6,18 @@
  */
 import { getDb } from './db.js';
 
-export const BUSINESS_SETTINGS_SCHEMA = [
-  { label: 'Minimum priced units before flagging', def: 3, kind: 'int', min: 1,
-    notes: 'Ignore items with fewer priced units when judging this shop’s pricing, so a one-off sale can’t raise a false alarm.' },
-];
+/**
+ * Currently EMPTY. "Minimum priced units before flagging" lived here and was
+ * removed: nothing ever read its value, so it was a knob an owner could turn to
+ * no effect.
+ *
+ * The mechanism is kept rather than deleted with it. It is schema-driven — a
+ * label, a default, and validation bounds — so the next genuinely per-shop
+ * tunable is one entry in this list, and the storage, routes and form all
+ * already work. An empty list renders nothing at all (see renderSettingsForm),
+ * so an owner is not shown a section with nothing in it.
+ */
+export const BUSINESS_SETTINGS_SCHEMA = [];
 
 function validate(schema, value) {
   let n = Number(value);

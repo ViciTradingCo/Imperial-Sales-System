@@ -5,7 +5,7 @@
  *     performance, notices to staff, and the coffer.
  *   • Shop Settings (side menu) — what they SET UP and rarely touch again:
  *     discounts, the storefront link, exports, the staff code, and the shop's
- *     own name, style and tunables.
+ *     own name and style.
  *
  * They were one screen of ten tiles, which meant the coffer — looked at daily —
  * sat beside the accent colour, looked at once. Splitting by how often a thing
@@ -78,7 +78,7 @@ export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
         })) },
       // Name, look, and tunables are one job — "set my shop up" — and were three
       // tiles you had to visit in turn to do it.
-      { key: 'led-settings', label: 'Settings', hint: 'Name, style & tunables', glyph: '⚙️',
+      { key: 'led-settings', label: 'Settings', hint: 'Name & style', glyph: '⚙️',
         open: (host) => {
           const formHost = el('div', {});
           mount(host, companyCard(me, onBusinessRenamed), styleCard(), formHost);

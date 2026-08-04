@@ -21,6 +21,9 @@ export function renderSettingsForm(container, { title, subtitle, load, save, bac
   let SETTINGS = [];
 
   function renderFields() {
+    // A settings form with no settings is not a thing worth drawing: the whole
+    // card goes rather than leaving a heading over a lone Save button.
+    if (!SETTINGS.length) { mount(container); return; }
     const wrap = el('div', {});
     SETTINGS.forEach((s) => {
       const input = el('input', {
