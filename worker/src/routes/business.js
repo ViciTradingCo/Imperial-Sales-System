@@ -12,7 +12,7 @@ import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport, convertItems } from '../inventory.js';
-import { recordIntake, listIntake } from '../intake.js';
+import { recordIntake, listIntake, deleteIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
 import { listItemIndex, listItemTypes } from '../item-index.js';
 import { checkCertification } from '../cert.js';
@@ -106,6 +106,20 @@ async function addShopNotice({ request, env, body }) {
 async function deleteShopNotice({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
   return { notices: await deleteMotdForBusiness(env, caller.business, body.id, realmIdOf(caller, env)) };
+}
+
+/**
+ * Removes an intake entry, putting its stock back out and refunding the coffer.
+ * Owner/admin only: it rewrites the shop's books.
+ */
+async function deleteIntakeRoute({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await deleteIntake(env, caller.business, body.id, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'intake.delete',
+    detail: res.item + ' ×' + res.removed + ' returned' +
+      (res.shortBy ? ' (' + res.shortBy + ' already sold on)' : ''), realmId });
+  return res;
 }
 
 /**
@@ -485,6 +499,7 @@ export const routes = [
   { method: 'GET', path: '/tiles', handler: getTiles },
   { method: 'GET', path: '/market/region', handler: holdReportRoute },
   { method: 'GET', path: '/motd', handler: getMotd },
+  { method: 'POST', path: '/business/intake/delete', handler: deleteIntakeRoute },
   { method: 'POST', path: '/business/inventory/convert', handler: convertInventory },
   { method: 'GET', path: '/feedback', handler: getFeedback },
   { method: 'POST', path: '/feedback', handler: postFeedback },

@@ -71,7 +71,10 @@ export function renderInventory(container, { me }) {
         const edit = el('button.primary.small', { onclick: () => openItemModal(it, refreshInventory) }, 'Edit');
         const del = el('button.secondary-btn.small', {
           onclick: async () => {
-            if (!confirm('Remove "' + it.item + '"?')) return;
+            if (!confirm('Remove "' + it.item + '" from your inventory?\n\n' +
+              'This deletes the listing and its sale price. An item with no stock left is kept on ' +
+              'purpose — it stays priced and ready for the next delivery — so there is no need to ' +
+              'remove it just because it hit zero.')) return;
             try { const res = await api.deleteItem(it.item); renderList(res.inventory || []); }
             catch (e) { alert(e.message || e); }
           },
@@ -86,12 +89,36 @@ export function renderInventory(container, { me }) {
   function renderIntake(list) {
     if (!intakeHost) return;
     if (!list.length) { mount(intakeHost, emptyState({ glyph: '🚚', title: 'No intake recorded yet', hint: 'Purchases you record will be listed here.' })); return; }
-    mount(intakeHost, ...list.map((r) => el('div.emp-row', {}, [
-      el('span', { html:
-        '<b>' + esc(r.item) + '</b> ×' + r.numItems + ' @ ' + money(r.pricePer) +
-        (r.hold ? ' · ' + esc(r.hold) : '') + (r.vendor ? ' · ' + esc(r.vendor) : '') +
-        ' <span class="note">' + esc(shortDate(r.ts)) + '</span>' }),
-    ])));
+    mount(intakeHost, ...list.map((r) => {
+      const row = el('div.emp-row', {}, [
+        el('span', { html:
+          '<b>' + esc(r.item) + '</b> ×' + r.numItems + ' @ ' + money(r.pricePer) +
+          (r.hold ? ' · ' + esc(r.hold) : '') + (r.vendor ? ' · ' + esc(r.vendor) : '') +
+          ' <span class="note">' + esc(shortDate(r.ts)) + '</span>' }),
+      ]);
+      // The way to undo a mistyped delivery — sales have a void, intake had
+      // nothing, so a wrong quantity used to be permanent.
+      if (canEdit) {
+        row.appendChild(el('span', { class: 'row-actions' }, [
+          el('button.danger.small', { onclick: () => removeIntake(r) }, 'Delete'),
+        ]));
+      }
+      return row;
+    }));
+  }
+
+  async function removeIntake(r) {
+    if (!window.confirm('Delete this intake?\n\n' + r.item + ' ×' + r.numItems + ' @ ' + money(r.pricePer) +
+      '\n\nThe stock it added comes back out and your coffer is refunded ' + money(r.numItems * r.pricePer) +
+      '. The item stays listed in your inventory either way.')) return;
+    try {
+      const res = await api.deleteIntake(r.id);
+      renderList(res.inventory || []);
+      renderIntake(res.intake || []);
+      toast(res.shortBy
+        ? 'Removed. Only ' + res.removed + ' could come back out — ' + res.shortBy + ' had already sold on.'
+        : 'Intake removed and ' + money(res.refunded) + ' refunded.', res.shortBy ? 'warn' : 'ok');
+    } catch (e) { toast(e.message || String(e), 'error'); }
   }
 
   async function refreshInventory() {
@@ -143,8 +170,9 @@ function openItemModal(it, onSaved) {
 
   modal = openModal([
     el('h3', {}, 'Edit ' + it.item),
-    el('p', { class: 'note' }, 'Stock (' + it.stock + ') is set by intake and sales, not here.'),
-    el('label', {}, 'Sale price'), price,
+    el('p', { class: 'note' }, 'Stock (' + it.stock + ') is set by intake, sales and crafting, not here. ' +
+      'An item with none left keeps its listing and its price.'),
+    el('label', {}, 'Sale price — the register’s default for this item'), price,
     el('label', {}, 'Low stock threshold'), low,
     save,
     status,
@@ -270,13 +298,37 @@ function openIntakeModal(onRecorded) {
     placeholder: 'Search the item index…',
     meta: (it) => 'base ' + money(it.baseValue) +
       (it.category && it.category !== 'Unsorted' ? ' · ' + it.category : ''),
-    onPick: (it) => { if (!per.value) per.value = String(it.baseValue); },
+    onPick: (it) => {
+      if (!per.value) per.value = String(it.baseValue);
+      // Suggest the index's base value to charge, not the cost — a shop that
+      // sells at what it paid makes nothing, and that was the old default.
+      if (!sale.value) sale.value = String(it.baseValue);
+      showKnownPrice(it.name);
+    },
   });
   api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});
   const vendor = el('input', { type: 'text', placeholder: 'Vendor (who you bought from)' });
   const hold = el('select', {}, el('option', { value: '' }, 'Select a ' + regionWord() + '…'));
   const qty = el('input', { type: 'number', step: '1', min: '1', placeholder: '# of items' });
-  const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'gp per item' });
+  const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Cost per item' });
+  /**
+   * What the register will charge for this item. Separate from the cost above,
+   * which is what the shop PAID — conflating the two is how an item ends up
+   * listed at its own purchase price.
+   */
+  const sale = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Leave blank to keep the current price' });
+  const saleHint = el('p', { class: 'note' }, '');
+
+  // If the shop already lists this item, say what it currently charges, so a
+  // blank field is an informed choice rather than a guess.
+  let current = [];
+  api.getInventory().then((r) => { current = r.inventory || []; }).catch(() => {});
+  function showKnownPrice(name) {
+    const have = current.find((i) => i.item.toLowerCase() === String(name).toLowerCase());
+    saleHint.textContent = have
+      ? 'You currently sell this at ' + money(have.price) + '. Leave blank to keep that.'
+      : 'New to your shop — this becomes its price in the register.';
+  }
   const status = el('p', {});
   const save = el('button.primary', { onclick: doRecord }, 'Record intake');
 
@@ -296,6 +348,7 @@ function openIntakeModal(onRecorded) {
     try {
       await api.recordIntake({
         item: picked.name,
+        salePrice: sale.value,
         vendor: vendor.value.trim(),
         hold: hold.value,
         numItems: qty.value,
@@ -317,7 +370,9 @@ function openIntakeModal(onRecorded) {
     el('label', {}, 'Vendor'), vendor,
     ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
     el('label', {}, '# of items'), qty,
-    el('label', {}, 'Price per item (gp)'), per,
+    el('label', {}, 'Cost per item — what you paid'), per,
+    el('label', {}, 'Sale price — what the register will charge'), sale,
+    saleHint,
     save,
     status,
   ]);

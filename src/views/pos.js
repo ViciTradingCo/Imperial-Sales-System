@@ -106,9 +106,11 @@ export function renderPos(container, { me }) {
       onPick: (it) => {
         const inv = invByNorm.get(norm(it.name));
         price.value = String(inv ? inv.price : it.baseValue);
+        // Say WHERE the price came from: your own listing (set on intake or in
+        // Inventory → Edit) or, failing that, the index's base value.
         itemHint.textContent = inv
-          ? inv.stock + ' in stock · your price ' + money(inv.price)
-          : 'Not in your inventory · master base ' + money(it.baseValue);
+          ? inv.stock + ' in stock · your sale price ' + money(inv.price)
+          : 'Not listed in your inventory · using the index base ' + money(it.baseValue);
       },
     });
     function rebuildSuggestions() {

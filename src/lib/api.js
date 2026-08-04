@@ -215,6 +215,8 @@ export const api = {
     const s = q.toString();
     return request('GET', '/admin/audit' + (s ? '?' + s : ''));
   },
+  /** Owner/admin: remove an intake entry — stock comes back out, coffer refunded. */
+  deleteIntake: (id) => request('POST', '/business/intake/delete', { id }),
   /** Owner/admin: craft — consume ingredients from stock, produce another item. */
   convertInventory: (inputs, output, idempotencyKey) =>
     request('POST', '/business/inventory/convert', { inputs, output, idempotencyKey }),
