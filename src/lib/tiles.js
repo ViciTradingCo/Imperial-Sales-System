@@ -11,18 +11,26 @@
  */
 import { el } from './dom.js';
 import { openModal } from './modal.js';
+import { suspendActions, resumeActions } from './actions.js';
 
 /**
  * Opens a section as a focal menu. `build(host, modal)` fills the modal body —
  * it can be a small form, or an existing page view rendered into `host`.
  * `wide` (default true) gives full sections room to breathe.
+ *
+ * The page's action bar is SUSPENDED for as long as the menu is open. Views
+ * built as pages call setActions when they render, and opening one in a modal
+ * used to raise its bar above the overlay — visible, unreachable, and belonging
+ * to a page you are no longer looking at. Suspending here fixes it for every
+ * view at once, including ones not written yet.
  */
 export function openFocalMenu(title, build, opts) {
   const options = opts || {};
   const host = el('div', { class: 'focal-body' });
+  suspendActions();
   const modal = openModal(
     [el('h3', { class: 'focal-title' }, title), host],
-    { wide: options.wide !== false }
+    { wide: options.wide !== false, onClose: resumeActions }
   );
   build(host, modal);
   return modal;
