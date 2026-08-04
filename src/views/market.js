@@ -53,22 +53,23 @@ const REGION_COLS = {
   row: (h) => [h.hold, h.orders, h.items, money(h.revenue)],
 };
 /**
- * Item Performance reports PRICES, not takings. What an admin needs from an
- * item is what it changes hands for — the total gold it has generated says more
- * about how often it sold than about the item.
+ * Item Performance answers ONE question: what is this item worth?
  *
- * A dash means that side has no records yet; 0 would claim the item was traded
- * for nothing.
+ * It used to also carry quantity sold, order count, average bought and average
+ * sold. Volume is not what an item is worth, and splitting the average by
+ * direction split one number into two halves of the same thing — a buy and a
+ * sale are both the item changing hands at a price. They are now one figure,
+ * measured over every transaction, and the columns that were around it are
+ * gone rather than left to be scanned past.
  */
 const ITEM_COLS = {
-  headers: () => ['Item', 'Qty sold', 'Orders', 'Avg bought', 'Avg sold', 'Avg value']
+  headers: () => ['Item', 'Avg value']
     // Only when the realm uses regions — otherwise the column would be a row of
     // dashes explaining a concept this realm has switched off.
     .concat(regionsOn() ? ['Best ' + regionWord()] : []),
-  row: (i) => [i.item, i.qty, i.orders, avg(i.avgBought), avg(i.avgSold), valueCell(i)]
+  row: (i) => [i.item, valueCell(i)]
     .concat(regionsOn() ? [regionCell(i)] : []),
 };
-function avg(v) { return v == null ? '—' : money(v); }
 /**
  * Where the item is worth most — the region with the highest average value,
  * measured the same way the realm-wide valuation is. The figure is shown
@@ -88,7 +89,7 @@ function regionCell(i) {
 function valueCell(i) {
   if (i.avgValue == null) return el('span', {}, '—');
   const n = i.valueSamples || 0;
-  return el('span', { title: 'From ' + n + ' unit' + (n === 1 ? '' : 's') + ' sold' },
+  return el('span', { title: 'From ' + n + ' unit' + (n === 1 ? '' : 's') + ' traded' },
     money(i.avgValue) + (n < 4 ? ' ?' : ''));
 }
 
@@ -170,10 +171,9 @@ function itemPerformance(d) {
 
   return el('div.card', {}, [
     el('h3', {}, 'Item Performance'),
-    el('p', { class: 'note' }, 'Average bought is what shops paid on intake; average sold is the mean price ' +
-      'customers paid. Average value is a valuation from the sales themselves — the middle price by units ' +
-      'sold, with outliers fenced off — so one collector overpaying does not become the item’s worth. ' +
-      'Hover a value to see how many units it rests on.'),
+    el('p', { class: 'note' }, 'Average value is what the item actually changes hands for — every sale, ' +
+      'every intake, every transfer, weighted by units and with outliers fenced off, so one collector ' +
+      'overpaying does not become the item’s worth. Hover a value to see how much trade it rests on.'),
     top.length
       ? el('div', {}, top.map((i) => itemBlock(i)))
       : el('p', { class: 'note' }, 'No items sold yet.'),

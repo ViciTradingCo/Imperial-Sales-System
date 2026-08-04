@@ -44,27 +44,6 @@ const intake = (qty, per) => env.DB.prepare(
 
 const itemRow = async () => (await marketAnalysis(env, R)).items[0];
 
-describe('average sold', () => {
-  it('weights by quantity, not by order', async () => {
-    await sale([{ name: 'Iron Sword', qty: 10, price: 10 }]);
-    await sale([{ name: 'Iron Sword', qty: 1, price: 100 }]);
-    const i = await itemRow();
-    expect(i.qty).toBe(11);
-    expect(i.avgSold).toBeCloseTo(200 / 11);  // not 55
-  });
-
-  it('is null, not zero, when nothing has sold', async () => {
-    await intake(5, 20);
-    expect((await itemRow()).avgSold).toBeNull();
-  });
-
-  it('ignores voided sales', async () => {
-    await sale([{ name: 'Iron Sword', qty: 1, price: 50 }]);
-    await sale([{ name: 'Iron Sword', qty: 1, price: 999 }], 'VOIDED');
-    expect((await itemRow()).avgSold).toBe(50);
-  });
-});
-
 /** A transfer accepted from another company: goods in, paid for at its price. */
 let transferNo = 0;
 const transferIn = (qty, price, status) => env.DB.prepare(
@@ -72,70 +51,21 @@ const transferIn = (qty, price, status) => env.DB.prepare(
    VALUES (?, 'Rival Traders', 'Alpha', 'Iron Sword', ?, ?, ?, '2026-01-01T00:00:00Z')`)
   .bind(R, qty, price, status || 'accepted').run();
 
-describe('average bought', () => {
-  it('weights intake by quantity', async () => {
-    await intake(10, 5);
-    await intake(1, 60);
-    const i = await itemRow();
-    expect(i.avgBought).toBeCloseTo(110 / 11);
-  });
-
-  it('is null when the item was never bought in', async () => {
-    await sale([{ name: 'Iron Sword', qty: 1, price: 50 }]);
-    expect((await itemRow()).avgBought).toBeNull();
-  });
-
-  it('skips intake rows with no quantity', async () => {
-    await intake(0, 999);
-    await intake(2, 10);
-    expect((await itemRow()).avgBought).toBe(10);
-  });
-
-  it('counts stock taken in from another company — that is buying too', async () => {
-    await transferIn(4, 25);
-    expect((await itemRow()).avgBought).toBe(25);
-  });
-
-  it('weights intake and transfers together', async () => {
-    await intake(3, 10);       // 30 over 3
-    await transferIn(1, 50);   // 50 over 1
-    expect((await itemRow()).avgBought).toBe(80 / 4);
-  });
-
-  it('ignores a transfer that was never accepted', async () => {
-    await intake(2, 10);
-    await transferIn(10, 999, 'pending');
-    await transferIn(10, 999, 'declined');
-    expect((await itemRow()).avgBought).toBe(10);
-  });
-
-  it('ignores a gifted transfer — a price of nothing is not a purchase', async () => {
-    await intake(2, 10);
-    await transferIn(50, 0);
-    expect((await itemRow()).avgBought).toBe(10);
-  });
-
-  it('does not read another realm\'s transfers', async () => {
-    await intake(2, 10);
-    await env.DB.prepare(
-      `INSERT INTO transfers (realm_id, from_business, to_business, item, qty, price, status, ts)
-       VALUES ('rlm-other', 'X', 'Alpha', 'Iron Sword', 99, 999, 'accepted', '2026-01-01T00:00:00Z')`).run();
-    expect((await itemRow()).avgBought).toBe(10);
-  });
-});
-
 /**
- * The valuation is a SALES analysis: the weighted median of what the item
- * actually sold at, with outliers fenced off. Not the mean, and not blended
- * with what shops paid suppliers.
+ * Average value is what the item CHANGES HANDS FOR, over every transaction in
+ * it — sales to customers, intake from vendors, transfers between companies.
+ * A buy and a sale are both the item moving at a price, so both are evidence.
+ *
+ * It is a weighted MEDIAN with outliers fenced, not a mean: a realm's trade is
+ * exactly where the one absurd deal happens.
  */
 describe('average value', () => {
-  it('is the weighted median, so one dear sale does not become the value', async () => {
+  it('weights by units, so a bulk deal outweighs a one-off', async () => {
     await sale([{ name: 'Iron Sword', qty: 10, price: 10 }]);
     await sale([{ name: 'Iron Sword', qty: 1, price: 100 }]);
     const i = await itemRow();
-    expect(i.avgValue).toBe(10);              // where the units actually went
-    expect(i.avgSold).toBeCloseTo(200 / 11);  // the mean is dragged upward
+    expect(i.avgValue).toBe(10);          // where the units actually went
+    expect(i.valueSamples).toBe(11);
   });
 
   it('fences off an outlier once there is a spread to measure', async () => {
@@ -143,9 +73,7 @@ describe('average value', () => {
     await sale([{ name: 'Iron Sword', qty: 5, price: 31 }]);
     await sale([{ name: 'Iron Sword', qty: 5, price: 32 }]);
     await sale([{ name: 'Iron Sword', qty: 1, price: 5000 }]); // a collector
-    const i = await itemRow();
-    expect(i.avgValue).toBe(31);
-    expect(i.avgSold).toBeGreaterThan(300);   // the mean is useless here
+    expect((await itemRow()).avgValue).toBe(31);
   });
 
   it('holds the line on too few prices to fence, where the median alone must do', async () => {
@@ -155,24 +83,50 @@ describe('average value', () => {
     expect((await itemRow()).avgValue).toBe(40);
   });
 
-  it('ignores intake — what a shop paid a supplier is cost, not value', async () => {
-    await intake(100, 999);
-    await sale([{ name: 'Iron Sword', qty: 2, price: 40 }]);
+  it('counts what shops PAID as well as what they charged', async () => {
+    // Ten bought at 10 and one sold at 100: the item changes hands at 10.
+    await intake(10, 10);
+    await sale([{ name: 'Iron Sword', qty: 1, price: 100 }]);
     const i = await itemRow();
-    expect(i.avgValue).toBe(40);
-    expect(i.avgBought).toBe(999);
+    expect(i.avgValue).toBe(10);
+    expect(i.valueSamples).toBe(11);
   });
 
-  it('is null when the item has only ever been bought in, never sold', async () => {
+  it('values an item that has only ever been bought in', async () => {
     await intake(5, 20);
     const i = await itemRow();
-    expect(i.avgValue).toBeNull();
-    expect(i.valueSamples).toBe(0);
+    expect(i.avgValue).toBe(20);
+    expect(i.valueSamples).toBe(5);
   });
 
-  it('reports how many units the valuation rests on', async () => {
-    await sale([{ name: 'Iron Sword', qty: 7, price: 40 }]);
-    expect((await itemRow()).valueSamples).toBe(7);
+  it('counts transfers between companies too', async () => {
+    await transferIn(4, 25);
+    expect((await itemRow()).avgValue).toBe(25);
+  });
+
+  it('ignores a transfer that was never accepted', async () => {
+    await intake(2, 10);
+    await transferIn(10, 999, 'pending');
+    await transferIn(10, 999, 'declined');
+    expect((await itemRow()).avgValue).toBe(10);
+  });
+
+  it('ignores a gift — a price of nothing is not a price', async () => {
+    await intake(2, 10);
+    await transferIn(50, 0);
+    expect((await itemRow()).avgValue).toBe(10);
+  });
+
+  it('ignores voided sales', async () => {
+    await sale([{ name: 'Iron Sword', qty: 1, price: 50 }]);
+    await sale([{ name: 'Iron Sword', qty: 1, price: 999 }], 'VOIDED');
+    expect((await itemRow()).avgValue).toBe(50);
+  });
+
+  it('skips intake rows with no quantity', async () => {
+    await intake(0, 999);
+    await intake(2, 10);
+    expect((await itemRow()).avgValue).toBe(10);
   });
 
   it('lists nothing for an indexed item with no trade at all', async () => {
@@ -270,7 +224,7 @@ describe('one item on demand', () => {
     const listed = (await marketAnalysis(env, R)).items[0];
     expect(d.item.qty).toBe(listed.qty);
     expect(d.item.avgValue).toBe(listed.avgValue);
-    expect(d.item.avgBought).toBe(listed.avgBought);
+    expect(d.item.valueSamples).toBe(listed.valueSamples);
     expect(d.item.trend).toEqual([{ day: '2026-01-01', qty: 4, revenue: 100, orders: 1 }]);
     expect(d.baseValue).toBe(30);
   });
@@ -309,6 +263,8 @@ describe('scope', () => {
     await env.DB.prepare(
       `INSERT INTO intake (realm_id, business, ts, item, num_items, price_per)
        VALUES ('rlm-other', 'Alpha', '2026-01-01T00:00:00Z', 'Iron Sword', 5, 999)`).run();
-    expect((await itemRow()).avgBought).toBeNull();
+    const i = await itemRow();
+    expect(i.avgValue).toBe(50);      // the other realm's 999 must not weigh in
+    expect(i.valueSamples).toBe(1);
   });
 });

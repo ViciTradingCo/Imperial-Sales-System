@@ -44,32 +44,32 @@ function weightedQuantile(prices, q) {
 }
 
 /**
- * What the market actually values an item at, from its SALES.
+ * What the market values an item at, from EVERY transaction in it.
  *
- * The mean sale price is not that number. One collector paying 5,000 for a
- * sword that normally moves at 30 drags the mean far above any price the item
- * has ever repeatedly fetched, and a single mispriced sale at 1 drags it under.
- * A realm's trade is exactly where those happen.
+ * Both directions count: what customers paid for it, what shops paid to stock
+ * it, and what companies paid each other for it in transfers. They are all
+ * prices the item actually changed hands at, which is the only evidence there
+ * is of what it is worth.
  *
- * So this does what a valuation normally does with observed transactions:
+ * A mean over those would not do. One collector paying 5,000 for a sword that
+ * normally moves at 30 drags the mean far above any price the item has ever
+ * repeatedly fetched, and a single mispriced deal at 1 drags it under. A realm's
+ * trade is exactly where those happen. So this does what a valuation does with
+ * observed transactions:
  *
- *   1. Build the distribution of prices the item SOLD at, each weighted by how
- *      many units went at that price.
+ *   1. Build the distribution of prices the item changed hands at, each
+ *      weighted by how many units went at that price.
  *   2. Fence off outliers with the interquartile rule (Q1 − 1.5·IQR to
  *      Q3 + 1.5·IQR), the standard test for "this is not from the same
  *      population as the rest".
  *   3. Take the weighted MEDIAN of what survives — the price the middle unit
- *      sold at, which is what "worth about this much" means.
+ *      changed hands at, which is what "worth about this much" means.
  *
  * Fencing needs a spread to measure, so it is skipped below four distinct
- * prices: with two or three sales an "outlier" is just as likely to be the real
+ * prices: with two or three deals an "outlier" is just as likely to be the real
  * price, and throwing it away would be inventing confidence.
- *
- * Intake is deliberately NOT part of this. What a shop paid a supplier is its
- * cost, not the item's value — mixing the two produces a number that is neither.
- * It stays available on its own as avgBought.
  */
-function salesValue(lines) {
+function transactionValue(lines) {
   if (!lines.length) return null;
   const byPrice = new Map();
   lines.forEach((l) => byPrice.set(l.price, (byPrice.get(l.price) || 0) + l.qty));
@@ -99,7 +99,7 @@ function trendOf(dayMap) {
 
 /**
  * Where the item is worth most: the region with the highest AVERAGE VALUE,
- * measured exactly as the realm-wide valuation is (see salesValue) so the two
+ * measured exactly as the realm-wide valuation is (see transactionValue) so the two
  * figures are comparable — "best" here means the item fetches more there, not
  * that more of it moves there.
  *
@@ -109,7 +109,7 @@ function trendOf(dayMap) {
 function bestRegionOf(regionMap) {
   let best = null;
   regionMap.forEach((v, name) => {
-    const value = salesValue(v.lines);
+    const value = transactionValue(v.lines);
     if (value == null) return;
     if (!best || value > best.value || (value === best.value && v.qty > best.qty)) {
       best = { region: name, value, qty: v.qty, revenue: v.revenue };
@@ -123,21 +123,18 @@ function bestRegionOf(regionMap) {
  * (new/off-index items are kept out of the market so the data stays clean).
  * Names are canonicalized to their master spelling.
  *
- * Both SIDES of the trade are reported, plus a valuation and two views of where
- * and when the item moves:
+ * What comes out:
  *
- *   • avgSold   — quantity-weighted MEAN of what it went for. "On average we
- *                 charged this", takings divided by units.
- *   • avgBought — what it costs to STOCK: intake bought from vendors, plus
- *                 accepted transfers bought from other companies. A price of 0
- *                 is a gift, not a purchase, and is left out.
- *   • avgValue  — what the item is WORTH, from a sales analysis (see
- *                 salesValue). Robust to the one absurd sale that a mean is not.
- *   • valueSamples — units of sales behind avgValue, so a valuation resting on
- *                 two units can be read as the guess it is.
- *   • bestRegion — where the item is worth most, by that region's own
- *                 average value.
- *   • trend      — its daily series, for the graph.
+ *   • avgValue  — what the item is WORTH, from EVERY transaction in it: sales
+ *                 to customers, intake bought from vendors, and transfers
+ *                 bought from other companies. See transactionValue.
+ *   • valueSamples — units of trade behind avgValue, both directions, so a
+ *                 valuation resting on two changes of hands reads as the guess
+ *                 it is.
+ *   • bestRegion — where the item is worth most. Measured on SALES only: a
+ *                 region is where something sold, and intake records where
+ *                 goods came from, which is a different question.
+ *   • trend      — its daily series of units sold, for the graph.
  *
  * `revenue` stays on the row: it is the ranking key here, and the shop and
  * region reports display it.
@@ -186,13 +183,15 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
   // The BUY side: every way a company takes stock in and pays for it.
   const bought = (name, qty, per) => {
     const hit = canon(name);
-    // A price of 0 is a gift, not a purchase, and averaging it in would drag
-    // the cost of stocking an item toward nothing — the same reason an employee
+    // A price of 0 is a gift, not a transaction at a price, and averaging it in
+    // would drag the item's value toward nothing — the same reason an employee
     // purchase is not a sale.
     if (!hit || !(qty > 0) || !(per > 0)) return;
     const m = row(hit.name);
     m.boughtQty += qty;
     m.boughtValue += qty * per;
+    // A buy is a transaction too, so it is evidence of what the item is worth.
+    m.lines.push({ price: per, qty });
   };
   // Intake: bought from a vendor outside the network.
   (intakeRows || []).forEach((r) => bought(r.item, Number(r.num_items) || 0, Number(r.price_per) || 0));
@@ -206,10 +205,11 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
     const { lines, days, regions, ...rest } = m;
     return {
       ...rest,
-      avgSold: m.qty > 0 ? m.revenue / m.qty : null,
-      avgBought: m.boughtQty > 0 ? m.boughtValue / m.boughtQty : null,
-      avgValue: salesValue(lines),
-      valueSamples: m.qty,
+      avgValue: transactionValue(lines),
+      // Units of real trade behind the valuation, both directions — a figure
+      // from two changes of hands and one from two hundred read identically in
+      // a table, and they should not.
+      valueSamples: m.qty + m.boughtQty,
       bestRegion: bestRegionOf(regions),
       // withoutTrend() strips this for list responses: a 30-point series per
       // item would dwarf everything else in them.
@@ -287,7 +287,7 @@ export async function marketAnalysis(env, realmId) {
    * The comparison used to be the master index's base value — a figure an admin
    * typed in, which the settings already called an "item average" without being
    * one. It now uses avgValue: the weighted median of what the item really sold
-   * for, outliers fenced (see salesValue). A shop charging double what the realm
+   * hands at, outliers fenced (see transactionValue). A shop charging double what the realm
    * pays is the thing worth flagging, and only observed trade can say what that
    * is.
    *
@@ -364,7 +364,7 @@ export async function itemReport(env, name, realmId) {
   return {
     item: found || {
       item: hit.name, qty: 0, revenue: 0, orders: 0, boughtQty: 0, boughtValue: 0,
-      avgSold: null, avgBought: null, avgValue: null, valueSamples: 0,
+      avgValue: null, valueSamples: 0,
       bestRegion: null, trend: [],
     },
     baseValue: hit.baseValue,
