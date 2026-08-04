@@ -160,8 +160,7 @@ function itemPerformance(d) {
   const top = d.topItems || [];
   const picker = createItemPicker({
     placeholder: 'Look up any item…',
-    meta: (it) => 'base ' + money(it.baseValue) +
-      (it.category && it.category !== 'Unsorted' ? ' · ' + it.category : ''),
+    meta: (it) => (it.category && it.category !== 'Unsorted' ? it.category : ''),
     onPick: (it) => { picker.clear(); openItemDetail(it.name); },
   });
   // The same index the register picks from, so a name typed here is a real item.

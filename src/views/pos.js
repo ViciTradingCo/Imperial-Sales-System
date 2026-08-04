@@ -98,10 +98,12 @@ export function renderPos(container, { me }) {
       placeholder: 'Search the item index…',
       meta: (it) => {
         const inv = invByNorm.get(norm(it.name));
-        // The type disambiguates similarly named entries; Unsorted says nothing,
-        // so it is left off rather than added to every row.
-        const type = it.category && it.category !== 'Unsorted' ? ' · ' + it.category : '';
-        return (inv ? inv.stock + ' in stock · ' + money(inv.price) : 'base ' + money(it.baseValue)) + type;
+        // Stock and type only. Whether you HOLD any helps you choose; the price
+        // does not, and it lands in the price field the moment you pick — see
+        // the hint below the box.
+        const type = it.category && it.category !== 'Unsorted' ? it.category : '';
+        const held = inv ? inv.stock + ' in stock' : '';
+        return [held, type].filter(Boolean).join(' · ');
       },
       onPick: (it) => {
         const inv = invByNorm.get(norm(it.name));

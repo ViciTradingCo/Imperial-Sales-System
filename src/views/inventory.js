@@ -214,8 +214,9 @@ function openCraftModal(onDone) {
 
   const outPicker = createItemPicker({
     placeholder: 'What are you making?',
-    meta: (it) => 'base ' + money(it.baseValue) +
-      (it.category && it.category !== 'Unsorted' ? ' · ' + it.category : ''),
+    // The type only, to tell similarly named items apart. No price: this picks
+    // a name, and the cost and sale price have their own fields below.
+    meta: (it) => (it.category && it.category !== 'Unsorted' ? it.category : ''),
   });
   const outQty = el('input', { type: 'number', step: '1', min: '1', value: '1' });
   const status = el('p', {});
@@ -309,8 +310,9 @@ function openIntakeModal(onRecorded) {
   // Items must be chosen from the master index so stock never lands under a typo.
   const picker = createItemPicker({
     placeholder: 'Search the item index…',
-    meta: (it) => 'base ' + money(it.baseValue) +
-      (it.category && it.category !== 'Unsorted' ? ' · ' + it.category : ''),
+    // The type only, to tell similarly named items apart. No price: this picks
+    // a name, and the cost and sale price have their own fields below.
+    meta: (it) => (it.category && it.category !== 'Unsorted' ? it.category : ''),
     onPick: (it) => {
       if (!per.value) per.value = String(it.baseValue);
       // Suggest the index's base value to charge, not the cost — a shop that

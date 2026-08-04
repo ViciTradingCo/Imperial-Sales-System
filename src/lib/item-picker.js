@@ -15,6 +15,11 @@
  *
  * Each entry needs a `name`; anything else (price, stock, baseValue) is passed
  * through to onPick and may be shown via the optional `meta` formatter.
+ *
+ * `meta` is for what helps you CHOOSE — whether you hold any, mainly. Prices do
+ * not belong here: every row reading "Iron Sword base 30gp" made the list harder
+ * to scan for the name, which is the one thing it is for, and the price is
+ * already on the field that asks for one.
  */
 import { el, mount, esc } from './dom.js';
 
