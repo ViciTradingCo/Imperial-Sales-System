@@ -38,7 +38,9 @@ export async function publicStorefront(env, business, realmId) {
     .bind(realm, target).first();
   if (!co) throw new Error('Shop not found.');
   const style = await getShopStyle(env, co.business, realm);
-  const { results } = await db.prepare('SELECT item, price, stock, low_stock FROM inventory WHERE realm_id = ? AND business = ? ORDER BY item COLLATE NOCASE')
+  // Ingredients are excluded: a storefront is a list of what is FOR SALE, and
+  // advertising crafting materials invites orders the shop will not fill.
+  const { results } = await db.prepare('SELECT item, price, stock, low_stock FROM inventory WHERE realm_id = ? AND business = ? AND ingredient = 0 ORDER BY item COLLATE NOCASE')
     .bind(realm, co.business).all();
   const items = (results || []).map((r) => ({
     item: r.item,

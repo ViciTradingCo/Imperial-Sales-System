@@ -111,3 +111,37 @@ describe('deleting an intake entry', () => {
     await expect(deleteIntake(env, SHOP, 9999, R)).rejects.toThrow(/no longer exists/i);
   });
 });
+
+/**
+ * Ingredients: stock a shop holds to craft with and does not sell.
+ *
+ * It is a property of the SHOP'S LISTING, not of the item — one shop's
+ * ingredient is another's stock-in-trade — so it lives on the inventory row.
+ */
+describe('ingredients', () => {
+  it('are flagged on the listing when taken in as one', async () => {
+    await take({ ingredient: true });
+    expect(await itemRow('Iron Sword')).toMatchObject({ ingredient: true, stock: 10 });
+  });
+
+  it('are ordinary stock by default', async () => {
+    await take({});
+    expect((await itemRow('Iron Sword')).ingredient).toBe(false);
+  });
+
+  it('can be turned back into sellable stock by a later delivery', async () => {
+    await take({ ingredient: true });
+    await take({ salePrice: 30 });
+    const row = await itemRow('Iron Sword');
+    expect(row.ingredient).toBe(false);
+    expect(row.price).toBe(30);
+  });
+
+  it('are one shop\'s business only', async () => {
+    await take({ ingredient: true });
+    await recordIntake(env, 'Rival Traders', { item: 'Iron Sword', numItems: 5, pricePer: 5, salePrice: 40 }, R);
+    expect((await itemRow('Iron Sword')).ingredient).toBe(true);
+    const rival = (await listInventory(env, 'Rival Traders', R)).find((i) => i.item === 'Iron Sword');
+    expect(rival).toMatchObject({ ingredient: false, price: 40 });
+  });
+});

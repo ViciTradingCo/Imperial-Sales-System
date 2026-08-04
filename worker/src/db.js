@@ -30,6 +30,7 @@ const SCHEMA = [
      business TEXT NOT NULL, item TEXT NOT NULL,
      price REAL NOT NULL DEFAULT 0, stock INTEGER NOT NULL DEFAULT 0,
      low_stock INTEGER NOT NULL DEFAULT 0,
+     ingredient INTEGER NOT NULL DEFAULT 0,
      UNIQUE (realm_id, business, item))`,
   `CREATE INDEX IF NOT EXISTS idx_inventory_business ON inventory (business)`,
   `CREATE TABLE IF NOT EXISTS sales (
@@ -244,6 +245,10 @@ const MIGRATIONS = [
   // stats query filters on it — overloading it would have made an employee
   // purchase either count as a sale or count as voided, and it is neither.
   'ALTER TABLE sales ADD COLUMN staff_purchase INTEGER NOT NULL DEFAULT 0',
+  // Stock a shop holds but does NOT sell — crafting materials. It is a property
+  // of the shop's listing, not of the item itself: one shop's ingredient is
+  // another's stock-in-trade, so this cannot live on the master index.
+  'ALTER TABLE inventory ADD COLUMN ingredient INTEGER NOT NULL DEFAULT 0',
   'CREATE INDEX IF NOT EXISTS idx_sales_counted ON sales (realm_id, status, staff_purchase)',
 ];
 
@@ -261,7 +266,7 @@ const REBUILDS = [
   { table: 'business_settings', cols: ['realm_id', 'business', 'label', 'value'] },
   { table: 'shop_style', cols: ['realm_id', 'business', 'tagline', 'accent'] },
   { table: 'master_item', cols: ['realm_id', 'name', 'base_value', 'category'], defaults: { category: 'Unsorted' } },
-  { table: 'inventory', cols: ['realm_id', 'business', 'item', 'price', 'stock', 'low_stock'] },
+  { table: 'inventory', cols: ['realm_id', 'business', 'item', 'price', 'stock', 'low_stock', 'ingredient'], defaults: { ingredient: 0 } },
   { table: 'discounts', cols: ['realm_id', 'business', 'name', 'percent'] },
 ];
 

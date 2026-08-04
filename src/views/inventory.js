@@ -64,7 +64,9 @@ export function renderInventory(container, { me }) {
     }
     const rows = items.map((it) => {
       const meta = el('span', { html:
-        '<b>' + esc(it.item) + '</b> · ' + money(it.price) +
+        '<b>' + esc(it.item) + '</b> · ' +
+        // An ingredient has no sale price worth showing — it is never sold.
+        (it.ingredient ? '<span class="role-pill">Ingredient</span>' : money(it.price)) +
         ' · ' + it.stock + ' in stock · ' + statusTag(it.status) });
       const row = el('div.emp-row', {}, [meta]);
       if (canEdit) {
@@ -149,6 +151,13 @@ function shortDate(ts) {
 function openItemModal(it, onSaved) {
   const price = el('input', { type: 'number', step: '0.01', min: '0', value: String(it.price) });
   const low = el('input', { type: 'number', step: '1', min: '0', value: String(it.lowStock || 0) });
+  const ingredient = el('input', { type: 'checkbox' });
+  ingredient.checked = !!it.ingredient;
+  const priceWrap = el('div', {}, [
+    el('label', {}, 'Sale price — the register’s default for this item'), price,
+  ]);
+  priceWrap.hidden = ingredient.checked;
+  ingredient.addEventListener('change', () => { priceWrap.hidden = ingredient.checked; });
   const status = el('p', {});
   const save = el('button.primary', { onclick: doSave }, 'Save');
 
@@ -159,7 +168,10 @@ function openItemModal(it, onSaved) {
     save.disabled = true;
     setStatus('Saving…', '');
     try {
-      await api.saveItem({ item: it.item, price: price.value, lowStock: low.value || 0 });
+      await api.saveItem({
+        item: it.item, price: price.value, lowStock: low.value || 0,
+        ingredient: ingredient.checked,
+      });
       onSaved();
       modal.close();
     } catch (e) {
@@ -172,7 +184,8 @@ function openItemModal(it, onSaved) {
     el('h3', {}, 'Edit ' + it.item),
     el('p', { class: 'note' }, 'Stock (' + it.stock + ') is set by intake, sales and crafting, not here. ' +
       'An item with none left keeps its listing and its price.'),
-    el('label', {}, 'Sale price — the register’s default for this item'), price,
+    el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
+    priceWrap,
     el('label', {}, 'Low stock threshold'), low,
     save,
     status,
@@ -318,6 +331,17 @@ function openIntakeModal(onRecorded) {
    */
   const sale = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Leave blank to keep the current price' });
   const saleHint = el('p', { class: 'note' }, '');
+  /**
+   * Stock the shop holds to CRAFT with, not to sell. Ticking it takes the item
+   * out of the register and off the public storefront, and the sale price stops
+   * meaning anything — so the field goes with it rather than sitting there
+   * inviting a number nobody will ever charge.
+   */
+  const ingredient = el('input', { type: 'checkbox' });
+  const saleWrap = el('div', {}, [
+    el('label', {}, 'Sale price — what the register will charge'), sale, saleHint,
+  ]);
+  ingredient.addEventListener('change', () => { saleWrap.hidden = ingredient.checked; });
 
   // If the shop already lists this item, say what it currently charges, so a
   // blank field is an informed choice rather than a guess.
@@ -348,7 +372,8 @@ function openIntakeModal(onRecorded) {
     try {
       await api.recordIntake({
         item: picked.name,
-        salePrice: sale.value,
+        salePrice: ingredient.checked ? '' : sale.value,
+        ingredient: ingredient.checked,
         vendor: vendor.value.trim(),
         hold: hold.value,
         numItems: qty.value,
@@ -371,8 +396,8 @@ function openIntakeModal(onRecorded) {
     ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
     el('label', {}, '# of items'), qty,
     el('label', {}, 'Cost per item — what you paid'), per,
-    el('label', {}, 'Sale price — what the register will charge'), sale,
-    saleHint,
+    el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
+    saleWrap,
     save,
     status,
   ]);

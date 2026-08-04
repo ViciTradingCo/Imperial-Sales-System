@@ -128,10 +128,12 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   }
 
   const master = await listItemIndex(env, realmId);
-  const { results } = await db.prepare('SELECT item, price, stock FROM inventory WHERE realm_id = ? AND business = ?')
+  const { results } = await db.prepare('SELECT item, price, stock, ingredient FROM inventory WHERE realm_id = ? AND business = ?')
     .bind(realmId, business).all();
   const inv = {};
-  (results || []).forEach((r) => { inv[r.item.toLowerCase()] = { item: r.item, price: r.price, stock: r.stock }; });
+  (results || []).forEach((r) => {
+    inv[r.item.toLowerCase()] = { item: r.item, price: r.price, stock: r.stock, ingredient: !!r.ingredient };
+  });
 
   const need = {};            // in-inventory items → stock decrements
   const lines = [];
@@ -148,6 +150,13 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     if (canon) name = canon.name;
     const invItem = inv[name.toLowerCase()];
     const inInv = !!invItem;
+    // An INGREDIENT is stock held to craft with, not to sell. The register hides
+    // them, but the refusal belongs here: the browser decides nothing, and a
+    // stale page or a replayed offline sale would otherwise sell the materials.
+    if (inInv && invItem.ingredient) {
+      throw new Error(invItem.item + ' is marked as an ingredient — it is stock you craft with, not stock you ' +
+        'sell. Untick "Ingredient" on the item in Inventory to sell it.');
+    }
 
     const qty = Math.floor(Number(line.qty));
     if (!qty || qty < 1) throw new Error('Bad quantity for ' + name + '.');

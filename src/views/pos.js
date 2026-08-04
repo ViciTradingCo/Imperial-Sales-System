@@ -115,7 +115,14 @@ export function renderPos(container, { me }) {
     });
     function rebuildSuggestions() {
       invByNorm = new Map(inventory.map((it) => [norm(it.item), it]));
-      picker.setItems(master);
+      // Ingredients are stock this shop crafts with, not stock it sells, so
+      // they are not offered. Only THIS shop's listing decides that — a master
+      // item the shop doesn't stock is still perfectly sellable, and another
+      // shop may trade in the very thing this one keeps as a material.
+      picker.setItems(master.filter((it) => {
+        const inv = invByNorm.get(norm(it.name));
+        return !(inv && inv.ingredient);
+      }));
     }
     rebuildSuggestions();
     const addBtn = el('button.secondary-btn', { onclick: addToCart }, 'Add to order');

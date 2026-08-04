@@ -21,9 +21,9 @@ import { cofferBalance } from '../src/coffers.js';
 let env;
 const caller = { character: 'Tester', email: 't@example.com' };
 
-async function seed(business, item, price, stock) {
-  await env.DB.prepare('INSERT INTO inventory (business, item, price, stock, low_stock) VALUES (?, ?, ?, ?, 0)')
-    .bind(business, item, price, stock).run();
+async function seed(business, item, price, stock, ingredient) {
+  await env.DB.prepare('INSERT INTO inventory (business, item, price, stock, low_stock, ingredient) VALUES (?, ?, ?, ?, 0, ?)')
+    .bind(business, item, price, stock, ingredient ? 1 : 0).run();
 }
 async function stockOf(b, i) {
   const r = await env.DB.prepare('SELECT stock FROM inventory WHERE business = ? AND item = ?').bind(b, i).first();
@@ -141,5 +141,45 @@ describe('employee purchases', () => {
     expect(res.total).toBe(50);
     expect(res.staffPurchase).toBe(false);
     expect(await cofferBalance(env, 'Alpha', 'default')).toBe(50);
+  });
+});
+
+/**
+ * The register hides ingredients, but hiding is not enforcing: a stale page or
+ * a replayed offline sale would otherwise sell the shop's crafting materials.
+ */
+describe('ingredients cannot be sold', () => {
+  it('refuses a line for stock the shop holds as an ingredient', async () => {
+    await seed('Alpha', 'Iron Sword', 30, 10, true);
+    await expect(checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 30 }], hold: 'Whiterun' }, 'default'))
+      .rejects.toThrow(/marked as an ingredient/i);
+    expect(await stockOf('Alpha', 'Iron Sword')).toBe(10);
+  });
+
+  it('refuses the whole order, not just that line', async () => {
+    await seed('Alpha', 'Iron Sword', 30, 10, true);
+    await seed('Alpha', 'Health Potion', 5, 10);
+    await expect(checkout(env, 'Alpha', caller, {
+      cart: [{ item: 'Health Potion', qty: 2, price: 5 }, { item: 'Iron Sword', qty: 1, price: 30 }],
+      hold: 'Whiterun',
+    }, 'default')).rejects.toThrow(/ingredient/i);
+    expect(await stockOf('Alpha', 'Health Potion')).toBe(10);
+  });
+
+  it('still sells an item another shop keeps as an ingredient', async () => {
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    await seed('Rival', 'Iron Sword', 30, 10, true);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 30 }], hold: 'Whiterun' }, 'default');
+    expect(res.total).toBe(30);
+  });
+
+  it('still sells an indexed item the shop does not stock at all', async () => {
+    // Nothing in this shop's inventory says otherwise, so it is sellable.
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Health Potion', qty: 1, price: 5 }], hold: 'Whiterun' }, 'default');
+    expect(res.total).toBe(5);
+    expect(res.offInventory).toEqual(['Health Potion']);
   });
 });

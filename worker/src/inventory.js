@@ -37,7 +37,7 @@ export async function lowStockReport(env, business, realmId) {
 export async function listInventory(env, business, realmId) {
   const db = await getDb(env);
   const { results } = await db
-    .prepare('SELECT item, price, stock, low_stock FROM inventory WHERE realm_id = ? AND business = ? ORDER BY item COLLATE NOCASE')
+    .prepare('SELECT item, price, stock, low_stock, ingredient FROM inventory WHERE realm_id = ? AND business = ? ORDER BY item COLLATE NOCASE')
     .bind(realmId, business)
     .all();
   return (results || []).map((r) => ({
@@ -45,6 +45,10 @@ export async function listInventory(env, business, realmId) {
     price: r.price,
     stock: r.stock,
     lowStock: r.low_stock,
+    // Stock held to craft with, not to sell. A property of THIS shop's listing:
+    // one shop's ingredient is another's stock-in-trade, so it could never live
+    // on the shared item index.
+    ingredient: !!r.ingredient,
     status: statusFor(r.stock, r.low_stock),
   }));
 }
@@ -54,7 +58,7 @@ export async function listInventory(env, business, realmId) {
  * NOT set here — it's driven by intake (in) and sales (out). A brand-new item
  * starts at 0 stock; record an intake to stock it.
  */
-export async function upsertItem(env, business, { item, price, lowStock }, realmId) {
+export async function upsertItem(env, business, { item, price, lowStock, ingredient }, realmId) {
   const db = await getDb(env);
   const name = String(item || '').trim();
   if (!name) throw new Error('Item name is required.');
@@ -62,14 +66,15 @@ export async function upsertItem(env, business, { item, price, lowStock }, realm
   const l = Math.floor(Number(lowStock));
   if (!isFinite(p) || p < 0) throw new Error('Price must be a number ≥ 0.');
   const low = isFinite(l) && l > 0 ? l : 0;
+  const ing = ingredient ? 1 : 0;
   await db
     .prepare(
-      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock)
-       VALUES (?, ?, ?, ?, 0, ?)
+      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient)
+       VALUES (?, ?, ?, ?, 0, ?, ?)
        ON CONFLICT (realm_id, business, item)
-       DO UPDATE SET price = excluded.price, low_stock = excluded.low_stock`
+       DO UPDATE SET price = excluded.price, low_stock = excluded.low_stock, ingredient = excluded.ingredient`
     )
-    .bind(realmId, business, name, p, low)
+    .bind(realmId, business, name, p, low, ing)
     .run();
   return listInventory(env, business, realmId);
 }

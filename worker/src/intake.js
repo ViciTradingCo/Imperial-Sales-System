@@ -11,7 +11,7 @@ import { getDb } from './db.js';
 import { listInventory } from './inventory.js';
 
 /** Records one intake transaction. Returns the recent intake list. */
-export async function recordIntake(env, business, { item, vendor, hold, numItems, pricePer, salePrice, idempotencyKey }, realmId) {
+export async function recordIntake(env, business, { item, vendor, hold, numItems, pricePer, salePrice, ingredient, idempotencyKey }, realmId) {
   const db = await getDb(env);
   const idem = String(idempotencyKey || '').trim();
   if (idem) {
@@ -35,6 +35,10 @@ export async function recordIntake(env, business, { item, vendor, hold, numItems
     sale = Number(askedSale);
     if (!isFinite(sale) || sale < 0) throw new Error('Sale price must be a number ≥ 0.');
   }
+  // An INGREDIENT is stock the shop holds to craft with and does not sell. The
+  // flag is set per delivery because that is when you know what the stock is
+  // for; it can be changed later from the item's own editor.
+  const ing = ingredient ? 1 : 0;
   const ts = new Date().toISOString();
 
   await db.batch([
@@ -45,12 +49,13 @@ export async function recordIntake(env, business, { item, vendor, hold, numItems
     // New item → priced at the sale price given, or at the cost paid if none.
     // Existing item → stock only, unless a sale price was explicitly given.
     db.prepare(
-      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock)
-       VALUES (?, ?, ?, ?, ?, 0)
+      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient)
+       VALUES (?, ?, ?, ?, ?, 0, ?)
        ON CONFLICT (realm_id, business, item) DO UPDATE SET
          stock = stock + excluded.stock,
-         price = CASE WHEN ? THEN excluded.price ELSE inventory.price END`
-    ).bind(realmId, business, name, sale === null ? per : sale, qty, sale === null ? 0 : 1),
+         price = CASE WHEN ? THEN excluded.price ELSE inventory.price END,
+         ingredient = excluded.ingredient`
+    ).bind(realmId, business, name, sale === null ? per : sale, qty, ing, sale === null ? 0 : 1),
     // Debit the shop's coffers for what was paid.
     db.prepare(
       `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'intake', ?, ?)`
