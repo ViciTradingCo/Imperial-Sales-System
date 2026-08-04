@@ -145,3 +145,49 @@ describe('ingredients', () => {
     expect(rival).toMatchObject({ ingredient: false, price: 40 });
   });
 });
+
+/**
+ * "Bought from" — which REGISTERED company supplied a delivery.
+ *
+ * The vendor field stays free text because most suppliers are NPCs with no
+ * account. This is the joinable half: it is what lets a region credit the shop
+ * that actually sold the goods, rather than only counting the total.
+ */
+describe('the supplying company', () => {
+  beforeEach(async () => {
+    await env.DB.prepare(
+      `INSERT INTO companies (id, realm_id, business, hold, court, priority, perpetual, status)
+       VALUES ('co-a', ?, ?, 'Whiterun', 0, 0, 1, 'VALID'), ('co-b', ?, 'Rift Traders', 'The Rift', 0, 0, 1, 'VALID')`)
+      .bind(R, SHOP, R).run();
+  });
+
+  it('is recorded when the supplier is a registered shop', async () => {
+    await take({ fromBusiness: 'Rift Traders' });
+    expect((await listIntake(env, SHOP, R))[0].fromBusiness).toBe('Rift Traders');
+  });
+
+  it('is empty for an ordinary NPC vendor', async () => {
+    await take({});
+    expect((await listIntake(env, SHOP, R))[0].fromBusiness).toBe('');
+  });
+
+  it('resolves loosely to the company\'s real name', async () => {
+    await take({ fromBusiness: '  rift traders ' });
+    expect((await listIntake(env, SHOP, R))[0].fromBusiness).toBe('Rift Traders');
+  });
+
+  it('refuses a company that is not registered here', async () => {
+    await expect(take({ fromBusiness: 'Ghost Emporium' })).rejects.toThrow(/no registered company/i);
+  });
+
+  it('refuses a shop recording a purchase from itself', async () => {
+    await expect(take({ fromBusiness: SHOP })).rejects.toThrow(/from itself/i);
+  });
+
+  it('does not resolve a company in another realm', async () => {
+    await env.DB.prepare(
+      `INSERT INTO companies (id, realm_id, business, hold, court, priority, perpetual, status)
+       VALUES ('co-x', 'rlm-other', 'Far Traders', 'Elsewhere', 0, 0, 1, 'VALID')`).run();
+    await expect(take({ fromBusiness: 'Far Traders' })).rejects.toThrow(/no registered company/i);
+  });
+});

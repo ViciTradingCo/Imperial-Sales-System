@@ -32,7 +32,7 @@ export function renderInventory(container, { me }) {
   ];
   if (canEdit) {
     firstCard.push(el('div', { class: 'row-actions' }, [
-      el('button.primary', { onclick: () => openIntakeModal(refreshAll) }, 'Record Intake'),
+      el('button.primary', { onclick: () => openIntakeModal(refreshAll, me) }, 'Record Intake'),
       el('button.secondary-btn', { onclick: () => openCraftModal(refreshAll) }, 'Craft'),
       el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshAll) }, 'Transfer'),
       el('button.secondary-btn', { onclick: () => openImportExportModal(refreshInventory) }, 'Import/Export'),
@@ -95,7 +95,8 @@ export function renderInventory(container, { me }) {
       const row = el('div.emp-row', {}, [
         el('span', { html:
           '<b>' + esc(r.item) + '</b> ×' + r.numItems + ' @ ' + money(r.pricePer) +
-          (r.hold ? ' · ' + esc(r.hold) : '') + (r.vendor ? ' · ' + esc(r.vendor) : '') +
+          (r.hold ? ' · ' + esc(r.hold) : '') +
+          (r.fromBusiness ? ' · <b>' + esc(r.fromBusiness) + '</b>' : (r.vendor ? ' · ' + esc(r.vendor) : '')) +
           ' <span class="note">' + esc(shortDate(r.ts)) + '</span>' }),
       ]);
       // The way to undo a mistyped delivery — sales have a void, intake had
@@ -305,7 +306,7 @@ function openCraftModal(onDone) {
 }
 
 /** Intake (restock) transaction as a focus modal. */
-function openIntakeModal(onRecorded) {
+function openIntakeModal(onRecorded, me) {
   const idem = newIdem(); // one key per intake entry — retries won't double the stock
   // Items must be chosen from the master index so stock never lands under a typo.
   const picker = createItemPicker({
@@ -323,6 +324,21 @@ function openIntakeModal(onRecorded) {
   });
   api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});
   const vendor = el('input', { type: 'text', placeholder: 'Vendor (who you bought from)' });
+  /**
+   * The supplier, when it was a REGISTERED company rather than an NPC.
+   *
+   * Optional and separate from the vendor field on purpose: most suppliers in
+   * the fiction have no account, and forcing every delivery through a dropdown
+   * of registered shops would mean typing a lie. When it IS a registered shop,
+   * this is the joinable half — it is what lets a region credit the company
+   * that actually supplied the goods rather than only counting the total.
+   */
+  const fromSel = el('select', {}, el('option', { value: '' }, '— an unregistered vendor —'));
+  api.listBusinesses()
+    .then((r) => (r.businesses || [])
+      .filter((b) => b !== (me && me.business))   // a shop does not buy from itself
+      .forEach((b) => fromSel.appendChild(el('option', { value: b }, b))))
+    .catch(() => { /* the field is optional; an empty list just means none offered */ });
   const hold = el('select', {}, el('option', { value: '' }, 'Select a ' + regionWord() + '…'));
   const qty = el('input', { type: 'number', step: '1', min: '1', placeholder: '# of items' });
   const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Cost per item' });
@@ -377,6 +393,7 @@ function openIntakeModal(onRecorded) {
         salePrice: ingredient.checked ? '' : sale.value,
         ingredient: ingredient.checked,
         vendor: vendor.value.trim(),
+        fromBusiness: fromSel.value,
         hold: hold.value,
         numItems: qty.value,
         pricePer: per.value,
@@ -395,6 +412,9 @@ function openIntakeModal(onRecorded) {
     el('p', { class: 'note' }, 'Log a purchase — this adds the stock and records what you paid and where. Pick the item from the index.'),
     el('label', {}, 'Item'), picker.el,
     el('label', {}, 'Vendor'), vendor,
+    el('label', {}, 'Bought from a registered company?'), fromSel,
+    el('p', { class: 'note' }, 'Only if the supplier is a shop on this network — it credits them for the ' +
+      'supply in their ' + regionWord() + '’s figures. Leave it as an unregistered vendor otherwise.'),
     ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
     el('label', {}, '# of items'), qty,
     el('label', {}, 'Cost per item — what you paid'), per,

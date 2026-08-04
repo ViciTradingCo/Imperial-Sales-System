@@ -11,7 +11,7 @@ import { getDb } from './db.js';
 import { listInventory } from './inventory.js';
 
 /** Records one intake transaction. Returns the recent intake list. */
-export async function recordIntake(env, business, { item, vendor, hold, numItems, pricePer, salePrice, ingredient, idempotencyKey }, realmId) {
+export async function recordIntake(env, business, { item, vendor, hold, fromBusiness, numItems, pricePer, salePrice, ingredient, idempotencyKey }, realmId) {
   const db = await getDb(env);
   const idem = String(idempotencyKey || '').trim();
   if (idem) {
@@ -39,13 +39,28 @@ export async function recordIntake(env, business, { item, vendor, hold, numItems
   // flag is set per delivery because that is when you know what the stock is
   // for; it can be changed later from the item's own editor.
   const ing = ingredient ? 1 : 0;
+  // Bought from a REGISTERED company, when it was. Resolved against the realm's
+  // own companies so it is a real join rather than a second free-text field —
+  // and a shop cannot record buying from itself, which would credit its own
+  // region for supply that never moved.
+  let from = String(fromBusiness || '').trim();
+  if (from) {
+    const known = await (await getDb(env)).prepare(
+      'SELECT business FROM companies WHERE realm_id = ? AND lower(business) = ?')
+      .bind(realmId, from.toLowerCase()).first();
+    if (!known) throw new Error('No registered company called "' + from + '" in this realm.');
+    if (known.business.toLowerCase() === String(business || '').trim().toLowerCase()) {
+      throw new Error('A shop cannot record buying from itself.');
+    }
+    from = known.business;
+  }
   const ts = new Date().toISOString();
 
   await db.batch([
     db.prepare(
-      `INSERT INTO intake (realm_id, business, ts, item, vendor, source_hold, num_items, price_per, idem)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(realmId, business, ts, name, String(vendor || '').trim(), String(hold || '').trim(), qty, per, idem || null),
+      `INSERT INTO intake (realm_id, business, ts, item, vendor, source_hold, num_items, price_per, idem, from_business)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(realmId, business, ts, name, String(vendor || '').trim(), String(hold || '').trim(), qty, per, idem || null, from),
     // New item → priced at the sale price given, or at the cost paid if none.
     // Existing item → stock only, unless a sale price was explicitly given.
     db.prepare(
@@ -70,7 +85,7 @@ export async function listIntake(env, business, realmId, limit = 20) {
   const db = await getDb(env);
   const { results } = await db
     .prepare(
-      `SELECT id, ts, item, vendor, source_hold, num_items, price_per
+      `SELECT id, ts, item, vendor, source_hold, num_items, price_per, from_business
        FROM intake WHERE realm_id = ? AND business = ? ORDER BY id DESC LIMIT ?`
     )
     .bind(realmId, business, limit)
@@ -78,6 +93,7 @@ export async function listIntake(env, business, realmId, limit = 20) {
   return (results || []).map((r) => ({
     id: r.id,
     ts: r.ts, item: r.item, vendor: r.vendor, hold: r.source_hold,
+    fromBusiness: r.from_business || '',
     numItems: r.num_items, pricePer: r.price_per,
   }));
 }

@@ -227,6 +227,21 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
   }).sort((a, b) => b.revenue - a.revenue);
 }
 
+/** Folds a region's sellers together, whichever side they sold from. */
+function mergeSellers(...groups) {
+  const byShop = new Map();
+  groups.forEach((rows) => (rows || []).forEach((r) => {
+    const name = String(r.seller || '').trim();
+    if (!name) return;
+    const cur = byShop.get(name) || { business: name, orders: 0, items: 0, revenue: 0 };
+    cur.orders += Number(r.orders) || 0;
+    cur.items += Number(r.items) || 0;
+    cur.revenue += Number(r.revenue) || 0;
+    byShop.set(name, cur);
+  }));
+  return [...byShop.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 200);
+}
+
 /**
  * Folds the two sides of a region's trade together, keyed by region name.
  * `hold` is kept as the field name because every caller and view already reads
@@ -480,11 +495,25 @@ export async function holdReport(env, hold, realmId) {
     activeShops: sold ? sold.activeShops : 0,
   };
 
-  const businesses = ((await db.prepare(
-    `SELECT business, COUNT(*) AS orders,
-            COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?
-      GROUP BY business ORDER BY revenue DESC LIMIT 200`).bind(realmId, h).all()).results) || [];
+  /**
+   * Who SOLD here. Two sources: shops that rang up sales in this region, and
+   * shops recorded as the supplier on a delivery sourced from it. The second
+   * only exists where the buyer named a registered company — an NPC vendor is
+   * free text with nobody to credit, so it counts toward the region's totals
+   * but not toward anybody's line.
+   */
+  const businesses = mergeSellers(
+    ((await db.prepare(
+      `SELECT business AS seller, COUNT(*) AS orders,
+              COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
+         FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?
+        GROUP BY business`).bind(realmId, h).all()).results) || [],
+    ((await db.prepare(
+      `SELECT from_business AS seller, COUNT(*) AS orders,
+              COALESCE(SUM(num_items), 0) AS items,
+              COALESCE(SUM(num_items * price_per), 0) AS revenue
+         FROM intake WHERE realm_id = ? AND source_hold = ? AND from_business != ''
+        GROUP BY from_business`).bind(realmId, h).all()).results) || []);
 
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`).bind(realmId, h).all()).results) || [];

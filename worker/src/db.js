@@ -50,7 +50,8 @@ const SCHEMA = [
      realm_id TEXT NOT NULL DEFAULT '${R}',
      business TEXT NOT NULL, ts TEXT NOT NULL, item TEXT, vendor TEXT,
      source_hold TEXT, num_items INTEGER NOT NULL DEFAULT 0,
-     price_per REAL NOT NULL DEFAULT 0, idem TEXT)`,
+     price_per REAL NOT NULL DEFAULT 0, idem TEXT,
+     from_business TEXT NOT NULL DEFAULT '')`,
   `CREATE INDEX IF NOT EXISTS idx_intake_business ON intake (business)`,
   `CREATE TABLE IF NOT EXISTS transfers (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -294,6 +295,12 @@ const MIGRATIONS = [
   // of the shop's listing, not of the item itself: one shop's ingredient is
   // another's stock-in-trade, so this cannot live on the master index.
   'ALTER TABLE inventory ADD COLUMN ingredient INTEGER NOT NULL DEFAULT 0',
+  // Which REGISTERED COMPANY supplied a delivery, when one did. `vendor` stays
+  // free text because most suppliers are NPCs with no account; this is the
+  // joinable half, so a region's supply can be credited to the shop that
+  // actually sold it.
+  "ALTER TABLE intake ADD COLUMN from_business TEXT NOT NULL DEFAULT ''",
+  'CREATE INDEX IF NOT EXISTS idx_intake_from ON intake (realm_id, from_business)',
   'CREATE INDEX IF NOT EXISTS idx_sales_counted ON sales (realm_id, status, staff_purchase)',
 ];
 

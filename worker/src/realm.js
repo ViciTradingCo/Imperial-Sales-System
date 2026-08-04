@@ -12,9 +12,9 @@
  * stored on their user row and re-checked on every request (guards.realmIdOf),
  * so it is still read from the database rather than trusted from the client.
  *
- * Use `realmScope(env, realmId)` in data modules: it hands back the db plus the
- * realm id and small SQL helpers, so scoping is one consistent idiom rather
- * than an easily-forgotten `AND realm_id = ?`.
+ * In practice that means every data module resolves the realm with
+ * `guards.realmIdOf(caller)` and carries it into the SQL itself; there is no
+ * ambient "current realm" a query can forget to apply.
  */
 import { getDb, DEFAULT_REALM_ID, DEFAULT_REALM_NAME, REALM_TABLES } from './db.js';
 
@@ -100,24 +100,6 @@ function genRealmId() {
 export function realmOf(value) {
   const r = String(value || '').trim();
   return r || DEFAULT_REALM_ID;
-}
-
-/**
- * A realm-bound handle for data modules:
- *   const { db, realmId, and, where } = await realmScope(env, caller.realmId);
- *   db.prepare('SELECT * FROM sales' + where() + ' AND business = ?').bind(realmId, business)
- * `where()` opens the clause with the realm filter (so realmId binds FIRST);
- * `and()` appends it to an existing WHERE.
- */
-export async function realmScope(env, realmId) {
-  const db = await getDb(env);
-  const id = realmOf(realmId);
-  return {
-    db,
-    realmId: id,
-    where: () => ' WHERE realm_id = ?',
-    and: () => ' AND realm_id = ?',
-  };
 }
 
 /**

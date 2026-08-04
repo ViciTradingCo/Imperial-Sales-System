@@ -4,7 +4,7 @@
  * caller's role/business. The browser never touches the datastore directly and
  * never holds any backend credential.
  */
-import { getIdToken } from './auth.js';
+import { getIdToken, handleUnauthorized } from './auth.js';
 
 let baseUrl = '';
 export function configureApi(url) { baseUrl = String(url || '').replace(/\/$/, ''); }
@@ -32,6 +32,10 @@ async function request(method, path, body) {
   try { data = text ? JSON.parse(text) : null; } catch (e) { /* non-JSON error body */ }
 
   if (!res.ok) {
+    // 401 mid-session is what an expired Google token looks like from here.
+    // Ask for a fresh one rather than leaving the user staring at an error they
+    // can only fix by signing out and back in.
+    if (res.status === 401 && token) handleUnauthorized();
     const msg = (data && data.error) || text || (res.status + ' ' + res.statusText);
     throw new Error(msg);
   }

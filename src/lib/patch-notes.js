@@ -3,6 +3,19 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.5', date: '2026-08-04', notes: [
+    'Court Tools: a company flagged as a Court now governs its region from one page in the side menu — a levy on trade, licences and sanctions on the shops it oversees, price controls, a public notice, the treasury, and a view of everything held in the region.',
+    'The levy never moves money on its own. A Court sets a percentage, the system records what each shop owes, and the Court marks it paid when it actually is. Set it to 0 and the feature is simply off.',
+    'Courts can also look: a read-only view of every company in their region — rosters, ledgers and performance — without seeing anything outside it.',
+    'Register: a sale can be ticked as an Employee Purchase. It leaves the stock and the record alone but charges nothing, and it is kept out of every statistic.',
+    'Inventory: crafting. Turn a quantity of one or more items into a quantity of another — the ingredients come out of stock and the result goes in, in one step.',
+    'Inventory: owners can set a sale price per item, which the register offers as the default. Deleting an intake entry is now possible, and an item that runs out of stock stays listed so its price and history survive.',
+    'Intake: an item can be marked as an Ingredient (kept out of the register and out of pricing statistics), and can record which registered company it was Bought From.',
+    'Intake now counts as trade for the region it came from, so a region that supplies goods shows up in Market Analysis instead of looking idle.',
+    'Item Performance is down to what matters: one Average Value per item, worked out from every transaction in both directions, plus its best region and its trend. Over- and undercutting is measured against that value.',
+    'Register: Style, Company and Settings are one Settings button. The Shop Ledger keeps Performance, Notices and Coffers; everything else moved into Shop Settings.',
+    'Signing in sticks. The app no longer signs you out when a page reloads or when your phone puts the tab to sleep, and it quietly renews your session before it expires.',
+  ] },
   { version: '1.4', date: '2026-08-03', notes: [
     'Feedback: owners and employees now have a Feedback page in the side menu. Pick a subject, write what you think, and send — your name, shop, and the date are attached automatically. You can see everything you have sent and whether it has been reviewed.',
     'Item Performance now leads with the top five items, each with its own trend graph, and a search box for looking up any item in the index.',
