@@ -281,20 +281,38 @@ export async function marketAnalysis(env, realmId) {
   const items = withoutTrend(ranked);
   const topItems = ranked.slice(0, TOP_ITEMS);
 
-  // Pricing anomalies vs the master base values, using the network thresholds.
+  /**
+   * Pricing anomalies, measured against what the item is actually WORTH.
+   *
+   * The comparison used to be the master index's base value — a figure an admin
+   * typed in, which the settings already called an "item average" without being
+   * one. It now uses avgValue: the weighted median of what the item really sold
+   * for, outliers fenced (see salesValue). A shop charging double what the realm
+   * pays is the thing worth flagging, and only observed trade can say what that
+   * is.
+   *
+   * An item with no sales yet is SKIPPED rather than falling back to the base
+   * value. Nothing has been observed, so there is no claim to make — and a list
+   * mixing "twice what it sells for" with "twice what someone guessed" would
+   * mean neither.
+   */
   const settings = await readSettings(env, realmId);
   const overX = settingVal(settings, 'Overpricing threshold (x item average)', 1.5);
   const underX = settingVal(settings, 'Undercutting threshold (x item average)', 0.5);
-  const masterByNorm = new Map(master.map((m) => [normalizeItem(m.name), m]));
-  const invRows = ((await db.prepare('SELECT business, item, price FROM inventory WHERE realm_id = ?').bind(realmId).all()).results) || [];
+  const valueByNorm = new Map();
+  ranked.forEach((r) => { if (r.avgValue > 0) valueByNorm.set(normalizeItem(r.item), r); });
+  // Ingredients are excluded: they are held to craft with, not sold, so their
+  // listed price is not an offer to anybody.
+  const invRows = ((await db.prepare('SELECT business, item, price FROM inventory WHERE realm_id = ? AND ingredient = 0').bind(realmId).all()).results) || [];
   const overpriced = [];
   const undercut = [];
   invRows.forEach((r) => {
-    const m = masterByNorm.get(normalizeItem(r.item));
-    if (!m || !(m.baseValue > 0)) return; // only items with a real base value
-    const ratio = r.price / m.baseValue;
-    if (ratio >= overX) overpriced.push({ business: r.business, item: m.name, price: r.price, baseValue: m.baseValue, ratio });
-    else if (ratio <= underX) undercut.push({ business: r.business, item: m.name, price: r.price, baseValue: m.baseValue, ratio });
+    const m = valueByNorm.get(normalizeItem(r.item));
+    if (!m) return; // never sold in this realm — nothing observed to judge against
+    const ratio = r.price / m.avgValue;
+    const row = { business: r.business, item: m.item, price: r.price, value: m.avgValue, samples: m.valueSamples, ratio };
+    if (ratio >= overX) overpriced.push(row);
+    else if (ratio <= underX) undercut.push(row);
   });
   overpriced.sort((a, b) => b.ratio - a.ratio);
   undercut.sort((a, b) => a.ratio - b.ratio);

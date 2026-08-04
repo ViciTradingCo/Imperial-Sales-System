@@ -12,6 +12,7 @@ import { checkCertification } from './cert.js';
 import { readRealmPrefs } from './realm-prefs.js';
 import { listItemIndex, matchMasterItem } from './item-index.js';
 import { logAudit } from './audit.js';
+import { courtRules, standingOf, accrueLevy } from './court.js';
 
 /**
  * A sale's lines, as DATA: [{name, qty, price}].
@@ -127,6 +128,17 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     throw new Error('Pick the ' + prefs.regionLabel.toLowerCase() + ' this sale happened in.');
   }
 
+  // The region's Court, if it has one. Null when no company there holds the
+  // flag, and then nothing below it costs anything.
+  const rules = await courtRules(env, holdName, realmId);
+  if (rules) {
+    const standing = await standingOf(env, business, holdName, realmId);
+    if (standing === 'banned') {
+      throw new Error('The ' + rules.hold + ' Court has barred this shop from trading. Speak to ' +
+        rules.seat + ' before selling again.');
+    }
+  }
+
   const master = await listItemIndex(env, realmId);
   const { results } = await db.prepare('SELECT item, price, stock, ingredient FROM inventory WHERE realm_id = ? AND business = ?')
     .bind(realmId, business).all();
@@ -167,6 +179,19 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     if (inInv) need[invItem.item] = (need[invItem.item] || 0) + qty;
     else offInventory.push(name);
     if (!inMaster) newItems.push(name);
+
+    // Price controls: a Court's floor and ceiling on what may be charged for an
+    // item in its region. Checked per LINE and refused with the actual bound, so
+    // the clerk is told what to change rather than that something is wrong.
+    if (rules) {
+      const cap = rules.prices.get(name.toLowerCase());
+      if (cap && cap.max != null && price > cap.max) {
+        throw new Error(rules.hold + ' Court caps ' + name + ' at ' + cap.max + ' — this line is at ' + price + '.');
+      }
+      if (cap && cap.min != null && price < cap.min) {
+        throw new Error(rules.hold + ' Court sets a floor of ' + cap.min + ' on ' + name + ' — this line is at ' + price + '.');
+      }
+    }
 
     subtotal += price * qty;
     qtyTotal += qty;
@@ -217,6 +242,11 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   }
   await db.batch(stmts);
 
+  // The levy: what this sale owes the region's Court. Recorded as a DEBT, never
+  // taken — the Court marks it paid when it actually is. An employee purchase
+  // took no money, so it owes nothing.
+  const levy = staff ? 0 : await accrueLevy(env, rules, { business, total: finalTotal, orderNo }, realmId);
+
   // Flag off-inventory / non-master (new) items in the audit log — the sale
   // still processes so the data is captured, but new items stay out of market.
   const actor = caller.character || caller.email;
@@ -226,7 +256,7 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   if (newList.length) await logAudit(env, { actor, business, action: 'sale.new_item', detail: orderNo + ': ' + newList.join(', '), realmId });
 
   return { ok: true, orderNo, total: finalTotal, hold: holdName, discount: discountLabel,
-    staffPurchase: staff, offInventory: offList, newItems: newList };
+    staffPurchase: staff, levy, offInventory: offList, newItems: newList };
 }
 
 /** Recent sales, optionally filtered by order #, customer, or employee. */

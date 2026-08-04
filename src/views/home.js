@@ -22,9 +22,6 @@ import { renderEmployees } from './employees.js';
 import { renderLedgerSettings } from './ledger-settings.js';
 import { openLowStockModal } from './low-stock.js';
 import { skeletonLines } from '../lib/skeleton.js';
-import { renderCourtCompanies } from './court.js';
-import { renderRegionReport } from './region-report.js';
-import { regionLabel, regionWord } from '../lib/format.js';
 
 export function renderHome(container, { me }) {
   // Notices — the global MOTD plus any active per-business messages.
@@ -60,10 +57,6 @@ export function renderHome(container, { me }) {
         : el('p', { class: 'ok' }, 'Your account is active.'),
     ]),
     el('div.card', {}, [el('h3', {}, 'Shop tools'), gridHost]),
-    // A Court oversees trade in its region — a role, not a shop tool, so it
-    // gets a card of its own rather than a tile among the register and the
-    // stockroom. Absent entirely for a company that is not one.
-    ...(me.court ? [courtCard()] : []),
     subscriptionCard(me));
 
   // Tiles render as soon as the page does; artwork fills in when it arrives.
@@ -89,30 +82,6 @@ export function renderHome(container, { me }) {
     ];
     mount(gridHost, tileGrid(tiles.filter(Boolean), tileImages));
   }
-}
-
-/**
- * Court oversight, for a company an admin has flagged as its region's Court.
- *
- * Two context buttons: the market for the region, and the companies trading in
- * it. Both open in place — a Court checks on its region between doing its own
- * business, and sending it to another page to look would interrupt that.
- */
-function courtCard() {
-  const gridHost = el('div', {});
-  const card = el('div.card', {}, [
-    el('h3', {}, '⚖️ ' + regionLabel() + ' Court'),
-    el('p', { class: 'note' }, 'Your company oversees trade in its ' + regionWord() + '. These cover every ' +
-      'shop there, not just your own.'),
-    gridHost,
-  ]);
-  mount(gridHost, tileGrid([
-    { key: 'court-market', label: 'Market Analysis', hint: 'Your ' + regionWord() + '’s trade', glyph: '📊',
-      onOpen: () => openFocalMenu(regionLabel() + ' market', (h) => renderRegionReport(h, { embedded: true })) },
-    { key: 'court-companies', label: 'Company List', hint: 'Shops in your ' + regionWord(), glyph: '🏛️',
-      onOpen: () => openFocalMenu('Companies in your ' + regionWord(), (h) => renderCourtCompanies(h)) },
-  ], {}));
-  return card;
 }
 
 /**

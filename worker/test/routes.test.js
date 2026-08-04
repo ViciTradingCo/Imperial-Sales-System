@@ -58,13 +58,21 @@ describe('route wiring', () => {
   });
 
   /**
-   * A Court reads its region's shops. It is an overseer AND a rival trader, so
-   * a write path here would let it act on a competitor's books — the same
-   * reasoning as the admin ledger, with more at stake.
+   * A Court governs its region, so it does write — but only its OWN
+   * instruments: the levy, its rulings, price controls, the notice, its dues
+   * ledger and its treasury. It has no path that reaches into a shop's stock,
+   * coffer or sales, which is what separates governing from helping yourself.
+   *
+   * Listed exactly, so a new Court write is a decision rather than a surprise.
    */
-  it('gives a Court reads only', () => {
-    const court = all.filter((r) => r.path.startsWith('/court/'));
-    expect(court.length).toBeGreaterThan(0);
-    expect(court.every((r) => r.method === 'GET')).toBe(true);
+  it('lets a Court write only its own instruments', () => {
+    const writes = all.filter((r) => r.method === 'POST' && r.path.startsWith('/court')).map((r) => r.path).sort();
+    expect(writes).toEqual([
+      '/court/dues/pay',
+      '/court/prices',
+      '/court/settings',
+      '/court/spending',
+      '/court/standing',
+    ]);
   });
 });

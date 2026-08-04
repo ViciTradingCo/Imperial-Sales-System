@@ -25,6 +25,12 @@ import { readMotd, readWarnDays, activeNoticesForBusiness,
   listMotdsForBusiness, addMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
 import { holdReport, businessReport } from '../market.js';
 import { requireCourt, courtCompanies, courtShop } from '../oversight.js';
+import {
+  SPEND_CATEGORIES, STANDINGS, readCourtSettings, writeCourtSettings,
+  courtStandings, setCourtStanding, courtPrices, setCourtPrice,
+  courtDues, courtDuesFor, recordDuesPayment, courtSpending, recordCourtSpend, courtStock,
+  standingOf,
+} from '../court.js';
 import { businessCsv } from '../export.js';
 import { publicStorefront } from '../storefront.js';
 import { readBranding } from '../branding.js';
@@ -398,6 +404,88 @@ async function courtShopRoute({ request, env, url }) {
   return await courtShop(env, hold, url.searchParams.get('business'), realmId);
 }
 
+/* ---- Court Tools: a region's government ---- */
+/**
+ * Every Court route resolves the caller's OWN region first, and acts only on
+ * it. One gate, applied identically, so no individual handler can be the one
+ * that forgot.
+ */
+async function courtSeat(request, env) {
+  const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
+  const hold = await requireCourt(env, caller.business, realmId);
+  return { caller, realmId, hold };
+}
+
+/** Everything the Court Tools page opens with, in one call. */
+async function courtOverview({ request, env }) {
+  const { caller, realmId, hold } = await courtSeat(request, env);
+  const [settings, dues, standings] = await Promise.all([
+    readCourtSettings(env, hold, realmId),
+    courtDues(env, hold, realmId),
+    courtStandings(env, hold, realmId),
+  ]);
+  return {
+    hold, seat: caller.business, settings, dues,
+    shops: standings.length,
+    standings, categories: SPEND_CATEGORIES, options: STANDINGS,
+  };
+}
+async function courtSaveSettings({ request, env, body }) {
+  const { caller, realmId, hold } = await courtSeat(request, env);
+  const settings = await writeCourtSettings(env, hold, body, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.settings',
+    detail: hold + ': levy ' + settings.taxPercent + '%' + (body.notice !== undefined ? ', notice updated' : ''), realmId });
+  return { settings };
+}
+async function courtSetStanding({ request, env, body }) {
+  const { caller, realmId, hold } = await courtSeat(request, env);
+  const standings = await setCourtStanding(env, hold, body, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.standing',
+    detail: String(body.business || '') + ' → ' + String(body.standing || ''), realmId });
+  return { standings };
+}
+async function courtGetPrices({ request, env }) {
+  const { realmId, hold } = await courtSeat(request, env);
+  return { hold, prices: await courtPrices(env, hold, realmId) };
+}
+async function courtSavePrice({ request, env, body }) {
+  const { caller, realmId, hold } = await courtSeat(request, env);
+  const prices = await setCourtPrice(env, hold, body, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.price',
+    detail: String(body.item || '') + ': ' + (body.min || '—') + ' to ' + (body.max || '—'), realmId });
+  return { prices };
+}
+async function courtGetDues({ request, env, url }) {
+  const { realmId, hold } = await courtSeat(request, env);
+  const one = String(url.searchParams.get('business') || '').trim();
+  return one
+    ? { hold, business: one, entries: await courtDuesFor(env, hold, one, realmId) }
+    : { hold, ...(await courtDues(env, hold, realmId)) };
+}
+async function courtPayDues({ request, env, body }) {
+  const { caller, realmId, hold } = await courtSeat(request, env);
+  const dues = await recordDuesPayment(env, hold, body, realmId, caller.business);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.dues.paid',
+    detail: String(body.business || '') + ': ' + String(body.amount || ''), realmId });
+  return dues;
+}
+async function courtGetSpending({ request, env }) {
+  const { realmId, hold } = await courtSeat(request, env);
+  return { hold, ...(await courtSpending(env, hold, realmId)) };
+}
+async function courtSpend({ request, env, body }) {
+  const { caller, realmId, hold } = await courtSeat(request, env);
+  const spending = await recordCourtSpend(env, hold, body, realmId, caller.business);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.spend',
+    detail: String(body.category || '') + ': ' + String(body.amount || ''), realmId });
+  return spending;
+}
+async function courtGetStock({ request, env }) {
+  const { realmId, hold } = await courtSeat(request, env);
+  return { hold, stock: await courtStock(env, hold, realmId) };
+}
+
 /**
  * Public (no auth): branding — needed before sign-in, so this is the DEPLOYMENT's
  * identity. A realm's own overrides are applied once the user signs in and their
@@ -427,8 +515,25 @@ async function getMotd({ request, env }) {
   const global = await readMotd(env, realmId);
   if (global) notices.push(global);
   notices.push(...(await activeNoticesForBusiness(env, caller.business, realmId)));
+  // The Court's notice to its region — announcements from the government of
+  // the place you trade in, alongside the network's own.
+  const meta = await findBusinessMeta(env, caller.business, realmId);
+  if (meta && meta.hold) {
+    const court = await readCourtSettings(env, meta.hold, realmId);
+    if (court.notice) notices.push('⚖️ ' + meta.hold + ' Court: ' + court.notice);
+  }
 
   const banners = [];
+  // A sanction is not a notice to skim past: it stops or threatens trade, so it
+  // goes in the banner strip with the certification warnings.
+  if (meta && meta.hold && (caller.role === 'owner' || caller.role === 'employee')) {
+    const standing = await standingOf(env, caller.business, meta.hold, realmId);
+    if (standing === 'banned') {
+      banners.push({ text: '⚖️ The ' + meta.hold + ' Court has BARRED this shop from trading — sales are blocked.' });
+    } else if (standing === 'restricted') {
+      banners.push({ text: '⚖️ The ' + meta.hold + ' Court has placed this shop under restriction.' });
+    }
+  }
   if (caller.role === 'owner' || caller.role === 'employee') {
     const cert = await checkCertification(env, caller.business, realmId);
     if (!cert.perpetual) {
@@ -523,6 +628,16 @@ export const routes = [
   { method: 'GET', path: '/market/region', handler: holdReportRoute },
   { method: 'GET', path: '/court/companies', handler: courtCompaniesRoute },
   { method: 'GET', path: '/court/company', handler: courtShopRoute },
+  { method: 'GET', path: '/court', handler: courtOverview },
+  { method: 'POST', path: '/court/settings', handler: courtSaveSettings },
+  { method: 'POST', path: '/court/standing', handler: courtSetStanding },
+  { method: 'GET', path: '/court/prices', handler: courtGetPrices },
+  { method: 'POST', path: '/court/prices', handler: courtSavePrice },
+  { method: 'GET', path: '/court/dues', handler: courtGetDues },
+  { method: 'POST', path: '/court/dues/pay', handler: courtPayDues },
+  { method: 'GET', path: '/court/spending', handler: courtGetSpending },
+  { method: 'POST', path: '/court/spending', handler: courtSpend },
+  { method: 'GET', path: '/court/stock', handler: courtGetStock },
   { method: 'GET', path: '/motd', handler: getMotd },
   { method: 'POST', path: '/business/intake/delete', handler: deleteIntakeRoute },
   { method: 'POST', path: '/business/inventory/convert', handler: convertInventory },

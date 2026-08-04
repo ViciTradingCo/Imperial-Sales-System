@@ -124,6 +124,27 @@ export const api = {
   getCourtCompanies: () => request('GET', '/court/companies'),
   /** Court businesses: one of those shops in full — roster, coffer, performance. */
   getCourtCompany: (business) => request('GET', '/court/company?business=' + encodeURIComponent(business)),
+  /* ---- Court Tools: a region's government ---- */
+  /** The Court Tools landing data: levy rate, notice, dues owed, standings. */
+  getCourt: () => request('GET', '/court'),
+  /** Set the levy percentage (0 = off) and/or the region's notice. */
+  saveCourtSettings: (patch) => request('POST', '/court/settings', patch),
+  /** Grant a licence, restrict, bar, or clear a shop's standing. */
+  setCourtStanding: (business, standing, note) => request('POST', '/court/standing', { business, standing, note }),
+  /** Price controls in force across the region. */
+  getCourtPrices: () => request('GET', '/court/prices'),
+  /** Set (or, with both blank, remove) the floor and ceiling on one item. */
+  saveCourtPrice: (item, min, max) => request('POST', '/court/prices', { item, min, max }),
+  /** What each shop owes — or one shop's levy history with ?business=. */
+  getCourtDues: (business) => request('GET', '/court/dues' + (business ? '?business=' + encodeURIComponent(business) : '')),
+  /** Record a levy payment received; credits the Court's own coffer. */
+  payCourtDues: (business, amount, note) => request('POST', '/court/dues/pay', { business, amount, note }),
+  /** The treasury: public spending by category. */
+  getCourtSpending: () => request('GET', '/court/spending'),
+  /** Spend public money; debits the Court's own coffer. */
+  spendCourt: (category, amount, note) => request('POST', '/court/spending', { category, amount, note }),
+  /** What the whole region holds, by item. */
+  getCourtStock: () => request('GET', '/court/stock'),
   /** Banners for the current user: { notices[], banners[] }. Deduped for ~3s. */
   getMotd: () => {
     const now = Date.now();

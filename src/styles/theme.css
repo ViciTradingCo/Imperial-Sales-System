@@ -141,6 +141,13 @@ body {
 .trend-fill { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
 .trend-day { font-size: 10px; color: var(--note); white-space: nowrap; }
 
+/* A Court's seal (or its sanction) on a public storefront. */
+.court-seal {
+  display: inline-block; margin: 0 0 var(--sp-2);
+  border: 1px solid currentColor; border-radius: var(--radius);
+  padding: 4px 10px; font-weight: bold; font-size: 13px;
+}
+
 /* An ingredient line: the picker takes the room, quantity and Remove sit tight
    beside it rather than each claiming a full-width row. */
 .craft-row {

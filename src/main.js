@@ -12,6 +12,7 @@ import { applyPrefs } from './lib/theme.js';
 import { applyLang } from './lib/i18n.js';
 import { loadBranding, applyBranding } from './lib/branding.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
+import { renderCourtTools } from './views/court.js';
 import { renderFeedback } from './views/feedback.js';
 import { renderFeedbackAdmin } from './views/feedback-admin.js';
 import { initActions, clearActions } from './lib/actions.js';
@@ -31,7 +32,6 @@ import { renderRealms } from './views/realms.js';
 import { renderMembers } from './views/members.js';
 import { renderCompanies } from './views/companies.js';
 import { renderMarket } from './views/market.js';
-import { renderRegionReport } from './views/region-report.js';
 import { renderMotdAdmin } from './views/motd-admin.js';
 import { renderAudit } from './views/audit.js';
 import { renderItemIndex } from './views/item-index.js';
@@ -192,6 +192,14 @@ route('/patch-notes', (container) => {
   renderPatchNotes(host);
 });
 
+route('/court', (container) => {
+  const m = state.me;
+  // Guarded again by the Worker, which resolves the Court's region from its own
+  // company; this only keeps the page out of the way of a typed URL.
+  if (!m || !m.registered || !m.court) { navigate('/'); return; }
+  renderCourtTools(container, { me: m });
+});
+
 route('/feedback', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
   renderFeedback(container, { me: state.me });
@@ -292,12 +300,6 @@ route('/admin/market/items', adminMarket('items'));
 route('/admin/market/regions', adminMarket('regions'));
 route('/admin/market/companies', adminMarket('companies'));
 route('/admin/market/trends', adminMarket('trends'));
-
-route('/region-report', (container) => {
-  if (!state.me || !state.me.registered) { navigate('/'); return; }
-  if (!state.me.court) { navigate('/'); return; }
-  renderRegionReport(container);
-});
 
 route('/ledger/settings', (container) => {
   const m = state.me;

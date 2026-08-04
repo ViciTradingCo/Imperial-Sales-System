@@ -113,6 +113,24 @@ word from other tables' flags so no stored flag can ever be dead. Import
 destinations come from one shared planner (`destinationPlanner`) so the preview
 and the apply cannot disagree.
 
+## Courts govern a region
+
+A company an admin flags as **Court** is its region's government. Everything it
+can do lives behind one nav entry, **Court Tools** (`/court`), so a Court's two
+jobs — running a shop, governing a region — stay separable.
+
+`oversight.js` is a Court LOOKING (companies, rosters, books — shared with the
+admin Company List). `court.js` is a Court GOVERNING: the levy, licences and
+sanctions, price controls, the notice, the treasury, regional stock.
+
+Court data is keyed by REGION, never by the Court company, so a rename or the
+flag moving elsewhere leaves the region's rules and books intact. `requireCourt`
+resolves the caller's own region and every read and write is scoped to it.
+
+THE MONEY NEVER MOVES ON ITS OWN. A levy records what a shop OWES; a Court marks
+it paid when it actually is. A levy of 0 is the feature DISABLED — checkout skips
+it entirely rather than working out 0% of every sale, and the UI says "Disabled".
+
 ## Store data, present labels
 
 Never write a realm's wording into a stored value. Sale lines are JSON numbers,

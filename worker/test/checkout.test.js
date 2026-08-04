@@ -31,7 +31,12 @@ async function stockOf(b, i) {
 }
 
 beforeAll(async () => { env = { DB: makeD1() }; await ensureSchema(env); });
-beforeEach(async () => { for (const t of ['inventory', 'sales', 'coffer_entries']) await env.DB.prepare('DELETE FROM ' + t).run(); });
+beforeEach(async () => {
+  for (const t of ['inventory', 'sales', 'coffer_entries', 'companies',
+    'court_settings', 'court_status', 'court_price', 'court_dues']) {
+    await env.DB.prepare('DELETE FROM ' + t).run();
+  }
+});
 
 describe('checkout', () => {
   it('decrements stock, records the sale, and credits coffers', async () => {
@@ -181,5 +186,100 @@ describe('ingredients cannot be sold', () => {
       { cart: [{ item: 'Health Potion', qty: 1, price: 5 }], hold: 'Whiterun' }, 'default');
     expect(res.total).toBe(5);
     expect(res.offInventory).toEqual(['Health Potion']);
+  });
+});
+
+/**
+ * A Court's rules reach the register: a barred shop cannot sell, a capped item
+ * cannot be sold outside its bounds, and a levy accrues as a debt.
+ *
+ * courtRules returns null when no company in the region holds the Court flag,
+ * so every test above runs with no Court and pays nothing for the feature.
+ */
+describe('a Court\'s rules at the register', () => {
+  const HOLD = 'Whiterun';
+  async function seatCourt(taxPercent) {
+    await env.DB.prepare(
+      `INSERT INTO companies (id, realm_id, business, hold, court, priority, perpetual, status)
+       VALUES ('co-court', 'default', 'Whiterun Court', ?, 1, 0, 1, 'VALID')`).bind(HOLD).run();
+    if (taxPercent != null) {
+      await env.DB.prepare('INSERT INTO court_settings (realm_id, hold, tax_percent, notice) VALUES (?, ?, ?, \'\')')
+        .bind('default', HOLD, taxPercent).run();
+    }
+  }
+
+  it('bars a sanctioned shop from selling', async () => {
+    await seatCourt(null);
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    await env.DB.prepare(
+      "INSERT INTO court_status (realm_id, hold, business, standing, note, updated) VALUES ('default', ?, 'Alpha', 'banned', '', '')")
+      .bind(HOLD).run();
+    await expect(checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 30 }], hold: HOLD }, 'default'))
+      .rejects.toThrow(/barred this shop/i);
+    expect(await stockOf('Alpha', 'Iron Sword')).toBe(10);
+  });
+
+  it('lets a restricted shop keep trading — it is a warning, not a stop', async () => {
+    await seatCourt(null);
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    await env.DB.prepare(
+      "INSERT INTO court_status (realm_id, hold, business, standing, note, updated) VALUES ('default', ?, 'Alpha', 'restricted', '', '')")
+      .bind(HOLD).run();
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 30 }], hold: HOLD }, 'default');
+    expect(res.total).toBe(30);
+  });
+
+  it('refuses a line above the Court\'s ceiling, naming the bound', async () => {
+    await seatCourt(null);
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    await env.DB.prepare(
+      "INSERT INTO court_price (realm_id, hold, item, min_price, max_price, updated) VALUES ('default', ?, 'Iron Sword', NULL, 40, '')")
+      .bind(HOLD).run();
+    await expect(checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 55 }], hold: HOLD }, 'default'))
+      .rejects.toThrow(/caps Iron Sword at 40/i);
+    expect(await stockOf('Alpha', 'Iron Sword')).toBe(10);
+  });
+
+  it('refuses a line below the floor', async () => {
+    await seatCourt(null);
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    await env.DB.prepare(
+      "INSERT INTO court_price (realm_id, hold, item, min_price, max_price, updated) VALUES ('default', ?, 'Iron Sword', 20, NULL, '')")
+      .bind(HOLD).run();
+    await expect(checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 5 }], hold: HOLD }, 'default'))
+      .rejects.toThrow(/floor of 20/i);
+  });
+
+  it('accrues the levy as a debt and takes no money', async () => {
+    await seatCourt(10);
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 2, price: 25 }], hold: HOLD }, 'default');
+    expect(res.total).toBe(50);
+    expect(res.levy).toBe(5);
+    // The shop keeps its takings; the Court is owed, not paid.
+    expect(await cofferBalance(env, 'Alpha', 'default')).toBe(50);
+    expect(await cofferBalance(env, 'Whiterun Court', 'default')).toBe(0);
+  });
+
+  it('charges no levy on an employee purchase — it took no money', async () => {
+    await seatCourt(10);
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 2, price: 25 }], hold: HOLD, staffPurchase: true }, 'default');
+    expect(res.levy).toBe(0);
+    const rows = await env.DB.prepare('SELECT COUNT(*) AS n FROM court_dues').first();
+    expect(rows.n).toBe(0);
+  });
+
+  it('does nothing at all in a region with no Court', async () => {
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 999 }], hold: 'The Rift' }, 'default');
+    expect(res.levy).toBe(0);
   });
 });

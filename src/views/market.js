@@ -116,15 +116,17 @@ function overview(d) {
         '<b>' + esc(u.business) + '</b> · ' + esc(u.item) + ' — selling at ' +
         money(u.salePrice) + ' vs. avg cost ' + money(u.avgCost)),
       'No items are priced below their purchase cost.'),
-    alertsCard('⤴ Overpriced (vs base value)', 'bad',
+    // Measured against what the item actually sells for, not its index base —
+    // and items with no sales yet are simply not judged.
+    alertsCard('⤴ Overpriced (vs average value)', 'bad',
       (d.overpriced || []).map((o) =>
         '<b>' + esc(o.business) + '</b> · ' + esc(o.item) + ' — ' + money(o.price) +
-        ' vs base ' + money(o.baseValue) + ' (' + o.ratio.toFixed(2) + '×)'),
-      'No items are overpriced.'),
-    alertsCard('⤵ Undercut (vs base value)', 'warn',
+        ' vs ' + money(o.value) + ' average (' + o.ratio.toFixed(2) + '×)'),
+      'No items are priced above what they sell for.'),
+    alertsCard('⤵ Undercut (vs average value)', 'warn',
       (d.undercut || []).map((u) =>
         '<b>' + esc(u.business) + '</b> · ' + esc(u.item) + ' — ' + money(u.price) +
-        ' vs base ' + money(u.baseValue) + ' (' + u.ratio.toFixed(2) + '×)'),
+        ' vs ' + money(u.value) + ' average (' + u.ratio.toFixed(2) + '×)'),
       'No items are undercut.'),
   ];
 }

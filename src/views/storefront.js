@@ -24,6 +24,14 @@ export function renderStorefront(container, business, realmId) {
     const accent = s.accent || '';
     const header = el('div', {}, [
       el('h2', { style: accent ? 'color:' + accent : '' }, s.business),
+      // The region's Court either vouches for this shop, has sanctioned it, or
+      // has said nothing — and "nothing" shows nothing, so a seal keeps meaning
+      // something.
+      s.seal === 'licensed'
+        ? el('p', { class: 'court-seal ok' }, '⚖️ Licensed by the ' + (s.hold || '') + ' Court')
+        : s.seal === 'restricted'
+          ? el('p', { class: 'court-seal bad' }, '⚖️ Under restriction by the ' + (s.hold || '') + ' Court')
+          : el('span', {}),
       s.tagline ? el('p', { class: 'shop-tagline', style: accent ? 'border-color:' + accent + ';color:' + accent : '' }, s.tagline) : el('span', {}),
     ]);
     const items = s.items || [];

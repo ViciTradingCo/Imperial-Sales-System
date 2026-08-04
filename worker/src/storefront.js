@@ -34,7 +34,7 @@ export async function publicStorefront(env, business, realmId) {
   }
   const db = await getDb(env);
   const target = String(business || '').trim().toLowerCase();
-  const co = await db.prepare("SELECT business FROM companies WHERE realm_id = ? AND lower(business) = ? AND upper(status) != 'ARCHIVED'")
+  const co = await db.prepare("SELECT business, hold FROM companies WHERE realm_id = ? AND lower(business) = ? AND upper(status) != 'ARCHIVED'")
     .bind(realm, target).first();
   if (!co) throw new Error('Shop not found.');
   const style = await getShopStyle(env, co.business, realm);
@@ -47,5 +47,13 @@ export async function publicStorefront(env, business, realmId) {
     price: r.price,
     status: r.stock <= 0 ? 'Out of Stock' : (r.low_stock > 0 && r.stock <= r.low_stock ? 'Low' : 'In Stock'),
   }));
-  return { business: co.business, tagline: style.tagline || '', accent: style.accent || '', items };
+  // The Court's seal, when its region's Court has granted one. Only an explicit
+  // 'licensed' shows a seal — an unruled shop is not endorsed, and a restricted
+  // one is worth a visitor knowing about before they order.
+  const standing = await standingOf(env, co.business, co.hold, realm);
+  return {
+    business: co.business, tagline: style.tagline || '', accent: style.accent || '', items,
+    hold: co.hold || '',
+    seal: standing === 'licensed' ? 'licensed' : (standing === 'restricted' ? 'restricted' : ''),
+  };
 }

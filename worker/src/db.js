@@ -174,6 +174,50 @@ const SCHEMA = [
      role TEXT, status TEXT, subject TEXT NOT NULL, body TEXT NOT NULL,
      completed INTEGER NOT NULL DEFAULT 0, completed_at TEXT, completed_by TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_feedback_open ON feedback (completed, ts DESC)`,
+  // ---- Courts: a region's government ----
+  // A Court is the company an admin has flagged as its region's authority. These
+  // tables are its instruments. All are keyed by REGION rather than by the Court
+  // company, so a Court being renamed — or the flag moving to a different
+  // company — leaves the region's rules and its books intact.
+  //
+  // tax_percent 0 means the levy is OFF, and checkout skips it entirely rather
+  // than working out 0% of every sale.
+  `CREATE TABLE IF NOT EXISTS court_settings (
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     hold TEXT NOT NULL,
+     tax_percent REAL NOT NULL DEFAULT 0,
+     notice TEXT NOT NULL DEFAULT '',
+     PRIMARY KEY (realm_id, hold))`,
+  // A shop's standing with its Court. Absent = no ruling, which is the default
+  // and is NOT the same as licensed — a seal has to be granted to mean anything.
+  `CREATE TABLE IF NOT EXISTS court_status (
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     hold TEXT NOT NULL, business TEXT NOT NULL,
+     standing TEXT NOT NULL DEFAULT 'none', note TEXT, updated TEXT,
+     PRIMARY KEY (realm_id, business))`,
+  // Price controls: a floor and/or a ceiling on one item, region-wide.
+  `CREATE TABLE IF NOT EXISTS court_price (
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     hold TEXT NOT NULL, item TEXT NOT NULL,
+     min_price REAL, max_price REAL, updated TEXT,
+     PRIMARY KEY (realm_id, hold, item))`,
+  // What each shop OWES its Court, as a ledger rather than a running total:
+  // levies are positive, payments negative, and the balance is the sum. The
+  // money never moves on its own — a Court records payment when it is made.
+  `CREATE TABLE IF NOT EXISTS court_dues (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     hold TEXT NOT NULL, business TEXT NOT NULL, ts TEXT NOT NULL,
+     kind TEXT NOT NULL, amount REAL NOT NULL DEFAULT 0, note TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_court_dues_shop ON court_dues (realm_id, hold, business)`,
+  // Public spending, by category. Every row also debits the Court's own coffer,
+  // so its treasury and its accounts cannot tell different stories.
+  `CREATE TABLE IF NOT EXISTS court_spend (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     hold TEXT NOT NULL, ts TEXT NOT NULL,
+     category TEXT NOT NULL, amount REAL NOT NULL DEFAULT 0, note TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_court_spend_hold ON court_spend (realm_id, hold)`,
   // ---- Realms (multi-tenancy) ----
   // One deployment can host several independent RP servers. Every data table
   // carries a realm_id and queries filter on it, so nothing is ever shared or
@@ -190,6 +234,7 @@ export const REALM_TABLES = [
   'inventory', 'sales', 'intake', 'transfers', 'coffer_entries', 'discounts',
   'shop_style', 'audit', 'master_item', 'item_type', 'hold_index', 'users', 'companies',
   'master_settings', 'business_settings', 'motd_list', 'feedback',
+  'court_settings', 'court_status', 'court_price', 'court_dues', 'court_spend',
 ];
 
 /**

@@ -4,7 +4,7 @@
  * left drawer on mobile). Access is still enforced by the API and the route
  * guards — this only decides which buttons to show.
  */
-import { regionLabel, regionsOn } from './format.js';
+import { regionsOn } from './format.js';
 import { navigate, currentPath } from './router.js';
 
 /** The nav destinations available to a given user, in order. */
@@ -27,9 +27,12 @@ export function navItems(me) {
     // deployment gets the review screen; a Realm Admin cannot act on it.
     if (me.systemAdmin) items.push({ path: '/admin/feedback', label: 'Feedback' });
   }
-  // Court businesses get a report for their own hold.
-  // A realm with regions switched off has nothing for this report to show.
-  if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/region-report', label: regionLabel() + ' Report' });
+  // A Court governs its region. Every Court-specific tool — the region's market
+  // and companies, the levy, licences, price controls, the notice, the treasury,
+  // its stock — lives behind this one entry, so a Court's two jobs (running a
+  // shop, governing a region) stay separable.
+  // A realm with regions switched off has no region for a Court to govern.
+  if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/court', label: 'Court Tools' });
   if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Shop Settings' });
   // The people who use the app every day are the ones with something to say
   // about it; an admin has the review screen instead.
