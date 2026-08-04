@@ -8,13 +8,30 @@ import { findUserByEmail, isConfiguredAdmin } from './users.js';
 import { markPriority } from './ratelimit.js';
 import { findBusinessMeta } from './registry.js';
 import { DEFAULT_REALM_ID } from './db.js';
+import { isSessionToken, resolveSession } from './sessions.js';
 
-/** Verifies the Bearer ID token on a request; returns the decoded payload or throws. */
+/**
+ * Resolves the Bearer credential on a request to a verified identity, or throws.
+ *
+ * TWO KINDS OF CREDENTIAL, one answer. A Google ID token is verified against
+ * Google's JWKS; one of our own session tokens is looked up in D1. Both come
+ * back as `{ email, name }`, because everything downstream cares about the
+ * email and nothing else — which is what lets the session token exist at all
+ * without a second authorization path to keep in step with this one.
+ *
+ * A session proves identity, never authorization: the role, the business, the
+ * realm and the account's status are read from the user row on every request,
+ * so a session issued yesterday grants exactly what the account is owed today.
+ */
 export async function requireUser(request, env) {
-  const auth = request.headers.get('Authorization') || '';
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  if (!m) throw new Error('Missing bearer token.');
-  return verifyIdToken(m[1], env.GOOGLE_CLIENT_ID);
+  const raw = bearerToken(request);
+  if (!raw) throw new Error('Missing bearer token.');
+  if (isSessionToken(raw)) {
+    const session = await resolveSession(env, raw);
+    if (!session) throw new Error('Your session has expired — signing you back in.');
+    return { email: session.email, name: session.name };
+  }
+  return verifyIdToken(raw, env.GOOGLE_CLIENT_ID);
 }
 
 /** The raw bearer token string (for rate-limit priority tagging), or ''. */

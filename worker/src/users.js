@@ -10,6 +10,7 @@
  * first sign-in. See docs/SETUP.md.
  */
 import { getDb, DEFAULT_REALM_ID } from './db.js';
+import { revokeSessionsFor } from './sessions.js';
 
 /** Emails granted admin by configuration (comma-separated ADMIN_EMAILS var). */
 function adminEmails(env) {
@@ -175,9 +176,13 @@ export async function deleteMember(env, uid, realmId) {
   if (!target) throw new Error('Missing member uid.');
   const realm = String(realmId || DEFAULT_REALM_ID);
   const db = await getDb(env);
-  const existing = await db.prepare('SELECT uid FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).first();
+  const existing = await db.prepare('SELECT uid, email FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).first();
   if (!existing) throw new Error('Member not found.');
   await db.prepare('DELETE FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).run();
+  // Their signed-in sessions go with them. A session only ever proves identity —
+  // with no user row there is nothing left to authorize — but an account that
+  // has been deleted should not leave live credentials lying in a table.
+  await revokeSessionsFor(env, existing.email);
   bustUserCache();
 }
 

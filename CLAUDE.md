@@ -31,7 +31,11 @@ The only Google product still involved is **Sign-In** (identity). Full detail in
   verifies it (`worker/src/verify.js`, RS256 against Google's JWKS) → maps the
   email to a row in the D1 `users` table (`worker/src/users.js`). The **first
   admin** is bootstrapped from the `ADMIN_EMAILS` worker var (auto-provisioned on
-  first sign-in) — no hand-seeded row.
+  first sign-in) — no hand-seeded row. Google's token is then traded once for a
+  **24-hour session token** (`worker/src/sessions.js`); everything after sign-in
+  carries that. A session proves IDENTITY only — role, business, realm and status
+  are re-read from the `users` row on every request, which is what makes a
+  day-long credential safe.
 - **Roles:** `admin` (Core Dashboard + Market Analysis + all), `owner` (their
   business + manage employees), `employee` (their business only).
 - **Data:** everything is in D1 via `worker/src/db.js`. There is no

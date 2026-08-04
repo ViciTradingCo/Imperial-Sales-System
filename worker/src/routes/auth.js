@@ -14,6 +14,7 @@
  */
 import { requireUser, requireRegistered, publicUser, bearerToken, findBusinessMeta, markPriority, realmIdOf, homeRealmOf, isSystemAdmin } from '../guards.js';
 import { findUserByEmail, setUserCharacter, touchLastSeen } from '../users.js';
+import { createSession, revokeSession, isSessionToken } from '../sessions.js';
 import { registerUser } from '../registry.js';
 import { listRealms, getRealm, resolveJoinCode } from '../realm.js';
 import { readRegions } from '../regions.js';
@@ -53,6 +54,46 @@ async function handleMe({ request, env }) {
     // each one fetching settings of its own.
     prefs: await readRealmPrefs(env, activeRealm),
   });
+}
+
+/**
+ * Trades a verified Google sign-in for a session of ours, good for 24 hours.
+ *
+ * This is the ONLY route that insists on a Google token: accepting a session
+ * token here would let a session mint its own successor forever, and the day
+ * limit would mean nothing. Signing in again after 24 hours therefore means
+ * proving to Google who you are again — which the browser does silently while
+ * you are still signed in to Google, so nobody sees a login screen for it.
+ *
+ * Issued to unregistered callers too. Someone signing up has proved who they
+ * are and has several screens still to go; making them do that on an expiring
+ * credential is how registration used to fail halfway through.
+ */
+async function handleSession({ request, env }) {
+  if (isSessionToken(bearerToken(request))) {
+    throw new Error('Sign in with Google to start a new session.');
+  }
+  const payload = await requireUser(request, env);
+  const user = await findUserByEmail(env, payload.email);
+  const { token, expires } = await createSession(env, {
+    email: payload.email, name: payload.name || '', uid: user ? user.uid : '',
+  });
+  return {
+    token, expires,
+    email: payload.email,
+    name: payload.name || '',
+    picture: payload.picture || '',
+  };
+}
+
+/**
+ * Ends this session — the "unless they specifically log out" half of staying
+ * signed in. The row goes, so the token is dead everywhere at once rather than
+ * merely forgotten by the browser that was holding it.
+ */
+async function handleSignOut({ request, env }) {
+  await revokeSession(env, bearerToken(request));
+  return { ok: true };
 }
 
 /**
@@ -122,6 +163,8 @@ async function handleUpdateProfile({ request, env, body }) {
 }
 
 export const routes = [
+  { method: 'POST', path: '/auth/session', handler: handleSession },
+  { method: 'POST', path: '/auth/signout', handler: handleSignOut },
   { method: 'POST', path: '/auth/me', handler: handleMe },
   { method: 'POST', path: '/auth/code', handler: handleCheckCode },
   { method: 'POST', path: '/auth/register', handler: handleRegister },

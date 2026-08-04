@@ -3,6 +3,11 @@
  * entry at the top as features ship.
  */
 export const PATCH_NOTES = [
+  { version: '1.6', date: '2026-08-04', notes: [
+    'Fixed: the Record Intake button did nothing. A rename in the last release left the form calling something that no longer existed, so it failed before it could open. There is now a test that catches this whole class of mistake before it ships.',
+    'Recording intake is now three short steps — what arrived, what it cost, where it came from — with Previous and Next, and a summary of the whole delivery before anything is recorded.',
+    'You stay signed in for 24 hours. Signing in with Google now issues a session that lasts a day, so reloading, closing the tab, or leaving the app on your phone no longer signs you out. Sign Out still signs you out immediately, everywhere.',
+  ] },
   { version: '1.5', date: '2026-08-04', notes: [
     'Court Tools: a company flagged as a Court now governs its region from one page in the side menu — a levy on trade, licences and sanctions on the shops it oversees, price controls, a public notice, the treasury, and a view of everything held in the region.',
     'The levy never moves money on its own. A Court sets a percentage, the system records what each shop owes, and the Court marks it paid when it actually is. Set it to 0 and the feature is simply off.',

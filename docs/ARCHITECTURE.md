@@ -13,7 +13,7 @@ used is **Sign-In** (identity).
 │  views (Register · Ledger · Admin · Market)  │
 │  offline-tolerant register (localStorage)    │
 └───────────────┬──────────────────────────────┘
-                │  HTTPS + Google ID token (Bearer)
+                │  HTTPS + 24h session token (Bearer)
 ┌───────────────▼──────────────────────────────┐   THE TRUST BOUNDARY
 │  Cloudflare Worker API                        │   verifies token → resolves
 │  index.js (shell) · http.js · guards.js       │   UID/role/business → returns
@@ -42,6 +42,16 @@ cannot edit. The browser is told only what it's allowed to see.
 - **Identity:** Google Sign-In → signed ID token → the Worker verifies it
   (RS256 against Google's JWKS, checks issuer/audience/expiry) → maps the
   verified email to a row in the D1 `users` table.
+- **Sessions:** a Google ID token lasts an hour and cannot be extended, which is
+  shorter than a shift at the register. So `POST /auth/session` trades a verified
+  Google token for a **24-hour session token** (`sessions.js`), and every later
+  request carries that instead. Only the SHA-256 of the token is stored, so the
+  table cannot be replayed; the row holds an email and nothing else, because
+  role, business, realm and status are still re-read from the `users` row on
+  every request. Sign-out deletes the row, so the token dies everywhere at once.
+  Not a cookie: the site and the API are on different hosts, so a session cookie
+  would be third-party (`SameSite=None`) — blocked in Safari, restricted in
+  Chrome. `localStorage` + `Authorization` behaves the same everywhere.
 - **First admin:** bootstrapped from the `ADMIN_EMAILS` worker var — a listed
   email is treated as admin and auto-provisioned a row on first sign-in. No
   hand-seeded database row.

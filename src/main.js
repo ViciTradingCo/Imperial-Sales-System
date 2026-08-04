@@ -356,7 +356,10 @@ async function main() {
   if (publicDeepLink) render();
   else renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
   onAuthChange(({ idToken }) => { if (idToken) onSignedIn(); });
-  await initAuth(config.googleClientId);
+  // The API base goes in too: sign-in trades the Google token for a 24-hour
+  // session of ours, which auth.js fetches for itself (it cannot import the API
+  // client — the API client imports it).
+  await initAuth(config.googleClientId, config.apiBaseUrl);
   // GIS is ready now — re-render so the sign-in button paints (unless one-tap
   // already signed the user in).
   if (!state.profile && !publicDeepLink) renderSignedOutLanding(appEl);

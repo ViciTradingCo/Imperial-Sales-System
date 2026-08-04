@@ -19,6 +19,7 @@ import { rateHit, isPriorityToken, MAX_BODY_BYTES } from './ratelimit.js';
 import { ensureSchema } from './db.js';
 import { recordError } from './status.js';
 import { runScheduledBackup } from './backup-cron.js';
+import { purgeExpiredSessions } from './sessions.js';
 import { routes as authRoutes } from './routes/auth.js';
 import { routes as adminRoutes } from './routes/admin.js';
 import { routes as businessRoutes } from './routes/business.js';
@@ -86,8 +87,14 @@ export default {
     }
   },
 
-  /** Scheduled off-site backup to R2 (see backup-cron.js). No-op if unconfigured. */
+  /**
+   * Daily housekeeping: the off-site backup to R2 (see backup-cron.js, a no-op
+   * if unconfigured) and clearing out sessions that have expired. Neither is
+   * load-bearing — an expired session is already refused on sight; this only
+   * stops the table growing a row per sign-in forever.
+   */
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runScheduledBackup(env).catch((e) => recordError(env, 'cron:backup', e && e.message ? e.message : String(e))));
+    ctx.waitUntil(purgeExpiredSessions(env).catch((e) => recordError(env, 'cron:sessions', e && e.message ? e.message : String(e))));
   },
 };

@@ -13,6 +13,7 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
+import { openStepModal } from '../lib/steps.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
@@ -305,7 +306,15 @@ function openCraftModal(onDone) {
   ]);
 }
 
-/** Intake (restock) transaction as a focus modal. */
+/**
+ * Intake (restock), asked one step at a time.
+ *
+ * The form grew to nine fields — item, quantity, cost, sale price, ingredient,
+ * vendor, supplier, region — which is a wall to scroll for what is usually a
+ * four-field job. It is now three steps: WHAT arrived, WHAT IT COST and what it
+ * sells for, and WHERE it came from. The last step shows the whole delivery
+ * back before anything is recorded.
+ */
 function openIntakeModal(onRecorded, me) {
   const idem = newIdem(); // one key per intake entry — retries won't double the stock
   // Items must be chosen from the master index so stock never lands under a typo.
@@ -334,7 +343,7 @@ function openIntakeModal(onRecorded, me) {
    * that actually supplied the goods rather than only counting the total.
    */
   const fromSel = el('select', {}, el('option', { value: '' }, '— an unregistered vendor —'));
-  api.listBusinesses()
+  api.getBusinesses()
     .then((r) => (r.businesses || [])
       .filter((b) => b !== (me && me.business))   // a shop does not buy from itself
       .forEach((b) => fromSel.appendChild(el('option', { value: b }, b))))
@@ -371,58 +380,93 @@ function openIntakeModal(onRecorded, me) {
       ? 'You currently sell this at ' + money(have.price) + '. Leave blank to keep that.'
       : 'New to your shop — this becomes its price in the register.';
   }
-  const status = el('p', {});
-  const save = el('button.primary', { onclick: doRecord }, 'Record intake');
-
-  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
-
   // Fill the hold dropdown.
   api.getRegions()
     .then((res) => (res.holds || []).forEach((h) => hold.appendChild(el('option', { value: h }, h))))
     .catch(() => { /* hold is optional */ });
 
-  let modal;
-  async function doRecord() {
+  // The delivery read back before it is recorded — the one screen where a
+  // mistyped quantity or a cost in the sale-price field is obvious.
+  const review = el('div', { class: 'step-review' }, '');
+  function fillReview() {
     const picked = picker.selected();
-    if (!picked) { setStatus('Pick an item from the index — start typing and click a result.', 'error'); return; }
-    save.disabled = true;
-    setStatus('Recording…', '');
-    try {
-      await api.recordIntake({
-        item: picked.name,
-        salePrice: ingredient.checked ? '' : sale.value,
-        ingredient: ingredient.checked,
-        vendor: vendor.value.trim(),
-        fromBusiness: fromSel.value,
-        hold: hold.value,
-        numItems: qty.value,
-        pricePer: per.value,
-        idempotencyKey: idem,
-      });
-      onRecorded();
-      modal.close();
-    } catch (e) {
-      save.disabled = false;
-      setStatus(e.message || String(e), 'error');
-    }
+    const n = Number(qty.value) || 0;
+    const cost = Number(per.value) || 0;
+    const rows = [
+      ['Item', picked ? picked.name : '—'],
+      ['Quantity', String(n)],
+      ['Cost', money(cost) + ' each · ' + money(n * cost) + ' total'],
+    ];
+    if (ingredient.checked) rows.push(['Sells for', 'Ingredient — not sold']);
+    else if (sale.value !== '') rows.push(['Sells for', money(Number(sale.value) || 0)]);
+    const source = fromSel.value || vendor.value.trim();
+    if (source) rows.push(['Bought from', source]);
+    if (regionsOn() && hold.value) rows.push([regionLabel(), hold.value]);
+    review.innerHTML = rows
+      .map(([k, v]) => '<div class="step-review-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>')
+      .join('');
   }
 
-  modal = openModal([
-    el('h3', {}, 'Record intake (restock)'),
-    el('p', { class: 'note' }, 'Log a purchase — this adds the stock and records what you paid and where. Pick the item from the index.'),
-    el('label', {}, 'Item'), picker.el,
-    el('label', {}, 'Vendor'), vendor,
-    el('label', {}, 'Bought from a registered company?'), fromSel,
-    el('p', { class: 'note' }, 'Only if the supplier is a shop on this network — it credits them for the ' +
-      'supply in their ' + regionWord() + '’s figures. Leave it as an unregistered vendor otherwise.'),
-    ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
-    el('label', {}, '# of items'), qty,
-    el('label', {}, 'Cost per item — what you paid'), per,
-    el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
-    saleWrap,
-    save,
-    status,
-  ]);
+  async function doRecord() {
+    await api.recordIntake({
+      item: picker.selected().name,
+      salePrice: ingredient.checked ? '' : sale.value,
+      ingredient: ingredient.checked,
+      vendor: vendor.value.trim(),
+      fromBusiness: fromSel.value,
+      hold: hold.value,
+      numItems: qty.value,
+      pricePer: per.value,
+      idempotencyKey: idem,
+    });
+    onRecorded();
+  }
+
+  return openStepModal({
+    title: 'Record intake (restock)',
+    finishLabel: 'Record intake',
+    onFinish: doRecord,
+    steps: [
+      {
+        title: 'What arrived?',
+        hint: 'Pick the item from the index so the stock never lands under a typo.',
+        nodes: [
+          el('label', {}, 'Item'), picker.el,
+          el('label', {}, '# of items'), qty,
+        ],
+        validate: () => {
+          if (!picker.selected()) return 'Pick an item from the index — start typing and click a result.';
+          if (!(Number(qty.value) > 0)) return 'How many arrived? Enter at least 1.';
+          return null;
+        },
+      },
+      {
+        title: 'What did it cost?',
+        hint: 'The cost is what you paid. The sale price is what the register will charge — they are not the same number.',
+        nodes: [
+          el('label', {}, 'Cost per item — what you paid'), per,
+          el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
+          saleWrap,
+        ],
+        validate: () => (per.value !== '' && Number(per.value) >= 0
+          ? null
+          : 'Enter what you paid per item — 0 is fine if it was free.'),
+      },
+      {
+        title: 'Where did it come from?',
+        hint: 'All optional. Fill in what you know.',
+        nodes: [
+          el('label', {}, 'Vendor'), vendor,
+          el('label', {}, 'Bought from a registered company?'), fromSel,
+          el('p', { class: 'note' }, 'Only if the supplier is a shop on this network — it credits them for the ' +
+            'supply in their ' + regionWord() + '’s figures. Leave it as an unregistered vendor otherwise.'),
+          ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
+          review,
+        ],
+        onEnter: fillReview,
+      },
+    ],
+  });
 }
 
 /** Bulk import/export inventory via a copy-paste text box (focus modal). */

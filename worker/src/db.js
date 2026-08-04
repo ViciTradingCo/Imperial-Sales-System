@@ -228,6 +228,21 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS realms (
      id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT, created TEXT,
      join_code TEXT)`,
+  // ---- Sessions (staying signed in) ----
+  // A Google ID token lasts an hour; a shift at the register lasts longer. So
+  // signing in trades the Google token for one of ours, which lasts a day.
+  //
+  // `id` is the SHA-256 of the token, never the token: a leaked backup of this
+  // table cannot be replayed as anybody's session. NOT realm-scoped on purpose —
+  // a session identifies a PERSON, and which realm they see is read from their
+  // user row on every request (a System Admin switches realms mid-session, and a
+  // realm stamped on the session here would go stale the moment they did).
+  `CREATE TABLE IF NOT EXISTS sessions (
+     id TEXT PRIMARY KEY,
+     uid TEXT, email TEXT NOT NULL, name TEXT,
+     created TEXT, expires TEXT NOT NULL, last_seen TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_email ON sessions (email)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions (expires)`,
 ];
 
 /** Every table that holds realm-owned data (all get a realm_id column). */
