@@ -101,10 +101,23 @@ export function openStepModal({ title, steps, finishLabel = 'Done', onFinish }) 
     }
   }
 
-  // Enter advances, the way it would submit an ordinary form — except in a
-  // textarea, where Enter is a newline.
+  /**
+   * Enter advances, the way it would submit an ordinary form — with two
+   * exceptions that are both bugs if you skip them:
+   *
+   *   • a control that already handled Enter keeps it. The item picker accepts
+   *     the highlighted match on Enter and calls preventDefault; without this
+   *     check the same keystroke would also jump to the next step, so choosing
+   *     an item would skip past the quantity field. `defaultPrevented` is the
+   *     general form of "someone downstream already dealt with this".
+   *   • the last step never fires on Enter. That button is the one that writes
+   *     the record, and nobody should commit a delivery with a stray keystroke
+   *     while typing into a field above the summary.
+   */
   function onKey(e) {
     if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
+    if (e.defaultPrevented) return;
+    if (at === last) return;
     e.preventDefault();
     go(at + 1);
   }
