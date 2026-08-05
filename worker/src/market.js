@@ -20,6 +20,12 @@ import { parseSaleItems } from './sales.js';
 import { listItemIndex, matchMasterItem, normalizeItem } from './item-index.js';
 import { readSettings } from './settings.js';
 import { listBusinessCards } from './registry.js';
+import { lastWeekWindow } from './week.js';
+
+// Re-exported so callers reading a market report get the week from the same
+// place they get the report. The definition lives in week.js — one week, shared
+// by everything that happens weekly.
+export { lastWeekWindow };
 
 function settingVal(settings, label, dflt) {
   const s = (settings || []).find((x) => x.label === label);
@@ -507,35 +513,6 @@ export async function businessReport(env, business, realmId) {
  * A single hold's report — the slice a Court oversees. Scoped to sales made in
  * that hold: overview, the shops trading there, and the items moving there.
  */
-/**
- * The last COMPLETE week, as a half-open [from, to) window.
- *
- * What a shop sees of its region is deliberately lagged: a Court reads its
- * economy live, and everyone else reads the week that has finished. That is the
- * point of the feature rather than a limitation of it — a shop watching its
- * neighbours' takings arrive in real time is a shop pricing against them by the
- * hour, which is not trade, it is surveillance. A settled week is enough to know
- * the market and too old to chase.
- *
- * Weeks run Monday 00:00 UTC to Monday 00:00 UTC, so the figures change once,
- * when Monday arrives, and hold still for the seven days after. UTC rather than
- * anyone's local time because the realm spans time zones and the week has to
- * turn over at the same instant for all of them, or two shops comparing notes
- * would be reading different weeks.
- */
-export function lastWeekWindow(now) {
-  const at = now instanceof Date ? now : new Date(now || Date.now());
-  const midnight = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
-  const DAY = 86400000;
-  // getUTCDay is 0 for Sunday; shift so Monday is 0 and the week ends on Sunday.
-  const sinceMonday = (at.getUTCDay() + 6) % 7;
-  const thisMonday = midnight - sinceMonday * DAY;
-  return {
-    from: new Date(thisMonday - 7 * DAY).toISOString(),
-    to: new Date(thisMonday).toISOString(),
-  };
-}
-
 export async function holdReport(env, hold, realmId, window) {
   const db = await getDb(env);
   const h = String(hold || '').trim();
@@ -552,6 +529,7 @@ export async function holdReport(env, hold, realmId, window) {
    */
   const from = window && window.from;
   const to = window && window.to;
+  const keepTrends = !!(window && window.keepTrends);
   const w = (col) => (from && to ? ` AND ${col} >= ? AND ${col} < ?` : '');
   const wp = from && to ? [from, to] : [];
 
@@ -621,10 +599,16 @@ export async function holdReport(env, hold, realmId, window) {
     `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?` + w('ts'))
     .bind(realmId, h, ...wp).all()).results) || [];
 
+  // Only items that actually SOLD here. An item sourced from the region but
+  // never sold in it lands with a quantity of 0, and a table of zeroes is noise
+  // between the rows anyone is actually reading.
+  const ranked = itemStats(saleRows, await listItemIndex(env, realmId), intakeRows)
+    .filter((i) => (Number(i.qty) || 0) > 0);
+
   return { hold: h, overview, businesses, unregistered,
-    // Only items that actually SOLD here. An item sourced from the region but
-    // never sold in it lands with a quantity of 0, and a table of zeroes is
-    // noise between the rows a Court is reading.
-    items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId), intakeRows))
-      .filter((i) => (Number(i.qty) || 0) > 0) };
+    // Trends are stripped by default — a 30-point series per item is most of
+    // the payload and no list renders it. A WINDOWED report keeps them: it
+    // covers one week, so the series is at most seven points, and the whole
+    // point of that view is the graph.
+    items: keepTrends ? ranked : withoutTrend(ranked) };
 }

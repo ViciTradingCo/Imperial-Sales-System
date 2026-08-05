@@ -9,7 +9,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { makeD1 } from './d1shim.js';
 import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
-import { holdReport, lastWeekWindow } from '../src/market.js';
+import { holdReport } from '../src/market.js';
+import { lastWeekWindow, weekStart, isWeekTurnover } from '../src/week.js';
 import { importItemIndex } from '../src/item-index.js';
 import { encodeSaleItems } from '../src/sales.js';
 
@@ -71,6 +72,43 @@ describe('which week it covers', () => {
     const a = lastWeekWindow(new Date('2026-08-05T00:00:00Z'));
     const b = lastWeekWindow(new Date('2026-08-12T00:00:00Z'));
     expect(a.to).toBe(b.from);
+  });
+});
+
+/**
+ * ONE boundary for everything weekly. There used to be two — the market window
+ * rolled on Monday, the backup reminder fired on Sunday — so the "end of the
+ * week" nudge arrived a full day before the week's figures settled.
+ */
+describe('every weekly thing turns over together', () => {
+  it('the reminder fires on the day the market window rolls', () => {
+    const monday = new Date('2026-08-10T09:00:00Z');
+    expect(isWeekTurnover(monday)).toBe(true);
+    // The window it rolled to begins exactly where the previous week's ended.
+    expect(lastWeekWindow(monday).to).toBe(weekStart(monday).toISOString());
+  });
+
+  it('does not fire on any other day of the week', () => {
+    for (const day of ['2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15', '2026-08-16']) {
+      expect(isWeekTurnover(new Date(day + 'T12:00:00Z')), day).toBe(false);
+    }
+  });
+
+  it('no longer fires on Sunday, a day before the figures settle', () => {
+    expect(isWeekTurnover(new Date('2026-08-09T12:00:00Z'))).toBe(false);
+  });
+
+  it('the window and the reminder cannot disagree — both read weekStart', () => {
+    // Across a whole week, the reminder is true on exactly the day the window
+    // last changed. Anything else means two definitions have crept back in.
+    const days = ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13',
+      '2026-08-14', '2026-08-15', '2026-08-16'];
+    const firing = days.filter((d) => isWeekTurnover(new Date(d + 'T12:00:00Z')));
+    expect(firing).toEqual(['2026-08-10']);
+    const start = weekStart(new Date('2026-08-10T12:00:00Z')).toISOString();
+    days.forEach((d) => {
+      expect(weekStart(new Date(d + 'T12:00:00Z')).toISOString(), d).toBe(start);
+    });
   });
 });
 

@@ -62,13 +62,18 @@ const REGION_COLS = {
  * measured over every transaction, and the columns that were around it are
  * gone rather than left to be scanned past.
  */
+/**
+ * `oneRegion` drops the Best-region column. A report already scoped to a single
+ * region cannot have a best one — the answer would be the region you are
+ * looking at, on every row. Market Info passes it; the realm-wide page does not.
+ */
 const ITEM_COLS = {
-  headers: () => ['Item', 'Avg value']
+  headers: (oneRegion) => ['Item', 'Avg value']
     // Only when the realm uses regions — otherwise the column would be a row of
     // dashes explaining a concept this realm has switched off.
-    .concat(regionsOn() ? ['Best ' + regionWord()] : []),
-  row: (i) => [i.item, valueCell(i)]
-    .concat(regionsOn() ? [regionCell(i)] : []),
+    .concat(regionsOn() && !oneRegion ? ['Best ' + regionWord()] : []),
+  row: (i, oneRegion) => [i.item, valueCell(i)]
+    .concat(regionsOn() && !oneRegion ? [regionCell(i)] : []),
 };
 /**
  * Where the item is worth most — the region with the highest average value,
@@ -194,13 +199,14 @@ function itemPerformance(d) {
  * appears here too — and a reader moving between Overview and this page is
  * reading the same row twice, not two different summaries.
  */
-function itemBlock(i) {
+export function itemBlock(i, opts) {
+  const o = opts || {};
   return el('div', { class: 'item-block' }, [
-    el('div', { class: 'table-scroll' }, tableEl(ITEM_COLS.headers(), [ITEM_COLS.row(i)])),
+    el('div', { class: 'table-scroll' }, tableEl(ITEM_COLS.headers(o.oneRegion), [ITEM_COLS.row(i, o.oneRegion)])),
     lineChart((i.trend || []).map((p) => ({ day: p.day, value: p.qty })), {
       label: i.item + ' units sold per day',
       format: (v) => v + ' sold',
-      emptyMsg: 'No sales in the last 30 days.',
+      emptyMsg: o.emptyMsg || 'No sales in the last 30 days.',
     }),
   ]);
 }

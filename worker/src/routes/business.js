@@ -23,7 +23,8 @@ import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
 import { getShopStyle, setShopStyle } from '../shop-style.js';
 import { readMotd, readWarnDays, activeNoticesForBusiness,
   listMotdsForBusiness, addMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
-import { holdReport, businessReport, lastWeekWindow } from '../market.js';
+import { holdReport, businessReport } from '../market.js';
+import { lastWeekWindow, isWeekTurnover } from '../week.js';
 import { requireCourt, courtCompanies, courtShop } from '../oversight.js';
 import {
   SPEND_CATEGORIES, STANDINGS, readCourtSettings, writeCourtSettings,
@@ -429,7 +430,8 @@ async function weeklyRegionRoute({ request, env }) {
     return { hold: '', noRegion: true, week: lastWeekWindow(), overview: {}, businesses: [], items: [] };
   }
   const week = lastWeekWindow();
-  const report = await holdReport(env, meta.hold, realmId, week);
+  // keepTrends: this view is Item Performance's graphs, scoped to the week.
+  const report = await holdReport(env, meta.hold, realmId, { ...week, keepTrends: true });
   // The window travels with the figures so the page can say which week it is
   // showing. A report that does not name its period is a report you cannot check.
   return { ...report, week };
@@ -613,11 +615,14 @@ async function getMotd({ request, env }) {
       }
     } catch (e) { /* D1 optional */ }
   }
-  // Sunday only: a weekly nudge that shows every day is one nobody reads, and
-  // Sunday is when a week's trading is complete rather than half-done.
-  if (caller.role === 'admin' && new Date().getUTCDay() === 0) {
+  // Once a week, on the day the week turns over — the same instant Market Info
+  // rolls to the week just finished. It used to fire on Sunday, a full day
+  // BEFORE the figures settled, so the prompt to back up a week arrived while
+  // the reports still called that week unfinished. One definition now, in
+  // week.js, shared by everything weekly.
+  if (caller.role === 'admin' && isWeekTurnover()) {
     banners.push({
-      text: '🗓️ End of the week — download a fresh data backup.',
+      text: '🗓️ A new week has begun — download a backup of the week just gone.',
       action: { label: 'Backup', route: '/admin/settings' },
     });
   }

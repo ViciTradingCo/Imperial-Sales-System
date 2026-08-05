@@ -1,34 +1,47 @@
 /**
- * Market Info — a shop's view of its own region, one week behind.
+ * Market Info — Item Performance for one shop's own region, one week behind.
  *
- * The same report the region's Court reads, with one difference that is the
- * whole point of the page: it covers the week that has FINISHED, not the week
- * happening. A Court governs its region and needs it live; a shop needs to know
- * the market it trades in. Those are different needs, and a live feed of the
- * neighbours' takings answers neither — it just invites pricing against the till
- * by the hour. A settled week is enough to trade on and too old to chase.
+ * The SAME page an admin reads realm-wide, narrowed twice: to the shop's own
+ * region, and to the week that has finished. It reuses Market Analysis's own
+ * blocks rather than imitating them, so the two cannot drift apart — a column
+ * added there appears here, and a shop and an admin discussing an item are
+ * reading the same figure presented the same way.
  *
- * The figures change once, when Monday arrives, and hold still for seven days.
+ * What a shop actually needs from a market is what things are WORTH there.
+ * Not who took the most gold last week — that is a Court's business, or an
+ * admin's. So this is the items and nothing else.
+ *
+ * WHY LAST WEEK. A Court governs its region and reads it live; everyone else
+ * gets the week that has settled. A live feed of the neighbours' takings invites
+ * pricing against their till by the hour, which is not knowing a market. The
+ * figures change once, when the week turns over, and hold still for seven days.
  */
-import { money, regionWord, regionsOn } from '../lib/format.js';
-import { el, mount, statTiles } from '../lib/dom.js';
+import { regionWord, regionsOn } from '../lib/format.js';
+import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setOpsActions } from '../lib/sections.js';
 import { emptyState } from '../lib/empty.js';
-import { tableCard } from './market.js';
+import { createItemPicker } from '../lib/item-picker.js';
+import { openFocalMenu } from '../lib/tiles.js';
+import { itemBlock } from './market.js';
 
-/** "1–7 Aug" for a half-open [from, to) week, in the reader's own locale. */
+/** How many items lead the page, matching Item Performance. */
+const TOP_ITEMS = 5;
+
+/** Scoped to one region, so no "best region" column and a week-long graph. */
+const BLOCK = { oneRegion: true, emptyMsg: 'No sales that week.' };
+
+/** "27 Jul – 2 Aug" for a half-open [from, to) week, in the reader's locale. */
 function weekLabel(week) {
   if (!week || !week.from || !week.to) return '';
   const from = new Date(week.from);
-  // `to` is the Monday AFTER the week, so the last day it covers is the day before.
+  // `to` is the start of the NEXT week, so the last day covered is the day before.
   const to = new Date(new Date(week.to).getTime() - 86400000);
   if (isNaN(from.getTime()) || isNaN(to.getTime())) return '';
-  const day = { day: 'numeric' };
   const dayMonth = { day: 'numeric', month: 'short' };
   // Drop the repeated month when the week does not straddle one.
   const left = from.getMonth() === to.getMonth()
-    ? from.toLocaleDateString(undefined, day)
+    ? from.toLocaleDateString(undefined, { day: 'numeric' })
     : from.toLocaleDateString(undefined, dayMonth);
   return left + ' – ' + to.toLocaleDateString(undefined, dayMonth);
 }
@@ -38,8 +51,8 @@ export function renderMarketInfo(container, { me }) {
   const host = el('div', {}, el('p', { class: 'note' }, 'Reading last week’s trade…'));
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Market Info'),
-    el('p', { class: 'note' }, 'How your ' + regionWord() + ' traded LAST week — every shop selling there, ' +
-      'and what moved. It updates once a week, when the new week starts.'),
+    el('p', { class: 'note' }, 'What things are worth in your ' + regionWord() + ', over the week just gone. ' +
+      'It updates once a week, when the new week begins.'),
     host,
   ]));
 
@@ -56,37 +69,43 @@ export function renderMarketInfo(container, { me }) {
         return;
       }
 
-      const o = d.overview || {};
+      const items = d.items || [];
       const label = weekLabel(d.week);
-      // Trade with nobody to credit: supply bought from this region from a
-      // seller nobody registered. Listed so the table adds up to the total.
-      const un = d.unregistered || {};
-      const sellers = (d.businesses || []).map((b) => [b.business || '—', money(b.revenue)]);
-      if (Number(un.revenue) > 0) sellers.push(['Unregistered shops', money(un.revenue)]);
 
-      const traded = (o.revenue || 0) > 0 || sellers.length > 0;
+      if (!items.length) {
+        mount(host, emptyState({
+          glyph: '🪙',
+          title: 'A quiet week',
+          hint: 'Nothing was traded in your ' + regionWord() + (label ? ' between ' + label : ' last week') +
+            '. Check back when the next week turns over.',
+        }));
+        return;
+      }
+
+      // The same picker Item Performance uses, but over the items that traded
+      // HERE — offering a name with no local trade would open an empty block.
+      const picker = createItemPicker({
+        placeholder: 'Look up an item…',
+        items: items.map((i) => ({ ...i, name: i.item })),
+        onPick: (it) => {
+          picker.clear();
+          openFocalMenu(it.item, (h) => mount(h, itemBlock(it, BLOCK)));
+        },
+      });
+
       mount(host,
         el('div.card', {}, [
           el('h3', {}, (d.hold || 'Your ' + regionWord()) + (label ? ' · ' + label : '')),
-          el('p', { class: 'note' }, 'The week just gone. This is what every shop in your ' + regionWord() +
-            ' can see, including yours.'),
-        ]),
-        ...(traded ? [
-          statTiles([
-            ['Revenue', money(o.revenue)],
-            ['Shops', String(o.activeShops || 0)],
-          ]),
-          tableCard('Shops selling in your ' + regionWord(), ['Company', 'Revenue'], sellers,
-            'Nobody sold here last week.'),
-          tableCard('Items moving in your ' + regionWord(), ['Item', 'Qty sold', 'Revenue'],
-            (d.items || []).map((i) => [i.item, i.qty, money(i.revenue)]),
-            'Nothing sold here last week.'),
-        ] : [
-          emptyState({
-            glyph: '🪙',
-            title: 'A quiet week',
-            hint: 'Nothing was traded in your ' + regionWord() + ' last week. Check back when the next week turns over.',
-          }),
+          el('p', { class: 'note' }, 'Average value is what the item actually changed hands for here — ' +
+            'every sale and every delivery bought from your ' + regionWord() + ', weighted by units and with ' +
+            'outliers fenced off, so one buyer overpaying does not become the item’s worth. Hover a value to ' +
+            'see how much trade it rests on.'),
+          ...items.slice(0, TOP_ITEMS).map((i) => itemBlock(i, BLOCK)),
+          ...(items.length > TOP_ITEMS ? [
+            el('h4', {}, 'Look up an item'),
+            el('p', { class: 'note' }, 'Any of the ' + items.length + ' items that traded here last week.'),
+            picker.el,
+          ] : []),
         ]),
       );
     })

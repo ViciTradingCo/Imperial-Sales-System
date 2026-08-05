@@ -46,7 +46,8 @@ export function renderInventory(container, { me }) {
   if (canEdit) {
     intakeHost = el('div', {}, '');
     nodes.push(el('div.card', {}, [
-      el('h3', {}, 'Recent intake'),
+      el('h3', {}, 'History'),
+      el('p', { class: 'note' }, 'Deliveries you have recorded, newest first.'),
       intakeHost,
     ]));
   }
