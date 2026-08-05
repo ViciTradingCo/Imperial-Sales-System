@@ -27,6 +27,16 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // API + Google stay live
 
+  // The update check asks for index.html to find out whether a NEWER build has
+  // been deployed. Serving it from the cache would answer with the very version
+  // it is trying to notice has been replaced, so this one goes straight to the
+  // network and is never stored (its URL is unique per check — caching it would
+  // grow the cache forever, for answers that are stale the moment they land).
+  if (url.searchParams.has('vcheck')) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
   const isConfig = url.pathname.endsWith('app-config.json');
 
   if (req.mode === 'navigate' || isConfig) {

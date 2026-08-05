@@ -6,12 +6,12 @@
  */
 import { requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
 import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid } from '../users.js';
-import { renameBusiness, listBusinessNames } from '../registry.js';
+import { renameBusiness, listBusinessCards } from '../registry.js';
 import { realmOf } from '../realm.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
-import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport, convertItems } from '../inventory.js';
+import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport, convertItems, setStock } from '../inventory.js';
 import { recordIntake, listIntake, deleteIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
 import { listItemIndex, listItemTypes } from '../item-index.js';
@@ -224,6 +224,23 @@ async function deleteItemRoute({ request, env, body }) {
   }
   return { inventory: await deleteItem(env, caller.business, body.item, realmIdOf(caller, env)) };
 }
+/**
+ * A hand correction to an item's stock. Owner/admin only, and always audited:
+ * this is the one path that changes stock without something having happened to
+ * cause it, so the trail is the only thing that separates a stocktake from a
+ * mistake.
+ */
+async function adjustStock({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await setStock(env, caller.business, body, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'inventory.stock',
+    detail: res.item + ': ' + res.was + ' → ' + res.now + (res.note ? ' (' + res.note + ')' : ''),
+    realmId });
+  return { ...res, inventory: await listInventory(env, caller.business, realmId) };
+}
+
 async function importInventoryRoute({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
   const res = await importInventory(env, caller.business, body.rows, realmIdOf(caller, env));
@@ -345,7 +362,12 @@ async function ownerExport({ request, env, url, cors }) {
 /* ---- lookups shared across the app ---- */
 async function listBusinesses({ request, env }) {
   const caller = await requireRegistered(request, env);
-  return { businesses: await listBusinessNames(env, realmIdOf(caller, env)) };
+  const realmId = realmIdOf(caller, env);
+  // `businesses` stays a list of names, because that is what every existing
+  // caller puts in a dropdown. `cards` carries the same companies with the
+  // details a form can fill itself in from.
+  const cards = await listBusinessCards(env, realmId);
+  return { businesses: cards.map((b) => b.business), cards };
 }
 /**
  * The item index plus the type tables it is divided into. Both in one call: the
@@ -608,6 +630,7 @@ export const routes = [
   { method: 'GET', path: '/inventory', handler: getInventory },
   { method: 'POST', path: '/inventory', handler: saveItem },
   { method: 'POST', path: '/inventory/delete', handler: deleteItemRoute },
+  { method: 'POST', path: '/inventory/stock', handler: adjustStock },
   { method: 'POST', path: '/inventory/import', handler: importInventoryRoute },
   { method: 'GET', path: '/intake', handler: getIntake },
   { method: 'POST', path: '/intake', handler: recordIntakeRoute },

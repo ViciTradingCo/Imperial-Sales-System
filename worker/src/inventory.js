@@ -80,6 +80,41 @@ export async function upsertItem(env, business, { item, price, lowStock, ingredi
 }
 
 /**
+ * Sets an item's stock BY HAND — a stocktake, breakage, spoilage, a delivery
+ * that arrived short, or simply a number that drifted.
+ *
+ * Everything else moves stock as a side effect of something that happened:
+ * intake adds, sales subtract, crafting does both. Those are the honest paths
+ * and this does not replace them — it exists because the shelf is the real
+ * authority, and when the count on it disagrees with the count in here, the
+ * shelf wins. Without this the only way to fix a wrong number was to invent an
+ * intake, which put money through the coffer that nobody spent.
+ *
+ * So: the stock changes and NOTHING ELSE does. No coffer entry, because no gold
+ * moved. The audit trail is where it is explained — a correction with no record
+ * of who made it is indistinguishable from a bug.
+ */
+export async function setStock(env, business, { item, stock, note }, realmId) {
+  const db = await getDb(env);
+  const name = String(item || '').trim();
+  if (!name) throw new Error('Which item?');
+  const n = Math.floor(Number(stock));
+  if (!isFinite(n) || n < 0) throw new Error('Stock must be a whole number, 0 or more.');
+
+  const row = await db.prepare(
+    'SELECT item, stock FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
+    .bind(realmId, business, name.toLowerCase()).first();
+  // Only an item the shop already lists. Creating one here would make a stock
+  // count a way to invent inventory, bypassing the index the register picks from.
+  if (!row) throw new Error('"' + name + '" is not in your inventory. Record an intake to stock it first.');
+
+  await db.prepare('UPDATE inventory SET stock = ? WHERE realm_id = ? AND business = ? AND item = ?')
+    .bind(n, realmId, business, row.item).run();
+
+  return { was: row.stock, now: n, item: row.item, note: String(note || '').trim().slice(0, 200) };
+}
+
+/**
  * Bulk upsert from a pasted/CSV list. Each row: { item, price?, stock?, lowStock? }.
  * Omitted numeric fields keep the item's current value (or 0 for a new item), so
  * you can paste just names+prices without wiping stock. Rows with a non-numeric

@@ -72,6 +72,7 @@ export function renderInventory(container, { me }) {
       const row = el('div.emp-row', {}, [meta]);
       if (canEdit) {
         const edit = el('button.primary.small', { onclick: () => openItemModal(it, refreshInventory) }, 'Edit');
+        const count = el('button.secondary-btn.small', { onclick: () => openStockModal(it, refreshAll) }, 'Stock');
         const del = el('button.secondary-btn.small', {
           onclick: async () => {
             if (!confirm('Remove "' + it.item + '" from your inventory?\n\n' +
@@ -82,7 +83,7 @@ export function renderInventory(container, { me }) {
             catch (e) { alert(e.message || e); }
           },
         }, 'Remove');
-        row.appendChild(el('span', { class: 'row-actions' }, [edit, del]));
+        row.appendChild(el('span', { class: 'row-actions' }, [edit, count, del]));
       }
       return row;
     });
@@ -189,6 +190,53 @@ function openItemModal(it, onSaved) {
     el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
     priceWrap,
     el('label', {}, 'Low stock threshold'), low,
+    save,
+    status,
+  ]);
+}
+
+/**
+ * Correcting an item's stock by hand.
+ *
+ * Every other path moves stock because something HAPPENED — a sale, a delivery,
+ * a craft. This one exists because the shelf is the real authority: when the
+ * count in the app disagrees with the count in the room, the room wins. Before
+ * it, the only way to fix a wrong number was to invent an intake, which pushed
+ * money through the coffer that nobody actually spent.
+ *
+ * It shows the current figure and takes the new one, rather than asking for a
+ * difference — "there are 7" is what someone counting a shelf knows, and making
+ * them work out "so that is minus 3" is how a correction becomes a second error.
+ */
+function openStockModal(it, onSaved) {
+  const count = el('input', { type: 'number', step: '1', min: '0', value: String(it.stock) });
+  const note = el('input', { type: 'text', placeholder: 'Why? (stocktake, breakage, spoilage…)' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Set stock');
+  function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
+
+  let modal;
+  async function doSave() {
+    save.disabled = true;
+    setStatus('Saving…', '');
+    try {
+      const res = await api.setStock(it.item, count.value, note.value);
+      onSaved();
+      modal.close();
+      toast(it.item + ': ' + res.was + ' → ' + res.now + ' in stock.', 'ok');
+    } catch (e) {
+      save.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  modal = openModal([
+    el('h3', {}, 'Stock — ' + it.item),
+    el('p', { class: 'note' }, 'Currently ' + it.stock + ' in stock. Enter what is actually there.'),
+    el('p', { class: 'note' }, 'This moves no money and records no purchase — it only corrects the count. ' +
+      'For goods you actually bought, record an intake instead so the coffer matches.'),
+    el('label', {}, 'Stock on hand'), count,
+    el('label', {}, 'Note (optional)'), note,
     save,
     status,
   ]);
@@ -332,23 +380,43 @@ function openIntakeModal(onRecorded, me) {
     },
   });
   api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});
-  const vendor = el('input', { type: 'text', placeholder: 'Vendor (who you bought from)' });
-  /**
-   * The supplier, when it was a REGISTERED company rather than an NPC.
-   *
-   * Optional and separate from the vendor field on purpose: most suppliers in
-   * the fiction have no account, and forcing every delivery through a dropdown
-   * of registered shops would mean typing a lie. When it IS a registered shop,
-   * this is the joinable half — it is what lets a region credit the company
-   * that actually supplied the goods rather than only counting the total.
-   */
-  const fromSel = el('select', {}, el('option', { value: '' }, '— an unregistered vendor —'));
-  api.getBusinesses()
-    .then((r) => (r.businesses || [])
-      .filter((b) => b !== (me && me.business))   // a shop does not buy from itself
-      .forEach((b) => fromSel.appendChild(el('option', { value: b }, b))))
-    .catch(() => { /* the field is optional; an empty list just means none offered */ });
   const hold = el('select', {}, el('option', { value: '' }, 'Select a ' + regionWord() + '…'));
+  /**
+   * WHO SOLD IT TO YOU — one field for both kinds of supplier.
+   *
+   * It used to be two: a free-text "Vendor" and a dropdown asking, separately,
+   * whether that vendor happened to be a registered company. That made the
+   * common case (an NPC smith) look like it was missing an answer, and the
+   * useful case (a real shop) something you had to fill in twice.
+   *
+   * Now you type a name. Registered companies narrow as you type and can be
+   * clicked; anything else is taken as written. Naming a registered company
+   * credits it for the supply in its region's figures, and fills in the region
+   * from that company's own record — the goods came from where the seller
+   * trades, and asking a second time invites a different answer.
+   */
+  const vendor = createItemPicker({
+    allowFree: true,
+    placeholder: 'Who did you buy from?',
+    freeHint: 'Not a registered company — it will be recorded as typed.',
+    meta: (c) => (regionsOn() && c.hold ? c.hold : ''),
+    onPick: (c) => {
+      // The supplier's own region, unless the user has already chosen one.
+      if (regionsOn() && c.hold && !hold.value) hold.value = c.hold;
+    },
+  });
+  api.getBusinesses()
+    .then((r) => {
+      // `cards` carries each company's region; the plain name list is the
+      // fallback for a Worker that has not caught up with this deploy yet.
+      const cards = r.cards || (r.businesses || []).map((b) => ({ business: b, hold: '' }));
+      vendor.setItems(cards
+        .filter((c) => c.business !== (me && me.business))   // a shop does not buy from itself
+        .map((c) => ({ name: c.business, hold: c.hold })));
+    })
+    .catch(() => { /* free text still works; there is just nothing to suggest */ });
+  /** The typed name, only when it IS a registered company. */
+  const vendorCompany = () => (vendor.selected() ? vendor.selected().name : '');
   const qty = el('input', { type: 'number', step: '1', min: '1', placeholder: '# of items' });
   const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Cost per item' });
   /**
@@ -399,8 +467,10 @@ function openIntakeModal(onRecorded, me) {
     ];
     if (ingredient.checked) rows.push(['Sells for', 'Ingredient — not sold']);
     else if (sale.value !== '') rows.push(['Sells for', money(Number(sale.value) || 0)]);
-    const source = fromSel.value || vendor.value.trim();
-    if (source) rows.push(['Bought from', source]);
+    const source = vendor.value();
+    // Say which kind it was: a registered company is credited for the supply,
+    // a typed name is not, and that difference is worth seeing before it lands.
+    if (source) rows.push(['Bought from', source + (vendorCompany() ? ' (registered)' : '')]);
     if (regionsOn() && hold.value) rows.push([regionLabel(), hold.value]);
     review.innerHTML = rows
       .map(([k, v]) => '<div class="step-review-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>')
@@ -412,8 +482,8 @@ function openIntakeModal(onRecorded, me) {
       item: picker.selected().name,
       salePrice: ingredient.checked ? '' : sale.value,
       ingredient: ingredient.checked,
-      vendor: vendor.value.trim(),
-      fromBusiness: fromSel.value,
+      vendor: vendor.value(),
+      fromBusiness: vendorCompany(),
       hold: hold.value,
       numItems: qty.value,
       pricePer: per.value,
@@ -456,10 +526,9 @@ function openIntakeModal(onRecorded, me) {
         title: 'Where did it come from?',
         hint: 'All optional. Fill in what you know.',
         nodes: [
-          el('label', {}, 'Vendor'), vendor,
-          el('label', {}, 'Bought from a registered company?'), fromSel,
-          el('p', { class: 'note' }, 'Only if the supplier is a shop on this network — it credits them for the ' +
-            'supply in their ' + regionWord() + '’s figures. Leave it as an unregistered vendor otherwise.'),
+          el('label', {}, 'Vendor'), vendor.el,
+          el('p', { class: 'note' }, 'Start typing — shops on this network will appear as you go. Naming one ' +
+            'credits it for the supply in its ' + regionWord() + '’s figures. Anyone else, just type the name.'),
           ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
           review,
         ],

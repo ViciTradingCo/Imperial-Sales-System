@@ -3,6 +3,13 @@
  * entry at the top as features ship.
  */
 const PATCH_NOTES = [
+  { version: '1.8', date: '2026-08-05', notes: [
+    'The app now tells you when a new version has been released, with a Refresh button. A tab left open used to go on running whatever it loaded, for days.',
+    'Inventory: stock can be corrected by hand. Count the shelf, enter what is actually there. It moves no money and records no purchase — for goods you really bought, record an intake so the coffer matches.',
+    'Intake: Vendor and "bought from a registered company" are one field. Type a name; shops on this network appear as you type. Pick one and it is credited for the supply and fills in its region; type anything else and it is recorded as written.',
+    'Court Tools → Market: the Orders and Items Sold figures are gone — they said how busy the region was, not what its Court should do about it. Items nothing sold of are no longer listed.',
+    'Court Tools → Market: trade from sellers nobody registered now has its own "Unregistered shops" line, so the table adds up to the region\'s revenue instead of quietly falling short of it.',
+  ] },
   { version: '1.7', date: '2026-08-05', notes: [
     'Money is whole coins. Prices can still be typed with a fraction — 22.5 is accepted anywhere a price is asked for — but every amount the system records or shows is a whole number with the fraction dropped, never rounded up. A ledger reads 1240gp, not 1240.00gp.',
     'The rounding happens once, on the total, so a cart of three items at 10.5 takes 31 rather than losing a coin on every line. A percentage discount rounds down the same way, and voiding a sale gives back exactly what was taken.',

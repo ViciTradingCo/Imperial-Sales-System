@@ -36,6 +36,7 @@ import { renderMotdAdmin } from './views/motd-admin.js';
 import { renderAudit } from './views/audit.js';
 import { renderItemIndex } from './views/item-index.js';
 import { renderShopSettingsPage } from './views/ledger-settings.js';
+import { startUpdateWatch } from './lib/update-check.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
@@ -54,22 +55,45 @@ globalBanner.id = 'globalBanner';
 globalBanner.hidden = true;
 appEl.parentNode.insertBefore(globalBanner, appEl);
 
+/**
+ * A new version has been deployed and this tab is still running the old one.
+ * Set by the update watcher, and sticky: once it is true the notice stays until
+ * the page is actually reloaded, because the condition it describes does not go
+ * away on its own.
+ */
+let updateWaiting = false;
+
+/** The update notice — first in the stack, since it explains all the others. */
+function updateBannerRow() {
+  return el('div', { class: 'global-banner' }, [
+    el('span', {}, 'A new version of the Ledger has been released. Refresh to update.'),
+    el('button', { class: 'banner-btn', onclick: () => location.reload() }, 'Refresh now'),
+  ]);
+}
+
+function paintBanners(apiBanners) {
+  const rows = updateWaiting ? [updateBannerRow()] : [];
+  rows.push(...apiBanners.map((b) => {
+    const row = el('div', { class: 'global-banner' }, [el('span', {}, b.text)]);
+    if (b.action && b.action.modal === 'lowstock') {
+      row.appendChild(el('button', { class: 'banner-btn', onclick: () => openLowStockModal() }, b.action.label || 'Open'));
+    } else if (b.action && b.action.route) {
+      row.appendChild(el('button', { class: 'banner-btn', onclick: () => navigate(b.action.route) }, b.action.label || 'Open'));
+    }
+    return row;
+  }));
+  if (!rows.length) { globalBanner.hidden = true; globalBanner.innerHTML = ''; return; }
+  mount(globalBanner, ...rows);
+  globalBanner.hidden = false;
+}
+
 function refreshGlobalBanner() {
   if (!(state.me && state.me.registered)) { globalBanner.hidden = true; globalBanner.innerHTML = ''; return; }
-  api.getMotd().then((r) => {
-    const banners = (r && r.banners) || (r && r.banner ? [{ text: r.banner }] : []);
-    if (!banners.length) { globalBanner.hidden = true; globalBanner.innerHTML = ''; return; }
-    mount(globalBanner, ...banners.map((b) => {
-      const row = el('div', { class: 'global-banner' }, [el('span', {}, b.text)]);
-      if (b.action && b.action.modal === 'lowstock') {
-        row.appendChild(el('button', { class: 'banner-btn', onclick: () => openLowStockModal() }, b.action.label || 'Open'));
-      } else if (b.action && b.action.route) {
-        row.appendChild(el('button', { class: 'banner-btn', onclick: () => navigate(b.action.route) }, b.action.label || 'Open'));
-      }
-      return row;
-    }));
-    globalBanner.hidden = false;
-  }).catch(() => { globalBanner.hidden = true; });
+  api.getMotd()
+    .then((r) => paintBanners((r && r.banners) || (r && r.banner ? [{ text: r.banner }] : [])))
+    // An unreachable MOTD must not swallow the update notice — that one is
+    // known locally and does not depend on the API being up.
+    .catch(() => paintBanners([]));
 }
 // Views can ask the shell to re-check banners (e.g. after accepting a transfer).
 window.addEventListener('eec:banners', () => { api.bustMotd(); refreshGlobalBanner(); });
@@ -330,6 +354,10 @@ async function onSignedIn() {
   if (currentPath().split('?')[0] === '/shop') { render(); return; }
   renderBadge();
   showNav(!!(state.me && state.me.registered));
+  // Watch for a deploy from here on. Started after sign-in because the notice
+  // has nowhere to appear before it, and a signed-out visitor loading the page
+  // is getting the current version anyway.
+  startUpdateWatch(() => { updateWaiting = true; refreshGlobalBanner(); });
   refreshGlobalBanner();
   navigate(state.me.registered ? '/' : '/register');
   render(); // paint even if the hash was already the target

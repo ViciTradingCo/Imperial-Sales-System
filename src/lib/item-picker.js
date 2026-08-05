@@ -28,13 +28,31 @@ function norm(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * `allowFree` turns the picker from a chooser into a suggester.
+ *
+ * The default is strict, and should stay that way for items: free text there
+ * fragments the index on typos, which is the whole reason this control exists.
+ * But a VENDOR is not an item. Most suppliers in the fiction are an NPC smith or
+ * a caravan with no account, so the field has to take a name nobody registered —
+ * while still recognising the ones who are registered, because that is what
+ * credits their shop for the supply. So: type anything, and if what you typed IS
+ * a company, it counts as picking it.
+ */
 export function createItemPicker(opts) {
   const options = opts || {};
   let items = options.items || [];
   const limit = options.limit || 8;
   const meta = options.meta || (() => '');
+  const allowFree = !!options.allowFree;
 
   let chosen = null;
+
+  /** The entry the current text names exactly, if any. */
+  function exactMatch() {
+    const key = norm(input.value);
+    return key ? items.find((it) => norm(it.name) === key) || null : null;
+  }
 
   const input = el('input', {
     type: 'search', autocomplete: 'off', class: 'item-picker-input',
@@ -61,8 +79,12 @@ export function createItemPicker(opts) {
   function open() {
     const found = matches(input.value);
     if (!found.length) {
-      mount(list, el('p', { class: 'note item-picker-empty' },
-        items.length ? 'No matching item in the index.' : 'The item index is empty — an admin must add items.'));
+      // In free-text mode an empty list is a normal outcome, not a dead end —
+      // say what typing anyway will do rather than reporting a failure.
+      const msg = allowFree
+        ? (options.freeHint || 'No registered company by that name — it will be recorded as typed.')
+        : (items.length ? 'No matching item in the index.' : 'The item index is empty — an admin must add items.');
+      mount(list, el('p', { class: 'note item-picker-empty' }, msg));
       list.hidden = false;
       return;
     }
@@ -87,6 +109,12 @@ export function createItemPicker(opts) {
   input.addEventListener('input', () => {
     // Typing invalidates a previous choice — a selection must be re-clicked.
     if (chosen && input.value !== chosen.name) chosen = null;
+    // …except that typing a registered name in full IS choosing it. Someone who
+    // knows the supplier should not have to click a list to prove it.
+    if (allowFree) {
+      const exact = exactMatch();
+      if (exact && options.onPick) { chosen = exact; options.onPick(exact); }
+    }
     open();
   });
   input.addEventListener('focus', open);
@@ -95,6 +123,9 @@ export function createItemPicker(opts) {
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { close(); return; }
     if (e.key === 'Enter') {
+      // In free-text mode Enter means "I have finished typing", so leave the
+      // event alone for the form to act on and just get the list out of the way.
+      if (allowFree) { close(); return; }
       e.preventDefault();
       const found = matches(input.value);
       if (found.length === 1) pick(found[0]); // unambiguous — accept it
@@ -104,8 +135,11 @@ export function createItemPicker(opts) {
 
   return {
     el: wrap,
-    value: () => (chosen ? chosen.name : ''),
-    selected: () => chosen,
+    // What was typed, in free-text mode; the canonical name otherwise.
+    value: () => (chosen ? chosen.name : (allowFree ? input.value.trim() : '')),
+    // The registered entry, if this names one. Resolved rather than remembered,
+    // so typing a name in full counts as much as clicking it.
+    selected: () => chosen || (allowFree ? exactMatch() : null),
     setItems: (next) => { items = next || []; },
     clear: () => { chosen = null; input.value = ''; close(); },
     focus: () => input.focus(),

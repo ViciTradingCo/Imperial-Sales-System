@@ -69,11 +69,24 @@ export async function findBusinessByName(env, name, realmId) {
 
 /** All active (non-archived) business names — for pickers like transfer targets. */
 export async function listBusinessNames(env, realmId) {
+  return (await listBusinessCards(env, realmId)).map((b) => b.business);
+}
+
+/**
+ * The same list with the details a form might fill in from — currently the
+ * region a company trades in, which is what lets recording a delivery from a
+ * registered supplier know where the goods came from without asking twice.
+ *
+ * Deliberately a separate function from listBusinessNames rather than a widened
+ * return: half the callers want a list of names to put in a dropdown, and
+ * handing them objects would break each one quietly.
+ */
+export async function listBusinessCards(env, realmId) {
   const db = await getDb(env);
   const { results } = await db.prepare(
-    "SELECT business FROM companies WHERE upper(status) != 'ARCHIVED' AND business != '' AND realm_id = ? ORDER BY business")
+    "SELECT business, hold FROM companies WHERE upper(status) != 'ARCHIVED' AND business != '' AND realm_id = ? ORDER BY business")
     .bind(String(realmId || DEFAULT_REALM_ID)).all();
-  return (results || []).map((r) => String(r.business).trim());
+  return (results || []).map((r) => ({ business: String(r.business).trim(), hold: String(r.hold || '').trim() }));
 }
 
 /** Returns a business's Hold / Court / Priority flags ({ hold, court, priority }). */
