@@ -9,6 +9,7 @@
  */
 import { getDb } from './db.js';
 import { listInventory } from './inventory.js';
+import { coin } from './money.js';
 
 /** Records one intake transaction. Returns the recent intake list. */
 export async function recordIntake(env, business, { item, vendor, hold, fromBusiness, numItems, pricePer, salePrice, ingredient, idempotencyKey }, realmId) {
@@ -74,7 +75,7 @@ export async function recordIntake(env, business, { item, vendor, hold, fromBusi
     // Debit the shop's coffers for what was paid.
     db.prepare(
       `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'intake', ?, ?)`
-    ).bind(realmId, business, ts, -(qty * per), name),
+    ).bind(realmId, business, ts, -coin(qty * per), name),
   ]);
 
   return listIntake(env, business, realmId);
@@ -121,7 +122,9 @@ export async function deleteIntake(env, business, id, realmId) {
   if (!row) throw new Error('That intake entry no longer exists.');
 
   const qty = Number(row.num_items) || 0;
-  const paid = qty * (Number(row.price_per) || 0);
+  // Mirror the debit exactly — it was rounded down when it went out, so the
+  // refund has to round down too or removing an intake would mint a coin.
+  const paid = coin(qty * (Number(row.price_per) || 0));
   const inv = await db.prepare('SELECT stock FROM inventory WHERE realm_id = ? AND business = ? AND item = ?')
     .bind(realmId, business, row.item).first();
   const have = inv ? Number(inv.stock) || 0 : 0;

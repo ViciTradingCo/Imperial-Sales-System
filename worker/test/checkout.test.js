@@ -83,6 +83,63 @@ describe('checkout', () => {
  * a free item counted at 0 would drag an item's average price down and make the
  * shop look like it was giving stock away.
  */
+/**
+ * Fractional prices are ACCEPTED; the money that changes hands is whole coins,
+ * rounded down. The rounding happens once, on the total — rounding every line
+ * would compound the loss across a big cart.
+ */
+describe('whole coins, rounded down', () => {
+  it('accepts a fractional price and settles the total down', async () => {
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 22.5 }], hold: 'Whiterun' }, 'default');
+    expect(res.total).toBe(22);
+    expect(await cofferBalance(env, 'Alpha', 'default')).toBe(22);
+  });
+
+  it('rounds once at the total, not per line', async () => {
+    // Three lines at 10.5 are 31.5 together. Rounding each line down would take
+    // 30 — a whole coin lost to the arithmetic rather than to the rounding.
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 3, price: 10.5 }], hold: 'Whiterun' }, 'default');
+    expect(res.total).toBe(31);
+  });
+
+  it('rounds a percentage discount down too', async () => {
+    // 15% off 25 is 21.25.
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 25 }], hold: 'Whiterun', discountPercent: 15 }, 'default');
+    expect(res.total).toBe(21);
+  });
+
+  it('never rounds up, however close', async () => {
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 24.999 }], hold: 'Whiterun' }, 'default');
+    expect(res.total).toBe(24);
+  });
+
+  it('a sale worth less than a coin takes nothing', async () => {
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 0.5 }], hold: 'Whiterun' }, 'default');
+    expect(res.total).toBe(0);
+    expect(await stockOf('Alpha', 'Iron Sword')).toBe(9); // the goods still moved
+  });
+
+  it('voiding gives back exactly what was taken', async () => {
+    await seed('Alpha', 'Iron Sword', 30, 10);
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 3, price: 10.5 }], hold: 'Whiterun' }, 'default');
+    expect(await cofferBalance(env, 'Alpha', 'default')).toBe(31);
+    await voidSale(env, 'Alpha', res.orderNo, 'default');
+    // Not 31.5 back against 31 taken — a void must not mint half a coin.
+    expect(await cofferBalance(env, 'Alpha', 'default')).toBe(0);
+  });
+});
+
 describe('employee purchases', () => {
   it('takes the stock but no money, and credits no coffer', async () => {
     await seed('Alpha', 'Iron Sword', 30, 10);

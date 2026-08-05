@@ -9,6 +9,7 @@
  * name, and their coffers are entirely separate ledgers.
  */
 import { getDb } from './db.js';
+import { coin } from './money.js';
 
 export async function cofferBalance(env, business, realmId) {
   const db = await getDb(env);
@@ -36,8 +37,11 @@ export async function cofferSummary(env, business, realmId) {
 export async function adjustCoffer(env, business, { amount, note }, realmId) {
   const n = Number(amount);
   if (!isFinite(n) || n === 0) throw new Error('Enter a non-zero amount (negative to withdraw).');
+  // Whole coins only, rounded down, like every other amount the ledger holds.
+  const whole = coin(n);
+  if (whole === 0) throw new Error('That rounds to nothing — amounts are whole coins.');
   const db = await getDb(env);
   await db.prepare('INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(realmId, business, new Date().toISOString(), n > 0 ? 'deposit' : 'withdrawal', n, String(note || '').trim()).run();
+    .bind(realmId, business, new Date().toISOString(), whole > 0 ? 'deposit' : 'withdrawal', whole, String(note || '').trim()).run();
   return cofferSummary(env, business, realmId);
 }

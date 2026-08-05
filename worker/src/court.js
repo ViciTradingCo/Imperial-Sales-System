@@ -21,6 +21,7 @@
  */
 import { getDb } from './db.js';
 import { listCompanies } from './registry.js';
+import { coin } from './money.js';
 
 /** What public money may be spent on. Served to the client so there is one list. */
 export const SPEND_CATEGORIES = [
@@ -37,7 +38,8 @@ export const STANDINGS = ['banned', 'restricted', 'none', 'licensed'];
 
 const now = () => new Date().toISOString();
 const key = (s) => String(s || '').trim().toLowerCase();
-const money2 = (n) => Math.round(Number(n) * 100) / 100;
+// Every court figure is a whole coin, rounded down — see money.js.
+const money2 = coin;
 
 /* ---- settings: the levy rate and the region's notice ---- */
 

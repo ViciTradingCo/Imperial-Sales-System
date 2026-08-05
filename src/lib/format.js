@@ -37,22 +37,19 @@ export function regionsOn() { return region.shown; }
 /**
  * An amount, in this realm's denomination.
  *
- * DECIMALS ONLY WHEN THERE ARE DECIMALS. Trade here is in whole coins — a sale
- * is 25gp, not 25.00gp — so a ledger reading "1240.00gp" was inventing a
- * precision the shop does not use, on every figure on the page. A fractional
- * amount (a percentage discount off an odd number, say) still prints its two
- * places, because there the decimal is real.
+ * WHOLE COINS, ROUNDED DOWN. Prices may be typed with a fraction — the register
+ * and the inventory both accept 22.5 — but nothing here deals in half a coin, so
+ * every amount SHOWN is a whole number with the fraction dropped, never rounded
+ * up. This mirrors `worker/src/money.js`, which applies the same rule to what
+ * gets stored, so a figure on screen is the figure in the ledger.
  *
- * The rounding comes FIRST and is not optional. Revenue is summed in JavaScript
- * in places, and floating point makes those sums drift: 0.1 + 0.2 is
- * 0.30000000000000004, and a day's takings can land on 1240.0000000000002.
- * Settling to 2dp before asking "is this a whole number?" is what stops that
- * drift from printing — the old toFixed(2) was hiding it rather than resolving
- * it, which is why it never showed up as a bug until the .00 came off.
+ * The float tail is settled BEFORE the fraction is dropped, at six places —
+ * below anything a person would type, above the noise a summed ledger carries.
+ * Without it 1239.9999999999998 would print as 1239; at two places a genuine
+ * 12.999 would print as 13, rounding up. See worker/src/money.js.
  */
 export function money(n) {
   const v = Number(n);
   if (!isFinite(v)) return '0' + unit;
-  const settled = Math.round(v * 100) / 100;
-  return (Number.isInteger(settled) ? String(settled) : settled.toFixed(2)) + unit;
+  return String(Math.floor(Math.round(v * 1e6) / 1e6)) + unit;
 }

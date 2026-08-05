@@ -147,6 +147,23 @@ Presentation settings are set once at sign-in from `/auth/me`'s `prefs`, not
 fetched per screen. Threading them through every render function is how the
 register ended up the only place that honoured them.
 
+## Money is whole coins, rounded down
+
+Fractional input is ACCEPTED — a price may be typed as 22.5 — but every amount
+that gets stored, moved, owed or shown is a whole number with the fraction
+DROPPED, never rounded up. `coin()` in `worker/src/money.js` is the one rule;
+`money()` in `src/lib/format.js` applies the same arithmetic so the figure on
+screen is the figure in the ledger, and a test asserts the two agree.
+
+Round ONCE, at the total. Rounding every line compounds the loss across a cart
+(three lines at 10.5 must take 31, not 30). The intermediate arithmetic stays
+exact; only the settled figure is a coin.
+
+Settle the float tail BEFORE flooring, at six places. Money summed in JS drifts,
+so a day's takings arrive as 1239.9999999999998 and a bare floor would report
+1239 — but settling at 2dp would round a genuine 12.999 UP to 13, which is the
+one thing this must never do.
+
 ## Multi-realm
 
 The system can host several independent servers ("realms") from one deployment,

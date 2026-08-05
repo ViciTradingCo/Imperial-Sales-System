@@ -4,7 +4,8 @@
  */
 export const PATCH_NOTES = [
   { version: '1.7', date: '2026-08-05', notes: [
-    'Amounts no longer print decimals they do not have. A shop trading in whole coins now reads 1240gp instead of 1240.00gp, everywhere in the app. An amount that genuinely has a fraction — a percentage discount off an odd number — still shows both places.',
+    'Money is whole coins. Prices can still be typed with a fraction — 22.5 is accepted anywhere a price is asked for — but every amount the system records or shows is a whole number with the fraction dropped, never rounded up. A ledger reads 1240gp, not 1240.00gp.',
+    'The rounding happens once, on the total, so a cart of three items at 10.5 takes 31 rather than losing a coin on every line. A percentage discount rounds down the same way, and voiding a sale gives back exactly what was taken.',
   ] },
   { version: '1.6', date: '2026-08-04', notes: [
     'Fixed: the Record Intake button did nothing. A rename in the last release left the form calling something that no longer existed, so it failed before it could open. There is now a test that catches this whole class of mistake before it ships.',

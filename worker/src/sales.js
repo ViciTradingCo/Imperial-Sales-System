@@ -13,6 +13,7 @@ import { readRealmPrefs } from './realm-prefs.js';
 import { listItemIndex, matchMasterItem } from './item-index.js';
 import { logAudit } from './audit.js';
 import { courtRules, standingOf, accrueLevy } from './court.js';
+import { coin } from './money.js';
 
 /**
  * A sale's lines, as DATA: [{name, qty, price}].
@@ -208,11 +209,11 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   // A discount off nothing is nothing; an employee purchase ignores it rather
   // than recording a percentage that did no work.
   const discPct = !staff && isFinite(pct) && pct > 0 && pct <= 100 ? pct : 0;
-  // Always settle money to 2dp — float sums like 0.1+0.2 would otherwise store
-  // (and later refund) a value with a long fractional tail.
-  const finalTotal = staff ? 0 : (discPct
-    ? Math.round(subtotal * (100 - discPct)) / 100
-    : Math.round(subtotal * 100) / 100);
+  // The line arithmetic above is exact — fractional prices and percentage
+  // discounts are allowed to produce whatever they produce. It is settled to a
+  // whole coin ONCE, here, at the end: rounding every line would compound the
+  // loss, and rounding down at the total is the customer's favour, once.
+  const finalTotal = staff ? 0 : coin(discPct ? subtotal * (100 - discPct) / 100 : subtotal);
   const discountLabel = discPct
     ? (String(discountName || '').trim() ? String(discountName).trim() + ' ' : '') + '(' + discPct + '%)'
     : '';
