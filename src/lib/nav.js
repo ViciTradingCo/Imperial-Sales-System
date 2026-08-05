@@ -8,7 +8,7 @@ import { regionsOn } from './format.js';
 import { navigate, currentPath } from './router.js';
 
 /** The nav destinations available to a given user, in order. */
-export function navItems(me) {
+function navItems(me) {
   const items = [{ path: '/', label: me.role === 'admin' ? 'Admin Panel' : 'Home' }];
   // Register / Inventory / Employees live on an action bar on Home for
   // owners/employees. Admins manage the network, not a shop, so they don't get

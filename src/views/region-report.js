@@ -25,18 +25,26 @@ export function renderRegionReport(container) {
   api.getRegionReport()
     .then((d) => {
       const o = d.overview || {};
+      /**
+       * Trade with nobody to credit — supply bought from this region from an
+       * unregistered seller (an NPC smith, a caravan, a farm). Listed as its own
+       * line so the table adds up to the region's revenue instead of quietly
+       * falling short of it. Only when there is some: a standing row of zeroes
+       * is the kind of filler this screen was cleared of.
+       */
+      const un = d.unregistered || {};
+      const sellers = (d.businesses || []).map((b) => [b.business || '—', money(b.revenue)]);
+      if (Number(un.revenue) > 0) sellers.push(['Unregistered shops', money(un.revenue)]);
+
       mount(host,
         el('div.card', {}, [el('h3', {}, d.hold || 'Your ' + regionWord())]),
+        // Revenue and how many shops trade here. Order and item counts said how
+        // BUSY the region was, which is not a thing a Court rules on.
         statTiles([
           ['Revenue', money(o.revenue)],
-          ['Orders', String(o.orders || 0)],
-          ['Items sold', String(o.itemsSold || 0)],
           ['Shops', String(o.activeShops || 0)],
         ]),
-        // Shops that SOLD here: intake names a vendor rather than a registered
-        // company, so the supply side has nobody to credit.
-        tableCard('Shops selling in your ' + regionWord(), ['Company', 'Orders', 'Items', 'Revenue'],
-          (d.businesses || []).map((b) => [b.business || '—', b.orders, b.items, money(b.revenue)]),
+        tableCard('Shops selling in your ' + regionWord(), ['Company', 'Revenue'], sellers,
           'No sales recorded in your ' + regionWord() + ' yet.'),
         tableCard('Items moving in your ' + regionWord(), ['Item', 'Qty sold', 'Revenue'],
           (d.items || []).map((i) => [i.item, i.qty, money(i.revenue)]),

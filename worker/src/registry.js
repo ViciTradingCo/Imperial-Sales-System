@@ -32,7 +32,7 @@ async function trialUntil(env, realmId) {
 }
 
 /** Short, collision-resistant application id. */
-export function genUid(prefix) {
+function genUid(prefix) {
   return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
@@ -122,7 +122,7 @@ export async function regenerateBusinessCode(env, business, realmId) {
 }
 
 /** Invalidates the cert + business-meta caches (call on any registry change). */
-export function bustRegistryCache() { cacheBust('cert:'); cacheBust('meta:'); }
+function bustRegistryCache() { cacheBust('cert:'); cacheBust('meta:'); }
 
 /**
  * Moves a company and everything it owns into another realm — the corrective

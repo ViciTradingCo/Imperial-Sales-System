@@ -11,7 +11,7 @@
 import { getDb, getFlag, setFlag, DEFAULT_REALM_ID } from './db.js';
 import { getShopStyle } from './shop-style.js';
 
-export const STOREFRONT_FLAG = 'storefronts_enabled';
+const STOREFRONT_FLAG = 'storefronts_enabled';
 
 function flagKey(realmId) {
   return STOREFRONT_FLAG + ':' + String(realmId || DEFAULT_REALM_ID);

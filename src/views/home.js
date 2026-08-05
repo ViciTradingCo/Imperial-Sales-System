@@ -129,7 +129,7 @@ function errorsCard(me) {
  * realm and cannot. The distinction comes from the server (me.systemAdmin), not
  * from the stored role.
  */
-export function roleTitle(me) {
+function roleTitle(me) {
   if (!me) return 'Trader';
   if (me.role === 'admin') return me.systemAdmin ? 'System Admin' : 'Realm Admin';
   return { owner: 'Shop Owner', employee: 'Employee' }[me.role] || 'Trader';

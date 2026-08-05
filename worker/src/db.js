@@ -258,7 +258,7 @@ export const REALM_TABLES = [
  * column naming it. Moving or renaming a business walks exactly this list, so a
  * new per-shop table only has to be added here.
  */
-export const BUSINESS_TABLES = [
+const BUSINESS_TABLES = [
   ['inventory', 'business'], ['sales', 'business'], ['intake', 'business'],
   ['transfers', 'from_business'], ['transfers', 'to_business'],
   ['coffer_entries', 'business'], ['discounts', 'business'], ['shop_style', 'business'],

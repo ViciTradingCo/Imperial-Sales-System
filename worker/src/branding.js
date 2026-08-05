@@ -22,7 +22,7 @@ function realmKey(realmId) {
 }
 const HTTPS_URL = /^https:\/\/[^\s"'<>]+$/i;
 
-export const BRANDING_DEFAULTS = {
+const BRANDING_DEFAULTS = {
   appName: 'Vici Trading Co.',
   shortName: 'Vici Ledger',
   tagline: 'The Vici Automated Ledger',

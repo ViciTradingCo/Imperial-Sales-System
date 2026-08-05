@@ -18,7 +18,7 @@ export async function cofferBalance(env, business, realmId) {
   return r ? r.bal : 0;
 }
 
-export async function listCofferEntries(env, business, realmId, limit = 30) {
+async function listCofferEntries(env, business, realmId, limit = 30) {
   const db = await getDb(env);
   const { results } = await db.prepare(
     'SELECT ts, kind, amount, note FROM coffer_entries WHERE realm_id = ? AND business = ? ORDER BY id DESC LIMIT ?')

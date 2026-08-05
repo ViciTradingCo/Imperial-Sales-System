@@ -145,4 +145,41 @@ describe('the region\'s market report', () => {
     const d = await holdReport(env, 'Whiterun', R);
     expect(d.overview.revenue).toBe(0);
   });
+
+  /**
+   * Supply from a seller nobody registered — an NPC smith, a caravan, a farm.
+   * It is real trade in the region and counts toward its revenue, but it can
+   * never sit on a company's line, so it gets a bucket of its own rather than
+   * leaving the shops table silently short of the region's total.
+   */
+  it('buckets supply from unregistered sellers on its own', async () => {
+    await env.DB.prepare(
+      `INSERT INTO intake (realm_id, business, ts, item, source_hold, num_items, price_per, from_business)
+       VALUES (?, ?, '2026-01-01T00:00:00Z', 'Iron Sword', 'Whiterun', 4, 25, '')`).bind(R, NEIGHBOUR).run();
+    const d = await holdReport(env, 'Whiterun', R);
+    expect(d.unregistered).toEqual({ orders: 1, items: 4, revenue: 100 });
+    expect(d.businesses).toEqual([]);           // nobody to credit
+    expect(d.overview.revenue).toBe(100);       // but the region still earned it
+  });
+
+  it('credits a registered supplier to its own line, not the bucket', async () => {
+    await env.DB.prepare(
+      `INSERT INTO intake (realm_id, business, ts, item, source_hold, num_items, price_per, from_business)
+       VALUES (?, ?, '2026-01-01T00:00:00Z', 'Iron Sword', 'Whiterun', 4, 25, ?)`)
+      .bind(R, NEIGHBOUR, COURT).run();
+    const d = await holdReport(env, 'Whiterun', R);
+    expect(d.unregistered.revenue).toBe(0);
+    expect(d.businesses).toEqual([{ business: COURT, orders: 1, items: 4, revenue: 100 }]);
+  });
+
+  it('leaves out items nothing sold of', async () => {
+    // Sourced from the region but never sold there: a row of zeroes is noise
+    // between the rows a Court is actually reading.
+    await env.DB.prepare(
+      `INSERT INTO intake (realm_id, business, ts, item, source_hold, num_items, price_per)
+       VALUES (?, ?, '2026-01-01T00:00:00Z', 'Iron Sword', 'Whiterun', 4, 25)`).bind(R, NEIGHBOUR).run();
+    const d = await holdReport(env, 'Whiterun', R);
+    expect(d.items.every((i) => i.qty > 0)).toBe(true);
+    expect(d.items.find((i) => i.item === 'Iron Sword')).toBeUndefined();
+  });
 });

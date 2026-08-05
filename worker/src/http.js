@@ -34,7 +34,7 @@ export function json(body, status, extraHeaders) {
 }
 
 /** Parses a JSON request body sent as text/plain (our CORS-preflight-free shape). */
-export async function readJsonBody(request) {
+async function readJsonBody(request) {
   const text = await request.text();
   if (!text) return {};
   try { return JSON.parse(text); }

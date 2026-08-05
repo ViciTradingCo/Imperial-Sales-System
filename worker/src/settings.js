@@ -11,7 +11,7 @@ import { getDb } from './db.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
 
 // Canonical schema — the source of truth for defaults, validation, and UI.
-export const SETTINGS_SCHEMA = [
+const SETTINGS_SCHEMA = [
   { label: 'Shop sync interval (minutes)', def: 5, kind: 'int', min: 1, max: 30,
     notes: 'How often each shop self-syncs.' },
   { label: 'Core maintenance interval (minutes)', def: 5, kind: 'int', min: 1, max: 30,

@@ -2,7 +2,7 @@
  * Patch notes — a static changelog rendered as its own nav page. Add a new
  * entry at the top as features ship.
  */
-export const PATCH_NOTES = [
+const PATCH_NOTES = [
   { version: '1.7', date: '2026-08-05', notes: [
     'Money is whole coins. Prices can still be typed with a fraction — 22.5 is accepted anywhere a price is asked for — but every amount the system records or shows is a whole number with the fraction dropped, never rounded up. A ledger reads 1240gp, not 1240.00gp.',
     'The rounding happens once, on the total, so a cart of three items at 10.5 takes 31 rather than losing a coin on every line. A percentage discount rounds down the same way, and voiding a sale gives back exactly what was taken.',

@@ -34,7 +34,7 @@ export const THEMES = {
   },
 };
 
-export const DEFAULT_PREFS = { theme: 'parchment' };
+const DEFAULT_PREFS = { theme: 'parchment' };
 
 export function loadPrefs() {
   try {

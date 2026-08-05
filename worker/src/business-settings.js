@@ -17,7 +17,7 @@ import { getDb } from './db.js';
  * already work. An empty list renders nothing at all (see renderSettingsForm),
  * so an owner is not shown a section with nothing in it.
  */
-export const BUSINESS_SETTINGS_SCHEMA = [];
+const BUSINESS_SETTINGS_SCHEMA = [];
 
 function validate(schema, value) {
   let n = Number(value);

@@ -304,7 +304,7 @@ function createRealmCard(onCreated) {
  * with its whole roster, and is refused if the name (or any member's email) is
  * already taken over there.
  */
-export function transferCard(getRealms, me) {
+function transferCard(getRealms, me) {
   const fromSel = el('select', {});
   const memberSel = el('select', {});
   const memberTo = el('select', {});

@@ -433,14 +433,6 @@ label.inline {
 }
 label.inline input { width: auto; }
 
-/* Role feature stubs on the dashboard */
-.card.stub { opacity: 0.85; }
-.card.stub h3 { margin: 0 0 4px; color: var(--accent); }
-.pill-soon {
-  display: inline-block; font-size: 11px; text-transform: uppercase;
-  letter-spacing: 0.04em; background: var(--note); color: var(--paper-raised);
-  padding: 2px 8px; border-radius: 20px; margin-top: 6px;
-}
 .pill {
   display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.04em; padding: 2px 8px; border-radius: 20px;
@@ -493,9 +485,6 @@ button.danger.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto;
 /* A submitted feedback form, as the System Admin reads it. */
 .feedback-card { margin-bottom: var(--sp-3); }
 .feedback-body { white-space: pre-wrap; margin: var(--sp-2) 0 0; }
-
-.inv-editor { margin-top: 18px; border-top: 1px solid rgba(122, 74, 31, 0.25); padding-top: 12px; }
-.inv-editor h3 { margin: 0 0 4px; color: var(--accent); }
 
 .lookup-card {
   border: 1px solid rgba(122, 74, 31, 0.25);
@@ -577,9 +566,6 @@ img, table { max-width: 100%; }
 @media (max-width: 900px) {
   body.has-nav .patchnotes { display: none; }
 }
-/* Wide content scrolls inside itself rather than the page. */
-.scroll-x { overflow-x: auto; }
-
 @media (max-width: 600px) {
   .topbar {
     padding: 10px 14px;
@@ -686,14 +672,6 @@ img, table { max-width: 100%; }
 .empty-state .empty-title { font-weight: 700; color: var(--ink); margin-bottom: var(--sp-1); }
 .empty-state .row-actions { justify-content: center; margin-top: var(--sp-3); }
 
-/* Keep the primary action reachable at the bottom of a long focal menu. */
-.sticky-actions {
-  position: sticky; bottom: 0;
-  background: linear-gradient(to top, var(--paper-raised) 70%, rgba(255,250,240,0));
-  padding: var(--sp-3) 0 var(--sp-1);
-  margin-top: var(--sp-3);
-}
-
 /* Tile image editor (admin) */
 .tile-img-list { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-3) 0; }
 .tile-img-row {
@@ -755,25 +733,6 @@ img, table { max-width: 100%; }
    Realm selection lives only on the Admin Panel, so it can afford to be big and
    explicit: one button per realm, the active one unmistakable. Getting this
    wrong means working in the wrong world, so it reads as a choice, not a link. */
-.realm-picker { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
-.realm-pick {
-  font: inherit; cursor: pointer; text-align: left;
-  display: flex; flex-direction: column; gap: 2px;
-  min-width: 180px; flex: 1 1 180px;
-  padding: 12px 14px;
-  border: 2px solid rgba(122, 74, 31, 0.3);
-  border-radius: var(--radius);
-  background: var(--paper-raised); color: inherit;
-}
-.realm-pick:hover:not(:disabled) { border-color: var(--accent); }
-.realm-pick:disabled { opacity: 0.6; cursor: default; }
-.realm-pick.is-active {
-  border-color: var(--accent);
-  background: var(--accent); color: var(--header-text);
-}
-.realm-pick-name { font-weight: bold; font-size: 15px; }
-.realm-pick-meta { font-size: 12px; opacity: 0.8; }
-
 .realm-list { display: flex; flex-direction: column; gap: 8px; }
 .realm-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -818,19 +777,3 @@ img, table { max-width: 100%; }
   padding: 12px; width: 100%;
 }
 
-/* In-page tab row (Market Analysis sub-pages). Distinct from the action bar:
-   the bar is the app's fixed menu, these belong to one page. */
-.tab-row {
-  display: flex; flex-wrap: wrap; gap: 6px;
-  margin: 12px 0 16px;
-  border-bottom: 1px solid rgba(122, 74, 31, 0.25);
-  padding-bottom: 8px;
-}
-.tab-btn {
-  font: inherit; font-size: 13px; cursor: pointer;
-  background: transparent; color: inherit;
-  border: 1px solid rgba(122, 74, 31, 0.3);
-  border-radius: var(--radius); padding: 6px 12px;
-}
-.tab-btn:hover { border-color: var(--accent); }
-.tab-btn.is-active { background: var(--accent); color: var(--header-text); border-color: var(--accent); }

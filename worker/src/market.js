@@ -388,7 +388,7 @@ export async function marketAnalysis(env, realmId) {
 }
 
 /** How many items Item Performance leads with. */
-export const TOP_ITEMS = 5;
+const TOP_ITEMS = 5;
 
 /**
  * One item, in full — the same figures the top five show, plus its trend.
@@ -515,12 +515,37 @@ export async function holdReport(env, hold, realmId) {
          FROM intake WHERE realm_id = ? AND source_hold = ? AND from_business != ''
         GROUP BY from_business`).bind(realmId, h).all()).results) || []);
 
+  /**
+   * The trade with nobody to credit.
+   *
+   * Supply bought from this region where the buyer named no registered company —
+   * an NPC smith, a caravan, a farm. It counts toward the region's totals (it is
+   * real trade happening here) but it can never appear on a company's line,
+   * which used to leave the shops table quietly failing to add up to the
+   * region's revenue. Reported as its own bucket so the difference is named
+   * rather than unexplained.
+   */
+  const un = await db.prepare(
+    `SELECT COUNT(*) AS orders, COALESCE(SUM(num_items), 0) AS items,
+            COALESCE(SUM(num_items * price_per), 0) AS revenue
+       FROM intake WHERE realm_id = ? AND source_hold = ? AND COALESCE(from_business, '') = ''`)
+    .bind(realmId, h).first();
+  const unregistered = {
+    orders: (un && un.orders) || 0,
+    items: (un && un.items) || 0,
+    revenue: (un && un.revenue) || 0,
+  };
+
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`).bind(realmId, h).all()).results) || [];
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?`)
     .bind(realmId, h).all()).results) || [];
 
-  return { hold: h, overview, businesses,
-    items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId), intakeRows)) };
+  return { hold: h, overview, businesses, unregistered,
+    // Only items that actually SOLD here. An item sourced from the region but
+    // never sold in it lands with a quantity of 0, and a table of zeroes is
+    // noise between the rows a Court is reading.
+    items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId), intakeRows))
+      .filter((i) => (Number(i.qty) || 0) > 0) };
 }

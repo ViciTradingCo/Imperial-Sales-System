@@ -27,7 +27,7 @@ import { renderRegionReport } from './region-report.js';
 import { skeletonRows } from '../lib/skeleton.js';
 
 /** The list of shops trading in this Court's region. */
-export function renderCourtCompanies(container) {
+function renderCourtCompanies(container) {
   const listHost = el('div', {}, skeletonRows(4));
   const search = el('input', { type: 'search', placeholder: 'Search company or contact…' });
   let all = [];
