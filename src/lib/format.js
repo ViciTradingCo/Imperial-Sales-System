@@ -34,7 +34,25 @@ export function regionWord() { return region.label.toLowerCase(); }
 /** Whether this realm uses regions at all. False hides every region surface. */
 export function regionsOn() { return region.shown; }
 
+/**
+ * An amount, in this realm's denomination.
+ *
+ * DECIMALS ONLY WHEN THERE ARE DECIMALS. Trade here is in whole coins — a sale
+ * is 25gp, not 25.00gp — so a ledger reading "1240.00gp" was inventing a
+ * precision the shop does not use, on every figure on the page. A fractional
+ * amount (a percentage discount off an odd number, say) still prints its two
+ * places, because there the decimal is real.
+ *
+ * The rounding comes FIRST and is not optional. Revenue is summed in JavaScript
+ * in places, and floating point makes those sums drift: 0.1 + 0.2 is
+ * 0.30000000000000004, and a day's takings can land on 1240.0000000000002.
+ * Settling to 2dp before asking "is this a whole number?" is what stops that
+ * drift from printing — the old toFixed(2) was hiding it rather than resolving
+ * it, which is why it never showed up as a bug until the .00 came off.
+ */
 export function money(n) {
   const v = Number(n);
-  return (isFinite(v) ? v.toFixed(2) : '0.00') + unit;
+  if (!isFinite(v)) return '0' + unit;
+  const settled = Math.round(v * 100) / 100;
+  return (Number.isInteger(settled) ? String(settled) : settled.toFixed(2)) + unit;
 }
