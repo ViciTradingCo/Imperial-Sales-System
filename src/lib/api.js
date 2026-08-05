@@ -125,6 +125,8 @@ export const api = {
   wipeData: () => request('POST', '/admin/data/wipe', { confirm: 'ERASE' }),
   /** Court businesses: the market report for their own region. */
   getRegionReport: () => request('GET', '/market/region'),
+  /** Any shop with a region: that region's market for the week just gone. */
+  getWeeklyMarket: () => request('GET', '/market/week'),
   /** Court businesses: every shop trading in their region. */
   getCourtCompanies: () => request('GET', '/court/companies'),
   /** Court businesses: one of those shops in full — roster, coffer, performance. */

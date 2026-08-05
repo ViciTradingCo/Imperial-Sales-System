@@ -28,6 +28,13 @@ export function setOpsActions(me) {
   ];
   if (me.role === 'owner' || me.role === 'admin') {
     items.push({ label: 'Employees', path: '/employees', onClick: () => navigate('/employees') });
+    // Last week's trade in this shop's own region. Owner-level: it is what the
+    // person setting prices needs, not the person ringing them up. Omitted when
+    // the realm does not divide trade by region — the page would have nothing
+    // to report on.
+    if (regionsOn()) {
+      items.push({ label: 'Market Info', path: '/market-info', onClick: () => navigate('/market-info') });
+    }
   }
   setActions(mark(items));
 }

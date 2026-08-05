@@ -507,21 +507,64 @@ export async function businessReport(env, business, realmId) {
  * A single hold's report — the slice a Court oversees. Scoped to sales made in
  * that hold: overview, the shops trading there, and the items moving there.
  */
-export async function holdReport(env, hold, realmId) {
+/**
+ * The last COMPLETE week, as a half-open [from, to) window.
+ *
+ * What a shop sees of its region is deliberately lagged: a Court reads its
+ * economy live, and everyone else reads the week that has finished. That is the
+ * point of the feature rather than a limitation of it — a shop watching its
+ * neighbours' takings arrive in real time is a shop pricing against them by the
+ * hour, which is not trade, it is surveillance. A settled week is enough to know
+ * the market and too old to chase.
+ *
+ * Weeks run Monday 00:00 UTC to Monday 00:00 UTC, so the figures change once,
+ * when Monday arrives, and hold still for the seven days after. UTC rather than
+ * anyone's local time because the realm spans time zones and the week has to
+ * turn over at the same instant for all of them, or two shops comparing notes
+ * would be reading different weeks.
+ */
+export function lastWeekWindow(now) {
+  const at = now instanceof Date ? now : new Date(now || Date.now());
+  const midnight = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  const DAY = 86400000;
+  // getUTCDay is 0 for Sunday; shift so Monday is 0 and the week ends on Sunday.
+  const sinceMonday = (at.getUTCDay() + 6) % 7;
+  const thisMonday = midnight - sinceMonday * DAY;
+  return {
+    from: new Date(thisMonday - 7 * DAY).toISOString(),
+    to: new Date(thisMonday).toISOString(),
+  };
+}
+
+export async function holdReport(env, hold, realmId, window) {
   const db = await getDb(env);
   const h = String(hold || '').trim();
   if (!h) return { hold: '', overview: { revenue: 0, orders: 0, itemsSold: 0, activeShops: 0 }, businesses: [], items: [] };
+
+  /**
+   * An optional time window, half-open: [from, to). Half-open is what makes a
+   * run of weeks cover every moment exactly once — a closed range would count
+   * midnight twice, in both the week that ended and the one that began.
+   *
+   * `w()` appends the clause and `wp()` the parameters, so each query below
+   * stays one statement instead of being assembled by string surgery. With no
+   * window both are empty and the query is exactly what it was.
+   */
+  const from = window && window.from;
+  const to = window && window.to;
+  const w = (col) => (from && to ? ` AND ${col} >= ? AND ${col} < ?` : '');
+  const wp = from && to ? [from, to] : [];
 
   // Sales rung up here, plus what shops bought FROM here — both are trade in
   // this region, and a Court judging its own economy needs both.
   const sold = await db.prepare(
     `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS itemsSold, COUNT(DISTINCT business) AS activeShops
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`).bind(realmId, h).first();
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?` + w('ts')).bind(realmId, h, ...wp).first();
   const supplied = await db.prepare(
     `SELECT COALESCE(SUM(num_items * price_per), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(num_items), 0) AS itemsSold
-       FROM intake WHERE realm_id = ? AND source_hold = ?`).bind(realmId, h).first();
+       FROM intake WHERE realm_id = ? AND source_hold = ?` + w('ts')).bind(realmId, h, ...wp).first();
   const overview = {
     revenue: (sold ? sold.revenue : 0) + (supplied ? supplied.revenue : 0),
     orders: (sold ? sold.orders : 0) + (supplied ? supplied.orders : 0),
@@ -542,14 +585,14 @@ export async function holdReport(env, hold, realmId) {
     ((await db.prepare(
       `SELECT business AS seller, COUNT(*) AS orders,
               COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
-         FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?
-        GROUP BY business`).bind(realmId, h).all()).results) || [],
+         FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?` + w('ts') + `
+        GROUP BY business`).bind(realmId, h, ...wp).all()).results) || [],
     ((await db.prepare(
       `SELECT from_business AS seller, COUNT(*) AS orders,
               COALESCE(SUM(num_items), 0) AS items,
               COALESCE(SUM(num_items * price_per), 0) AS revenue
-         FROM intake WHERE realm_id = ? AND source_hold = ? AND from_business != ''
-        GROUP BY from_business`).bind(realmId, h).all()).results) || []);
+         FROM intake WHERE realm_id = ? AND source_hold = ? AND from_business != ''` + w('ts') + `
+        GROUP BY from_business`).bind(realmId, h, ...wp).all()).results) || []);
 
   /**
    * The trade with nobody to credit.
@@ -564,8 +607,8 @@ export async function holdReport(env, hold, realmId) {
   const un = await db.prepare(
     `SELECT COUNT(*) AS orders, COALESCE(SUM(num_items), 0) AS items,
             COALESCE(SUM(num_items * price_per), 0) AS revenue
-       FROM intake WHERE realm_id = ? AND source_hold = ? AND COALESCE(from_business, '') = ''`)
-    .bind(realmId, h).first();
+       FROM intake WHERE realm_id = ? AND source_hold = ? AND COALESCE(from_business, '') = ''` + w('ts'))
+    .bind(realmId, h, ...wp).first();
   const unregistered = {
     orders: (un && un.orders) || 0,
     items: (un && un.items) || 0,
@@ -573,10 +616,10 @@ export async function holdReport(env, hold, realmId) {
   };
 
   const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`).bind(realmId, h).all()).results) || [];
+    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?` + w('ts')).bind(realmId, h, ...wp).all()).results) || [];
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?`)
-    .bind(realmId, h).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?` + w('ts'))
+    .bind(realmId, h, ...wp).all()).results) || [];
 
   return { hold: h, overview, businesses, unregistered,
     // Only items that actually SOLD here. An item sourced from the region but

@@ -23,7 +23,7 @@ import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
 import { getShopStyle, setShopStyle } from '../shop-style.js';
 import { readMotd, readWarnDays, activeNoticesForBusiness,
   listMotdsForBusiness, addMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
-import { holdReport, businessReport } from '../market.js';
+import { holdReport, businessReport, lastWeekWindow } from '../market.js';
 import { requireCourt, courtCompanies, courtShop } from '../oversight.js';
 import {
   SPEND_CATEGORIES, STANDINGS, readCourtSettings, writeCourtSettings,
@@ -405,6 +405,37 @@ async function holdReportRoute({ request, env }) {
 }
 
 /**
+ * A SHOP's view of its own region — the same report its Court reads, one week
+ * behind.
+ *
+ * Same data, deliberately lagged. A Court governs its region and needs it live;
+ * everyone else gets the week that has finished. A shop watching its
+ * neighbours' takings arrive in real time would be pricing against them by the
+ * hour, which is not knowing the market, it is watching the till. A settled
+ * week is enough to trade on and too old to chase.
+ *
+ * Owner-level, like the rest of the shop's own figures: this is what the person
+ * setting prices needs, not the person ringing them up. A Court's owner may read
+ * it too, and sees exactly what its neighbours see of the region — which is the
+ * fair arrangement for the one company that also holds the live view.
+ */
+async function weeklyRegionRoute({ request, env }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const meta = await findBusinessMeta(env, caller.business, realmId);
+  if (!meta.hold) {
+    // Nothing to report on rather than an empty report: the difference between
+    // "your region traded nothing" and "you have no region" matters.
+    return { hold: '', noRegion: true, week: lastWeekWindow(), overview: {}, businesses: [], items: [] };
+  }
+  const week = lastWeekWindow();
+  const report = await holdReport(env, meta.hold, realmId, week);
+  // The window travels with the figures so the page can say which week it is
+  // showing. A report that does not name its period is a report you cannot check.
+  return { ...report, week };
+}
+
+/**
  * Court oversight: the shops trading in this Court's region.
  *
  * A Court sees more of its neighbours than an ordinary shop does — rosters and
@@ -649,6 +680,7 @@ export const routes = [
   { method: 'GET', path: '/regions', handler: getHolds },
   { method: 'GET', path: '/tiles', handler: getTiles },
   { method: 'GET', path: '/market/region', handler: holdReportRoute },
+  { method: 'GET', path: '/market/week', handler: weeklyRegionRoute },
   { method: 'GET', path: '/court/companies', handler: courtCompaniesRoute },
   { method: 'GET', path: '/court/company', handler: courtShopRoute },
   { method: 'GET', path: '/court', handler: courtOverview },

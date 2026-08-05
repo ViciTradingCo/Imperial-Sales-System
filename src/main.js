@@ -36,6 +36,7 @@ import { renderMotdAdmin } from './views/motd-admin.js';
 import { renderAudit } from './views/audit.js';
 import { renderItemIndex } from './views/item-index.js';
 import { renderShopSettingsPage } from './views/ledger-settings.js';
+import { renderMarketInfo } from './views/market-info.js';
 import { startUpdateWatch } from './lib/update-check.js';
 
 const appEl = document.getElementById('app');
@@ -253,6 +254,15 @@ route('/employees', (container) => {
 route('/inventory', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
   renderInventory(container, { me: state.me });
+});
+
+// Last week's trade in this shop's own region. Owner-level, like Employees —
+// the Worker enforces it too; this only keeps the door from opening on a page
+// that would refuse.
+route('/market-info', (container) => {
+  const m = state.me;
+  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  renderMarketInfo(container, { me: m });
 });
 
 route('/pos', (container) => {
