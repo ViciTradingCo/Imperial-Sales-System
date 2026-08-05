@@ -19,6 +19,7 @@ import { getDb } from './db.js';
 import { parseSaleItems } from './sales.js';
 import { listItemIndex, matchMasterItem, normalizeItem } from './item-index.js';
 import { readSettings } from './settings.js';
+import { listBusinessCards } from './registry.js';
 
 function settingVal(settings, label, dflt) {
   const s = (settings || []).find((x) => x.label === label);
@@ -227,6 +228,41 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
   }).sort((a, b) => b.revenue - a.revenue);
 }
 
+/**
+ * Company Performance over the WHOLE ROSTER, not just the shops that sold
+ * something.
+ *
+ * Grouping sales by business answers "who traded", which silently omits the
+ * shops an admin most needs to see: the one that opened last week and has rung
+ * up nothing, the one that has gone quiet. A shop missing from the table is
+ * indistinguishable from a shop that does not exist, and absence is not a figure
+ * anyone can act on — a row of zeroes is.
+ *
+ * The union runs the other way too: a business that appears in sales but not in
+ * the roster (archived, or renamed since) keeps its line, because the trade
+ * still happened and hiding it would make the totals unexplainable.
+ *
+ * Ordered by revenue, then by name — so the earners rank, and the long tail of
+ * zeroes is at least alphabetical instead of arbitrary.
+ */
+function withRoster(roster, sold) {
+  const byName = new Map();
+  (roster || []).forEach((c) => {
+    if (c.business) byName.set(c.business, { business: c.business, orders: 0, items: 0, revenue: 0 });
+  });
+  (sold || []).forEach((r) => {
+    const name = String(r.business || '').trim();
+    if (!name) return;
+    const row = byName.get(name) || { business: name, orders: 0, items: 0, revenue: 0 };
+    row.orders += Number(r.orders) || 0;
+    row.items += Number(r.items) || 0;
+    row.revenue += Number(r.revenue) || 0;
+    byName.set(name, row);
+  });
+  return [...byName.values()].sort((a, b) =>
+    b.revenue - a.revenue || a.business.localeCompare(b.business));
+}
+
 /** Folds a region's sellers together, whichever side they sold from. */
 function mergeSellers(...groups) {
   const byShop = new Map();
@@ -272,16 +308,16 @@ export async function marketAnalysis(env, realmId) {
   // No network-totals block: Overview stopped showing headline tiles, and a
   // summary nothing renders is a query run on every load for nobody. The shop
   // and region reports keep their own overviews — those ARE displayed.
-  const businesses = ((await db.prepare(
-    `SELECT business,
-            COUNT(*) AS orders,
-            COALESCE(SUM(qty_total), 0) AS items,
-            COALESCE(SUM(total), 0) AS revenue
-       FROM sales
-      WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0
-      GROUP BY business
-      ORDER BY revenue DESC
-      LIMIT 200`).bind(realmId).all()).results) || [];
+  const businesses = withRoster(
+    await listBusinessCards(env, realmId),
+    ((await db.prepare(
+      `SELECT business,
+              COUNT(*) AS orders,
+              COALESCE(SUM(qty_total), 0) AS items,
+              COALESCE(SUM(total), 0) AS revenue
+         FROM sales
+        WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0
+        GROUP BY business`).bind(realmId).all()).results) || []);
 
   /**
    * A region's trade is everything that changed hands THERE — sales rung up in

@@ -103,8 +103,12 @@ function valueCell(i) {
  */
 function overview(d) {
   return [
+    // Only shops that have actually traded. Company Performance lists the whole
+    // roster, zeroes included, because an admin needs to see who has gone quiet
+    // — but a "Top 5" is a ranking, and padding a ranking with nothing ranks
+    // nothing.
     tableCard('Top 5 companies', COMPANY_COLS.headers(),
-      (d.businesses || []).slice(0, 5).map(COMPANY_COLS.row),
+      (d.businesses || []).filter((b) => b.revenue > 0).slice(0, 5).map(COMPANY_COLS.row),
       'No sales recorded yet.'),
     tableCard('Top 5 ' + regionWord() + 's', REGION_COLS.headers(),
       (d.holds || []).slice(0, 5).map(REGION_COLS.row),
@@ -226,10 +230,15 @@ function regionPerformance(holds) {
 }
 
 /* ---- Company Performance ---- */
+/**
+ * Every registered company, whether or not it has sold anything. A shop with a
+ * row of zeroes is a shop that has not traded; a shop missing from the table
+ * looks like a shop that does not exist, and only one of those is actionable.
+ */
 function companyPerformance(businesses) {
   return tableCard('Company Performance', COMPANY_COLS.headers(),
     businesses.map(COMPANY_COLS.row),
-    'No sales recorded yet.');
+    'No companies registered yet.');
 }
 
 /* ---- shared bits ---- */

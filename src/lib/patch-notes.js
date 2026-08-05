@@ -4,6 +4,7 @@
  */
 const PATCH_NOTES = [
   { version: '1.8', date: '2026-08-05', notes: [
+    'Market Analysis → Company Performance now lists every registered company, including the ones that have not sold anything. A shop missing from the table looked the same as a shop that did not exist; a row of zeroes is something an admin can act on.',
     'The app now tells you when a new version has been released, with a Refresh button. A tab left open used to go on running whatever it loaded, for days.',
     'Inventory: stock can be corrected by hand. Count the shelf, enter what is actually there. It moves no money and records no purchase — for goods you really bought, record an intake so the coffer matches.',
     'Intake: Vendor and "bought from a registered company" are one field. Type a name; shops on this network appear as you type. Pick one and it is credited for the supply and fills in its region; type anything else and it is recorded as written.',

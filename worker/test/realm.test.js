@@ -171,13 +171,20 @@ describe('operational data is realm-scoped', () => {
     expect((await listInventory(env, SHOP, A))[0].stock).toBe(8);
     expect((await listInventory(env, SHOP, REALM_B))[0].stock).toBe(10);
 
-    // A's sale must not appear in B's market, from any angle. B's item list is
-    // empty too — its intake is real, but its item INDEX is empty, and the
-    // market only reports indexed items. That is the same rule that keeps
-    // off-index names out of A's numbers.
+    // A's sale must not appear in B's market, from any angle. B lists its own
+    // registered shop — Company Performance covers the whole roster, so a shop
+    // that has sold nothing is a row of zeroes rather than an absence — but the
+    // figures on it are B's, which is to say none.
+    //
+    // B's item list is empty: its intake is real, but its item INDEX is empty,
+    // and the market only reports indexed items. That is the same rule that
+    // keeps off-index names out of A's numbers.
     const market = await marketAnalysis(env, REALM_B);
-    expect(market.businesses).toEqual([]);
+    expect(market.businesses).toEqual([{ business: SHOP, orders: 0, items: 0, revenue: 0 }]);
     expect(market.items).toEqual([]);
+    // …and A's shop, which did sell, reports only A's sale.
+    expect((await marketAnalysis(env, A)).businesses)
+      .toEqual([{ business: SHOP, orders: 1, items: 2, revenue: 20 }]);
   });
 
   it('keeps the item index, holds, and network settings separate', async () => {

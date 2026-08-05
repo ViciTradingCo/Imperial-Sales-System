@@ -319,3 +319,70 @@ describe('scope', () => {
     expect(i.valueSamples).toBe(1);
   });
 });
+
+/**
+ * Company Performance covers the whole roster.
+ *
+ * Grouping sales by business answers "who traded", which leaves out the shops
+ * an admin most needs to find: the one that opened last week and has sold
+ * nothing, the one that has gone quiet. A missing row and a nonexistent shop
+ * look identical; a row of zeroes does not.
+ */
+describe('company performance', () => {
+  const register = (name, hold) => env.DB.prepare(
+    `INSERT INTO companies (id, realm_id, business, hold, status) VALUES (?, ?, ?, ?, 'ACTIVE')`)
+    .bind('co-' + name.toLowerCase().replace(/\W/g, ''), R, name, hold || '').run();
+
+  it('lists a registered company that has never sold anything', async () => {
+    await register('Alpha');
+    await register('Quiet Forge');
+    await sale([{ name: 'Iron Sword', qty: 2, price: 25 }]);   // Alpha only
+    const rows = (await marketAnalysis(env, R)).businesses;
+    expect(rows.map((b) => b.business)).toEqual(['Alpha', 'Quiet Forge']);
+    expect(rows[1]).toEqual({ business: 'Quiet Forge', orders: 0, items: 0, revenue: 0 });
+  });
+
+  it('ranks by revenue, then alphabetically among the silent', async () => {
+    await register('Zebra Goods');
+    await register('Alpha');
+    await register('Middle Rest');
+    await sale([{ name: 'Iron Sword', qty: 2, price: 25 }]);
+    const rows = (await marketAnalysis(env, R)).businesses;
+    expect(rows.map((b) => b.business)).toEqual(['Alpha', 'Middle Rest', 'Zebra Goods']);
+  });
+
+  it('keeps a business that traded but is no longer on the roster', async () => {
+    // Archived or renamed since: the trade still happened, and dropping it
+    // would leave the realm's totals unexplainable.
+    await sale([{ name: 'Iron Sword', qty: 2, price: 25 }]);
+    const rows = (await marketAnalysis(env, R)).businesses;
+    expect(rows.map((b) => b.business)).toEqual(['Alpha']);
+    expect(rows[0].revenue).toBe(50);
+  });
+
+  it('leaves out another realm\'s companies', async () => {
+    await register('Alpha');
+    await env.DB.prepare(
+      `INSERT INTO companies (id, realm_id, business, hold, status) VALUES ('co-other', ?, 'Other Realm Shop', '', 'ACTIVE')`)
+      .bind('rlm-market-b').run();
+    const rows = (await marketAnalysis(env, R)).businesses;
+    expect(rows.map((b) => b.business)).toEqual(['Alpha']);
+  });
+
+  it('leaves out an archived company', async () => {
+    await register('Alpha');
+    await env.DB.prepare(
+      `INSERT INTO companies (id, realm_id, business, hold, status) VALUES ('co-gone', ?, 'Shuttered', '', 'ARCHIVED')`)
+      .bind(R).run();
+    const rows = (await marketAnalysis(env, R)).businesses;
+    expect(rows.map((b) => b.business)).toEqual(['Alpha']);
+  });
+
+  it('counts neither voided sales nor employee purchases toward a shop', async () => {
+    await register('Alpha');
+    await sale([{ name: 'Iron Sword', qty: 2, price: 25 }], 'VOIDED');
+    await staffSale([{ name: 'Iron Sword', qty: 3, price: 25 }]);
+    const rows = (await marketAnalysis(env, R)).businesses;
+    expect(rows).toEqual([{ business: 'Alpha', orders: 0, items: 0, revenue: 0 }]);
+  });
+});
