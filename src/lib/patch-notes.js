@@ -4,6 +4,8 @@
  */
 const PATCH_NOTES = [
   { version: '1.9', date: '2026-08-07', notes: [
+    'The buttons on a shop\'s Home page now open real pages instead of pop-up windows. The side menu and the shop-tools bar stay visible, Back works, and the address bar points at what you are actually looking at — so you can bookmark it or return to it.',
+    'Restock and Shop Ledger got pages of their own to make that work. The restock nudge on the banner still opens as a window, since there you are mid-task and want to dismiss it.',
     'New Sales Log page, beside Register and Inventory: past sales and past deliveries in one place, each with the correction it allows — void an order, delete a delivery. Order Lookup has moved off the bottom of the register, and the delivery history off the bottom of Inventory.',
     'Home has buttons for Sales Log and, for shop owners, Market Info — so the things you consult are on the front page rather than at the foot of the things you use.',
   ] },

@@ -1,17 +1,24 @@
 /**
- * Low / out-of-stock report — a focal window (modal) an owner opens from the
- * restock nudge on Home. Lists items that are out of stock and items at or below
- * their Low Stock threshold, worst first.
+ * Low / out-of-stock report — items that are out, and items at or below their
+ * own Low Stock threshold, worst first.
+ *
+ * It appears in two places, and the difference is deliberate. As a PAGE, from
+ * the Restock button on Home: you went looking for it, so it gets a URL you can
+ * come back to. As a MODAL, from the restock nudge on the banner: you were in
+ * the middle of something else and the app interrupted, so it must be dismissable
+ * without losing where you were.
+ *
+ * Both render the same body, from one function — two copies of a report is how
+ * one of them ends up a version behind.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
+import { setOpsActions } from '../lib/sections.js';
 import { money } from '../lib/format.js';
 
-export function openLowStockModal() {
-  const host = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
-  const modal = openModal([el('h3', {}, 'Restock report'), host]);
-
+/** Fills `host` with the report. Shared by the page and the modal. */
+function fillReport(host) {
   api.getLowStock().then((r) => {
     const out = r.out || [], low = r.low || [];
     if (!out.length && !low.length) {
@@ -38,5 +45,24 @@ export function openLowStockModal() {
       el('span', { class: isOut ? 'pill danger' : 'pill warn' }, isOut ? 'OUT' : 'LOW'),
     ]);
   }
-  return modal;
+}
+
+/** The Restock page, reached from Home. */
+export function renderLowStock(container, { me }) {
+  setOpsActions(me); // keeps the shop-tools bar, like every other shop page
+  const host = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
+  mount(container, el('div.card', {}, [
+    el('h2', {}, 'Restock'),
+    el('p', { class: 'note' }, 'What has run out, and what is close to it. "Low" means at or below an ' +
+      'item’s own Low Stock number, which you set when editing the item.'),
+    host,
+  ]));
+  fillReport(host);
+}
+
+/** The same report as a focal window, for the nudge on the banner. */
+export function openLowStockModal() {
+  const host = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
+  openModal([el('h3', {}, 'Restock report'), host]);
+  fillReport(host);
 }

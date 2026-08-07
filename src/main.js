@@ -20,7 +20,7 @@ import { setCurrency, setRegion } from './lib/format.js';
 import { setSessionUser } from './lib/sections.js';
 import { renderLanding } from './views/landing.js';
 import { renderHome } from './views/home.js';
-import { openLowStockModal } from './views/low-stock.js';
+import { openLowStockModal, renderLowStock } from './views/low-stock.js';
 import { renderStorefront } from './views/storefront.js';
 import { renderRegister } from './views/register.js';
 import { renderProfile } from './views/profile.js';
@@ -35,7 +35,7 @@ import { renderMarket } from './views/market.js';
 import { renderMotdAdmin } from './views/motd-admin.js';
 import { renderAudit } from './views/audit.js';
 import { renderItemIndex } from './views/item-index.js';
-import { renderShopSettingsPage } from './views/ledger-settings.js';
+import { renderLedgerSettings, renderShopSettingsPage } from './views/ledger-settings.js';
 import { renderMarketInfo } from './views/market-info.js';
 import { renderSalesLog } from './views/sales-log.js';
 import { startUpdateWatch } from './lib/update-check.js';
@@ -271,6 +271,22 @@ route('/market-info', (container) => {
 route('/sales-log', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
   renderSalesLog(container, { me: state.me });
+});
+
+// The Shop Ledger — performance, notices, coffers. Distinct from Shop Settings
+// at /ledger/settings, which is where the things you CHANGE live.
+route('/ledger', (container) => {
+  const m = state.me;
+  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  renderLedgerSettings(container, { me: m });
+});
+
+// The restock report as a page. The same report opens as a modal from the
+// banner nudge, where you are mid-task and need to dismiss it.
+route('/restock', (container) => {
+  const m = state.me;
+  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  renderLowStock(container, { me: m });
 });
 
 route('/pos', (container) => {

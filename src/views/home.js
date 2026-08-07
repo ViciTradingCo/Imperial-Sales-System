@@ -15,15 +15,9 @@
 import { regionWord, regionsOn } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { tileGrid, openFocalMenu } from '../lib/tiles.js';
+import { navigate } from '../lib/router.js';
+import { tileGrid } from '../lib/tiles.js';
 import { setAdminActions, subscriptionCard, recentErrorsPanel } from '../lib/sections.js';
-import { renderPos } from './pos.js';
-import { renderInventory } from './inventory.js';
-import { renderEmployees } from './employees.js';
-import { renderLedgerSettings } from './ledger-settings.js';
-import { openLowStockModal } from './low-stock.js';
-import { renderSalesLog } from './sales-log.js';
-import { renderMarketInfo } from './market-info.js';
 import { skeletonLines } from '../lib/skeleton.js';
 
 export function renderHome(container, { me }) {
@@ -66,31 +60,36 @@ export function renderHome(container, { me }) {
   drawTiles();
   api.getTiles().then((r) => { tileImages = r.images || {}; drawTiles(); }).catch(() => { /* glyphs are fine */ });
 
-  function open(title, render) {
-    openFocalMenu(title, (host) => render(host));
-  }
-
+  /**
+   * Home's tiles NAVIGATE; they do not open focal menus.
+   *
+   * Every one of these has a page of its own, reachable from the shop-tools bar
+   * as well. Opening the same view in a modal gave it two lives: the bar and the
+   * side menu vanished behind the overlay, the browser's Back button closed
+   * nothing, and the address bar still said Home — so there was no way to link
+   * to what you were looking at, or return to it. A tile is a shortcut to a
+   * page, and now it behaves like one.
+   */
   function drawTiles() {
+    const go = (path) => () => navigate(path);
     const tiles = [
-      { key: 'register', label: 'Register', hint: 'Ring up a sale', glyph: '🪙',
-        onOpen: () => open('Register', (h) => renderPos(h, { me })) },
-      { key: 'inventory', label: 'Inventory', hint: 'Stock & intake', glyph: '📦',
-        onOpen: () => open('Inventory', (h) => renderInventory(h, { me })) },
+      { key: 'register', label: 'Register', hint: 'Ring up a sale', glyph: '🪙', onOpen: go('/pos') },
+      { key: 'inventory', label: 'Inventory', hint: 'Stock & intake', glyph: '📦', onOpen: go('/inventory') },
       me.role === 'owner' ? { key: 'employees', label: 'Employees', hint: 'Your roster', glyph: '🧑‍🤝‍🧑',
-        onOpen: () => open('Employees', (h) => renderEmployees(h, { me })) } : null,
+        onOpen: go('/employees') } : null,
       me.role === 'owner' ? { key: 'ledger', label: 'Shop Ledger', hint: 'Performance, notices, coffers', glyph: '📖',
-        onOpen: () => open('Shop Ledger', (h) => renderLedgerSettings(h, { me })) } : null,
+        onOpen: go('/ledger') } : null,
       { key: 'saleslog', label: 'Sales Log', hint: 'Past sales & deliveries', glyph: '🧾',
-        onOpen: () => open('Sales Log', (h) => renderSalesLog(h, { me })) },
+        onOpen: go('/sales-log') },
       me.role === 'owner' ? { key: 'restock', label: 'Restock', hint: 'Low & out of stock', glyph: '🔔',
-        onOpen: () => openLowStockModal() } : null,
+        onOpen: go('/restock') } : null,
       // Last week's trade in this shop's own region. Owner-level — it is what
       // the person setting prices needs, not the person ringing them up — and
       // hidden in realms that do not divide trade by region, where the page
       // would have nothing to report on.
       me.role === 'owner' && regionsOn()
         ? { key: 'marketinfo', label: 'Market Info', hint: 'Your ' + regionWord() + '’s market, last week', glyph: '📈',
-            onOpen: () => open('Market Info', (h) => renderMarketInfo(h, { me })) }
+            onOpen: go('/market-info') }
         : null,
     ];
     mount(gridHost, tileGrid(tiles.filter(Boolean), tileImages));
