@@ -12,6 +12,7 @@
  * Tile artwork is assigned by an admin (Network Settings → Tile Images) as image
  * URLs; tiles fall back to a glyph when no image is set.
  */
+import { regionWord, regionsOn } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { tileGrid, openFocalMenu } from '../lib/tiles.js';
@@ -21,6 +22,8 @@ import { renderInventory } from './inventory.js';
 import { renderEmployees } from './employees.js';
 import { renderLedgerSettings } from './ledger-settings.js';
 import { openLowStockModal } from './low-stock.js';
+import { renderSalesLog } from './sales-log.js';
+import { renderMarketInfo } from './market-info.js';
 import { skeletonLines } from '../lib/skeleton.js';
 
 export function renderHome(container, { me }) {
@@ -77,8 +80,18 @@ export function renderHome(container, { me }) {
         onOpen: () => open('Employees', (h) => renderEmployees(h, { me })) } : null,
       me.role === 'owner' ? { key: 'ledger', label: 'Shop Ledger', hint: 'Performance, notices, coffers', glyph: '📖',
         onOpen: () => open('Shop Ledger', (h) => renderLedgerSettings(h, { me })) } : null,
+      { key: 'saleslog', label: 'Sales Log', hint: 'Past sales & deliveries', glyph: '🧾',
+        onOpen: () => open('Sales Log', (h) => renderSalesLog(h, { me })) },
       me.role === 'owner' ? { key: 'restock', label: 'Restock', hint: 'Low & out of stock', glyph: '🔔',
         onOpen: () => openLowStockModal() } : null,
+      // Last week's trade in this shop's own region. Owner-level — it is what
+      // the person setting prices needs, not the person ringing them up — and
+      // hidden in realms that do not divide trade by region, where the page
+      // would have nothing to report on.
+      me.role === 'owner' && regionsOn()
+        ? { key: 'marketinfo', label: 'Market Info', hint: 'Your ' + regionWord() + '’s market, last week', glyph: '📈',
+            onOpen: () => open('Market Info', (h) => renderMarketInfo(h, { me })) }
+        : null,
     ];
     mount(gridHost, tileGrid(tiles.filter(Boolean), tileImages));
   }

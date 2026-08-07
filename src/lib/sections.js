@@ -7,7 +7,7 @@
  * buttons PERSIST as you move between sibling sub-pages, and the current page's
  * button is marked active.
  */
-import { regionLabel, regionsOn } from './format.js';
+import { regionLabel } from './format.js';
 import { el, mount, esc } from './dom.js';
 import { navigate, currentPath } from './router.js';
 import { setActions } from './actions.js';
@@ -26,15 +26,14 @@ export function setOpsActions(me) {
     { label: 'Register', path: '/pos', onClick: () => navigate('/pos') },
     { label: 'Inventory', path: '/inventory', onClick: () => navigate('/inventory') },
   ];
+  // What has already happened — past sales and past deliveries. Open to
+  // everyone who works the till, as order lookup was on the register. The two
+  // corrections keep the guards they already had: voiding a sale is any active
+  // member (the person who mis-rang it is usually the one who notices), while
+  // deleting a delivery is owner-only, since it rewrites the coffer.
+  items.push({ label: 'Sales Log', path: '/sales-log', onClick: () => navigate('/sales-log') });
   if (me.role === 'owner' || me.role === 'admin') {
     items.push({ label: 'Employees', path: '/employees', onClick: () => navigate('/employees') });
-    // Last week's trade in this shop's own region. Owner-level: it is what the
-    // person setting prices needs, not the person ringing them up. Omitted when
-    // the realm does not divide trade by region — the page would have nothing
-    // to report on.
-    if (regionsOn()) {
-      items.push({ label: 'Market Info', path: '/market-info', onClick: () => navigate('/market-info') });
-    }
   }
   setActions(mark(items));
 }

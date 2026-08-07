@@ -138,6 +138,30 @@ function orphanExports(files, universe) {
   }
 }
 
+/**
+ * Functions declared and never called, inside their own file.
+ *
+ * The export check cannot see these — they were never exported — but they are
+ * the same dead weight, and they appear for the same reason: the caller moved
+ * to another module and the helper it used got left behind.
+ */
+function unusedLocals(files) {
+  for (const file of files) {
+    const text = read(file);
+    const body = code(text);
+    for (const m of text.matchAll(/^(?:\s*)(?:async\s+)?function\s+(\w+)/gm)) {
+      const name = m[1];
+      if (/^export/.test(text.slice(Math.max(0, m.index - 7), m.index + 7))) continue;
+      const uses = (body.match(new RegExp(`\\b${name}\\b`, 'g')) || []).length;
+      // One hit is the declaration itself.
+      if (uses <= 1) {
+        add('dead', rel(file), `declares \`${name}()\`, which nothing calls`,
+          'Delete it. A helper whose caller moved away is the usual cause, and it will not be missed.');
+      }
+    }
+  }
+}
+
 /** Frontend calls into the API client that the client does not define. */
 function apiClientDrift() {
   const clientPath = join(SRC, 'lib', 'api.js');
@@ -354,6 +378,7 @@ const universe = [...all, ...jsFiles(TESTS)];
 unusedImports(all);
 orphanExports(front, [...front, ...jsFiles(join(ROOT, 'scripts'))]);
 orphanExports(back, universe);
+unusedLocals(all);
 apiClientDrift();
 unusedCss();
 unusedDeps();

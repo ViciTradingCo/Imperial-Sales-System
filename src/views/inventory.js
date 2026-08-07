@@ -42,16 +42,6 @@ export function renderInventory(container, { me }) {
   firstCard.push(listHost);
   const nodes = [el('div.card', {}, firstCard)];
 
-  let intakeHost = null;
-  if (canEdit) {
-    intakeHost = el('div', {}, '');
-    nodes.push(el('div.card', {}, [
-      el('h3', {}, 'History'),
-      el('p', { class: 'note' }, 'Deliveries you have recorded, newest first.'),
-      intakeHost,
-    ]));
-  }
-
   mount(container, ...nodes);
 
   function renderList(items) {
@@ -91,64 +81,20 @@ export function renderInventory(container, { me }) {
     mount(listHost, ...rows);
   }
 
-  function renderIntake(list) {
-    if (!intakeHost) return;
-    if (!list.length) { mount(intakeHost, emptyState({ glyph: '🚚', title: 'No intake recorded yet', hint: 'Purchases you record will be listed here.' })); return; }
-    mount(intakeHost, ...list.map((r) => {
-      const row = el('div.emp-row', {}, [
-        el('span', { html:
-          '<b>' + esc(r.item) + '</b> ×' + r.numItems + ' @ ' + money(r.pricePer) +
-          (r.hold ? ' · ' + esc(r.hold) : '') +
-          (r.fromBusiness ? ' · <b>' + esc(r.fromBusiness) + '</b>' : (r.vendor ? ' · ' + esc(r.vendor) : '')) +
-          ' <span class="note">' + esc(shortDate(r.ts)) + '</span>' }),
-      ]);
-      // The way to undo a mistyped delivery — sales have a void, intake had
-      // nothing, so a wrong quantity used to be permanent.
-      if (canEdit) {
-        row.appendChild(el('span', { class: 'row-actions' }, [
-          el('button.danger.small', { onclick: () => removeIntake(r) }, 'Delete'),
-        ]));
-      }
-      return row;
-    }));
-  }
-
-  async function removeIntake(r) {
-    if (!window.confirm('Delete this intake?\n\n' + r.item + ' ×' + r.numItems + ' @ ' + money(r.pricePer) +
-      '\n\nThe stock it added comes back out and your coffer is refunded ' + money(r.numItems * r.pricePer) +
-      '. The item stays listed in your inventory either way.')) return;
-    try {
-      const res = await api.deleteIntake(r.id);
-      renderList(res.inventory || []);
-      renderIntake(res.intake || []);
-      toast(res.shortBy
-        ? 'Removed. Only ' + res.removed + ' could come back out — ' + res.shortBy + ' had already sold on.'
-        : 'Intake removed and ' + money(res.refunded) + ' refunded.', res.shortBy ? 'warn' : 'ok');
-    } catch (e) { toast(e.message || String(e), 'error'); }
-  }
-
   async function refreshInventory() {
     try { renderList((await api.getInventory()).inventory || []); }
     catch (e) { mount(listHost, el('p', { class: 'error' }, e.message || String(e))); }
   }
-  async function refreshIntake() {
-    if (!intakeHost) return;
-    try { renderIntake((await api.getIntake()).intake || []); }
-    catch (e) { mount(intakeHost, el('p', { class: 'error' }, e.message || String(e))); }
-  }
-  async function refreshAll() { await refreshInventory(); await refreshIntake(); }
+  // Recording intake changes stock, so the list redraws; the delivery itself is
+  // listed on the Sales Log, which is where records live now.
+  async function refreshAll() { await refreshInventory(); }
 
   refreshInventory();
-  refreshIntake();
 }
 
 function statusTag(s) {
   const cls = s === 'Out of Stock' ? 'bad' : s === 'Low' ? 'warn' : 'ok';
   return '<span class="' + cls + '">' + esc(s) + '</span>';
-}
-function shortDate(ts) {
-  const d = new Date(ts);
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
 }
 
 /** Focus modal to edit an existing item's sale price + low-stock threshold. */

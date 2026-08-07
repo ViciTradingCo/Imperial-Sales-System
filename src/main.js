@@ -37,6 +37,7 @@ import { renderAudit } from './views/audit.js';
 import { renderItemIndex } from './views/item-index.js';
 import { renderShopSettingsPage } from './views/ledger-settings.js';
 import { renderMarketInfo } from './views/market-info.js';
+import { renderSalesLog } from './views/sales-log.js';
 import { startUpdateWatch } from './lib/update-check.js';
 
 const appEl = document.getElementById('app');
@@ -263,6 +264,13 @@ route('/market-info', (container) => {
   const m = state.me;
   if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
   renderMarketInfo(container, { me: m });
+});
+
+// Past sales and past deliveries. Anyone who works the till may look one up;
+// undoing one is owner-only, enforced per action rather than at the door.
+route('/sales-log', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  renderSalesLog(container, { me: state.me });
 });
 
 route('/pos', (container) => {

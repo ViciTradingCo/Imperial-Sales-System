@@ -3,6 +3,10 @@
  * entry at the top as features ship.
  */
 const PATCH_NOTES = [
+  { version: '1.9', date: '2026-08-07', notes: [
+    'New Sales Log page, beside Register and Inventory: past sales and past deliveries in one place, each with the correction it allows — void an order, delete a delivery. Order Lookup has moved off the bottom of the register, and the delivery history off the bottom of Inventory.',
+    'Home has buttons for Sales Log and, for shop owners, Market Info — so the things you consult are on the front page rather than at the foot of the things you use.',
+  ] },
   { version: '1.8', date: '2026-08-05', notes: [
     'Shop owners have a new Market Info button beside Register and Inventory: what things are WORTH in your region, over the week just gone. It is the same Item Performance view an admin reads realm-wide — the top five items, each with its own graph, and a search for the rest — narrowed to your region and to the settled week.',
     'Everything that happens weekly now happens at the same moment: the market figures roll and the backup reminder arrives together, when the new week begins (Monday). The reminder used to fire on Sunday, a day before the figures it was about had settled.',

@@ -8,7 +8,6 @@
 import { currency, money } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { openModal } from '../lib/modal.js';
 import { setOpsActions } from '../lib/sections.js';
 import { newIdem } from '../lib/id.js';
 import { enqueueSale, flushSales, queuedCount, isNetworkError } from '../lib/offline-queue.js';
@@ -278,7 +277,6 @@ export function renderPos(container, { me }) {
       }
     }
 
-    const lookupBtn = el('button.secondary-btn', { onclick: () => openLookupModal() }, 'Open Order Lookup');
 
     mount(body,
       el('div.card', {}, [
@@ -305,74 +303,8 @@ export function renderPos(container, { me }) {
         complete,
         status,
       ]),
-      // Order Lookup is its own card at the bottom.
-      el('div.card', {}, [
-        el('h3', {}, 'Order Lookup'),
-        el('p', { class: 'note' }, 'Find a past sale by order number, customer, or employee — or void one.'),
-        lookupBtn,
-      ]),
     );
     renderCart();
   }
 }
 
-/** Order lookup + void, in a focus modal. */
-function openLookupModal() {
-  const q = el('input', { type: 'text', placeholder: 'Order #, customer, or employee' });
-  const results = el('div', {}, el('p', { class: 'note' }, 'Loading recent sales…'));
-  const search = el('button.secondary-btn', { onclick: run }, 'Search');
-
-  async function run() {
-    mount(results, el('p', { class: 'note' }, 'Searching…'));
-    try {
-      const res = await api.getSales(q.value.trim());
-      renderResults(res.sales || []);
-    } catch (e) {
-      mount(results, el('p', { class: 'error' }, e.message || String(e)));
-    }
-  }
-
-  function renderResults(sales) {
-    if (!sales.length) { mount(results, el('p', { class: 'note' }, 'No matching orders.')); return; }
-    mount(results, ...sales.map((s) => {
-      const voided = String(s.status).toUpperCase() === 'VOIDED';
-      const card = el('div', { class: 'lookup-card' }, [
-        el('p', { html:
-          '<b>' + esc(s.orderNo) + '</b>' + (voided ? ' <span class="bad">VOIDED</span>' : '') +
-          (s.staffPurchase ? ' <span class="role-pill">Employee purchase</span>' : '') + '<br>' +
-          (s.staffPurchase ? 'No charge' : money(s.total)) + ' · ' + esc(s.customer || 'Walk-in') + ' · ' + esc(s.hold || '') + '<br>' +
-          '<span class="note">' + esc(saleLines(s)) + '</span><br>' +
-          '<span class="note">by ' + esc(s.employee || '') + (s.discount ? ' · ' + esc(s.discount) : '') + '</span>' }),
-      ]);
-      if (!voided) {
-        card.appendChild(el('button.secondary-btn.small', {
-          onclick: async () => {
-            if (!confirm('Void ' + s.orderNo + '? This returns the items to stock.')) return;
-            try { await api.voidSale(s.orderNo); run(); }
-            catch (e) { alert(e.message || e); }
-          },
-        }, 'Void this sale'));
-      }
-      return card;
-    }));
-  }
-
-  openModal([
-    el('h3', {}, 'Order Lookup'),
-    el('p', { class: 'note' }, 'Search by order number, customer, or employee — or leave blank for the latest sales.'),
-    q, search, results,
-  ]);
-  run();
-}
-
-/**
- * A sale's lines, rendered in THIS realm's denomination. The server sends the
- * numbers; the unit is applied here, so renaming the money re-renders history
- * rather than invalidating it. Falls back to the stored text for any row too
- * old or too damaged to parse.
- */
-function saleLines(s) {
-  const lines = (s && s.lines) || [];
-  if (!lines.length) return String((s && s.items) || '');
-  return lines.map((l) => l.name + ' x' + l.qty + ' @ ' + money(l.price)).join(', ');
-}
