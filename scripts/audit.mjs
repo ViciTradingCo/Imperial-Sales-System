@@ -206,6 +206,37 @@ function unusedCss() {
   }
 }
 
+/**
+ * Translations for text the app no longer renders.
+ *
+ * i18n here matches rendered text against an English→target dictionary, so a key
+ * whose English never appears in the source translates nothing — it just ships,
+ * in every bundle, in five languages. They accumulate silently whenever a button
+ * is renamed or a screen retired, because nothing ever fails.
+ *
+ * It under-reports rather than over-reports: a phrase mentioned anywhere in the
+ * source counts as live, including in patch-note prose describing the screen
+ * that was removed. That is the safe direction — a missed row costs bytes, a
+ * wrongly-deleted one costs a translation.
+ */
+function staleTranslations() {
+  const path = join(SRC, 'lib', 'i18n.js');
+  if (!existsSync(path)) return;
+  const dict = read(path);
+  const body = dict.slice(dict.indexOf('const T = {'));
+  const source = jsFiles(SRC).filter((f) => f !== path).map(read).join('\n');
+  const stale = [];
+  for (const m of body.matchAll(/^\s*'((?:[^'\\]|\\.)*)':\s*\{/gm)) {
+    const phrase = m[1].replace(/\\'/g, "'");
+    // The dictionary quotes with ', the source may use either.
+    if (!source.includes(phrase)) stale.push(phrase);
+  }
+  if (stale.length) {
+    add('left', rel(path), `${stale.length} translation(s) for text nothing renders: ${stale.slice(0, 8).map((p) => `"${p}"`).join(', ')}${stale.length > 8 ? ', …' : ''}`,
+      'Delete the rows. Check first that the phrase is not assembled at runtime — this only sees whole literals.');
+  }
+}
+
 /** Dependencies declared but never imported. */
 function unusedDeps() {
   for (const dir of [ROOT, join(ROOT, 'worker')]) {
@@ -381,6 +412,7 @@ orphanExports(back, universe);
 unusedLocals(all);
 apiClientDrift();
 unusedCss();
+staleTranslations();
 unusedDeps();
 repeatedLiterals(all);
 bigFiles(all);

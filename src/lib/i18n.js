@@ -69,14 +69,12 @@ const T = {
   'Complete sale': { es: 'Completar venta', fr: 'Finaliser la vente', de: 'Verkauf abschließen', it: 'Completa vendita' },
   'Record Intake': { es: 'Registrar entrada', fr: 'Enregistrer un achat', de: 'Wareneingang', it: 'Registra carico' },
   'Record intake': { es: 'Registrar entrada', fr: 'Enregistrer un achat', de: 'Wareneingang', it: 'Registra carico' },
-  'Open Order Lookup': { es: 'Buscar pedido', fr: 'Rechercher une commande', de: 'Bestellung suchen', it: 'Cerca ordine' },
   'Void this sale': { es: 'Anular esta venta', fr: 'Annuler cette vente', de: 'Verkauf stornieren', it: 'Annulla vendita' },
 
   // Headings
   'Appearance': { es: 'Apariencia', fr: 'Apparence', de: 'Darstellung', it: 'Aspetto' },
   'Language': { es: 'Idioma', fr: 'Langue', de: 'Sprache', it: 'Lingua' },
   'Order': { es: 'Pedido', fr: 'Commande', de: 'Bestellung', it: 'Ordine' },
-  'Order Lookup': { es: 'Buscar pedido', fr: 'Recherche de commande', de: 'Bestellsuche', it: 'Ricerca ordine' },
   'Customer Details': { es: 'Datos del cliente', fr: 'Détails du client', de: 'Kundendaten', it: 'Dati cliente' },
   'Recent intake': { es: 'Entradas recientes', fr: 'Achats récents', de: 'Letzte Eingänge', it: 'Carichi recenti' },
   'Credits': { es: 'Créditos', fr: 'Crédits', de: 'Mitwirkende', it: 'Crediti' },
@@ -100,7 +98,6 @@ const T = {
   'Quantity': { es: 'Cantidad', fr: 'Quantité', de: 'Menge', it: 'Quantità' },
   'Item': { es: 'Artículo', fr: 'Article', de: 'Artikel', it: 'Articolo' },
   'Vendor': { es: 'Proveedor', fr: 'Fournisseur', de: 'Lieferant', it: 'Fornitore' },
-  'Your role': { es: 'Tu rol', fr: 'Votre rôle', de: 'Deine Rolle', it: 'Il tuo ruolo' },
   'Sale price': { es: 'Precio de venta', fr: 'Prix de vente', de: 'Verkaufspreis', it: 'Prezzo di vendita' },
 
   // Statuses / words
@@ -110,10 +107,9 @@ const T = {
   'admin': { es: 'administrador', fr: 'administrateur', de: 'Administrator', it: 'amministratore' },
   'owner': { es: 'propietario', fr: 'propriétaire', de: 'Inhaber', it: 'proprietario' },
   'employee': { es: 'empleado', fr: 'employé', de: 'Mitarbeiter', it: 'dipendente' },
-  'Administrator': { es: 'Administrador', fr: 'Administrateur', de: 'Administrator', it: 'Amministratore' },
   'Shop Owner': { es: 'Propietario', fr: 'Propriétaire', de: 'Ladeninhaber', it: 'Proprietario' },
   'Employee': { es: 'Empleado', fr: 'Employé', de: 'Mitarbeiter', it: 'Dipendente' },
-  'Cart is empty.': { es: 'El carrito está vacío.', fr: 'Le panier est vide.', de: 'Warenkorb ist leer.', it: 'Il carrello è vuoto.' },
+  'Cart is empty': { es: 'El carrito está vacío', fr: 'Le panier est vide', de: 'Warenkorb ist leer', it: 'Il carrello è vuoto' },
   'Your account is active.': { es: 'Tu cuenta está activa.', fr: 'Votre compte est actif.', de: 'Dein Konto ist aktiv.', it: 'Il tuo account è attivo.' },
 };
 
