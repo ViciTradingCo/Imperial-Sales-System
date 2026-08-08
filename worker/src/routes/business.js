@@ -14,7 +14,7 @@ import { readBusinessSettings, writeBusinessSettings } from '../business-setting
 import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport, convertItems, setStock } from '../inventory.js';
 import { recordIntake, listIntake, deleteIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
-import { listItemIndex, listItemTypes } from '../item-index.js';
+import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
 import { checkCertification } from '../cert.js';
 import { checkout, listSales, voidSale, employeePerformance } from '../sales.js';
 import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory } from '../transfers.js';
@@ -620,6 +620,23 @@ async function getMotd({ request, env }) {
   // BEFORE the figures settled, so the prompt to back up a week arrived while
   // the reports still called that week unfinished. One definition now, in
   // week.js, shared by everything weekly.
+  /**
+   * New items the register invented and nobody has confirmed. Ahead of the
+   * weekly backup nudge because it is the one banner with a queue behind it:
+   * every day it goes unread, more sales attach to a name that may turn out to
+   * be a duplicate of something already in the index.
+   */
+  if (caller.role === 'admin') {
+    try {
+      const n = (await listPendingItems(env, realmId)).length;
+      if (n > 0) {
+        banners.push({
+          text: '🆕 ' + n + ' new item' + (n === 1 ? '' : 's') + ' from the register need review.',
+          action: { label: 'Item Index', route: '/admin/items' },
+        });
+      }
+    } catch (e) { /* the index is optional */ }
+  }
   if (caller.role === 'admin' && isWeekTurnover()) {
     banners.push({
       text: '🗓️ A new week has begun — download a backup of the week just gone.',

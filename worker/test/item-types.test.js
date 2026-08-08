@@ -71,13 +71,13 @@ describe('sorting an import by its type flag', () => {
     await importItemIndex(env, [{ name: 'iron sword', baseValue: 35, type: 'Weapons' }], A);
     const items = await listItemIndex(env, A);
     expect(items).toHaveLength(1);
-    expect(items[0]).toEqual({ name: 'iron sword', baseValue: 35, category: 'Weapons' });
+    expect(items[0]).toMatchObject({ name: 'iron sword', baseValue: 35, category: 'Weapons' });
   });
 
   it('leaves an existing item where it is when the flag is omitted', async () => {
     await importItemIndex(env, [{ name: 'Iron Sword', baseValue: 30, type: 'Weapons' }], A);
     await importItemIndex(env, [{ name: 'Iron Sword', baseValue: 40 }], A);
-    expect((await listItemIndex(env, A))[0]).toEqual({ name: 'Iron Sword', baseValue: 40, category: 'Weapons' });
+    expect((await listItemIndex(env, A))[0]).toMatchObject({ name: 'Iron Sword', baseValue: 40, category: 'Weapons' });
   });
 
   it('reports the filing in the preview without applying it', async () => {
@@ -317,8 +317,8 @@ describe('realm isolation', () => {
 
     expect(await names(A)).toEqual([UNSORTED, 'Weapons']);
     expect(await names(B)).toEqual([UNSORTED, 'Relics']);
-    expect(await listItemIndex(env, A)).toEqual([{ name: 'Iron Sword', baseValue: 30, category: 'Weapons' }]);
-    expect(await listItemIndex(env, B)).toEqual([{ name: 'Iron Sword', baseValue: 99, category: 'Relics' }]);
+    expect(await listItemIndex(env, A)).toMatchObject([{ name: 'Iron Sword', baseValue: 30, category: 'Weapons' }]);
+    expect(await listItemIndex(env, B)).toMatchObject([{ name: 'Iron Sword', baseValue: 99, category: 'Relics' }]);
 
     // Removing B's table must not touch A's identically named item.
     await deleteItemType(env, 'Relics', B);

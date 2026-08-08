@@ -216,12 +216,121 @@ export async function deleteItemType(env, name, realmId) {
 
 export async function listItemIndex(env, realmId) {
   const db = await getDb(env);
-  const { results } = await db.prepare('SELECT name, base_value, category FROM master_item WHERE realm_id = ? ORDER BY name').bind(realmId).all();
+  const { results } = await db.prepare(
+    'SELECT name, base_value, category, pending, first_seen, first_by FROM master_item WHERE realm_id = ? ORDER BY name')
+    .bind(realmId).all();
   return (results || []).map((r) => ({
     name: r.name,
     baseValue: Number(r.base_value) || 0,
     category: r.category || UNSORTED,
+    // A register-invented item, awaiting an admin's yes or no. It is a real
+    // index entry meanwhile — the sale happened, and pretending otherwise would
+    // lose it from every report.
+    pending: !!r.pending,
+    firstSeen: r.first_seen || '',
+    firstBy: r.first_by || '',
   }));
+}
+
+/**
+ * Records an item the REGISTER met for the first time.
+ *
+ * A clerk sold something the index had never heard of. Refusing the sale would
+ * be the wrong trade-off — the goods left the shelf whatever the index thinks —
+ * and silently dropping it from the market, which is what used to happen, means
+ * the realm's figures quietly omit whatever nobody remembered to add.
+ *
+ * So it goes in, flagged, priced at what it just sold for (the only evidence
+ * there is), and an admin decides. The usual answer is that it duplicates
+ * something already there under a different spelling, which is exactly why a
+ * person and not the app has to look.
+ *
+ * Never overwrites an existing row: an item that is already in the index — or
+ * already pending from an earlier sale — keeps the value and category it has.
+ */
+export async function notePendingItem(env, { name, baseValue, by }, realmId) {
+  const nm = String(name || '').trim();
+  if (!nm) return null;
+  const db = await getDb(env);
+  const val = Number(baseValue);
+  await db.prepare(
+    `INSERT INTO master_item (realm_id, name, base_value, category, pending, first_seen, first_by)
+     VALUES (?, ?, ?, ?, 1, ?, ?)
+     ON CONFLICT (realm_id, name) DO NOTHING`)
+    .bind(realmId, nm, isFinite(val) && val > 0 ? val : 0, UNSORTED,
+      new Date().toISOString(), String(by || '').slice(0, 120)).run();
+  return nm;
+}
+
+/** Every item still awaiting review, oldest first — the order to work through. */
+export async function listPendingItems(env, realmId) {
+  const db = await getDb(env);
+  const { results } = await db.prepare(
+    `SELECT name, base_value, category, first_seen, first_by FROM master_item
+      WHERE realm_id = ? AND pending = 1 ORDER BY first_seen, name`).bind(realmId).all();
+  // Compared against the SETTLED index only: one pending item is not evidence
+  // that another is a duplicate, and pairing two unreviewed names with each
+  // other would just double the work.
+  const settled = (await listItemIndex(env, realmId)).filter((i) => !i.pending);
+  return (results || []).map((r) => ({
+    name: r.name,
+    baseValue: Number(r.base_value) || 0,
+    category: r.category || UNSORTED,
+    firstSeen: r.first_seen || '',
+    firstBy: r.first_by || '',
+    // What it might duplicate. Worked out on read rather than stored, because
+    // the index changes underneath it — a name that looked unique when it was
+    // created may have a twin added the following week.
+    looksLike: similarItems(r.name, settled),
+  }));
+}
+
+/**
+ * Items a pending name might be a duplicate OF.
+ *
+ * Deliberately a WIDER net than matchMasterItem. That one is strict on purpose —
+ * it decides automatically whether an import folds into an existing row, so a
+ * false positive silently merges two real items. This one only SUGGESTS, to a
+ * person who is about to look at both, so a false positive costs a glance and a
+ * miss costs a duplicate living in the index forever. Wide is the cheap
+ * direction.
+ *
+ * Two names are worth showing together if they share a significant word
+ * ("Iron Sword" / "Iron Greatsword") or are close enough overall to be one
+ * mistyped as the other.
+ */
+const SUGGEST_LIMIT = 4;
+function similarItems(name, master) {
+  const target = normalizeItem(name);
+  if (!target) return [];
+  const words = new Set(target.split(' ').filter((w) => w.length > 2));
+  const scored = [];
+  for (const it of master) {
+    const other = normalizeItem(it.name);
+    if (!other || other === target) continue;
+    const shared = other.split(' ').filter((w) => w.length > 2 && words.has(w)).length;
+    const dist = editDistance(target, other);
+    // Close overall, or sharing real vocabulary with it.
+    const near = dist <= Math.max(2, Math.round(Math.max(target.length, other.length) * 0.25));
+    if (!shared && !near) continue;
+    // Fewest edits first; a shared word outranks raw distance.
+    scored.push({ name: it.name, score: dist - shared * 4 });
+  }
+  return scored.sort((a, b) => a.score - b.score).slice(0, SUGGEST_LIMIT).map((x) => x.name);
+}
+
+/** Clears the flag: an admin has looked and this is a real, distinct item. */
+export async function approveItem(env, name, realmId) {
+  const nm = String(name || '').trim();
+  if (!nm) throw new Error('Which item?');
+  const db = await getDb(env);
+  const row = await db.prepare(
+    'SELECT name FROM master_item WHERE realm_id = ? AND lower(name) = ?')
+    .bind(realmId, nm.toLowerCase()).first();
+  if (!row) throw new Error('"' + nm + '" is not in the index.');
+  await db.prepare('UPDATE master_item SET pending = 0 WHERE realm_id = ? AND name = ?')
+    .bind(realmId, row.name).run();
+  return row.name;
 }
 
 /** Add a new item or edit an existing one (rename via oldName). */

@@ -47,6 +47,10 @@ function glyphFor(type) {
 export function renderItemIndex(container) {
   setAdminActions();
   const listHost = el('div', {}, skeletonRows(5));
+  // The review queue sits ABOVE the tables: it is the one thing on this page
+  // with a queue behind it, and every day it goes unread more sales attach to a
+  // name that may turn out to be a duplicate.
+  const reviewHost = el('div', {});
   const search = el('input', { type: 'search', placeholder: 'Search every table…' });
   search.addEventListener('input', draw);
   let all = [];
@@ -62,6 +66,7 @@ export function renderItemIndex(container) {
       el('button.secondary-btn', { onclick: openTypesModal }, 'Manage tables'),
       el('button.danger', { onclick: () => doPurge('') }, 'Purge index'),
     ]),
+    reviewHost,
     search,
     listHost,
   ]));
@@ -101,6 +106,58 @@ export function renderItemIndex(container) {
       types = (r.types || []).length ? r.types : [{ name: UNSORTED, flags: [] }];
       draw();
     }).catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
+    drawReview();
+  }
+
+  /**
+   * Items the register invented, waiting on a yes or no.
+   *
+   * Shown with what each might duplicate, because that is the decision: almost
+   * every one of these is either a real new thing or a misspelling of something
+   * already in the index, and telling them apart needs both names side by side.
+   */
+  function drawReview() {
+    api.getPendingItems().then((r) => {
+      const pending = r.pending || [];
+      if (!pending.length) { mount(reviewHost); return; }
+      mount(reviewHost, el('div.card', { class: 'card review-card' }, [
+        el('h3', {}, '🆕 New from the register (' + pending.length + ')'),
+        el('p', { class: 'note' }, 'Sold at a till before anyone added them here, so they were added ' +
+          'automatically. Keep one that is genuinely new; remove one that duplicates an item you already ' +
+          'have — the sales stay either way.'),
+        ...pending.map(pendingRow),
+      ]));
+    }).catch(() => { mount(reviewHost); /* the queue is not worth an error banner */ });
+  }
+
+  function pendingRow(p) {
+    const when = p.firstSeen ? new Date(p.firstSeen).toLocaleDateString() : '';
+    const row = el('div.emp-row', {}, [
+      el('span', { html:
+        '<b>' + esc(p.name) + '</b> · ' + esc(money(p.baseValue)) +
+        '<br><span class="note">' + esc([when, p.firstBy && 'by ' + p.firstBy].filter(Boolean).join(' · ')) + '</span>' +
+        (p.looksLike.length
+          ? '<br><span class="note warn">Looks like: ' + esc(p.looksLike.join(', ')) + '</span>'
+          : '') }),
+    ]);
+    const keep = el('button.primary.small', {
+      onclick: async () => {
+        try { await api.approveItem(p.name); toast('"' + p.name + '" kept.', 'ok'); load(); }
+        catch (e) { toast(e.message || String(e), 'error'); }
+      },
+    }, 'Keep');
+    const drop = el('button.danger.small', {
+      onclick: async () => {
+        if (!confirm('Remove "' + p.name + '" from the index?\n\n' +
+          (p.looksLike.length ? 'Do this if it duplicates: ' + p.looksLike.join(', ') + '.\n\n' : '') +
+          'Sales already recorded against this name are kept — they simply stop being counted ' +
+          'as their own item.')) return;
+        try { await api.deleteMasterItem(p.name); toast('"' + p.name + '" removed.', 'ok'); load(); }
+        catch (e) { toast(e.message || String(e), 'error'); }
+      },
+    }, 'Remove');
+    row.appendChild(el('span', { class: 'row-actions' }, [keep, drop]));
+    return row;
   }
 
   function draw() {

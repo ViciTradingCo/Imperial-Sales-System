@@ -200,6 +200,12 @@ body {
 }
 .step-review-row span { color: var(--note); }
 
+/* The register's new-item queue on the Item Index. Bordered like the MOTD card
+   so it reads as "something wants your attention" rather than another table. */
+.review-card { border-left: 4px solid var(--warn); }
+.review-card h3 { margin-top: 0; color: var(--warn); }
+.note.warn { color: var(--warn); }
+
 /* Line chart (per-item trends) */
 .line-chart-wrap { margin: var(--sp-2) 0 0; }
 .line-chart {

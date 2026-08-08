@@ -16,7 +16,8 @@ import { shopOverview } from '../oversight.js';
 import { listAllFeedback, setFeedbackComplete } from '../feedback.js';
 import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport,
-  listItemIndex, moveItems, addItemType, updateItemType, deleteItemType } from '../item-index.js';
+  listItemIndex, moveItems, addItemType, updateItemType, deleteItemType,
+  listPendingItems, approveItem } from '../item-index.js';
 import { writeRegions } from '../regions.js';
 import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, readRealmBranding, writeBranding } from '../branding.js';
@@ -275,6 +276,25 @@ async function upsertItemRoute({ request, env, body }) {
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'item.upsert', detail: (body.oldName && body.oldName !== body.name ? body.oldName + ' → ' : '') + body.name + ' @ ' + body.baseValue, realmId: realmIdOf(caller, env) });
   return { items };
 }
+/**
+ * The new-item report: everything the register has invented and nobody has
+ * confirmed yet, each with what it might be a duplicate of.
+ */
+async function pendingItemsRoute({ request, env }) {
+  const caller = await requireAdmin(request, env);
+  return { pending: await listPendingItems(env, realmIdOf(caller, env)) };
+}
+
+/** "Yes, this is a real item." Clears the flag and leaves the row alone. */
+async function approveItemRoute({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const name = await approveItem(env, body.name, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'item.approve', detail: name, realmId });
+  return { pending: await listPendingItems(env, realmId), items: await listItemIndex(env, realmId) };
+}
+
 async function deleteMasterItemRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   const items = await deleteItemIndex(env, body.name, realmIdOf(caller, env));
@@ -610,6 +630,8 @@ export const routes = [
   { method: 'POST', path: '/admin/motd/individual/update', handler: updateIndividual },
   { method: 'POST', path: '/admin/motd/individual/delete', handler: deleteIndividual },
   { method: 'GET', path: '/admin/audit', handler: audit },
+  { method: 'GET', path: '/admin/items/pending', handler: pendingItemsRoute },
+  { method: 'POST', path: '/admin/items/approve', handler: approveItemRoute },
   { method: 'POST', path: '/admin/items', handler: upsertItemRoute },
   { method: 'POST', path: '/admin/items/delete', handler: deleteMasterItemRoute },
   { method: 'POST', path: '/admin/items/purge', handler: purgeMasterItems },

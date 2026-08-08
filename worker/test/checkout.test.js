@@ -13,7 +13,12 @@ vi.mock('../src/audit.js', () => ({ logAudit: async () => {} }));
 vi.mock('../src/item-index.js', () => ({
   listItemIndex: async () => ([{ name: 'Iron Sword', baseValue: 30 }, { name: 'Health Potion', baseValue: 5 }]),
   matchMasterItem: (name, master) => master.find((m) => m.name.toLowerCase() === String(name || '').trim().toLowerCase()) || null,
+  // Selling something the index has never seen now ADDS it, flagged for review.
+  // Recorded here so a test can assert what checkout tried to file.
+  notePendingItem: async (env, row) => { noted.push(row.name); return row.name; },
 }));
+/** Names checkout handed to the index as newly met. Cleared before each test. */
+const noted = [];
 
 import { checkout, listSales, voidSale, employeePerformance } from '../src/sales.js';
 import { cofferBalance } from '../src/coffers.js';
@@ -32,6 +37,7 @@ async function stockOf(b, i) {
 
 beforeAll(async () => { env = { DB: makeD1() }; await ensureSchema(env); });
 beforeEach(async () => {
+  noted.length = 0;
   for (const t of ['inventory', 'sales', 'coffer_entries', 'companies',
     'court_settings', 'court_status', 'court_price', 'court_dues']) {
     await env.DB.prepare('DELETE FROM ' + t).run();

@@ -79,6 +79,12 @@ export function renderHome(container, { me }) {
         onOpen: go('/employees') } : null,
       me.role === 'owner' ? { key: 'ledger', label: 'Shop Ledger', hint: 'Performance, notices, coffers', glyph: '📖',
         onOpen: go('/ledger') } : null,
+      // Shop Settings was reachable ONLY from the side menu — which on a phone
+      // is behind the hamburger — while its sibling the Shop Ledger had a tile.
+      // Half an owner's tools being one click from home and half being hidden is
+      // most of why things here were reported as hard to find.
+      me.role === 'owner' ? { key: 'shopsettings', label: 'Shop Settings', hint: 'Staff code, discounts, storefront', glyph: '⚙️',
+        onOpen: go('/ledger/settings') } : null,
       { key: 'saleslog', label: 'Sales Log', hint: 'Past sales & deliveries', glyph: '🧾',
         onOpen: go('/sales-log') },
       me.role === 'owner' ? { key: 'restock', label: 'Restock', hint: 'Low & out of stock', glyph: '🔔',

@@ -96,10 +96,19 @@ const SCHEMA = [
   // in item_type. An item's NAME is still unique realm-wide, not per type: the
   // register picks by name, so two "Iron Sword" rows filed under different types
   // would be an ambiguity, not a distinction.
+  // `pending` marks an item the REGISTER invented: a clerk sold something the
+  // index had never heard of, so it was added on the spot rather than refused.
+  // It trades and reports like any other item — the sale really happened — but
+  // it is held up for an admin to confirm or remove, because the usual cause is
+  // a near-duplicate of something already there ("Iron Swrd", "iron sword +1").
+  // `first_seen` and `first_by` say when and by whom, which is what makes a
+  // duplicate identifiable months later.
   `CREATE TABLE IF NOT EXISTS master_item (
      realm_id TEXT NOT NULL DEFAULT '${R}',
      name TEXT NOT NULL, base_value REAL NOT NULL DEFAULT 0,
      category TEXT NOT NULL DEFAULT 'Unsorted',
+     pending INTEGER NOT NULL DEFAULT 0,
+     first_seen TEXT, first_by TEXT,
      PRIMARY KEY (realm_id, name))`,
   // The realm's item types, in display order. Every realm starts with (and can
   // never lose) "Unsorted" — the table anything unflagged lands in.
@@ -270,6 +279,9 @@ const BUSINESS_TABLES = [
 // best-effort and IN ORDER; "duplicate column" on an already-migrated DB is
 // ignored. The idem index comes AFTER its column is guaranteed to exist.
 const MIGRATIONS = [
+  'ALTER TABLE master_item ADD COLUMN pending INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE master_item ADD COLUMN first_seen TEXT',
+  'ALTER TABLE master_item ADD COLUMN first_by TEXT',
   'ALTER TABLE sales ADD COLUMN idem TEXT',
   'CREATE INDEX IF NOT EXISTS idx_sales_idem ON sales (business, idem)',
   'ALTER TABLE intake ADD COLUMN idem TEXT',

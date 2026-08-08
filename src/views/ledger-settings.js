@@ -20,7 +20,7 @@ import { renderSettingsForm } from './settings-form.js';
 import { money } from '../lib/format.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { renderShopReport } from './shop-report.js';
-import { codePanel } from './realms.js';
+import { staffCodePanel } from './staff-code.js';
 import { renderShopNotices } from './shop-notices.js';
 
 /** Renders a tile page, with the admin-assigned artwork once it arrives. */
@@ -67,15 +67,7 @@ export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
       { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
         open: (host) => mount(host, exportCard()) },
       { key: 'led-staff-code', label: 'Staff code', hint: 'Invite your employees', glyph: '🎟️',
-        open: (host) => mount(host, codePanel({
-          title: '🎟️ Staff code',
-          note: 'Give this to anyone who works for you. They enter it when they sign up and land straight in ' +
-            'this shop as a pending employee — you activate them from Employees. They never see any other shop.',
-          load: async () => (await api.getBusinessCode()).joinCode,
-          reset: async () => (await api.resetBusinessCode()).joinCode,
-          resetWarning: 'Issue a new staff code?\n\nThe current code stops working immediately — use this if it ' +
-            'has been shared somewhere it shouldn\u2019t have been. Anyone still waiting to register will need the new one.',
-        })) },
+        open: (host) => mount(host, staffCodePanel()) },
       // Name, look, and tunables are one job — "set my shop up" — and were three
       // tiles you had to visit in turn to do it.
       { key: 'led-settings', label: 'Settings', hint: 'Name & style', glyph: '⚙️',

@@ -101,6 +101,10 @@ export const api = {
   getMarket: () => request('GET', '/admin/market'),
   /** Admin: one item's full performance, including its daily trend. */
   getMarketItem: (name) => request('GET', '/admin/market/item?name=' + encodeURIComponent(name)),
+  /** Admin: items the register invented that nobody has confirmed yet. */
+  getPendingItems: () => request('GET', '/admin/items/pending'),
+  /** Admin: confirm a register-invented item is real and distinct. */
+  approveItem: (name) => request('POST', '/admin/items/approve', { name }),
   /** Admin: wipe all sales + intake logs across the network. */
   clearLogs: () => request('POST', '/admin/logs/clear', {}),
   /** Admin: delete sales + intake older than N days/weeks/months. */

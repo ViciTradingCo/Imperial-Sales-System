@@ -12,6 +12,7 @@ import { setOpsActions } from '../lib/sections.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 import { skeletonRows, skeletonLines } from '../lib/skeleton.js';
+import { staffCodePanel } from './staff-code.js';
 import { money } from '../lib/format.js';
 
 export function renderEmployees(container, { me }) {
@@ -26,6 +27,11 @@ export function renderEmployees(container, { me }) {
   ]));
 
   const sections = [
+    // The staff code lives here as well as in Shop Settings. Someone wanting to
+    // bring on an employee comes to THIS page; finding a roster and no way to
+    // invite anyone is how people concluded there was no such button.
+    { key: 'emp-code', label: 'Staff code', hint: 'Invite someone to your shop', glyph: '🎟️',
+      open: (host) => mount(host, staffCodePanel()) },
     { key: 'emp-roster', label: 'Roster', hint: 'Activate & annotate', glyph: '🧑‍🤝‍🧑',
       open: (host) => mount(host, el('div.card', {}, [
         el('h3', {}, 'Roster'),
@@ -57,7 +63,8 @@ export function renderEmployees(container, { me }) {
       const rows = res.employees || [];
       if (!rows.length) {
         mount(list, emptyState({ glyph: '🧑‍🤝‍🧑', title: 'No one registered yet',
-          hint: 'Staff who register under your business appear here for you to activate.' }));
+          hint: 'Give someone your Staff code — the button beside this one — and they will appear here ' +
+            'when they sign up, ready for you to activate.' }));
         return;
       }
       // Bulk activation — onboarding a group one row at a time is tedious.

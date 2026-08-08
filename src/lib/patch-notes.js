@@ -3,6 +3,12 @@
  * entry at the top as features ship.
  */
 const PATCH_NOTES = [
+  { version: '2.0', date: '2026-08-07', notes: [
+    'The register can sell something that is not in the item index. Type the name, give the price, and the sale goes through — the item is added to the index flagged as new, for an admin to confirm or remove. Previously the only options were to abandon the sale or ring it up under the wrong name, and the item was left out of every report forever.',
+    'Admins get a "New from the register" queue at the top of the Master Item Index, with a banner when anything is waiting. Each entry shows what it might be a duplicate of, so a misspelling can be told from a genuinely new thing at a glance. Keep it, or remove it — the sales are kept either way.',
+    'Your Staff code now also appears on the Employees page, which is where you are when you want to invite someone. It stays in Shop Settings too.',
+    'Shop Settings has a button on Home. It used to be reachable only from the side menu, which on a phone is behind the hamburger.',
+  ] },
   { version: '1.9', date: '2026-08-07', notes: [
     'The buttons on a shop\'s Home page now open real pages instead of pop-up windows. The side menu and the shop-tools bar stay visible, Back works, and the address bar points at what you are actually looking at — so you can bookmark it or return to it.',
     'Restock and Shop Ledger got pages of their own to make that work. The restock nudge on the banner still opens as a window, since there you are mid-task and want to dismiss it.',

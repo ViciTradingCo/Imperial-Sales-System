@@ -33,7 +33,9 @@ function navItems(me) {
   // shop, governing a region) stay separable.
   // A realm with regions switched off has no region for a Court to govern.
   if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/court', label: 'Court Tools' });
-  if (me.role === 'owner') items.push({ path: '/ledger/settings', label: 'Shop Settings' });
+  // owner OR admin, like every other shop page — the route already admits both,
+  // so gating the MENU on owner alone hid it from an admin who runs a shop.
+  if (me.role === 'owner' || me.role === 'admin') items.push({ path: '/ledger/settings', label: 'Shop Settings' });
   // The people who use the app every day are the ones with something to say
   // about it; an admin has the review screen instead.
   if (me.role === 'owner' || me.role === 'employee') items.push({ path: '/feedback', label: 'Feedback' });

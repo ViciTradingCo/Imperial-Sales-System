@@ -93,7 +93,19 @@ export function renderPos(container, { me }) {
     const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: 'Sold for per item (' + currency() + ')' });
 
     let invByNorm = new Map();
+    /**
+     * The register can meet a NEW item.
+     *
+     * It used to demand a pick from the index, which is right for keeping the
+     * index clean and wrong for the moment it actually matters: a customer is
+     * standing there with something nobody has entered yet, and the choice was
+     * to abandon the sale or ring it up under the wrong name. Now anything can
+     * be typed, and a name the index does not know is added to it — flagged, so
+     * an admin confirms it or removes it as a duplicate.
+     */
     const picker = createItemPicker({
+      allowFree: true,
+      freeHint: 'Not in the index — selling it will add it, for an admin to check.',
       placeholder: 'Search the item index…',
       meta: (it) => {
         const inv = invByNorm.get(norm(it.name));
@@ -205,17 +217,26 @@ export function renderPos(container, { me }) {
 
     function addToCart() {
       const picked = picker.selected();
-      if (!picked) { setStatus('Pick an item from the index — start typing and click a result.', 'error'); return; }
-      const item = picked.name; // canonical spelling
+      // A picked item carries its canonical spelling; free text is taken as
+      // typed, and the Worker adds it to the index flagged for review.
+      const item = picked ? picked.name : picker.value();
+      if (!item) { setStatus('Type an item, or pick one from the index.', 'error'); return; }
       const q = Math.floor(Number(qty.value));
       if (!q || q < 1) { setStatus('Enter a quantity.', 'error'); return; }
       let p = Number(price.value);
       // Default the price from inventory / master if it was left blank.
       if (!isFinite(p) || p < 0 || price.value === '') {
         const inv = invByNorm.get(norm(item));
-        p = inv ? inv.price : picked.baseValue;
+        p = inv ? inv.price : (picked ? picked.baseValue : NaN);
       }
-      if (!isFinite(p) || p < 0) { setStatus('Enter a sold-for price.', 'error'); return; }
+      // A new item has no price to fall back on — the sold-for figure is the
+      // only evidence of what it is worth, so it has to be given.
+      if (!isFinite(p) || p < 0) {
+        setStatus(picked ? 'Enter a sold-for price.'
+          : '"' + item + '" is new — enter what it sold for.', 'error');
+        return;
+      }
+      if (!picked) toast('"' + item + '" is new. It will be added for an admin to check.', 'warn');
       if (!idemKey) idemKey = newIdem();
       cart.push({ item, qty: q, price: p });
       picker.clear(); qty.value = '1'; price.value = ''; itemHint.textContent = '';

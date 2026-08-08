@@ -10,7 +10,7 @@
 import { getDb } from './db.js';
 import { checkCertification } from './cert.js';
 import { readRealmPrefs } from './realm-prefs.js';
-import { listItemIndex, matchMasterItem } from './item-index.js';
+import { listItemIndex, matchMasterItem, notePendingItem } from './item-index.js';
 import { logAudit } from './audit.js';
 import { courtRules, standingOf, accrueLevy } from './court.js';
 import { coin } from './money.js';
@@ -248,13 +248,33 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   // took no money, so it owes nothing.
   const levy = staff ? 0 : await accrueLevy(env, rules, { business, total: finalTotal, orderNo }, realmId);
 
-  // Flag off-inventory / non-master (new) items in the audit log — the sale
-  // still processes so the data is captured, but new items stay out of market.
   const actor = caller.character || caller.email;
   const offList = [...new Set(offInventory)];
   const newList = [...new Set(newItems)];
   if (offList.length) await logAudit(env, { actor, business, action: 'sale.off_inventory', detail: orderNo + ': ' + offList.join(', '), realmId });
-  if (newList.length) await logAudit(env, { actor, business, action: 'sale.new_item', detail: orderNo + ': ' + newList.join(', '), realmId });
+
+  /**
+   * An item the index had never heard of goes INTO the index, flagged for
+   * review, priced at what it just sold for.
+   *
+   * It used to be logged and dropped — the sale recorded, the item excluded
+   * from the market forever, and nothing anywhere prompting anyone to add it.
+   * That quietly held whatever nobody remembered to enter out of the realm's
+   * own figures. Now the register can meet a new thing and the index learns it;
+   * an admin confirms it or removes it as a duplicate.
+   *
+   * Not for an employee purchase: nothing was charged, so there is no price to
+   * seed it with, and free stock is the worst possible evidence of worth.
+   */
+  if (newList.length) {
+    await logAudit(env, { actor, business, action: 'sale.new_item', detail: orderNo + ': ' + newList.join(', '), realmId });
+    if (!staff) {
+      for (const name of newList) {
+        const line = lines.find((l) => l.name === name);
+        await notePendingItem(env, { name, baseValue: line ? line.price : 0, by: actor }, realmId);
+      }
+    }
+  }
 
   return { ok: true, orderNo, total: finalTotal, hold: holdName, discount: discountLabel,
     staffPurchase: staff, levy, offInventory: offList, newItems: newList };
