@@ -28,9 +28,12 @@ beforeEach(async () => { for (const t of REALM_TABLES) await env.DB.prepare('DEL
 
 describe('meeting a new item', () => {
   it('adds it to the index, flagged, priced at what it sold for', async () => {
-    await notePendingItem(env, { name: 'Mystery Trinket', baseValue: 99, by: 'Ann' }, A);
+    await notePendingItem(env, { name: 'Mystery Trinket', baseValue: 99, by: 'Ann', shop: 'Iron Hearth' }, A);
     const [it] = await listItemIndex(env, A);
-    expect(it).toMatchObject({ name: 'Mystery Trinket', baseValue: 99, pending: true, firstBy: 'Ann' });
+    expect(it).toMatchObject({
+      name: 'Mystery Trinket', baseValue: 99, pending: true,
+      firstBy: 'Ann', firstShop: 'Iron Hearth',
+    });
     expect(it.firstSeen).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
@@ -47,13 +50,13 @@ describe('meeting a new item', () => {
   });
 
   it('a second sale of the same name neither duplicates nor overwrites', async () => {
-    await notePendingItem(env, { name: 'Mystery Trinket', baseValue: 99, by: 'Ann' }, A);
-    await notePendingItem(env, { name: 'Mystery Trinket', baseValue: 5, by: 'Bex' }, A);
+    await notePendingItem(env, { name: 'Mystery Trinket', baseValue: 99, by: 'Ann', shop: 'Iron Hearth' }, A);
+    await notePendingItem(env, { name: 'Mystery Trinket', baseValue: 5, by: 'Bex', shop: 'Rift Traders' }, A);
     const items = await listItemIndex(env, A);
     expect(items).toHaveLength(1);
-    // First price and first finder stand: the row is a record of when the realm
-    // first met this thing, not of the most recent time.
-    expect(items[0]).toMatchObject({ baseValue: 99, firstBy: 'Ann' });
+    // First price, first finder and first till stand: the row records when the
+    // realm first met this thing, not the most recent time.
+    expect(items[0]).toMatchObject({ baseValue: 99, firstBy: 'Ann', firstShop: 'Iron Hearth' });
   });
 
   it('never disturbs an item already in the index', async () => {
@@ -75,6 +78,11 @@ describe('meeting a new item', () => {
 });
 
 describe('the review queue', () => {
+  it('carries the shop and the person to the review queue', async () => {
+    await notePendingItem(env, { name: 'Mystery Trinket', baseValue: 99, by: 'Ann', shop: 'Iron Hearth' }, A);
+    expect((await listPendingItems(env, A))[0]).toMatchObject({ firstBy: 'Ann', firstShop: 'Iron Hearth' });
+  });
+
   it('lists only what is still pending, oldest first', async () => {
     await importItemIndex(env, [{ name: 'Iron Sword', baseValue: 30 }], A);
     await notePendingItem(env, { name: 'Aaa Thing', baseValue: 1 }, A);

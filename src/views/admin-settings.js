@@ -352,7 +352,6 @@ const TILE_KEYS = [
   ['led-coffer', 'Ledger · Coffers'], ['led-discounts', 'Ledger · Discounts'],
   ['led-style', 'Ledger · Style'], ['led-storefront', 'Ledger · Storefront'],
   ['led-export', 'Ledger · Export'], ['led-company', 'Ledger · Company'],
-  ['led-staff-code', 'Ledger · Staff code'],
   ['led-settings', 'Ledger · Shop settings'],
   // Employees + Notices sections
   ['emp-roster', 'Employees · Roster'], ['emp-performance', 'Employees · Performance'],

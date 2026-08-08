@@ -20,7 +20,6 @@ import { renderSettingsForm } from './settings-form.js';
 import { money } from '../lib/format.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { renderShopReport } from './shop-report.js';
-import { staffCodePanel } from './staff-code.js';
 import { renderShopNotices } from './shop-notices.js';
 
 /** Renders a tile page, with the admin-assigned artwork once it arrives. */
@@ -58,7 +57,7 @@ export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
   tilePage(container, {
     title: 'Shop Settings',
     note: esc(me.business || 'Your shop') + ' — how your shop is set up. Day-to-day figures are on the ' +
-      'Shop Ledger tile at home.',
+      'Shop Ledger tile at home; your staff code is on the Employees page, where you invite people.',
     sections: [
       { key: 'led-discounts', label: 'Discounts', hint: 'Reusable offers', glyph: '🏷️',
         open: (host) => mount(host, discountsCard()) },
@@ -66,8 +65,6 @@ export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
         open: (host) => mount(host, storefrontLinkCard(me)) },
       { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
         open: (host) => mount(host, exportCard()) },
-      { key: 'led-staff-code', label: 'Staff code', hint: 'Invite your employees', glyph: '🎟️',
-        open: (host) => mount(host, staffCodePanel()) },
       // Name, look, and tunables are one job — "set my shop up" — and were three
       // tiles you had to visit in turn to do it.
       { key: 'led-settings', label: 'Settings', hint: 'Name & style', glyph: '⚙️',

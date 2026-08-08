@@ -101,14 +101,16 @@ const SCHEMA = [
   // It trades and reports like any other item — the sale really happened — but
   // it is held up for an admin to confirm or remove, because the usual cause is
   // a near-duplicate of something already there ("Iron Swrd", "iron sword +1").
-  // `first_seen` and `first_by` say when and by whom, which is what makes a
-  // duplicate identifiable months later.
+  // `first_seen`, `first_by` and `first_shop` say when, by whom, and at which
+  // till — which is what makes a duplicate identifiable months later, and lets
+  // an admin see that one shop is generating most of them (usually a sign
+  // somebody needs showing where the search box is, not a data problem).
   `CREATE TABLE IF NOT EXISTS master_item (
      realm_id TEXT NOT NULL DEFAULT '${R}',
      name TEXT NOT NULL, base_value REAL NOT NULL DEFAULT 0,
      category TEXT NOT NULL DEFAULT 'Unsorted',
      pending INTEGER NOT NULL DEFAULT 0,
-     first_seen TEXT, first_by TEXT,
+     first_seen TEXT, first_by TEXT, first_shop TEXT,
      PRIMARY KEY (realm_id, name))`,
   // The realm's item types, in display order. Every realm starts with (and can
   // never lose) "Unsorted" — the table anything unflagged lands in.
@@ -282,6 +284,7 @@ const MIGRATIONS = [
   'ALTER TABLE master_item ADD COLUMN pending INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE master_item ADD COLUMN first_seen TEXT',
   'ALTER TABLE master_item ADD COLUMN first_by TEXT',
+  'ALTER TABLE master_item ADD COLUMN first_shop TEXT',
   'ALTER TABLE sales ADD COLUMN idem TEXT',
   'CREATE INDEX IF NOT EXISTS idx_sales_idem ON sales (business, idem)',
   'ALTER TABLE intake ADD COLUMN idem TEXT',

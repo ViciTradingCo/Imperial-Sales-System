@@ -217,7 +217,7 @@ export async function deleteItemType(env, name, realmId) {
 export async function listItemIndex(env, realmId) {
   const db = await getDb(env);
   const { results } = await db.prepare(
-    'SELECT name, base_value, category, pending, first_seen, first_by FROM master_item WHERE realm_id = ? ORDER BY name')
+    'SELECT name, base_value, category, pending, first_seen, first_by, first_shop FROM master_item WHERE realm_id = ? ORDER BY name')
     .bind(realmId).all();
   return (results || []).map((r) => ({
     name: r.name,
@@ -229,6 +229,7 @@ export async function listItemIndex(env, realmId) {
     pending: !!r.pending,
     firstSeen: r.first_seen || '',
     firstBy: r.first_by || '',
+    firstShop: r.first_shop || '',
   }));
 }
 
@@ -248,17 +249,17 @@ export async function listItemIndex(env, realmId) {
  * Never overwrites an existing row: an item that is already in the index — or
  * already pending from an earlier sale — keeps the value and category it has.
  */
-export async function notePendingItem(env, { name, baseValue, by }, realmId) {
+export async function notePendingItem(env, { name, baseValue, by, shop }, realmId) {
   const nm = String(name || '').trim();
   if (!nm) return null;
   const db = await getDb(env);
   const val = Number(baseValue);
   await db.prepare(
-    `INSERT INTO master_item (realm_id, name, base_value, category, pending, first_seen, first_by)
-     VALUES (?, ?, ?, ?, 1, ?, ?)
+    `INSERT INTO master_item (realm_id, name, base_value, category, pending, first_seen, first_by, first_shop)
+     VALUES (?, ?, ?, ?, 1, ?, ?, ?)
      ON CONFLICT (realm_id, name) DO NOTHING`)
     .bind(realmId, nm, isFinite(val) && val > 0 ? val : 0, UNSORTED,
-      new Date().toISOString(), String(by || '').slice(0, 120)).run();
+      new Date().toISOString(), String(by || '').slice(0, 120), String(shop || '').slice(0, 120)).run();
   return nm;
 }
 
@@ -266,7 +267,7 @@ export async function notePendingItem(env, { name, baseValue, by }, realmId) {
 export async function listPendingItems(env, realmId) {
   const db = await getDb(env);
   const { results } = await db.prepare(
-    `SELECT name, base_value, category, first_seen, first_by FROM master_item
+    `SELECT name, base_value, category, first_seen, first_by, first_shop FROM master_item
       WHERE realm_id = ? AND pending = 1 ORDER BY first_seen, name`).bind(realmId).all();
   // Compared against the SETTLED index only: one pending item is not evidence
   // that another is a duplicate, and pairing two unreviewed names with each
@@ -278,6 +279,7 @@ export async function listPendingItems(env, realmId) {
     category: r.category || UNSORTED,
     firstSeen: r.first_seen || '',
     firstBy: r.first_by || '',
+    firstShop: r.first_shop || '',
     // What it might duplicate. Worked out on read rather than stored, because
     // the index changes underneath it — a name that looked unique when it was
     // created may have a twin added the following week.

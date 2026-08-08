@@ -132,10 +132,13 @@ export function renderItemIndex(container) {
 
   function pendingRow(p) {
     const when = p.firstSeen ? new Date(p.firstSeen).toLocaleDateString() : '';
+    // Who rang it up and where. The shop matters as much as the person: one
+    // till producing most of the duplicates is a training answer, not a data one.
+    const who = [p.firstBy, p.firstShop && 'at ' + p.firstShop].filter(Boolean).join(' ');
     const row = el('div.emp-row', {}, [
       el('span', { html:
         '<b>' + esc(p.name) + '</b> · ' + esc(money(p.baseValue)) +
-        '<br><span class="note">' + esc([when, p.firstBy && 'by ' + p.firstBy].filter(Boolean).join(' · ')) + '</span>' +
+        '<br><span class="note">' + esc([when, who && 'by ' + who].filter(Boolean).join(' · ')) + '</span>' +
         (p.looksLike.length
           ? '<br><span class="note warn">Looks like: ' + esc(p.looksLike.join(', ')) + '</span>'
           : '') }),

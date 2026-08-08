@@ -271,7 +271,7 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     if (!staff) {
       for (const name of newList) {
         const line = lines.find((l) => l.name === name);
-        await notePendingItem(env, { name, baseValue: line ? line.price : 0, by: actor }, realmId);
+        await notePendingItem(env, { name, baseValue: line ? line.price : 0, by: actor, shop: business }, realmId);
       }
     }
   }
