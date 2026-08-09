@@ -43,8 +43,8 @@ export async function recordIntake(env, business, { item, vendor, hold, fromBusi
    * every delivery from a checkbox that defaults to off, which silently UNDID
    * the flag: an owner marked something an ingredient in the item editor, took
    * a routine delivery of it, and it quietly became sellable again — back in
-   * the register, back on the storefront, back in the pricing statistics. A
-   * restock is not a re-classification, exactly as it is not a repricing.
+   * the register, back in the pricing statistics. A restock is not a
+   * re-classification, exactly as it is not a repricing.
    */
   const ingGiven = ingredient !== undefined && ingredient !== null && ingredient !== '';
   const ing = ingredient ? 1 : 0;

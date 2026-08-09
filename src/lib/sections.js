@@ -7,17 +7,23 @@
  * buttons PERSIST as you move between sibling sub-pages, and the current page's
  * button is marked active.
  */
-import { regionLabel } from './format.js';
+import { regionLabel, regionsOn } from './format.js';
 import { el, mount, esc } from './dom.js';
 import { navigate, currentPath } from './router.js';
 import { setActions } from './actions.js';
 import { toast } from './toast.js';
 import { api } from './api.js';
 
-/** Marks the button whose `path` matches the current route as active. */
+/**
+ * Marks the button whose `path` matches the current route as active.
+ *
+ * A SUB-PATH counts as its parent: `/pos/buy` is still the register, and
+ * leaving Register unlit there made the bar look like it had lost its place.
+ */
 function mark(items) {
   const p = currentPath();
-  return items.map((it) => ({ ...it, class: it.path && it.path === p ? 'active' : undefined }));
+  const on = (path) => !!path && (path === p || p.startsWith(path + '/'));
+  return items.map((it) => ({ ...it, class: on(it.path) ? 'active' : undefined }));
 }
 
 /** The business-tools action set (Register / Inventory / Employees). */

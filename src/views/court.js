@@ -162,7 +162,7 @@ export function renderCourtTools(container, { me } = {}) {
   function draw() {
     const levy = state.settings.taxPercent;
     mount(head,
-      el('p', { class: 'note' }, 'You govern trade in ' + esc(state.hold) + ' — ' + state.shops +
+      el('p', { class: 'note' }, 'You govern trade in ' + state.hold + ' — ' + state.shops +
         ' compan' + (state.shops === 1 ? 'y' : 'ies') + ' trade here. Everything below covers the whole ' +
         regionWord() + ', not just your own shop.'),
       statTiles([
@@ -282,8 +282,9 @@ const STANDING_LABEL = {
 function standingsPanel(host, state, onChanged) {
   const listHost = el('div', {});
   mount(host,
-    el('p', { class: 'note' }, 'Your ruling on each shop trading here. A licence puts your seal on its public ' +
-      'storefront; a restriction warns visitors; barring one stops it selling until you lift it.'),
+    el('p', { class: 'note' }, 'Your ruling on each shop trading here. A licence is your seal of approval and a ' +
+      'restriction is a mark against it — both are on the record for you and the admins to read. Barring a shop is ' +
+      'the one that bites: it cannot sell here at all until you lift it.'),
     listHost);
 
   let rows = state.standings || [];

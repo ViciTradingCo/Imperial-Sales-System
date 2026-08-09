@@ -67,8 +67,14 @@ const T = {
   'Activate': { es: 'Activar', fr: 'Activer', de: 'Aktivieren', it: 'Attiva' },
   'Add to order': { es: 'Añadir al pedido', fr: 'Ajouter à la commande', de: 'Zur Bestellung', it: 'Aggiungi all’ordine' },
   'Complete sale': { es: 'Completar venta', fr: 'Finaliser la vente', de: 'Verkauf abschließen', it: 'Completa vendita' },
-  'Record Intake': { es: 'Registrar entrada', fr: 'Enregistrer un achat', de: 'Wareneingang', it: 'Registra carico' },
   'Record intake': { es: 'Registrar entrada', fr: 'Enregistrer un achat', de: 'Wareneingang', it: 'Registra carico' },
+  // The register's two sides.
+  'Selling': { es: 'Vendiendo', fr: 'Vente', de: 'Verkauf', it: 'Vendita' },
+  'Buying': { es: 'Comprando', fr: 'Achat', de: 'Einkauf', it: 'Acquisto' },
+  'Record a delivery': { es: 'Registrar una entrega', fr: 'Enregistrer une livraison', de: 'Lieferung erfassen', it: 'Registra una consegna' },
+  'Buy / Record a delivery': { es: 'Comprar / registrar entrega', fr: 'Acheter / enregistrer une livraison', de: 'Einkaufen / Lieferung erfassen', it: 'Acquista / registra consegna' },
+  'Buy ingredients': { es: 'Comprar ingredientes', fr: 'Acheter des ingrédients', de: 'Zutaten kaufen', it: 'Compra ingredienti' },
+  'Buy & add to stock': { es: 'Comprar y añadir al stock', fr: 'Acheter et ajouter au stock', de: 'Kaufen und einlagern', it: 'Compra e aggiungi' },
   'Void this sale': { es: 'Anular esta venta', fr: 'Annuler cette vente', de: 'Verkauf stornieren', it: 'Annulla vendita' },
 
   // Headings
@@ -76,7 +82,7 @@ const T = {
   'Language': { es: 'Idioma', fr: 'Langue', de: 'Sprache', it: 'Lingua' },
   'Order': { es: 'Pedido', fr: 'Commande', de: 'Bestellung', it: 'Ordine' },
   'Customer Details': { es: 'Datos del cliente', fr: 'Détails du client', de: 'Kundendaten', it: 'Dati cliente' },
-  'Recent intake': { es: 'Entradas recientes', fr: 'Achats récents', de: 'Letzte Eingänge', it: 'Carichi recenti' },
+  'Recent deliveries': { es: 'Entregas recientes', fr: 'Livraisons récentes', de: 'Letzte Lieferungen', it: 'Consegne recenti' },
   'Credits': { es: 'Créditos', fr: 'Crédits', de: 'Mitwirkende', it: 'Crediti' },
   'What you can do': { es: 'Qué puedes hacer', fr: 'Ce que vous pouvez faire', de: 'Was du tun kannst', it: 'Cosa puoi fare' },
   'Sign in to begin': { es: 'Inicia sesión para empezar', fr: 'Connectez-vous pour commencer', de: 'Zum Start anmelden', it: 'Accedi per iniziare' },

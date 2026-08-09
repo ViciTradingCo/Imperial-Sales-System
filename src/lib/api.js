@@ -357,14 +357,6 @@ export const api = {
   getTileImages: () => request('GET', '/admin/tiles'),
   /** Admin: save the tile artwork map ({ key: httpsUrl }); blank clears a tile. */
   setTileImages: async (images) => { const r = await request('POST', '/admin/tiles', { images }); _tiles = null; return r; },
-  /** Admin: whether public storefronts are enabled. */
-  getStorefrontFlag: () => request('GET', '/admin/storefronts'),
-  /** Admin: enable/disable public storefronts. */
-  setStorefrontFlag: (enabled) => request('POST', '/admin/storefronts', { enabled }),
-  /** Public (no auth): a shop's read-only catalog. */
-  getPublicStorefront: (business, realmId) => request('GET', '/public/storefront?b=' + encodeURIComponent(business || '') +
-    (realmId ? '&realm=' + encodeURIComponent(realmId) : '')),
-  /** The network hold list. */
   /** The region list for the caller's realm. (Sign-up gets its own from checkCode.) */
   getRegions: () => request('GET', '/regions'),
   /** Recent intake transactions for the caller's business. */

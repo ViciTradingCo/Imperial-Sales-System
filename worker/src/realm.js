@@ -96,8 +96,16 @@ function genRealmId() {
   return 'rlm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 
-/** Normalizes a realm id, falling back to the default realm. */
-export function realmOf(value) {
+/**
+ * Normalizes a realm id, falling back to the default realm.
+ *
+ * Internal on purpose: a realm id arriving from OUTSIDE this module comes from
+ * the caller's own user row via `guards.realmIdOf`, never from a request
+ * parameter. The only caller that ever passed one in was the public storefront
+ * route (shelved — see archive/storefront/), which had no signed-in user to
+ * read it from.
+ */
+function realmOf(value) {
   const r = String(value || '').trim();
   return r || DEFAULT_REALM_ID;
 }

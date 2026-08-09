@@ -19,7 +19,6 @@ import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, import
   listItemIndex, moveItems, addItemType, updateItemType, deleteItemType,
   listPendingItems, approveItem } from '../item-index.js';
 import { writeRegions } from '../regions.js';
-import { storefrontsEnabled, setStorefrontsEnabled } from '../storefront.js';
 import { readBranding, readRealmBranding, writeBranding } from '../branding.js';
 import { readRealmPrefs, writeRealmPrefs } from '../realm-prefs.js';
 import { listRealms, createRealm, renameRealm, deleteRealm, realmStats, getRealm, regenerateRealmCode } from '../realm.js';
@@ -449,16 +448,6 @@ async function setTileImages({ request, env, body }) {
   return { images: next };
 }
 
-async function getStorefrontFlag({ request, env }) {
-  const caller = await requireAdmin(request, env);
-  return { enabled: await storefrontsEnabled(env, realmIdOf(caller, env)) };
-}
-async function setStorefrontFlag({ request, env, body }) {
-  const caller = await requireAdmin(request, env);
-  const on = await setStorefrontsEnabled(env, !!body.enabled, realmIdOf(caller, env));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'storefronts.toggle', detail: on ? 'enabled' : 'disabled', realmId: realmIdOf(caller, env) });
-  return { enabled: on };
-}
 async function setHolds({ request, env, body }) {
   const caller = await requireAdmin(request, env);
   const holds = await writeRegions(env, body.holds, realmIdOf(caller, env));
@@ -659,6 +648,4 @@ export const routes = [
   { method: 'POST', path: '/admin/branding', handler: saveBranding },
   { method: 'GET', path: '/admin/tiles', handler: getTileImages },
   { method: 'POST', path: '/admin/tiles', handler: setTileImages },
-  { method: 'GET', path: '/admin/storefronts', handler: getStorefrontFlag },
-  { method: 'POST', path: '/admin/storefronts', handler: setStorefrontFlag },
 ];

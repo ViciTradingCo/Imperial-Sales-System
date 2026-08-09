@@ -17,7 +17,7 @@
  * address in ADMIN_EMAILS). The Worker enforces that independently; hiding the
  * controls here is a courtesy, not the security.
  */
-import { el, mount, esc } from '../lib/dom.js';
+import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { toast } from '../lib/toast.js';
 import { tileGrid, sectionTiles, openFocalMenu } from '../lib/tiles.js';
@@ -197,7 +197,7 @@ export function renderRealms(container, { me, onRealmChanged }) {
         mount(host, nameCard, codeCard, el('div.card', {}, [
           el('h3', {}, 'Network Settings'),
           el('p', { class: 'note' }, 'Each realm keeps its own sync cadence and market thresholds. Settings always ' +
-            'apply to the realm you are working in, so use “Work in this realm” on ' + esc(r.name) + ' first. ' +
+            'apply to the realm you are working in, so use “Work in this realm” on ' + r.name + ' first. ' +
             'That way you can never edit one realm while looking at another.'),
         ]));
         return;

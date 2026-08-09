@@ -3,9 +3,19 @@
  * entry at the top as features ship.
  */
 const PATCH_NOTES = [
+  { version: '2.2', date: '2026-08-09', notes: [
+    'The register has two sides: Selling and Buying. Selling is the till you already know. Buying is where deliveries are now recorded — a supplier, a price, coin leaving the coffer is a thing you do at the counter, not a property of a list.',
+    'Record Intake and Buy Ingredients have moved off Inventory and onto the register\'s Buying side. Inventory keeps what makes stock without spending: Farm/Harvest, Craft, and correcting a count. The old Inventory button is still there and takes you straight to Buying.',
+    'Buying shows the last few deliveries, so you can see that what you just recorded actually landed. The full history — and removing a delivery entered by mistake — is still in Sales Log.',
+    'Each side is its own page, so Back works and a half-built cart is not thrown away by a glance at your deliveries.',
+    'Public storefronts are shelved. The share link, the network switch, and the public shop page are gone from the site; nothing else changes, and no shop data was touched. We will revisit it.',
+    'Fixed: Market Analysis did not open for admins at all — the page threw before it drew anything, and had done since the Sales Log release on 7 August. The region tab was asking a question nobody had imported the answer to.',
+    'Fixed: a shop, character or region whose name has an apostrophe in it was shown with "&#39;" where the apostrophe should be, on the register, Inventory, Employees, Home, the Shop Ledger and Court Tools. Grim&#39;s Forge is now Grim\'s Forge.',
+    'The bloat audit now catches both of those before they ship: a function called but never imported, and text escaped twice.',
+  ] },
   { version: '2.1', date: '2026-08-09', notes: [
     'Fixed: a delivery recorded with different capitalisation ("iron sword" against "Iron Sword") was creating a SECOND listing with its own stock and price. The stock went up on a row nobody was looking at, which is why intake looked like it was not updating. Deliveries now always land on the listing you already have.',
-    'Fixed: an ordinary restock was silently clearing an item\'s Ingredient flag, putting it back into the register and the storefront. A restock is not a re-classification — the flag only changes when the form actually says so.',
+    'Fixed: an ordinary restock was silently clearing an item\'s Ingredient flag, putting it back into the register and the pricing figures. A restock is not a re-classification — the flag only changes when the form actually says so.',
     'Inventory: Farm/Harvest. For stock you produced rather than bought — a crop, a hunt, a dig. Item and quantity, nothing else. No money leaves your coffer, and it is not counted as a purchase in the market figures.',
     'Inventory: Buy Ingredients. Build a basket and watch it total as you go, with prices starting at what you have paid before. Record it once and every line becomes a delivery with the stock added.',
     'Inventory: ingredients now show what they cost you — the average of your own deliveries, weighted by quantity — since a sale price says nothing about something you never sell.',

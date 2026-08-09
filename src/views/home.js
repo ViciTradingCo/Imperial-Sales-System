@@ -43,7 +43,7 @@ export function renderHome(container, { me }) {
   mount(container,
     motdHost,
     el('div.card', {}, [
-      el('h2', {}, 'Welcome, ' + esc(me.character || 'trader')),
+      el('h2', {}, 'Welcome, ' + (me.character || 'trader')),
       el('p', { html:
         '<b>Business:</b> ' + esc(me.business || '—') + '<br>' +
         '<b>Role:</b> ' + esc(roleTitle(me)) + '<br>' +
@@ -83,7 +83,7 @@ export function renderHome(container, { me }) {
       // is behind the hamburger — while its sibling the Shop Ledger had a tile.
       // Half an owner's tools being one click from home and half being hidden is
       // most of why things here were reported as hard to find.
-      me.role === 'owner' ? { key: 'shopsettings', label: 'Shop Settings', hint: 'Staff code, discounts, storefront', glyph: '⚙️',
+      me.role === 'owner' ? { key: 'shopsettings', label: 'Shop Settings', hint: 'Discounts, style, exports', glyph: '⚙️',
         onOpen: go('/ledger/settings') } : null,
       { key: 'saleslog', label: 'Sales Log', hint: 'Past sales & deliveries', glyph: '🧾',
         onOpen: go('/sales-log') },
@@ -109,7 +109,7 @@ export function renderHome(container, { me }) {
  */
 function adminWelcomeCard(me) {
   const nodes = [
-    el('h2', {}, 'Welcome, ' + esc(me.character || me.email || 'administrator')),
+    el('h2', {}, 'Welcome, ' + (me.character || me.email || 'administrator')),
     el('p', { html: 'This is the Admin Panel — you are signed in as a <b>' + esc(roleTitle(me)) + '</b>. ' +
       'Your tools are on the bar above.' }),
   ];

@@ -5,7 +5,7 @@
 import { loadConfig } from './lib/config.js';
 import { initAuth, renderSignInButton, onAuthChange, getProfile, signOut } from './lib/auth.js';
 import { configureApi, api } from './lib/api.js';
-import { initRouter, route, navigate, render, onBeforeRender, currentPath } from './lib/router.js';
+import { initRouter, route, navigate, render, onBeforeRender } from './lib/router.js';
 import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
@@ -21,7 +21,6 @@ import { setSessionUser } from './lib/sections.js';
 import { renderLanding } from './views/landing.js';
 import { renderHome } from './views/home.js';
 import { openLowStockModal, renderLowStock } from './views/low-stock.js';
-import { renderStorefront } from './views/storefront.js';
 import { renderRegister } from './views/register.js';
 import { renderProfile } from './views/profile.js';
 import { renderEmployees } from './views/employees.js';
@@ -204,12 +203,6 @@ route('/register', (container) => {
   });
 });
 
-// Public storefront — no sign-in required. #/shop?b=<business>
-route('/shop', (container, path, query) => {
-  const q = new URLSearchParams(query || '');
-  renderStorefront(container, q.get('b'), q.get('realm'));
-});
-
 route('/patch-notes', (container) => {
   const host = el('div', {});
   mount(container, el('div.card', {}, [
@@ -299,7 +292,14 @@ route('/restock', (container) => {
 
 route('/pos', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
-  renderPos(container, { me: state.me });
+  renderPos(container, { me: state.me, mode: 'sell' });
+});
+
+// The register's other half — stock coming IN. Its own route rather than a tab,
+// so Back works and a half-built cart survives a look at the deliveries.
+route('/pos/buy', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  renderPos(container, { me: state.me, mode: 'buy' });
 });
 
 route('/admin/settings', (container) => {
@@ -392,8 +392,6 @@ async function onSignedIn() {
   if (state.me && state.me.branding) applyBranding(state.me.branding);
   if (state.me && state.me.prefs) { setCurrency(state.me.prefs.currency); setRegion(state.me.prefs); }
   setSessionUser(state.me);
-  // A public deep-link (e.g. a shared storefront) stays put — don't redirect.
-  if (currentPath().split('?')[0] === '/shop') { render(); return; }
   renderBadge();
   showNav(!!(state.me && state.me.registered));
   // Watch for a deploy from here on. Started after sign-in because the notice
@@ -421,10 +419,7 @@ async function main() {
   initRouter(appEl, showRoot);
   onBeforeRender(clearActions); // reset per-view action buttons before each render
 
-  // Honor a public deep-link (shared storefront) on first load; else show landing.
-  const publicDeepLink = currentPath().split('?')[0] === '/shop';
-  if (publicDeepLink) render();
-  else renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
+  renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
   onAuthChange(({ idToken }) => { if (idToken) onSignedIn(); });
   // The API base goes in too: sign-in trades the Google token for a 24-hour
   // session of ours, which auth.js fetches for itself (it cannot import the API
@@ -432,7 +427,7 @@ async function main() {
   await initAuth(config.googleClientId, config.apiBaseUrl);
   // GIS is ready now — re-render so the sign-in button paints (unless one-tap
   // already signed the user in).
-  if (!state.profile && !publicDeepLink) renderSignedOutLanding(appEl);
+  if (!state.profile) renderSignedOutLanding(appEl);
 }
 
 main();

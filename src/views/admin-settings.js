@@ -1,7 +1,7 @@
 /**
  * Admin-only Network Settings — a grid of big buttons rather than a wall of
  * stacked cards. Each tile opens its section in a focal menu: network tunables,
- * branding, holds, tile art, storefronts, system status, backup, and the danger
+ * branding, holds, tile art, system status, backup, and the danger
  * zone. The API enforces admin-only access.
  */
 import { el, mount } from '../lib/dom.js';
@@ -35,8 +35,6 @@ export function renderAdminSettings(container, { me } = {}) {
       open: (host) => mount(host, trialCard()) },
     { key: 'set-tiles', label: 'Tile images', hint: 'Home tile artwork', glyph: '🖼️',
       open: (host) => mount(host, tileImagesCard()) },
-    { key: 'set-storefront', label: 'Storefronts', hint: 'Public shop pages', glyph: '🏪',
-      open: (host) => mount(host, storefrontCard()) },
     { key: 'set-status', label: 'System status', hint: 'Counts + errors', glyph: '💚',
       open: (host) => mount(host, statusCard(me)) },
     // Backup, log maintenance, and the full reset are one "data" section — they
@@ -326,6 +324,8 @@ const TILE_KEYS = [
   ['register', 'Register'], ['inventory', 'Inventory'], ['employees', 'Employees'],
   ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
   ['saleslog', 'Sales Log'], ['marketinfo', 'Market Info'], ['shopsettings', 'Shop Settings'],
+  // The register's Buying side
+  ['buy-intake', 'Register · Record a delivery'], ['buy-basket', 'Register · Buy ingredients'],
   // Sales Log's own two sections
   ['log-sales', 'Sales Log · Sales'], ['log-intake', 'Sales Log · Deliveries'],
   ['emp-code', 'Employees · Staff code'],
@@ -336,7 +336,7 @@ const TILE_KEYS = [
   ['set-holds', 'Settings · Regions'], ['set-money', 'Settings · Denomination'],
   ['set-trial', 'Settings · New shops'],
   ['set-tiles', 'Settings · Tile images'],
-  ['set-storefront', 'Settings · Storefronts'], ['set-status', 'Settings · System status'],
+  ['set-status', 'Settings · System status'],
   ['set-data', 'Settings · Data'],
   // MOTD sections
   ['motd-global', 'MOTD · Global notice'], ['motd-individual', 'MOTD · Individual'],
@@ -351,7 +351,7 @@ const TILE_KEYS = [
   // Shop Ledger sections
   ['led-report', 'Ledger · Performance'], ['led-notices', 'Ledger · Notices'],
   ['led-coffer', 'Ledger · Coffers'], ['led-discounts', 'Ledger · Discounts'],
-  ['led-style', 'Ledger · Style'], ['led-storefront', 'Ledger · Storefront'],
+  ['led-style', 'Ledger · Style'],
   ['led-export', 'Ledger · Export'], ['led-company', 'Ledger · Company'],
   ['led-settings', 'Ledger · Shop settings'],
   // Employees + Notices sections
@@ -408,31 +408,6 @@ function tileImagesCard() {
       '(Discord, Imgur, your own host). Must be a full https:// link straight to the image file. Leave blank to ' +
       'use the default glyph.'),
     el('div', { class: 'tile-img-list' }, rows),
-    el('div', { class: 'row-actions' }, [save]),
-    status,
-  ]);
-}
-
-/** Admin toggle for the public storefront feature (off by default). */
-function storefrontCard() {
-  const status = el('p', {});
-  const toggle = el('input', { type: 'checkbox' });
-  const save = el('button.primary', { onclick: doSave }, 'Save');
-  function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
-  api.getStorefrontFlag().then((r) => { toggle.checked = !!r.enabled; }).catch(() => {});
-  async function doSave() {
-    save.disabled = true; setStatus('Saving…', '');
-    try {
-      const r = await api.setStorefrontFlag(toggle.checked);
-      setStatus('Public storefronts ' + (r.enabled ? 'enabled' : 'disabled') + '.', 'ok');
-    } catch (e) { setStatus(e.message || String(e), 'error'); }
-    finally { save.disabled = false; }
-  }
-  return el('div.card', {}, [
-    el('h3', {}, 'Public storefronts'),
-    el('p', { class: 'note' }, 'When on, every active shop gets a public, read-only catalog page (no sign-in) at ' +
-      'its share link — great for RP customers. Off by default.'),
-    el('label', { class: 'inline' }, [toggle, document.createTextNode(' Enable public storefronts')]),
     el('div', { class: 'row-actions' }, [save]),
     status,
   ]);

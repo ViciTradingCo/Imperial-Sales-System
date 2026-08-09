@@ -75,6 +75,29 @@ When adding a section, give it a stable `key` and add that key to `TILE_KEYS` in
 
 Navigation stays in the header/side menu; tiles are for content within a page.
 
+## The register has two sides
+
+`/pos` is SELLING and `/pos/buy` is BUYING — one `renderPos(container, { me, mode })`
+with two routes, not a tab that swaps the body, so Back works and a half-built
+cart survives a look at the deliveries. The Buying side lives in
+`src/views/intake-form.js` (`renderBuying`).
+
+The split is by WHAT MOVES, not by what changes stock. Buying spends coin and
+names a supplier, so it is a till operation. Producing stock — Farm/Harvest,
+Craft — costs nothing and has no vendor, so it stays on Inventory, which is the
+list of what the shop HAS. Adding a stock-creating feature: if coin leaves the
+coffer, it belongs on Buying.
+
+## Shelved features live in `archive/`
+
+Code taken off the site but kept for later goes in `archive/<feature>/` with a
+README that says what it was, why it was shelved, and the exact wiring to
+restore — see `archive/storefront/`. The archived modules are left UNMODIFIED
+(their relative imports no longer resolve, deliberately) so they stay a faithful
+record. `archive/` is outside the Vite and Worker builds and outside the bloat
+audit's scan. Shelving a feature means removing every live mention of it; the
+patch-notes history stays as written, because it is a record of what shipped.
+
 ## Standing rule: features are realm-wide, data is realm-local
 
 Any new capability applies to EVERY realm — build it once, and every realm gets

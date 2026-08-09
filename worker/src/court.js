@@ -126,7 +126,7 @@ export async function setCourtStanding(env, hold, { business, standing, note }, 
 }
 
 /**
- * One shop's standing, for the register and the storefront to act on.
+ * One shop's standing, for the register to act on.
  *
  * Verifies the ruling still applies to where the shop actually trades: a shop
  * that has moved to another region is out of its old Court's reach, and a stale

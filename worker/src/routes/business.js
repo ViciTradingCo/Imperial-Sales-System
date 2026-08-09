@@ -7,7 +7,6 @@
 import { requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
 import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate } from '../users.js';
 import { renameBusiness, listBusinessCards } from '../registry.js';
-import { realmOf } from '../realm.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
@@ -34,7 +33,6 @@ import {
   standingOf,
 } from '../court.js';
 import { businessCsv } from '../export.js';
-import { publicStorefront } from '../storefront.js';
 import { readBranding } from '../branding.js';
 import { FEEDBACK_SUBJECTS, submitFeedback, listOwnFeedback } from '../feedback.js';
 
@@ -652,11 +650,6 @@ async function branding({ env }) {
   return await readBranding(env);
 }
 
-/** Public (no auth): a shop's read-only catalog, if storefronts are enabled. */
-async function storefront({ env, url }) {
-  return await publicStorefront(env, url.searchParams.get('b'), realmOf(url.searchParams.get('realm')));
-}
-
 /* ---- MOTD banners ---- */
 function daysUntil(untilStr) {
   const d = new Date(untilStr);
@@ -831,6 +824,5 @@ export const routes = [
   { method: 'POST', path: '/business/inventory/convert', handler: convertInventory },
   { method: 'GET', path: '/feedback', handler: getFeedback },
   { method: 'POST', path: '/feedback', handler: postFeedback },
-  { method: 'GET', path: '/public/storefront', handler: storefront },
   { method: 'GET', path: '/branding', handler: branding },
 ];

@@ -4,7 +4,7 @@
  *   • Shop Ledger (Home tile)  — what an owner checks while TRADING:
  *     performance, notices to staff, and the coffer.
  *   • Shop Settings (side menu) — what they SET UP and rarely touch again:
- *     discounts, the storefront link, exports, the staff code, and the shop's
+ *     discounts, exports, the staff code, and the shop's
  *     own name and style.
  *
  * They were one screen of ten tiles, which meant the coffer — looked at daily —
@@ -39,7 +39,7 @@ function tilePage(container, { title, note, sections }) {
 export function renderLedgerSettings(container, { me }) {
   tilePage(container, {
     title: 'Shop Ledger',
-    note: esc(me.business || 'Your shop') + ' — how the shop is doing, day to day. ' +
+    note: (me.business || 'Your shop') + ' — how the shop is doing, day to day. ' +
       'Discounts, style, and the rest are under Shop Settings in the menu.',
     sections: [
       { key: 'led-report', label: 'Performance', hint: 'Revenue & best sellers', glyph: '📈',
@@ -56,13 +56,11 @@ export function renderLedgerSettings(container, { me }) {
 export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
   tilePage(container, {
     title: 'Shop Settings',
-    note: esc(me.business || 'Your shop') + ' — how your shop is set up. Day-to-day figures are on the ' +
+    note: (me.business || 'Your shop') + ' — how your shop is set up. Day-to-day figures are on the ' +
       'Shop Ledger tile at home; your staff code is on the Employees page, where you invite people.',
     sections: [
       { key: 'led-discounts', label: 'Discounts', hint: 'Reusable offers', glyph: '🏷️',
         open: (host) => mount(host, discountsCard()) },
-      { key: 'led-storefront', label: 'Storefront', hint: 'Public share link', glyph: '🏪',
-        open: (host) => mount(host, storefrontLinkCard(me)) },
       { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
         open: (host) => mount(host, exportCard()) },
       // Name, look, and tunables are one job — "set my shop up" — and were three
@@ -157,29 +155,6 @@ function cofferCard() {
     el('div', { class: 'row-actions' }, [amount, note, apply]),
     status,
     ledger,
-  ]);
-}
-
-/* ---- Public storefront share link ---- */
-function storefrontLinkCard(me) {
-  // The realm is part of the link: a visitor has no account, and two realms can
-  // each have a shop of this name.
-  const url = location.origin + location.pathname + '#/shop?b=' + encodeURIComponent(me.business || '') +
-    (me.homeRealm && me.homeRealm !== 'default' ? '&realm=' + encodeURIComponent(me.homeRealm) : '');
-  const box = el('input', { type: 'text', readonly: true, value: url });
-  const status = el('p', {});
-  const copy = el('button.secondary-btn', { onclick: async () => {
-    try { await navigator.clipboard.writeText(url); status.className = 'ok'; status.textContent = 'Copied ✓'; }
-    catch (e) { box.select(); status.className = ''; status.textContent = 'Press Ctrl/Cmd-C to copy.'; }
-  } }, 'Copy link');
-  const open = el('a', { class: 'secondary-btn', href: url, target: '_blank', rel: 'noopener' }, 'Preview');
-  return el('div.card', {}, [
-    el('h2', {}, 'Storefront'),
-    el('p', { class: 'note' }, 'A public, read-only page of your wares (no sign-in) that customers can browse. Share this ' +
-      'link. It only works while an admin has public storefronts enabled network-wide.'),
-    box,
-    el('div', { class: 'row-actions' }, [copy, open]),
-    status,
   ]);
 }
 

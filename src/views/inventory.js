@@ -1,20 +1,25 @@
 /**
- * Inventory page.
- *   • Everyone in the business: view items (price / stock / status).
- *   • Owner/admin: record intake (a purchase transaction — vendor, hold,
- *     quantity, $ per item — which logs the buy and adds stock), edit an item's
- *     sale price + low-stock threshold (via a focus modal opened from Edit), and
- *     remove items. Recent intake is listed for reference.
- * New items are created by recording intake; the edit modal only adjusts an
- * existing item's details.
+ * Inventory — WHAT THE SHOP HAS.
+ *
+ *   • Everyone in the business: view items (price / stock / status), and put
+ *     stock in that was PRODUCED rather than bought — Farm/Harvest and Craft.
+ *   • Owner/admin: correct a count by hand, edit an item's sale price and
+ *     low-stock threshold, move stock to another company, bulk import/export,
+ *     and remove a listing.
+ *
+ * BUYING IS NOT HERE. Recording a delivery and buying ingredients moved to the
+ * register's Buying side, because they are till operations — a supplier, a
+ * price agreed, coin leaving the coffer — and this page is a list of what you
+ * hold. What stayed is what creates stock without spending: a harvest and a
+ * craft have no vendor and no cost.
  */
-import { money, regionLabel, regionWord, regionsOn } from '../lib/format.js';
+import { money } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
-import { openStepModal } from '../lib/steps.js';
 import { setOpsActions } from '../lib/sections.js';
+import { navigate } from '../lib/router.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
@@ -25,27 +30,25 @@ export function renderInventory(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
   const listHost = el('div', {}, skeletonRows(4));
 
-  // The Record Intake button sits between the intro and the item list.
   const firstCard = [
     el('h2', {}, 'Inventory'),
-    el('p', { class: 'note' }, esc(me.business || 'Your shop') +
-      ' — items, prices, and stock. "Low" means at or below an item’s own Low Stock number.'),
+    el('p', { class: 'note' }, (me.business || 'Your shop') +
+      ' — items, prices, and stock. "Low" means at or below an item’s own Low Stock number. ' +
+      'Bought a delivery? That is the register, under Buying.'),
   ];
   // Crafting and harvesting are shop-floor work — the person at the bench or in
   // the field is usually not the owner — so they are open to any active member.
-  // Intake, transfers and the bulk import move money or rewrite the listing, and
-  // stay with the owner.
+  // Transfers and the bulk import rewrite the listing, and stay with the owner.
   const tools = [
-    el('button.secondary-btn', { onclick: () => openHarvestModal(refreshAll) }, 'Farm/Harvest'),
-    el('button.secondary-btn', { onclick: () => openCraftModal(refreshAll) }, 'Craft'),
+    el('button.secondary-btn', { onclick: () => openHarvestModal(refreshInventory) }, 'Farm/Harvest'),
+    el('button.secondary-btn', { onclick: () => openCraftModal(refreshInventory) }, 'Craft'),
   ];
   if (canEdit) {
-    tools.unshift(el('button.primary', { onclick: () => openIntakeModal(refreshAll, me) }, 'Record Intake'));
-    // Spends coin, so it stays with the owner — but it is the ingredient-buying
-    // trip, not a single delivery, so it gets its own door.
-    tools.push(el('button.secondary-btn', { onclick: () => openIngredientBuyModal(refreshAll) }, 'Buy Ingredients'));
+    // Not a duplicate of the register's Buying tile — it is the signpost for
+    // someone who came here looking for Record Intake, where it used to be.
+    tools.unshift(el('button.primary', { onclick: () => navigate('/pos/buy') }, 'Buy / Record a delivery'));
     tools.push(
-      el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshAll) }, 'Transfer'),
+      el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshInventory) }, 'Transfer'),
       el('button.secondary-btn', { onclick: () => openImportExportModal(refreshInventory) }, 'Import/Export'),
     );
   }
@@ -57,11 +60,12 @@ export function renderInventory(container, { me }) {
 
   function renderList(items) {
     if (!items.length) {
-      // No action button here: Record Intake is in the toolbar a few pixels
-      // above, and the empty state was rendering a second one right under it.
+      // No action button here: the toolbar is a few pixels above, and the empty
+      // state was rendering a second one right under it.
       mount(listHost, emptyState({ glyph: '📦', title: 'No items yet',
         hint: canEdit
-          ? 'Record an intake above to stock your first item — it will appear here with its price and stock.'
+          ? 'Record a delivery on the register’s Buying side to stock your first item — it will appear here '
+            + 'with its price and stock.'
           : 'Nothing stocked yet.' }));
       return;
     }
@@ -79,7 +83,7 @@ export function renderInventory(container, { me }) {
       const row = el('div.emp-row', {}, [meta]);
       if (canEdit) {
         const edit = el('button.primary.small', { onclick: () => openItemModal(it, refreshInventory) }, 'Edit');
-        const count = el('button.secondary-btn.small', { onclick: () => openStockModal(it, refreshAll) }, 'Stock');
+        const count = el('button.secondary-btn.small', { onclick: () => openStockModal(it, refreshInventory) }, 'Stock');
         const del = el('button.secondary-btn.small', {
           onclick: async () => {
             if (!confirm('Remove "' + it.item + '" from your inventory?\n\n' +
@@ -101,10 +105,6 @@ export function renderInventory(container, { me }) {
     try { renderList((await api.getInventory()).inventory || []); }
     catch (e) { mount(listHost, el('p', { class: 'error' }, e.message || String(e))); }
   }
-  // Recording intake changes stock, so the list redraws; the delivery itself is
-  // listed on the Sales Log, which is where records live now.
-  async function refreshAll() { await refreshInventory(); }
-
   refreshInventory();
 }
 
@@ -203,134 +203,6 @@ function openStockModal(it, onSaved) {
     save,
     status,
   ]);
-}
-
-/**
- * BUYING INGREDIENTS — a shopping list that totals as you build it.
- *
- * The job this replaces: standing at a supplier working out what a basket comes
- * to, then going home and recording each line as a separate intake. It is the
- * register's arithmetic pointed the other way — add lines, watch the total, and
- * when you actually buy it, record the lot in one go.
- *
- * It defaults every price to what this shop has ACTUALLY PAID before, which is
- * the whole reason the cost is worth showing on the item line: you arrive
- * knowing what it should come to.
- */
-function openIngredientBuyModal(onDone) {
-  const idem = newIdem();
-  let stock = [];
-  const rows = [];              // [{ el, name, qty, price }]
-  const rowsHost = el('div', {});
-  const totalLine = el('p', { class: 'buy-total' }, '');
-  const status = el('p', {});
-  const save = el('button.primary', { onclick: doBuy }, 'Buy & add to stock');
-  function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
-
-  const lineTotal = (r) => (Number(r.qty.value) || 0) * (Number(r.price.value) || 0);
-
-  function retotal() {
-    const n = rows.reduce((sum, r) => sum + lineTotal(r), 0);
-    totalLine.textContent = 'Basket: ' + money(n);
-    rows.forEach((r) => {
-      r.sub.textContent = lineTotal(r) ? money(lineTotal(r)) : '';
-    });
-  }
-
-  function addRow() {
-    const picker = createItemPicker({
-      allowFree: true,
-      placeholder: 'Ingredient…',
-      freeHint: 'Not in the index — it will be added for an admin to check.',
-      // What you last paid, so the price fills itself in.
-      meta: (it) => {
-        const held = stock.find((s) => s.item.toLowerCase() === it.name.toLowerCase());
-        return held && held.avgCost ? 'usually ' + money(held.avgCost) : '';
-      },
-      onPick: (it) => {
-        const held = stock.find((s) => s.item.toLowerCase() === it.name.toLowerCase());
-        if (held && held.avgCost && !row.price.value) row.price.value = String(held.avgCost);
-        retotal();
-      },
-    });
-    const qty = el('input', { type: 'number', step: '1', min: '1', value: '1' });
-    const price = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Each' });
-    const sub = el('span', { class: 'buy-sub' }, '');
-    qty.addEventListener('input', retotal);
-    price.addEventListener('input', retotal);
-    const remove = el('button.secondary-btn.small', { onclick: () => {
-      const i = rows.indexOf(row);
-      if (i >= 0) { rows.splice(i, 1); wrap.remove(); retotal(); }
-    } }, '×');
-    const wrap = el('div', { class: 'craft-row' }, [picker.el, qty, price, sub, remove]);
-    const row = { el: wrap, picker, qty, price, sub };
-    rows.push(row);
-    rowsHost.appendChild(wrap);
-    retotal();
-  }
-
-  api.getInventory().then((r) => {
-    stock = r.inventory || [];
-    // Seed the picker of every row already on screen.
-    const items = stock.map((s) => ({ name: s.item, avgCost: s.avgCost }));
-    rows.forEach((r) => r.picker.setItems(items));
-  }).catch(() => {});
-  api.getItems().then((r) => {
-    const idx = r.items || [];
-    rows.forEach((row) => row.picker.setItems(idx));
-    addRowSeeded = (row) => row.picker.setItems(idx);
-  }).catch(() => {});
-  let addRowSeeded = null;
-
-  async function doBuy() {
-    const lines = rows
-      .map((r) => ({
-        item: r.picker.selected() ? r.picker.selected().name : r.picker.value(),
-        qty: Math.floor(Number(r.qty.value) || 0),
-        price: Number(r.price.value),
-      }))
-      .filter((l) => l.item && l.qty > 0);
-    if (!lines.length) { setStatus('Add at least one ingredient.', 'error'); return; }
-    const bad = lines.find((l) => !isFinite(l.price) || l.price < 0);
-    if (bad) { setStatus('What did "' + bad.item + '" cost each?', 'error'); return; }
-
-    save.disabled = true;
-    setStatus('Recording…', '');
-    try {
-      // One intake per line, sharing a key prefix so a retry cannot double any
-      // of them. They are separate deliveries in the log because they are
-      // separate items — the basket is a convenience, not a record.
-      for (let i = 0; i < lines.length; i++) {
-        await api.recordIntake({
-          item: lines[i].item,
-          numItems: lines[i].qty,
-          pricePer: lines[i].price,
-          ingredient: true,
-          idempotencyKey: idem + '-' + i,
-        });
-      }
-      onDone();
-      modal.close();
-      toast(lines.length + ' ingredient(s) added to stock.', 'ok');
-    } catch (e) {
-      save.disabled = false;
-      setStatus(e.message || String(e), 'error');
-    }
-  }
-
-  addRow();
-  const modal = openModal([
-    el('h3', {}, 'Buy ingredients'),
-    el('p', { class: 'note' }, 'Build the basket and watch it total. Prices start at what you have paid ' +
-      'before. When you record it, each line becomes a delivery and the stock goes in — marked as ' +
-      'ingredients, so they stay out of the register.'),
-    rowsHost,
-    el('button.secondary-btn.small', { onclick: () => { addRow(); if (addRowSeeded) addRowSeeded(rows[rows.length - 1]); } }, '+ Add another'),
-    totalLine,
-    save,
-    status,
-  ]);
-  return modal;
 }
 
 /**
@@ -508,199 +380,6 @@ function openCraftModal(onDone) {
     save,
     status,
   ]);
-}
-
-/**
- * Intake (restock), asked one step at a time.
- *
- * The form grew to nine fields — item, quantity, cost, sale price, ingredient,
- * vendor, supplier, region — which is a wall to scroll for what is usually a
- * four-field job. It is now three steps: WHAT arrived, WHAT IT COST and what it
- * sells for, and WHERE it came from. The last step shows the whole delivery
- * back before anything is recorded.
- */
-function openIntakeModal(onRecorded, me) {
-  const idem = newIdem(); // one key per intake entry — retries won't double the stock
-  // Items must be chosen from the master index so stock never lands under a typo.
-  const picker = createItemPicker({
-    // Same as the register: a delivery can contain something the index has
-    // never heard of, and refusing it would mean either abandoning the record
-    // or filing it under the wrong name. It is added flagged, for an admin.
-    allowFree: true,
-    freeHint: 'Not in the index — recording this will add it, for an admin to check.',
-    placeholder: 'Search the item index…',
-    // The type only, to tell similarly named items apart. No price: this picks
-    // a name, and the cost and sale price have their own fields below.
-    meta: (it) => (it.category && it.category !== 'Unsorted' ? it.category : ''),
-    onPick: (it) => {
-      if (!per.value) per.value = String(it.baseValue);
-      // Suggest the index's base value to charge, not the cost — a shop that
-      // sells at what it paid makes nothing, and that was the old default.
-      if (!sale.value) sale.value = String(it.baseValue);
-      showKnownPrice(it.name);
-    },
-  });
-  api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});
-  const hold = el('select', {}, el('option', { value: '' }, 'Select a ' + regionWord() + '…'));
-  /**
-   * WHO SOLD IT TO YOU — one field for both kinds of supplier.
-   *
-   * It used to be two: a free-text "Vendor" and a dropdown asking, separately,
-   * whether that vendor happened to be a registered company. That made the
-   * common case (an NPC smith) look like it was missing an answer, and the
-   * useful case (a real shop) something you had to fill in twice.
-   *
-   * Now you type a name. Registered companies narrow as you type and can be
-   * clicked; anything else is taken as written. Naming a registered company
-   * credits it for the supply in its region's figures, and fills in the region
-   * from that company's own record — the goods came from where the seller
-   * trades, and asking a second time invites a different answer.
-   */
-  const vendor = createItemPicker({
-    allowFree: true,
-    placeholder: 'Who did you buy from?',
-    freeHint: 'Not a registered company — it will be recorded as typed.',
-    meta: (c) => (regionsOn() && c.hold ? c.hold : ''),
-    onPick: (c) => {
-      // The supplier's own region, unless the user has already chosen one.
-      if (regionsOn() && c.hold && !hold.value) hold.value = c.hold;
-    },
-  });
-  api.getBusinesses()
-    .then((r) => {
-      // `cards` carries each company's region; the plain name list is the
-      // fallback for a Worker that has not caught up with this deploy yet.
-      const cards = r.cards || (r.businesses || []).map((b) => ({ business: b, hold: '' }));
-      vendor.setItems(cards
-        .filter((c) => c.business !== (me && me.business))   // a shop does not buy from itself
-        .map((c) => ({ name: c.business, hold: c.hold })));
-    })
-    .catch(() => { /* free text still works; there is just nothing to suggest */ });
-  /** The typed name, only when it IS a registered company. */
-  const vendorCompany = () => (vendor.selected() ? vendor.selected().name : '');
-  const qty = el('input', { type: 'number', step: '1', min: '1', placeholder: '# of items' });
-  const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Cost per item' });
-  /**
-   * What the register will charge for this item. Separate from the cost above,
-   * which is what the shop PAID — conflating the two is how an item ends up
-   * listed at its own purchase price.
-   */
-  const sale = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Leave blank to keep the current price' });
-  const saleHint = el('p', { class: 'note' }, '');
-  /**
-   * Stock the shop holds to CRAFT with, not to sell. Ticking it takes the item
-   * out of the register and off the public storefront, and the sale price stops
-   * meaning anything — so the field goes with it rather than sitting there
-   * inviting a number nobody will ever charge.
-   */
-  const ingredient = el('input', { type: 'checkbox' });
-  const saleWrap = el('div', {}, [
-    el('label', {}, 'Sale price — what the register will charge'), sale, saleHint,
-  ]);
-  ingredient.addEventListener('change', () => { saleWrap.hidden = ingredient.checked; });
-
-  // If the shop already lists this item, say what it currently charges, so a
-  // blank field is an informed choice rather than a guess.
-  let current = [];
-  api.getInventory().then((r) => { current = r.inventory || []; }).catch(() => {});
-  function showKnownPrice(name) {
-    const have = current.find((i) => i.item.toLowerCase() === String(name).toLowerCase());
-    saleHint.textContent = have
-      ? 'You currently sell this at ' + money(have.price) + '. Leave blank to keep that.'
-      : 'New to your shop — this becomes its price in the register.';
-  }
-  // Fill the hold dropdown.
-  api.getRegions()
-    .then((res) => (res.holds || []).forEach((h) => hold.appendChild(el('option', { value: h }, h))))
-    .catch(() => { /* hold is optional */ });
-
-  // The delivery read back before it is recorded — the one screen where a
-  // mistyped quantity or a cost in the sale-price field is obvious.
-  const review = el('div', { class: 'step-review' }, '');
-  function fillReview() {
-    const picked = picker.selected();
-    const name = picked ? picked.name : picker.value();
-    const n = Number(qty.value) || 0;
-    const cost = Number(per.value) || 0;
-    const rows = [
-      ['Item', name ? name + (picked ? '' : ' (new)') : '—'],
-      ['Quantity', String(n)],
-      ['Cost', money(cost) + ' each · ' + money(n * cost) + ' total'],
-    ];
-    if (ingredient.checked) rows.push(['Sells for', 'Ingredient — not sold']);
-    else if (sale.value !== '') rows.push(['Sells for', money(Number(sale.value) || 0)]);
-    const source = vendor.value();
-    // Say which kind it was: a registered company is credited for the supply,
-    // a typed name is not, and that difference is worth seeing before it lands.
-    if (source) rows.push(['Bought from', source + (vendorCompany() ? ' (registered)' : '')]);
-    if (regionsOn() && hold.value) rows.push([regionLabel(), hold.value]);
-    review.innerHTML = rows
-      .map(([k, v]) => '<div class="step-review-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>')
-      .join('');
-  }
-
-  async function doRecord() {
-    const picked = picker.selected();
-    await api.recordIntake({
-      // A picked item carries its canonical spelling; free text is taken as
-      // typed and added to the index flagged for review.
-      item: picked ? picked.name : picker.value(),
-      salePrice: ingredient.checked ? '' : sale.value,
-      ingredient: ingredient.checked,
-      vendor: vendor.value(),
-      fromBusiness: vendorCompany(),
-      hold: hold.value,
-      numItems: qty.value,
-      pricePer: per.value,
-      idempotencyKey: idem,
-    });
-    onRecorded();
-  }
-
-  return openStepModal({
-    title: 'Record intake (restock)',
-    finishLabel: 'Record intake',
-    onFinish: doRecord,
-    steps: [
-      {
-        title: 'What arrived?',
-        hint: 'Pick the item from the index so the stock never lands under a typo.',
-        nodes: [
-          el('label', {}, 'Item'), picker.el,
-          el('label', {}, '# of items'), qty,
-        ],
-        validate: () => {
-          if (!picker.selected() && !picker.value()) return 'Type an item, or pick one from the index.';
-          if (!(Number(qty.value) > 0)) return 'How many arrived? Enter at least 1.';
-          return null;
-        },
-      },
-      {
-        title: 'What did it cost?',
-        hint: 'The cost is what you paid. The sale price is what the register will charge — they are not the same number.',
-        nodes: [
-          el('label', {}, 'Cost per item — what you paid'), per,
-          el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
-          saleWrap,
-        ],
-        validate: () => (per.value !== '' && Number(per.value) >= 0
-          ? null
-          : 'Enter what you paid per item — 0 is fine if it was free.'),
-      },
-      {
-        title: 'Where did it come from?',
-        hint: 'All optional. Fill in what you know.',
-        nodes: [
-          el('label', {}, 'Vendor'), vendor.el,
-          el('p', { class: 'note' }, 'Start typing — shops on this network will appear as you go. Naming one ' +
-            'credits it for the supply in its ' + regionWord() + '’s figures. Anyone else, just type the name.'),
-          ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
-          review,
-        ],
-        onEnter: fillReview,
-      },
-    ],
-  });
 }
 
 /** Bulk import/export inventory via a copy-paste text box (focus modal). */

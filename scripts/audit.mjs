@@ -37,7 +37,7 @@ const BIG_FN_LINES = 120;
 /** How many times a string has to repeat before it wants to be a constant. */
 const REPEAT_LITERAL = 4;
 
-const findings = { dead: [], dup: [], size: [], left: [] };
+const findings = { bug: [], dead: [], dup: [], size: [], left: [] };
 const add = (group, file, what, suggestion) => findings[group].push({ file, what, suggestion });
 
 /* ---------------------------------------------------------------- helpers */
@@ -60,7 +60,10 @@ function code(text) {
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
     .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
     .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
-    .replace(/`(?:[^`\\]|\\.)*`/g, '``');
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``')
+    // Regex literals, so a capture group inside one is not read as a call. Only
+    // where a regex can legally START, which is what keeps division safe.
+    .replace(/([=(,:[!&|?+;]|\breturn|\bmatch|\btest|\bsplit|\breplace)(\s*)\/(?![*\/])(?:[^/\\\n[]|\\.|\[(?:[^\]\\]|\\.)*\])+\/[gimsuy]*/g, '$1$2/./');
 }
 
 const IMPORT_RE = /import\s+(?:\{([^}]*)\}|(\w+))\s+from\s+['"]([^'"]+)['"]/gs;
@@ -361,9 +364,115 @@ function staleMarkers(files) {
   }
 }
 
+
+/**
+ * `esc()` applied to a TEXT NODE, which double-escapes it.
+ *
+ * `el(spec, props, children)` appends a string child with createTextNode, and
+ * emptyState() does the same with its title and hint — so those are already
+ * inert. Escaping first is what turns a shop called "Grim's Forge" into
+ * "Grim&#39;s Forge" on screen. `esc()` is only for a value being interpolated
+ * into an `html:` string.
+ *
+ * Raw lines, not `code()`: stripping comments renumbers the file, and a check
+ * that reports a line has to point at the real one.
+ *
+ * The discriminator is MARKUP. An `esc()` inside an `html:` string sits in a
+ * concatenation that contains tags, so a line with a `<` on it — or any line of
+ * the run above it — is left alone. That run is what keeps a middle line of a
+ * multi-line html: block (`(x ? ' · ' + esc(x) : '') +`) from being reported.
+ */
+function doubleEscaped(files) {
+  const LOOKBACK = 8;
+  for (const file of files) {
+    if (rel(file).endsWith('src/lib/dom.js')) continue;   // esc() is defined here
+    const lines = read(file).split('\n');
+    lines.forEach((line, i) => {
+      if (!/esc\(/.test(line)) return;
+      if (/[<>]/.test(line) || /html\s*:/.test(line)) return;
+      if (/^\s*(?:\*|\/\/)/.test(line)) return;          // prose about esc()
+      const above = lines.slice(Math.max(0, i - LOOKBACK), i).join('\n');
+      if (/[<>]/.test(above) || /html\s*:/.test(above)) return;
+      add('bug', `${rel(file)}:${i + 1}`, 'esc() on text that is not interpolated into HTML',
+        'Drop the esc(). el() and emptyState() append strings as TEXT NODES, so escaping first ' +
+        'shows the entities — a name with an apostrophe renders as &#39;.');
+    });
+  }
+}
+
+/**
+ * A function CALLED but never defined, imported, or passed in.
+ *
+ * The bug this catches has shipped three times now: `api.listBusinesses()` when
+ * the client exported `getBusinesses`, `regionsOn()` in sections.js with only
+ * `regionLabel` imported, and `standingOf()` in the storefront module. None of
+ * them are syntax errors, so the build is happy and the page throws the moment
+ * a person opens it.
+ *
+ * Deliberately conservative — it reports a bare `name(` only. A call through an
+ * object (`api.x()`, `foo.bar()`) is somebody else's contract to keep, and
+ * chasing those is what makes a check like this cry wolf until it is ignored.
+ */
+const BROWSER_GLOBALS = new Set([
+  'Array', 'Blob', 'Boolean', 'Date', 'Error', 'Intl', 'JSON', 'Map', 'Math', 'Number', 'Object',
+  'Promise', 'RegExp', 'Request', 'Response', 'Set', 'String', 'URL', 'URLSearchParams', 'WeakMap',
+  'AbortController', 'CustomEvent', 'Event', 'FormData', 'Headers', 'Image', 'MutationObserver',
+  'TextDecoder', 'TextEncoder', 'DecompressionStream', 'CompressionStream', 'ReadableStream',
+  'alert', 'atob', 'btoa', 'clearInterval', 'clearTimeout', 'confirm', 'crypto', 'decodeURIComponent',
+  'encodeURIComponent', 'fetch', 'isFinite', 'isNaN', 'parseFloat', 'parseInt', 'performance', 'prompt',
+  'queueMicrotask', 'requestAnimationFrame', 'setInterval', 'setTimeout', 'structuredClone',
+  'console', 'document', 'localStorage', 'location', 'navigator', 'sessionStorage', 'window',
+  'Uint8Array', 'Uint32Array', 'Int32Array', 'Float64Array', 'ArrayBuffer', 'DataView', 'BigInt', 'Symbol',
+  'Proxy', 'Reflect', 'globalThis', 'queueMicrotask', 'reportError',
+]);
+const KEYWORDS = new Set([
+  'if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'typeof', 'await', 'new', 'do',
+  'else', 'case', 'delete', 'void', 'in', 'of', 'yield', 'async', 'import', 'export', 'throw',
+  'instanceof', 'super', 'this', 'try', 'get', 'set', 'constructor',
+]);
+
+/** Every identifier a name could legitimately be bound to, in one file. */
+function boundNames(src) {
+  const names = new Set([...BROWSER_GLOBALS, ...KEYWORDS]);
+  const addList = (text) => {
+    // Handles `a, { b, c } = {}, ...rest` — the shapes that actually appear.
+    for (const m of String(text).matchAll(/([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
+  };
+  for (const m of src.matchAll(/import\s*\{([^}]+)\}/g)) {
+    m[1].split(',').forEach((n) => names.add(n.trim().split(/\s+as\s+/).pop()));
+  }
+  for (const m of src.matchAll(/import\s+(?:(\w+)|\*\s+as\s+(\w+))\s+from/g)) names.add(m[1] || m[2]);
+  for (const m of src.matchAll(/\b(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
+  // Parameters, destructured or not, plus catch bindings.
+  for (const m of src.matchAll(/(?:function\s*[\w$]*\s*|catch\s*)\(([^()]*)\)/g)) addList(m[1]);
+  for (const m of src.matchAll(/\(([^()]*)\)\s*=>/g)) addList(m[1]);
+  for (const m of src.matchAll(/([A-Za-z_$][\w$]*)\s*=>/g)) names.add(m[1]);
+  // Properties holding functions, and method SHORTHAND — `scheduled(a, b) {`
+  // is a definition even though it reads exactly like a call.
+  for (const m of src.matchAll(/([A-Za-z_$][\w$]*)\s*:/g)) names.add(m[1]);
+  for (const m of src.matchAll(/(?:^|[{,]|\basync\b|\bstatic\b)\s*([A-Za-z_$][\w$]*)\s*\([^()]*\)\s*\{/gm)) names.add(m[1]);
+  return names;
+}
+
+function undefinedCalls(files) {
+  for (const file of files) {
+    const src = code(read(file));
+    const bound = boundNames(src);
+    const missing = new Set();
+    for (const m of src.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)) {
+      if (!bound.has(m[1])) missing.add(m[1]);
+    }
+    for (const name of missing) {
+      add('bug', rel(file), `calls \`${name}()\`, which is not defined or imported here`,
+        'Import it, or fix the name. This throws the moment the code runs — the build cannot see it.');
+    }
+  }
+}
+
 /* ------------------------------------------------------------------ report */
 
 const GROUPS = [
+  ['bug', 'LIKELY BUGS', 'This does not do what it looks like it does.'],
   ['dead', 'DEAD WEIGHT', 'Nothing reaches this code.'],
   ['dup', 'DUPLICATION', 'The same thing, written more than once.'],
   ['size', 'SIZE', 'Big enough to be worth splitting.'],
@@ -419,4 +528,6 @@ bigFiles(all);
 bigFunctions(all);
 commentedCode(all);
 staleMarkers(all);
+doubleEscaped(front);
+undefinedCalls(all);
 report();

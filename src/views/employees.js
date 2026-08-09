@@ -22,7 +22,7 @@ export function renderEmployees(container, { me }) {
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
     el('h2', {}, 'Employees'),
-    el('p', { class: 'note' }, 'Your roster at ' + esc(me.business || 'your business') + '. Pick a section to open it.'),
+    el('p', { class: 'note' }, 'Your roster at ' + (me.business || 'your business') + '. Pick a section to open it.'),
     gridHost,
   ]));
 
@@ -35,7 +35,7 @@ export function renderEmployees(container, { me }) {
     { key: 'emp-roster', label: 'Roster', hint: 'Activate & annotate', glyph: '🧑‍🤝‍🧑',
       open: (host) => mount(host, el('div.card', {}, [
         el('h3', {}, 'Roster'),
-        el('p', { class: 'note' }, 'Everyone registered under ' + esc(me.business || 'your business') +
+        el('p', { class: 'note' }, 'Everyone registered under ' + (me.business || 'your business') +
           '. Activate pending accounts to let them ring up sales. Notes are private to you.'),
         list,
       ])) },

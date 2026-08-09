@@ -63,7 +63,6 @@ describe('frontend API client', () => {
   it('calls only paths the Worker actually routes', () => {
     const served = new Set([...authRoutes, ...adminRoutes, ...businessRoutes].map((r) => r.path));
     served.add('/health');       // served by the router itself, not a route module
-    served.add('/shop');         // public storefront, same
     const missing = [];
     // Paths are written as string or template literals in the client; take the
     // literal head, since anything after `?` or `${` is a query, not a route.
