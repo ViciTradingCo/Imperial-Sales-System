@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '2.5', date: '2026-08-09', notes: [
+    'Admins: the Master Item Index is one table on the page. It was a tile per type, each opening its own list in a window — so seeing what the index held cost a click per type, and two items filed differently could not be looked at together. Now every item is listed at once, sorted by name, with the table it is filed under as a column.',
+    'The types are still there as a filter beside the search. Picking one narrows the list in place, and Add, Import/Export and Empty follow whatever is on screen — each button says which, so none of them can act on something you are not looking at.',
+    'Ticking and moving items between tables works from the same list, and long indexes are paged rather than rendered all at once.',
+  ] },
   { version: '2.4', date: '2026-08-09', notes: [
     'A delivery can hold as many items as the trip brought. Add a line each — item, quantity, cost — and the total keeps up as you type, so you can check the form against what you actually handed over. The supplier and the region are asked once, because a crate comes from one person on one day.',
     'The second step now asks what each item will sell for, one at a time, with the Ingredient tick beside it. An ingredient run is one delivery again rather than a trip back to the form per reagent.',

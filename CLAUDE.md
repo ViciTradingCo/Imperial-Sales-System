@@ -155,6 +155,14 @@ whole-index import puts unflagged rows, and where a removed table's items go. It
 always exists and cannot be renamed or deleted. Removing a table never removes
 items.
 
+That division is STORAGE and routing, not layout. The admin view is ONE table on
+the page listing every item, with the type as a column and a filter; it was a
+tile per type, each opening its own list in a focal menu, which made reading the
+index cost a click per type and made comparing two differently-filed items
+impossible. Every action (add, import, empty) follows the filter and says so in
+its label. Manage tables stays a focal menu — it is a settings screen, not the
+index.
+
 Each table also carries `flags` — words an import line may use instead of the
 table's name. A table's own name beats any flag, and creating a table strips that
 word from other tables' flags so no stored flag can ever be dead. Import

@@ -140,6 +140,21 @@ body {
   .mode-btn { flex: 1 1 50%; padding: 11px 8px; }
 }
 
+/* ---- Master Item Index ----
+   Search and the table filter side by side above the list, so narrowing it is
+   one row of controls rather than a screen of its own. */
+.index-filters {
+  display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+.index-filters input[type="search"] { flex: 2 1 220px; margin: 0; }
+.index-filters select { flex: 1 1 160px; margin: 0; }
+/* A tick box in a table cell must not stretch to the input width every other
+   field on the page uses. */
+.data-table td input[type="checkbox"] { width: auto; margin: 0; }
+.data-table td .row-actions { display: flex; gap: 6px; margin: 0; }
+.data-table td .row-actions button { margin: 0; }
+
 /* ---- Market Analysis ---- */
 .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 4px; }
 .stat-tile {
@@ -563,9 +578,7 @@ button.danger.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto;
 .member-row:last-child { border-bottom: none; }
 .member-row p { margin: 0; }
 
-/* Bulk selection: a tick box per row, and the bar that acts on the selection. */
-.member-row .row-pick { flex: 0 0 auto; padding-top: 2px; }
-.member-row .row-pick input { width: auto; margin: 0; }
+/* Bulk selection: the bar that acts on whatever is ticked. */
 .bulk-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   flex-wrap: wrap;

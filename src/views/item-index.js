@@ -2,10 +2,18 @@
  * Master Item Index (admin) — the shared item library (canonical names + base
  * values) that the register and Market Analysis measure against.
  *
- * The index is DIVIDED INTO TABLES BY TYPE, one tile per table: Weapons,
- * Potions, whatever this realm keeps. Opening a tile gives that table on its
- * own — add, edit, delete and import/export inside it, with nothing from the
- * other tables in the way.
+ * ONE TABLE, ON THE PAGE. Every item in the realm, sorted by name, with the
+ * table it is filed under as a column. It used to be a grid of tiles — one per
+ * type — each opening its own list in a focal menu, which meant that seeing
+ * what the index CONTAINED took as many clicks as there were types, and that
+ * comparing two items filed differently was impossible without closing one
+ * window to open another. An index is a thing you read; reading it should not
+ * require opening anything.
+ *
+ * The type division is still real and still matters — it routes imports and
+ * groups the register's picker. It is now a COLUMN and a FILTER rather than a
+ * wall: picking a table narrows the same list in place, and every action
+ * (add, import, empty) follows whatever is currently in view.
  *
  * "Unsorted" is the DEFAULT table: it is where everything that predates the
  * split lives, where the whole-index import puts unflagged rows, and where a
@@ -13,11 +21,8 @@
  *
  * Each table also carries FLAGS — extra words an import line may use to be
  * sorted into it, for realms whose own sheets say "wep" where the table says
- * Weapons.
- *
- * Searching is the exception to the tiles: a search runs across EVERY table at
- * once and shows one flat result list, because "where did I file that?" is the
- * question the search is being asked.
+ * Weapons. Manage tables is still a focal menu: it is a settings screen, not
+ * the index.
  */
 import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { toast } from '../lib/toast.js';
@@ -26,53 +31,66 @@ import { skeletonRows } from '../lib/skeleton.js';
 import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
-import { tileGrid, openFocalMenu } from '../lib/tiles.js';
+import { openFocalMenu } from '../lib/tiles.js';
+import { pager } from '../lib/paginate.js';
 import { money } from '../lib/format.js';
 
 const UNSORTED = 'Unsorted';
+const ALL = '';          // the filter's "every table" value
 
-/** A tile glyph per table, matched loosely by name so common types look right. */
-const GLYPHS = [
-  [/weapon|sword|blade|axe|bow/i, '⚔️'], [/armou?r|shield|helm/i, '🛡️'],
-  [/potion|alchem|elixir/i, '🧪'], [/ingredient|food|produce|herb/i, '🌿'],
-  [/book|scroll|tome|spell/i, '📜'], [/ore|ingot|smith|material/i, '⛏️'],
-  [/gem|jewel|ring|amulet/i, '💎'], [/misc|other|sundr/i, '🧺'],
-];
-function glyphFor(type) {
-  if (type === UNSORTED) return '🗃️';
-  for (const [re, g] of GLYPHS) if (re.test(type)) return g;
-  return '📦';
-}
+/** Long enough that most realms never see a pager, short enough to stay quick. */
+const PAGE_SIZE = 100;
 
 export function renderItemIndex(container) {
   setAdminActions();
   const listHost = el('div', {}, skeletonRows(5));
-  // The review queue sits ABOVE the tables: it is the one thing on this page
-  // with a queue behind it, and every day it goes unread more sales attach to a
-  // name that may turn out to be a duplicate.
+  // The review queue sits ABOVE the table: it is the one thing on this page with
+  // a queue behind it, and every day it goes unread more sales attach to a name
+  // that may turn out to be a duplicate.
   const reviewHost = el('div', {});
-  const search = el('input', { type: 'search', placeholder: 'Search every table…' });
-  search.addEventListener('input', draw);
+  const search = el('input', { type: 'search', placeholder: 'Search every item…' });
+  search.addEventListener('input', () => { page = 1; draw(); });
+  // Which table is in view. '' is every table, which is where the page starts —
+  // the whole point is that the index is readable without choosing first.
+  const filter = el('select', {});
+  filter.addEventListener('change', () => { page = 1; draw(); });
+  const scopeNote = el('span', { class: 'note' }, '');
   let all = [];
   let types = [{ name: UNSORTED, flags: [] }];
+  let page = 1;
+
+  // The buttons act on WHAT IS IN VIEW. Filtering to Potions and pressing Add
+  // should add a potion; pressing Empty should empty potions. Their labels say
+  // which, so neither is a surprise.
+  const addBtn = el('button.primary', { onclick: () => openItemModal(null, filter.value || UNSORTED) }, 'Add item');
+  const ioBtn = el('button.secondary-btn', { onclick: () => openImportExport(filter.value) }, 'Import/Export');
+  const purgeBtn = el('button.danger', { onclick: () => doPurge(filter.value) }, 'Purge index');
 
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Master Item Index'),
-    el('p', { class: 'note' }, 'The shared item library, kept as one table per type of item. The register ' +
-      'and Market Analysis measure against these.'),
+    el('p', { class: 'note' }, 'The shared item library the register and Market Analysis measure against. ' +
+      'Every item is here; the Table column is how it is filed.'),
     el('div', { class: 'row-actions' }, [
-      el('button.primary', { onclick: () => openImportExport('') }, 'Import/Export all'),
+      addBtn, ioBtn,
       el('button.secondary-btn', { onclick: openTypesModal }, 'Manage tables'),
-      el('button.danger', { onclick: () => doPurge('') }, 'Purge index'),
+      purgeBtn,
     ]),
     reviewHost,
-    search,
+    el('div', { class: 'index-filters' }, [search, filter, scopeNote]),
     listHost,
   ]));
 
   const typeNames = () => types.map((t) => t.name);
   const itemsIn = (type) => all.filter((it) => (it.category || UNSORTED) === type);
+  const typeOf = (it) => it.category || UNSORTED;
+
+  /** The rows the page is currently showing: the filter, then the search. */
+  function inView() {
+    const q = search.value.trim().toLowerCase();
+    const scope = filter.value ? all.filter((it) => typeOf(it) === filter.value) : all;
+    return q ? scope.filter((it) => it.name.toLowerCase().includes(q)) : scope;
+  }
 
   /**
    * Empties the whole index, or one table. Deliberately a typed confirm rather
@@ -163,80 +181,78 @@ export function renderItemIndex(container) {
     return row;
   }
 
+  /**
+   * The page: the filter's options, the count, and the one table.
+   *
+   * Everything here re-reads `all`, so any action that changes the index calls
+   * this and the whole screen is consistent again — there is no second copy of
+   * the list in a window somewhere to fall out of step.
+   */
   function draw() {
-    const q = search.value.trim().toLowerCase();
-    if (q) { drawSearch(q); return; }
-    if (!all.length && types.length <= 1) {
-      mount(listHost, el('p', { class: 'note' }, 'No items yet — use Import/Export all to paste a list, or ' +
-        'Manage tables to set up your types first.'));
+    paintFilter();
+    const rows = inView();
+    const total = all.length;
+
+    scopeNote.textContent = !total ? ''
+      : rows.length === total ? total + ' item' + (total === 1 ? '' : 's')
+        : rows.length + ' of ' + total;
+
+    // The buttons name their scope, so "Purge index" can never quietly mean
+    // "purge Potions" or the other way round.
+    const scope = filter.value;
+    addBtn.textContent = scope ? 'Add to ' + scope : 'Add item';
+    ioBtn.textContent = scope ? 'Import/Export ' + scope : 'Import/Export all';
+    purgeBtn.textContent = scope ? 'Empty ' + scope : 'Purge index';
+
+    if (!total) {
+      mount(listHost, el('p', { class: 'note' }, 'No items yet — use Import/Export to paste a list, or ' +
+        'Add item to enter one.'));
       return;
     }
-    mount(listHost, tileGrid(types.map((t) => {
+    if (!rows.length) {
+      mount(listHost, el('p', { class: 'note' }, search.value.trim()
+        ? 'No matches' + (scope ? ' in ' + scope : '') + '.'
+        : 'The ' + scope + ' table is empty.'));
+      return;
+    }
+    mount(listHost, itemTable(rows));
+  }
+
+  /** Keeps the filter's options in step with the tables, without losing the pick. */
+  function paintFilter() {
+    const want = filter.value;
+    const opts = [[ALL, 'Every table']].concat(types.map((t) => {
       const n = itemsIn(t.name).length;
-      return {
-        key: 'itype:' + t.name,
-        label: t.name,
-        hint: n + ' item' + (n === 1 ? '' : 's'),
-        glyph: glyphFor(t.name),
-        onOpen: () => openTypeTable(t.name),
-      };
-    }), {}));
-  }
-
-  /** One flat list across every table — with the table each hit came from. */
-  function drawSearch(q) {
-    const hits = all.filter((it) => it.name.toLowerCase().includes(q));
-    if (!hits.length) { mount(listHost, el('p', { class: 'note' }, 'No matches in any table.')); return; }
-    const list = itemList(hits, { showType: true, redraw: () => drawSearch(q) });
-    mount(listHost, el('p', { class: 'note' }, hits.length + ' match(es) across ' +
-      new Set(hits.map((h) => h.category || UNSORTED)).size + ' table(s).'), list);
-  }
-
-  /** One table, opened as a focal menu — the whole index screen in miniature. */
-  function openTypeTable(type) {
-    openFocalMenu(type, (host) => {
-      const rows = el('div', {});
-      const redraw = () => {
-        const items = itemsIn(type);
-        mount(rows, items.length
-          ? itemList(items, { redraw })
-          : el('p', { class: 'note' }, 'This table is empty.'));
-      };
-      mount(host,
-        el('p', { class: 'note' }, type === UNSORTED
-          ? 'The default table — everything not filed under a type. Tick items and move them to sort this ' +
-            'table out.'
-          : 'Items filed as ' + type + '.'),
-        el('div', { class: 'row-actions' }, [
-          el('button.primary', { onclick: () => openItemModal(null, type, redraw) }, 'Add item'),
-          el('button.secondary-btn', { onclick: () => openImportExport(type, redraw) }, 'Import/Export'),
-          el('button.danger', { onclick: () => doPurge(type) }, 'Empty this table'),
-        ]),
-        rows);
-      redraw();
-    });
+      return [t.name, t.name + ' (' + n + ')'];
+    }));
+    filter.innerHTML = '';
+    opts.forEach(([v, label]) => filter.appendChild(el('option', { value: v }, label)));
+    // A table removed while it was selected drops the view back to everything,
+    // rather than filtering on a name that no longer exists and showing nothing.
+    filter.value = opts.some(([v]) => v === want) ? want : ALL;
   }
 
   /**
-   * A list of items with a tick box each and a "move selected to…" bar.
+   * THE table — every item in view, one row each, sorted by name.
    *
-   * Bulk re-filing is the operation the type split makes most likely: a realm
-   * that imported everything before setting its tables up has one enormous
-   * Unsorted table, and moving it item by item is the same work the import was
-   * meant to save.
+   * A real table rather than a stack of cards because the columns are the
+   * point: scanning base values down a column is how a wrong one is spotted,
+   * and that only works if they line up.
+   *
+   * Bulk re-filing lives here too. It is the operation the type split makes
+   * most likely — a realm that imported everything before setting its tables up
+   * has one enormous Unsorted table, and moving it item by item is the work the
+   * import was meant to save.
    */
-  function itemList(items, opts) {
-    const options = opts || {};
+  function itemTable(rows) {
     const boxes = new Map();
     const dest = el('select', {});
     typeNames().forEach((t) => dest.appendChild(el('option', { value: t }, t)));
     const moveBtn = el('button.primary.small', { onclick: doMove }, 'Move selected');
     const count = el('span', { class: 'note' }, '');
-    const all$ = el('input', { type: 'checkbox' });
+    const all$ = el('input', { type: 'checkbox', title: 'Select all on this page' });
 
-    function selected() {
-      return [...boxes.entries()].filter(([, b]) => b.checked).map(([name]) => name);
-    }
+    const selected = () => [...boxes.entries()].filter(([, b]) => b.checked).map(([name]) => name);
     function sync() {
       const n = selected().length;
       count.textContent = n ? n + ' selected' : '';
@@ -253,25 +269,31 @@ export function renderItemIndex(container) {
         const r = await api.moveItems(names, dest.value);
         all = r.items || all;
         toast(r.moved + ' item(s) moved to ' + r.category + '.', 'ok');
-        if (options.redraw) options.redraw();
         draw();
       } catch (e) { moveBtn.disabled = false; toast(e.message || String(e), 'error'); }
     }
 
-    const rows = items.map((it) => {
-      const cat = it.category || UNSORTED;
+    // Paged, because an index of a few thousand items would otherwise build a
+    // few thousand rows of DOM to scroll past. Ticks apply to the page you can
+    // see — selecting rows you are not looking at is not a thing to offer.
+    const sorted = [...rows].sort((a, b) => a.name.localeCompare(b.name));
+    const pg = pager(sorted.length, page, PAGE_SIZE, (n) => { page = n; draw(); });
+
+    const body = sorted.slice(pg.start, pg.end).map((it) => {
+      const cat = typeOf(it);
       const box = el('input', { type: 'checkbox' });
       box.addEventListener('change', sync);
       boxes.set(it.name, box);
-      return el('div', { class: 'member-row' }, [
-        el('span', { class: 'row-pick' }, [box]),
-        el('p', { html: '<b>' + esc(it.name) + '</b> · <span class="note">base ' + esc(money(it.baseValue)) +
-          (options.showType ? ' · ' + esc(cat) : '') + '</span>' }),
+      return [
+        box,
+        el('b', {}, it.name),
+        money(it.baseValue),
+        cat,
         el('span', { class: 'row-actions' }, [
-          el('button.primary.small', { onclick: () => openItemModal(it, cat, options.redraw) }, 'Edit'),
-          el('button.danger.small', { onclick: () => remove(it, options.redraw) }, 'Delete'),
+          el('button.primary.small', { onclick: () => openItemModal(it, cat) }, 'Edit'),
+          el('button.danger.small', { onclick: () => remove(it) }, 'Delete'),
         ]),
-      ]);
+      ];
     });
 
     sync();
@@ -281,15 +303,16 @@ export function renderItemIndex(container) {
         count,
         el('span', { class: 'row-actions' }, [el('span', { class: 'note' }, 'Move to'), dest, moveBtn]),
       ]),
-      ...rows,
+      el('div', { class: 'table-scroll' },
+        tableEl(['', 'Item', 'Base value', 'Table', ''], body)),
+      ...(pg.pages > 1 ? [pg.bar] : []),
     ]);
   }
 
-  async function remove(it, redraw) {
+  async function remove(it) {
     if (!window.confirm('Delete "' + it.name + '" from the master index?')) return;
     try {
       all = (await api.deleteMasterItem(it.name)).items || [];
-      if (redraw) redraw();
       draw();
     } catch (e) { toast(e.message || String(e), 'error'); }
   }
@@ -383,12 +406,16 @@ export function renderItemIndex(container) {
   /**
    * Import/Export for ONE table, or for the whole index when `into` is ''.
    *
-   * The only difference is where an unflagged row lands: in a table it lands in
-   * that table (you opened it there and said so), and in the whole-index one it
-   * lands in Unsorted. An explicit type flag still wins either way, so a mixed
-   * paste sorts itself even when made from inside one table.
+   * Which one you get follows the FILTER — the button says so, because an
+   * import that silently went somewhere other than what is on screen would be
+   * discovered later, by someone else.
+   *
+   * The only difference is where an unflagged row lands: filtered to a table it
+   * lands there (that is what the screen says you are looking at), and
+   * unfiltered it lands in Unsorted. An explicit type flag still wins either
+   * way, so a mixed paste sorts itself regardless.
    */
-  function openImportExport(into, onImported) {
+  function openImportExport(into) {
     const scope = into || '';
     const rowsFor = scope ? itemsIn(scope) : all;
     const exportBox = el('textarea', { rows: '6', readonly: true });
@@ -465,7 +492,6 @@ export function renderItemIndex(container) {
         setStatus('Imported / updated ' + (res.imported || 0) + ' item(s)' +
           ((res.typesAdded || []).length ? ', added ' + res.typesAdded.length + ' table(s)' : '') + '.', 'ok');
         mount(reportHost);
-        if (onImported) onImported();
         draw();
       } catch (e) { setStatus(e.message || String(e), 'error'); }
     }
@@ -488,7 +514,7 @@ export function renderItemIndex(container) {
   }
 
   /** Add or edit one item. `type` preselects the table it is being added to. */
-  function openItemModal(item, type, redraw) {
+  function openItemModal(item, type) {
     const isEdit = !!item;
     const name = el('input', { type: 'text', value: item ? item.name : '', placeholder: 'e.g. Iron Sword' });
     const base = el('input', { type: 'number', min: '0', step: '0.01', value: item ? String(item.baseValue) : '', placeholder: 'Base value' });
@@ -507,7 +533,6 @@ export function renderItemIndex(container) {
         const payload = { name: name.value.trim(), baseValue: base.value, category: cat.value };
         if (isEdit) payload.oldName = item.name;
         all = (await api.saveMasterItem(payload)).items || [];
-        if (redraw) redraw();
         draw();
         modal.close();
       } catch (e) { save.disabled = false; setStatus(e.message || String(e), 'error'); }
