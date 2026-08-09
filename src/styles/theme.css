@@ -140,6 +140,12 @@ body {
   .mode-btn { flex: 1 1 50%; padding: 11px 8px; }
 }
 
+/* A date field with its calendar and clear buttons beside it, rather than the
+   buttons claiming full-width rows of their own under it. */
+.date-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.date-row input[type="date"] { flex: 1 1 170px; width: auto; margin: 0; }
+.date-row button { flex: 0 0 auto; margin: 0; }
+
 /* ---- Master Item Index ----
    Search and the table filter side by side above the list, so narrowing it is
    one row of controls rather than a screen of its own. */

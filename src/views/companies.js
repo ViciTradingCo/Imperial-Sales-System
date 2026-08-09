@@ -215,33 +215,51 @@ function openNameModal(company, onSaved) {
   ]);
 }
 
-/** Subscription modal — calendar picker or manual entry, plus Perpetual. */
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Subscription modal — one native date field, plus Perpetual.
+ *
+ * ONE FIELD. It used to be a date input AND a free-text "YYYY-MM-DD" box kept
+ * in sync, which gave every platform the wrong answer: on a phone the plain
+ * text box is the inviting one to tap, so people typed a date by hand next to a
+ * control that would have opened the OS date wheel; and two fields that must
+ * agree is where "which one wins" bugs live. A date input already accepts
+ * typing — it is segmented — so the second box bought nothing.
+ *
+ * AND NO CLICK HANDLER. The old code called showPicker() from the field's own
+ * click. Chrome, Edge and Firefox all open the calendar when you click a date
+ * field, so that fired a SECOND open on the same gesture and the panel toggled
+ * straight back shut — which is why the calendar looked broken on a PC. The
+ * button below is a separate target, so it cannot fight the field.
+ */
 function openSubscriptionModal(company, onSaved) {
   const perpetual = el('input', { type: 'checkbox' });
   perpetual.checked = !!company.perpetual;
 
-  const picker = el('input', { type: 'date', value: company.until || '', class: 'date-picker' });
-  const manual = el('input', { type: 'text', placeholder: 'YYYY-MM-DD', value: company.until || '' });
+  const stored = String(company.until || '').trim();
+  const picker = el('input', { type: 'date', value: YMD.test(stored) ? stored : '' });
 
-  // On desktop the native calendar only opens from the tiny icon, so make a
-  // click anywhere on the field pop it. On touch devices the OS already opens
-  // the calendar on tap — calling showPicker() there fights the native picker,
-  // so we leave mobile to its built-in behaviour.
-  const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-  if (!isTouch) {
-    picker.addEventListener('click', () => { try { picker.showPicker(); } catch (e) { /* older browsers */ } });
-  }
-
-  // Keep the calendar picker and the manual field in sync.
-  picker.addEventListener('input', () => { manual.value = picker.value; });
-  manual.addEventListener('input', () => {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(manual.value.trim())) picker.value = manual.value.trim();
-  });
+  // An explicit way in for anyone whose browser does not open the calendar on
+  // click, and a visible affordance rather than the tiny built-in icon. Hidden
+  // where showPicker() does not exist, so it is never a button that does
+  // nothing — there, clicking the field is the way, as it always was.
+  const openBtn = el('button.secondary-btn.small', {
+    type: 'button',
+    onclick: () => { picker.focus(); try { picker.showPicker(); } catch (e) { /* already open, or refused */ } },
+  }, '📅 Calendar');
+  openBtn.hidden = typeof picker.showPicker !== 'function';
+  // Clearing matters: an empty date is "no subscription", and not every browser
+  // offers a way to empty a date field once it has one.
+  const clearBtn = el('button.secondary-btn.small', {
+    type: 'button', onclick: () => { picker.value = ''; },
+  }, 'Clear');
 
   function syncDisabled() {
     const off = perpetual.checked;
     picker.disabled = off;
-    manual.disabled = off;
+    openBtn.disabled = off;
+    clearBtn.disabled = off;
   }
   perpetual.addEventListener('change', syncDisabled);
   syncDisabled();
@@ -253,9 +271,9 @@ function openSubscriptionModal(company, onSaved) {
   let modal;
   async function doSave() {
     const perp = perpetual.checked;
-    const until = perp ? '' : (picker.value || manual.value.trim());
-    if (!perp && until && !/^\d{4}-\d{2}-\d{2}$/.test(until)) {
-      setStatus('Enter the date as YYYY-MM-DD, or use the calendar.', 'error');
+    const until = perp ? '' : picker.value;
+    if (!perp && until && !YMD.test(until)) {
+      setStatus('Pick a date from the calendar.', 'error');
       return;
     }
     save.disabled = true;
@@ -274,10 +292,15 @@ function openSubscriptionModal(company, onSaved) {
   modal = openModal([
     el('h3', {}, 'Subscription — ' + (company.business || '')),
     el('label', { class: 'inline' }, [perpetual, document.createTextNode(' Perpetual (never expires)')]),
-    el('label', {}, 'Expires — pick from the calendar'),
-    picker,
-    el('label', {}, '…or type it (YYYY-MM-DD)'),
-    manual,
+    el('label', {}, 'Expires'),
+    el('div', { class: 'date-row' }, [picker, openBtn, clearBtn]),
+    // A stored value the date field cannot show would otherwise just look
+    // blank, and saving would quietly wipe it.
+    ...(stored && !YMD.test(stored)
+      ? [el('p', { class: 'note warn' }, 'Currently stored as "' + stored + '", which is not a date this ' +
+          'field can show. Picking one will replace it.')]
+      : []),
+    el('p', { class: 'note' }, 'Leave it empty for no subscription. Type into the field or use the calendar.'),
     save,
     status,
   ]);
