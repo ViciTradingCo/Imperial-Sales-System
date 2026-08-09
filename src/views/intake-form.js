@@ -7,46 +7,75 @@
  * a person, a supplier, a price agreed, coin leaving the coffer. It belongs
  * beside Selling, and the register now has both.
  *
- * ONE DOOR. There were briefly two — a single delivery, and a basket for an
- * ingredient run — and you could not tell from the tiles which one your purchase
- * was. Intake covers both: it takes as many items as the trip brought, and its
- * walk-through says so on the step where ingredients are actually decided. Both
- * of the basket's advantages came with it — knowing what you usually pay, and a
- * total that keeps up as you type. See archive/ingredient-basket/.
+ * ONE DOOR, AND NO DOOR TO OPEN. There were briefly two forms — a single
+ * delivery, and a basket for an ingredient run — and you could not tell from
+ * the tiles which one your purchase was. Intake covers both, and it is now the
+ * page rather than something a tile opens. Both of the basket's advantages came
+ * with it: knowing what you usually pay, and a total that keeps up as you type.
+ * See archive/ingredient-basket/.
  *
  * Producing stock rather than buying it (Farm/Harvest, Craft) stays on
  * Inventory: no coin moves, no supplier exists, and there is no sale to ring.
  */
 import { money, coins, regionLabel, regionWord, regionsOn } from '../lib/format.js';
-import { el, mount, esc } from '../lib/dom.js';
+import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { openStepModal } from '../lib/steps.js';
+import { guidePanel, guideUnseen, markGuideSeen } from '../lib/guide.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
 import { skeletonRows } from '../lib/skeleton.js';
-import { tileGrid } from '../lib/tiles.js';
+import { toast } from '../lib/toast.js';
 
 /**
- * Intake — one delivery, one or many items, asked a step at a time.
+ * What each card explains. Kept out of the builder so the form reads as a form
+ * and the prose reads as prose.
+ */
+const GUIDE = {
+  arrived: [
+    'Anything you bought. The stock goes on your shelf and the cost comes out of your coffer, as one ' +
+      'record — the whole delivery lands, or none of it does.',
+    'Pick from the index where you can: it keeps "Iron Sword" and "iron sword" one item instead of ' +
+      'two. A name nobody has entered yet is fine — it is added for an admin to check.',
+    'Quantity is how many arrived. Cost is what you paid EACH.',
+  ],
+  pricing: [
+    'Cost was what you paid; this is what the register charges. The same number in both means the ' +
+      'shop makes nothing on every sale.',
+    'INGREDIENT is stock you craft with rather than sell — kept out of the register and out of the ' +
+      'pricing figures, so it has no sale price to give.',
+  ],
+  source: [
+    'Naming a REGISTERED shop credits it for the supply in its own region’s trade. Anyone else — an ' +
+      'NPC smith, a traveller, a mine — is recorded as typed.',
+    'Nothing is written until you press Record. A delivery entered by mistake can be removed in Sales Log.',
+  ],
+};
+
+/**
+ * Intake — one delivery, one or many items, as three cards on the page.
+ *
+ * ON THE PAGE, not in a window. It was a stepped modal: one question at a time
+ * behind Previous and Next, over the top of everything else. That is the right
+ * shape for a form you meet once, and the wrong one for the thing a shop does
+ * most often — you could not see what you had already typed, the deliveries
+ * list you were checking against was hidden behind the form, and every glance
+ * back cost two clicks. The three steps are now three cards, all visible, in
+ * the order you fill them in.
  *
  * A TRIP, NOT AN ITEM. A supplier run brings back a crate: three reagents, two
- * swords and a barrel of ale, from one person on one day. Recording that as six
- * visits to a one-item form is the job the ingredient basket existed to avoid,
- * and it is the job this form does now — the basket's running total included.
+ * swords and a barrel of ale, from one person on one day. COST, sale price and
+ * whether a thing is an ingredient differ item by item, so they are on the
+ * line. The SUPPLIER and the region are the trip, so they are asked once. The
+ * whole delivery is sent as one request the Worker writes atomically.
  *
- * The shape follows what varies. COST, sale price and whether a thing is an
- * ingredient differ item by item, so they are on the line. The SUPPLIER and the
- * region are the trip, so they are asked once. And the whole delivery is sent
- * as one request that the Worker writes atomically: a delivery lands whole or
- * not at all, rather than half-recorded with nothing saying which half.
- *
- * Three steps, because nine fields on one screen is a wall: WHAT arrived, WHAT
- * IT SELLS FOR, and WHERE it came from — with the whole delivery read back
- * before anything is written.
+ * @returns {{ node: HTMLElement, reset: Function }}
  */
-function openIntakeModal(onRecorded, me) {
-  const idem = newIdem(); // one key per delivery — retries won't double the stock
+function buildIntake(me, onRecorded) {
+  // ONE KEY PER DELIVERY, and a new one after each — retries must not double the
+  // stock, but the form now stays on screen, so a second delivery typed into it
+  // would otherwise look like a retry of the first and be silently discarded.
+  let idem = newIdem();
 
   // What this shop already holds, so a line can say what the item usually costs
   // it and what it currently charges. Loaded once and shared by every line.
@@ -54,7 +83,7 @@ function openIntakeModal(onRecorded, me) {
   let master = [];
   const held = (name) => current.find((i) => i.item.toLowerCase() === String(name).toLowerCase());
 
-  /* ---- the lines ------------------------------------------------------- */
+  /* ---- card 1: the lines ----------------------------------------------- */
   const lines = [];
   const linesHost = el('div', {});
   const totalLine = el('p', { class: 'buy-total' }, '');
@@ -63,37 +92,39 @@ function openIntakeModal(onRecorded, me) {
   const lineTotal = (l) => coins((Number(l.qty.value) || 0) * (Number(l.per.value) || 0));
 
   /**
-   * The running total, and each line's own subtotal.
-   *
-   * Summed from the FLOORED line totals rather than flooring the raw sum, so
-   * the figure at the bottom is the figure the lines above it add up to — and
-   * both match what the Worker will debit, since it rounds per line too.
-   */
-  function retotal() {
-    let sum = 0;
-    lines.forEach((l) => {
-      const n = lineTotal(l);
-      sum += n;
-      l.sub.textContent = n ? money(n) : '';
-    });
-    totalLine.textContent = 'Delivery: ' + money(sum);
-    totalLine.hidden = !sum;   // nothing costed yet is not a delivery worth 0
-  }
-
-  /**
    * True once a line has anything in it — an untouched row is skipped rather
-   * than failed, so a stray press of "+ Add another item" is not an error to
+   * than failed, so a stray press of "Add another item" is not an error to
    * clear before you can go on.
    *
    * Quantity is NOT evidence: it starts at 1, so counting it would make every
    * empty row look filled in.
    */
   const started = (l) => !!(l.name() || l.per.value);
-  const removeBtnsVisible = () => {
-    // Nothing to remove when there is only one line; a lone × that empties the
-    // form is a trap rather than an affordance.
-    lines.forEach((l) => { l.remove.hidden = lines.length < 2; });
-  };
+  const liveLines = () => lines.filter(started);
+
+  /**
+   * Everything that depends on the lines, after any change to them.
+   *
+   * Called on every keystroke, so it must not rebuild anything a person could
+   * be typing into: the totals and the card-2 headings are text updates, and
+   * card 2 is only re-parented when the SET of lines actually changes.
+   */
+  function sync() {
+    let sum = 0;
+    lines.forEach((l) => {
+      const n = lineTotal(l);
+      sum += n;
+      l.sub.textContent = n ? money(n) : '';
+      l.remove.hidden = lines.length < 2;
+    });
+    // Summed from the FLOORED line totals rather than flooring the raw sum, so
+    // the figure at the bottom is what the lines above it add up to — and both
+    // match what the Worker will debit, since it rounds per line too.
+    totalLine.textContent = 'Delivery: ' + money(sum);
+    totalLine.hidden = !sum;
+    syncPricing();
+    fillReview();
+  }
 
   function addLine() {
     const picker = createItemPicker({
@@ -120,7 +151,7 @@ function openIntakeModal(onRecorded, me) {
         const have = held(it.name);
         if (!line.per.value) line.per.value = String(have && have.avgCost ? have.avgCost : it.baseValue);
         if (!line.sale.value) line.sale.value = String(it.baseValue);
-        retotal();
+        sync();
       },
     });
     picker.setItems(master);
@@ -128,27 +159,23 @@ function openIntakeModal(onRecorded, me) {
     const qty = el('input', { type: 'number', step: '1', min: '1', value: '1', placeholder: 'Qty' });
     const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Cost each' });
     const sub = el('span', { class: 'buy-sub' }, '');
-    qty.addEventListener('input', retotal);
-    per.addEventListener('input', retotal);
-    const remove = el('button.secondary-btn.small', { onclick: () => {
+    const remove = el('button.secondary-btn.small', { type: 'button', onclick: () => {
       const i = lines.indexOf(line);
       if (i < 0) return;
       lines.splice(i, 1);
       wrap.remove();
-      removeBtnsVisible();
-      retotal();
+      sync();
     } }, '×');
     const wrap = el('div', { class: 'craft-row' }, [picker.el, qty, per, sub, remove]);
+    // One listener for the whole row: input events bubble, so this covers the
+    // picker's own box as well as the two numbers without reaching inside it.
+    wrap.addEventListener('input', sync);
 
     /**
-     * Pricing lives on the line too, but is ASKED on the next step: the sale
-     * price of a thing you have not finished describing is a question nobody
-     * can answer yet.
-     *
-     * The block is built here, once, and merely re-parented when that step is
-     * entered. Building it there instead meant a fresh `change` listener on the
-     * same checkbox every time you stepped back and forth, each holding a
-     * detached copy of the panel it was meant to hide.
+     * Pricing lives on the line but is ASKED on the next card, so the block is
+     * built here, once, and merely re-parented. Building it there instead meant
+     * a fresh listener on the same checkbox every time the card was redrawn,
+     * each holding a detached copy of the panel it was meant to hide.
      */
     const sale = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Leave blank to keep the current price' });
     const ingredient = el('input', { type: 'checkbox' });
@@ -156,13 +183,14 @@ function openIntakeModal(onRecorded, me) {
     const saleWrap = el('div', {}, [el('label', {}, 'Sells for'), sale, saleHint]);
     // Ticking Ingredient takes the sale price away rather than leaving it
     // sitting there inviting a number nobody will ever charge.
-    ingredient.addEventListener('change', () => { saleWrap.hidden = ingredient.checked; });
+    ingredient.addEventListener('change', () => { saleWrap.hidden = ingredient.checked; fillReview(); });
     const priceHead = el('p', { class: 'price-head' }, '');
     const priceBlock = el('div', { class: 'price-block' }, [
       priceHead,
       el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
       saleWrap,
     ]);
+    priceBlock.addEventListener('input', fillReview);
 
     const line = {
       wrap, picker, qty, per, sub, remove, sale, ingredient,
@@ -172,13 +200,12 @@ function openIntakeModal(onRecorded, me) {
     };
     lines.push(line);
     linesHost.appendChild(wrap);
-    removeBtnsVisible();
-    retotal();
+    sync();
     return line;
   }
 
   const addBtn = el('button.secondary-btn.small', {
-    onclick: () => { addLine().picker.focus(); },
+    type: 'button', onclick: () => { addLine().picker.focus(); },
   }, '+ Add another item');
 
   /* ---- what the shop already knows ------------------------------------- */
@@ -186,9 +213,34 @@ function openIntakeModal(onRecorded, me) {
     master = r.items || [];
     lines.forEach((l) => l.picker.setItems(master));
   }).catch(() => { /* free text still works; there is just nothing to suggest */ });
-  api.getInventory().then((r) => { current = r.inventory || []; }).catch(() => {});
+  api.getInventory().then((r) => { current = r.inventory || []; sync(); }).catch(() => {});
 
-  /* ---- the supplier, asked once for the whole trip --------------------- */
+  /* ---- card 2: what each line sells for -------------------------------- */
+  const priceHost = el('div', {});
+  const nothingToPrice = el('p', { class: 'note' }, 'Add an item above and it will appear here.');
+
+  function syncPricing() {
+    const live = liveLines();
+    live.forEach((l) => {
+      const have = held(l.name());
+      l.priceHead.textContent = l.name() + ' ×' + (Number(l.qty.value) || 0) +
+        ' · cost ' + money(Number(l.per.value) || 0) + ' each';
+      l.saleHint.textContent = have
+        ? 'You currently sell this at ' + money(have.price) + '. Leave blank to keep that.'
+        : 'New to your shop — this becomes its price in the register.';
+    });
+    // Only touch the DOM when the SET changes. Re-appending on every keystroke
+    // would move the node a person is typing into and take the caret with it.
+    const want = live.map((l) => l.priceBlock);
+    const have = [...priceHost.children];
+    if (have.length !== want.length || want.some((n, i) => have[i] !== n)) {
+      priceHost.innerHTML = '';
+      want.forEach((n) => priceHost.appendChild(n));
+    }
+    nothingToPrice.hidden = want.length > 0;
+  }
+
+  /* ---- card 3: the supplier, asked once for the whole trip -------------- */
   const hold = el('select', {}, el('option', { value: '' }, 'Select a ' + regionWord() + '…'));
   /**
    * WHO SOLD IT TO YOU — one field for both kinds of supplier.
@@ -197,12 +249,6 @@ function openIntakeModal(onRecorded, me) {
    * whether that vendor happened to be a registered company. That made the
    * common case (an NPC smith) look like it was missing an answer, and the
    * useful case (a real shop) something you had to fill in twice.
-   *
-   * Now you type a name. Registered companies narrow as you type and can be
-   * clicked; anything else is taken as written. Naming a registered company
-   * credits it for the supply in its region's figures, and fills in the region
-   * from that company's own record — the goods came from where the seller
-   * trades, and asking a second time invites a different answer.
    */
   const vendor = createItemPicker({
     allowFree: true,
@@ -212,8 +258,11 @@ function openIntakeModal(onRecorded, me) {
     onPick: (c) => {
       // The supplier's own region, unless the user has already chosen one.
       if (regionsOn() && c.hold && !hold.value) hold.value = c.hold;
+      fillReview();
     },
   });
+  vendor.el.addEventListener('input', fillReview);
+  hold.addEventListener('change', fillReview);
   api.getBusinesses()
     .then((r) => {
       // `cards` carries each company's region; the plain name list is the
@@ -230,33 +279,10 @@ function openIntakeModal(onRecorded, me) {
     .then((res) => (res.holds || []).forEach((h) => hold.appendChild(el('option', { value: h }, h))))
     .catch(() => { /* the region is optional */ });
 
-  /* ---- step 2: what each line sells for -------------------------------- */
-  const priceHost = el('div', {});
-  /**
-   * Shows one block per line that has something in it, in the order they were
-   * entered. Re-parenting rather than rebuilding, so a price already typed
-   * survives stepping back to fix a quantity.
-   */
-  function fillPricing() {
-    priceHost.innerHTML = '';
-    lines.filter(started).forEach((l) => {
-      const have = held(l.name());
-      // Named and costed HERE rather than at build time, because the line was
-      // still being filled in when the block was made.
-      l.priceHead.textContent = l.name() + ' ×' + (Number(l.qty.value) || 0) +
-        ' · cost ' + money(Number(l.per.value) || 0) + ' each';
-      l.saleHint.textContent = have
-        ? 'You currently sell this at ' + money(have.price) + '. Leave blank to keep that.'
-        : 'New to your shop — this becomes its price in the register.';
-      l.saleWrap.hidden = l.ingredient.checked;
-      priceHost.appendChild(l.priceBlock);
-    });
-  }
-
-  /* ---- step 3: the read-back ------------------------------------------- */
+  /* ---- the read-back and the button ------------------------------------ */
   const review = el('div', { class: 'step-review' }, '');
   function fillReview() {
-    const live = lines.filter(started);
+    const live = liveLines();
     let sum = 0;
     const rows = live.map((l) => {
       const n = lineTotal(l);
@@ -271,141 +297,152 @@ function openIntakeModal(onRecorded, me) {
     // a typed name is not, and that difference is worth seeing before it lands.
     if (source) rows.push(['Bought from', source + (vendorCompany() ? ' (registered)' : '')]);
     if (regionsOn() && hold.value) rows.push([regionLabel(), hold.value]);
-    review.innerHTML = rows
-      .map(([k, v]) => '<div class="step-review-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>')
-      .join('');
+    review.innerHTML = rows.length
+      ? rows.map(([k, v]) => '<div class="step-review-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>').join('')
+      : '<p class="note">Nothing to record yet.</p>';
+  }
+
+  const status = el('p', {});
+  const record = el('button.primary', { onclick: doRecord }, 'Record delivery');
+  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
+
+  /**
+   * Everything is checked HERE, not card by card.
+   *
+   * The stepped version validated on the way forward, which it could because it
+   * held you at a step. All three cards are visible now, so there is nowhere to
+   * hold you — and a message that names the line is more use than one that
+   * blocks a button anyway.
+   */
+  function problem() {
+    const live = liveLines();
+    if (!live.length) return 'Add at least one item to the delivery.';
+    for (let i = 0; i < live.length; i++) {
+      const l = live[i];
+      const where = live.length > 1 ? ' (item ' + (i + 1) + ')' : '';
+      if (!l.name()) return 'Type an item, or pick one from the index.' + where;
+      if (!(Number(l.qty.value) > 0)) return 'How many arrived? Enter at least 1.' + where;
+      if (l.per.value === '' || !(Number(l.per.value) >= 0)) {
+        return 'Enter what you paid per item — 0 is fine if it was free.' + where;
+      }
+    }
+    return null;
   }
 
   async function doRecord() {
-    const live = lines.filter(started);
-    await api.recordIntake({
-      // One request for the whole trip. The Worker validates every line before
-      // it writes any of them, so a bad line cannot leave a half-delivery.
-      items: live.map((l) => ({
-        // A picked item carries its canonical spelling; free text is taken as
-        // typed and added to the index flagged for review.
-        item: l.name(),
-        numItems: l.qty.value,
-        pricePer: l.per.value,
-        salePrice: l.ingredient.checked ? '' : l.sale.value,
-        ingredient: l.ingredient.checked,
-      })),
-      vendor: vendor.value(),
-      fromBusiness: vendorCompany(),
-      hold: hold.value,
-      idempotencyKey: idem,
-    });
-    onRecorded();
+    const bad = problem();
+    if (bad) { setStatus(bad, 'error'); return; }
+    record.disabled = true;
+    setStatus('Recording…', '');
+    try {
+      await api.recordIntake({
+        // One request for the whole trip. The Worker validates every line
+        // before it writes any of them, so a bad line cannot leave half a
+        // delivery.
+        items: liveLines().map((l) => ({
+          // A picked item carries its canonical spelling; free text is taken as
+          // typed and added to the index flagged for review.
+          item: l.name(),
+          numItems: l.qty.value,
+          pricePer: l.per.value,
+          salePrice: l.ingredient.checked ? '' : l.sale.value,
+          ingredient: l.ingredient.checked,
+        })),
+        vendor: vendor.value(),
+        fromBusiness: vendorCompany(),
+        hold: hold.value,
+        idempotencyKey: idem,
+      });
+      // Finishing once is what proves the walk-through is no longer needed.
+      markGuideSeen('intake');
+      toast('Delivery recorded.', 'ok');
+      reset();
+      onRecorded();
+    } catch (e) {
+      setStatus(e.message || String(e), 'error');
+    } finally {
+      record.disabled = false;
+    }
   }
 
+  /** Back to an empty form, ready for the next trip. */
+  function reset() {
+    idem = newIdem();
+    lines.splice(0, lines.length).forEach((l) => l.wrap.remove());
+    priceHost.innerHTML = '';
+    vendor.clear();
+    hold.value = '';
+    setStatus('');
+    addLine();
+  }
+
+  const unseen = guideUnseen('intake');
   addLine();
 
-  return openStepModal({
-    title: 'Intake Ingredients/Stock',
-    finishLabel: 'Record delivery',
-    guideKey: 'intake',
-    onFinish: doRecord,
-    steps: [
-      {
-        title: 'What arrived?',
-        hint: 'One line per item. Add as many as the delivery brought.',
-        guide: [
-          'Anything you bought. The stock goes on your shelf and the cost comes out of your coffer, as one ' +
-            'record — the whole delivery lands, or none of it does.',
-          'Pick from the index where you can: it keeps "Iron Sword" and "iron sword" one item instead of ' +
-            'two. A name nobody has entered yet is fine — it is added for an admin to check.',
-          'Quantity is how many arrived. Cost is what you paid EACH.',
-        ],
-        nodes: [
-          linesHost,
-          el('div', { class: 'row-actions' }, [addBtn]),
-          totalLine,
-        ],
-        validate: () => {
-          const live = lines.filter(started);
-          if (!live.length) return 'Add at least one item to the delivery.';
-          for (let i = 0; i < live.length; i++) {
-            const l = live[i];
-            const where = live.length > 1 ? ' (item ' + (i + 1) + ')' : '';
-            if (!l.name()) return 'Type an item, or pick one from the index.' + where;
-            if (!(Number(l.qty.value) > 0)) return 'How many arrived? Enter at least 1.' + where;
-            if (l.per.value === '' || !(Number(l.per.value) >= 0)) {
-              return 'Enter what you paid per item — 0 is fine if it was free.' + where;
-            }
-          }
-          return null;
-        },
-      },
-      {
-        title: 'What will you charge?',
-        hint: 'Per item. Leave a price blank to keep whatever it is already listed at.',
-        guide: [
-          'Cost was what you paid; this is what the register charges. The same number in both means the ' +
-            'shop makes nothing on every sale.',
-          'INGREDIENT is stock you craft with rather than sell — kept out of the register and out of the ' +
-            'pricing figures, so it has no sale price to give.',
-        ],
-        nodes: [priceHost],
-        onEnter: fillPricing,
-      },
-      {
-        title: 'Where did it come from?',
-        hint: 'All optional, and asked once for the whole delivery.',
-        guide: [
-          'Naming a REGISTERED shop credits it for the supply in its own ' + regionWord() + '’s trade. ' +
-            'Anyone else — an NPC smith, a traveller, a mine — is recorded as typed.',
-          'Nothing is written until you finish, so read the summary. A delivery entered by mistake can be ' +
-            'removed in Sales Log.',
-        ],
-        nodes: [
-          el('label', {}, 'Vendor'), vendor.el,
-          el('p', { class: 'note' }, 'Start typing — shops on this network appear as you go. Anyone else, ' +
-            'just type the name.'),
-          ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
-          review,
-        ],
-        onEnter: fillReview,
-      },
-    ],
-  });
+  const node = el('div', {}, [
+    el('div.card', {}, [
+      el('h3', {}, '1 · What arrived?'),
+      el('p', { class: 'note' }, 'One line per item. Add as many as the delivery brought.'),
+      guidePanel(GUIDE.arrived, unseen),
+      linesHost,
+      el('div', { class: 'row-actions' }, [addBtn]),
+      totalLine,
+    ]),
+    el('div.card', {}, [
+      el('h3', {}, '2 · What will you charge?'),
+      el('p', { class: 'note' }, 'Per item. Leave a price blank to keep whatever it is already listed at.'),
+      guidePanel(GUIDE.pricing, unseen),
+      nothingToPrice,
+      priceHost,
+    ]),
+    el('div.card', {}, [
+      el('h3', {}, '3 · Where did it come from?'),
+      el('p', { class: 'note' }, 'All optional, and asked once for the whole delivery.'),
+      guidePanel(GUIDE.source, unseen),
+      el('label', {}, 'Vendor'), vendor.el,
+      el('p', { class: 'note' }, 'Start typing — shops on this network appear as you go. Anyone else, ' +
+        'just type the name.'),
+      ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
+      el('h4', {}, 'About to record'),
+      review,
+      el('div', { class: 'row-actions' }, [record]),
+      status,
+    ]),
+  ]);
+
+  sync();
+  return { node, reset };
 }
 
 /**
  * The register's BUYING side.
  *
- * Two doors and a short receipt. The receipt is the point: Selling clears the
- * cart when a sale lands, which tells you it worked. Recording a delivery
- * closes a modal and leaves you looking at nothing, so the last few deliveries
- * sit here to say the thing you just typed actually landed. The full history —
- * and deleting one — stays in Sales Log rather than being built twice.
+ * The form IS the page. There is no tile to press first: Buying does one thing,
+ * and a grid of one button in front of it was a click that asked nothing.
+ *
+ * The deliveries below it are the receipt. Selling clears the cart when a sale
+ * lands, which tells you it worked; recording a delivery used to close a window
+ * and leave you looking at nothing. The full history — and removing a delivery
+ * entered by mistake — stays in Sales Log rather than being built twice.
  */
 export function renderBuying(host, { me }) {
   const canBuy = me.role === 'owner' || me.role === 'admin';
   const listHost = el('div', {}, skeletonRows(3));
 
-  // Not a security check — the Worker refuses both of these from an employee.
-  // The page simply does not offer a door that would slam.
-  const doors = el('div', {});
-  const drawDoors = (images) => mount(doors, canBuy
-    ? tileGrid([
-      { key: 'buy-intake', label: 'Intake Ingredients/Stock', glyph: '📦',
-        hint: 'Anything you bought — to sell or to craft with',
-        onOpen: () => openIntakeModal(refresh, me) },
-    ], images)
-    : el('p', { class: 'note' }, 'Recording what the shop buys is the owner’s — it moves coin out of the ' +
-      'coffer. Ask them to record an intake; what has already arrived is below.'));
-  // Glyphs first so the page is usable immediately; artwork replaces them when
-  // it arrives. Only the tiles are redrawn — the deliveries below are fetched
-  // once, not twice.
-  drawDoors({});
-  api.getTiles().then((r) => drawDoors(r.images || {})).catch(() => { /* glyphs are fine */ });
+  // Not a security check — the Worker refuses the write from an employee. The
+  // page simply does not show a form that cannot be submitted.
+  const intake = canBuy ? buildIntake(me, refresh) : null;
 
   mount(host,
     el('div.card', {}, [
-      el('p', { class: 'note' }, 'Stock coming IN, and the coin going out for it — to sell or to craft with. ' +
-        'Grown or crafted rather than bought? That is Farm/Harvest and Craft, on Inventory.'),
-      doors,
+      el('h3', {}, 'Intake Ingredients/Stock'),
+      el('p', { class: 'note' }, canBuy
+        ? 'Stock coming IN, and the coin going out for it — to sell or to craft with. Grown or crafted ' +
+          'rather than bought? That is Farm/Harvest and Craft, on Inventory.'
+        : 'Recording what the shop buys is the owner’s — it moves coin out of the coffer. Ask them to ' +
+          'record an intake; what has already arrived is below.'),
     ]),
+    intake ? intake.node : el('span', {}),
     el('div.card', {}, [
       el('h3', {}, 'Recent deliveries'),
       el('p', { class: 'note' }, 'The last few, so you can see what you just recorded. The full history, and ' +
@@ -422,21 +459,18 @@ export function renderBuying(host, { me }) {
       }));
       return;
     }
-    mount(listHost, el('table', {}, [
-      el('thead', {}, el('tr', {}, [
-        el('th', {}, 'When'), el('th', {}, 'Item'), el('th', {}, 'Qty'),
-        el('th', {}, 'Cost each'), el('th', {}, 'From'),
-      ])),
-      el('tbody', {}, rows.slice(0, 8).map((r) => el('tr', {}, [
-        el('td', {}, String(r.ts || '').slice(0, 10)),
-        el('td', {}, r.item || ''),
-        el('td', {}, String(r.numItems || 0)),
-        el('td', {}, money(r.pricePer || 0)),
+    mount(listHost, el('div', { class: 'table-scroll' }, tableEl(
+      ['When', 'Item', 'Qty', 'Cost each', 'From'],
+      rows.slice(0, 8).map((r) => [
+        String(r.ts || '').slice(0, 10),
+        r.item || '',
+        String(r.numItems || 0),
+        money(r.pricePer || 0),
         // A registered supplier is worth marking: it is the one that shows up in
         // its own region's figures as having supplied you.
-        el('td', {}, (r.fromBusiness || r.vendor || '—') + (r.fromBusiness ? ' ✓' : '')),
-      ]))),
-    ]));
+        (r.fromBusiness || r.vendor || '—') + (r.fromBusiness ? ' ✓' : ''),
+      ]),
+    )));
   }
 
   function refresh() {

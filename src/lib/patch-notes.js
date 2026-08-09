@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '2.8', date: '2026-08-09', notes: [
+    'Intake is the Buying page itself — three cards down the page instead of a pop-up asking one question at a time. You can see what you have already typed, the deliveries list you are checking against is right below it, and there is no window to open first.',
+    'What arrived, what you will charge, and where it came from are cards 1, 2 and 3. The second one fills itself in from the first as you add lines, and the summary above the Record button keeps up as you type.',
+    'The form clears itself after a delivery is recorded, ready for the next one.',
+    'The "How this works" help is still there, on each card, and still opens itself only for someone who has not recorded a delivery before.',
+  ] },
   { version: '2.7', date: '2026-08-09', notes: [
     'The feedback form has a "Report Delivery" subject. Use it to tell the network about a delivery rather than about the app.',
     'Those reports go to their own Appointments tab on the admin review page instead of sitting in the middle of the bug reports — a thing waiting on somebody looked exactly like a thing waiting on nobody. Its button says Archive, since the delivery is what gets completed and the button only files the report.',

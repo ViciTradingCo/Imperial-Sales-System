@@ -100,14 +100,24 @@ line. Every line is validated before any is written and all of them go in one
 `db.batch`, so a delivery lands whole or not at all — never loop a client over
 a one-item endpoint to fake it, which is the flaw the basket had.
 
+The intake form is THE PAGE, as three cards (`buildIntake`), not a modal and not
+behind a tile. It is the standing example of the stacked-card exception above: a
+form you fill in every day, next to the deliveries list you are checking it
+against. The form stays put after a successful record and RESETS — including a
+fresh idempotency key, or the next delivery looks like a retry of the last one
+and is silently discarded.
+
 ## Forms teach themselves (`guide`)
 
-A step in `openStepModal` may carry a `guide` — an array of paragraphs shown in
-one collapsible panel that follows you from step to step. Not a tour with its
-own Next button: a tour makes you read everything before you may touch anything,
-and it is gone exactly when you need it. Pass `guideKey` and the panel opens
-itself for someone who has never FINISHED that wizard (opening and abandoning it
-does not count — that is often the person who needed it most).
+`guidePanel(lines, open)` in `src/lib/guide.js` is a collapsible "How this
+works" that sits with a form and explains it. Not a tour with its own Next
+button: a tour makes you read everything before you may touch anything, and it
+is gone exactly when you need it.
+
+`guideUnseen(key)` decides whether it starts open and `markGuideSeen(key)` is
+called on a successful SUBMIT — finishing is what proves the help is no longer
+needed. Opening the form and abandoning it does not count; that is often the
+person who needed it most.
 
 ## Shelved features live in `archive/`
 

@@ -1,4 +1,10 @@
 /**
+ * SHELVED — the stepped-modal wizard, exactly as it shipped.
+ *
+ * Moved out of `src/lib/steps.js` unmodified. Its imports are written for that
+ * location and do not resolve from here; see this directory's README.
+ */
+/**
  * A stepped (wizard) modal — one question at a time, with Previous and Next.
  *
  * WHY. A form with nine fields is not nine times harder than a form with three,
