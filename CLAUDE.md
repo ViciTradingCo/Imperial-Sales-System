@@ -75,18 +75,24 @@ When adding a section, give it a stable `key` and add that key to `TILE_KEYS` in
 
 Navigation stays in the header/side menu; tiles are for content within a page.
 
-## The register has two sides
+## The register is where stock CHANGES
 
-`/pos` is SELLING and `/pos/buy` is BUYING — one `renderPos(container, { me, mode })`
-with two routes, not a tab that swaps the body, so Back works and a half-built
-cart survives a look at the deliveries. The Buying side lives in
-`src/views/intake-form.js` (`renderBuying`).
+Four sides, one `renderPos(container, { me, mode })`, one route each: `/pos`
+(Selling), `/pos/buy` (Buying — `intake-form.js`), `/pos/harvest` and
+`/pos/craft` (both `produce.js`). Routes rather than a tab that swaps the body,
+so Back works and a half-built cart survives a look at the deliveries.
 
-The split is by WHAT MOVES, not by what changes stock. Buying spends coin and
-names a supplier, so it is a till operation. Producing stock — Farm/Harvest,
-Craft — costs nothing and has no vendor, so it stays on Inventory, which is the
-list of what the shop HAS. Adding a stock-creating feature: if coin leaves the
-coffer, it belongs on Buying.
+The line is WHAT CHANGES STOCK, not what moves coin. Harvest and Craft were on
+Inventory under the older "the register is for money" rule, which put the four
+things a shop does to its stock in two different places. Inventory is now what
+the shop HOLDS — a list you consult, whose only writes CORRECT it (a miscount, a
+price, a listing that should not exist). Anything that adds or removes stock is
+a register side.
+
+What is still true is why Harvest and Craft are not intake: nobody was paid, so
+no vendor, no cost, no coffer entry, and no effect on what items are worth.
+Buying is owner/admin; Harvest and Craft are open to any ACTIVE member, because
+the person at the bench is usually not the owner.
 
 Buying is ONE door (`Intake Ingredients/Stock`), not one per kind of purchase.
 There were briefly two — a single delivery and an ingredient basket — and

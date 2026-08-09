@@ -117,10 +117,10 @@ body {
   border-left: 3px solid var(--accent); padding-left: 10px;
 }
 
-/* ---- Register: the Selling / Buying switch ----
-   A pair, drawn as one control, so it reads as two states of one till rather
-   than two unrelated buttons. The active half is filled; the other is an
-   outline you can obviously press. */
+/* ---- Register: the Selling / Buying / Harvest / Craft switch ----
+   Drawn as ONE control so it reads as four states of one till rather than four
+   unrelated buttons. The active one is filled; the rest are outlines you can
+   obviously press. */
 .mode-switch {
   display: inline-flex; margin: 8px 0 2px;
   border: 1px solid var(--accent); border-radius: var(--radius); overflow: hidden;
@@ -134,10 +134,15 @@ body {
 .mode-btn:hover:not(.active) { background: rgba(122, 74, 31, 0.08); }
 .mode-btn.active { background: var(--accent); color: #fff; cursor: default; }
 @media (max-width: 600px) {
-  /* Full width on a phone: these are the page's primary choice, and a 44px
-     target beats a neat one. */
-  .mode-switch { display: flex; width: 100%; }
-  .mode-btn { flex: 1 1 50%; padding: 11px 8px; }
+  /* Two by two on a phone rather than four slivers: these are the page's
+     primary choice, and a 44px target beats a neat one. */
+  .mode-switch { display: flex; flex-wrap: wrap; width: 100%; }
+  .mode-btn { flex: 1 1 40%; padding: 11px 8px; }
+  /* The dividers are drawn per button when they wrap, since "the one before
+     me" no longer means "the one to my left". */
+  .mode-btn + .mode-btn { border-left: none; }
+  .mode-btn { box-shadow: inset 1px 0 0 var(--accent), inset 0 1px 0 var(--accent); }
+  .mode-btn.active { box-shadow: none; }
 }
 
 /* A date field with its calendar and clear buttons beside it, rather than the

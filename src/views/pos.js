@@ -8,11 +8,15 @@
  * from the action bar.
  *
  * BUYING is the same counter pointed the other way — a delivery arriving, coin
- * leaving the coffer — and lives in `intake-form.js`. It used to be a button on
- * the Inventory page, which is the list of what you HAVE; spending is not a
- * property of a list, it is a thing a person does at the till.
+ * leaving the coffer — and lives in `intake-form.js`.
  *
- * The two are separate ROUTES rather than a tab that swaps the body, so Back
+ * HARVEST and CRAFT are the other two ways stock changes, and live in
+ * `produce.js`. All four were split between here and Inventory on the reasoning
+ * that the register was for things that move COIN; that put the four things a
+ * shop does to its stock in two different places. The register is now where
+ * stock CHANGES, and Inventory is what the shop currently HOLDS.
+ *
+ * Each is a separate ROUTE rather than a tab that swaps the body, so Back
  * works, the address bar says which one you are on, and a half-built cart is
  * not silently thrown away by a click meant to check a delivery.
  */
@@ -27,45 +31,57 @@ import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 import { renderBuying } from './intake-form.js';
+import { renderHarvest, renderCraft } from './produce.js';
+
+/** The register's sides, in the order stock travels: in, made, out. */
+const MODES = [
+  ['sell', 'Selling', '/pos'],
+  ['buy', 'Buying', '/pos/buy'],
+  ['harvest', 'Harvest', '/pos/harvest'],
+  ['craft', 'Craft', '/pos/craft'],
+];
 
 /**
- * The two context buttons. Rendered on BOTH sides so the pair is a fixed
- * landmark rather than a thing that appears on one screen and not the other —
- * the active one is marked, and pressing it does nothing.
+ * The context buttons. Rendered on EVERY side so the row is a fixed landmark
+ * rather than a thing that appears on one screen and not another — the active
+ * one is marked, and pressing it does nothing.
  */
-function modeSwitch(buying) {
-  const btn = (label, on, to) => el('button', {
-    type: 'button',
-    class: 'mode-btn' + (on ? ' active' : ''),
-    'aria-pressed': on ? 'true' : 'false',
-    onclick: () => { if (!on) navigate(to); },
-  }, label);
-  return el('div', { class: 'mode-switch' }, [
-    btn('Selling', !buying, '/pos'),
-    btn('Buying', buying, '/pos/buy'),
-  ]);
+function modeSwitch(mode) {
+  return el('div', { class: 'mode-switch' }, MODES.map(([key, label, to]) => {
+    const on = key === mode;
+    return el('button', {
+      type: 'button',
+      class: 'mode-btn' + (on ? ' active' : ''),
+      'aria-pressed': on ? 'true' : 'false',
+      onclick: () => { if (!on) navigate(to); },
+    }, label);
+  }));
 }
 
 export function renderPos(container, { me, mode }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
-  const buying = mode === 'buy';
 
   const banner = el('div', {});
   const offlineBar = el('div', {});
   const body = el('div', {}, el('p', { class: 'note' }, 'Loading register…'));
   const header = el('div.card', {}, [
     el('h2', {}, 'Register — ' + (me.business || 'Your shop')),
-    modeSwitch(buying),
+    modeSwitch(mode),
     banner,
   ]);
 
-  if (buying) {
-    // Nothing below this line applies: no cart, no certification check (an
-    // expired shop may still take a delivery), and no offline queue — an
-    // intake is not queued, so a bar promising to sync one would be a lie.
+  // Every side but Selling: no cart, no certification check (an expired shop
+  // may still take a delivery or bring in a crop), and no offline queue — none
+  // of these is queued, so a bar promising to sync one would be a lie.
+  const OTHER_SIDES = {
+    buy: renderBuying,
+    harvest: renderHarvest,
+    craft: renderCraft,
+  };
+  if (OTHER_SIDES[mode]) {
     const host = el('div', {});
     mount(container, header, host);
-    renderBuying(host, { me });
+    OTHER_SIDES[mode](host, { me });
     return;
   }
 

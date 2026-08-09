@@ -10,7 +10,7 @@ import { renameBusiness, listBusinessCards } from '../registry.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
-import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport, convertItems, setStock } from '../inventory.js';
+import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock } from '../inventory.js';
 import { recordIntakeLines, recordHarvest, listIntake, deleteIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
@@ -346,12 +346,6 @@ async function adjustStock({ request, env, body }) {
   return { ...res, inventory: await listInventory(env, caller.business, realmId) };
 }
 
-async function importInventoryRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
-  const res = await importInventory(env, caller.business, body.rows, realmIdOf(caller, env));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'inventory.import', detail: (res.imported || 0) + ' items', realmId: realmIdOf(caller, env) });
-  return res;
-}
 
 /* ---- intake ---- */
 async function getIntake({ request, env }) {
@@ -795,7 +789,6 @@ export const routes = [
   { method: 'POST', path: '/timecard/edit', handler: timecardEdit },
   { method: 'POST', path: '/timecard/delete', handler: timecardDelete },
   { method: 'POST', path: '/business/employees/rate', handler: payRateRoute },
-  { method: 'POST', path: '/inventory/import', handler: importInventoryRoute },
   { method: 'GET', path: '/intake', handler: getIntake },
   { method: 'POST', path: '/intake', handler: recordIntakeRoute },
   { method: 'GET', path: '/cert', handler: getCert },

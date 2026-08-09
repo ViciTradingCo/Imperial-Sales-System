@@ -85,6 +85,10 @@ const T = {
   // The register's two sides.
   'Selling': { es: 'Vendiendo', fr: 'Vente', de: 'Verkauf', it: 'Vendita' },
   'Buying': { es: 'Comprando', fr: 'Achat', de: 'Einkauf', it: 'Acquisto' },
+  'Harvest': { es: 'Cosecha', fr: 'Récolte', de: 'Ernte', it: 'Raccolto' },
+  'Craft': { es: 'Fabricar', fr: 'Fabriquer', de: 'Herstellen', it: 'Fabbrica' },
+  'Farm / Harvest': { es: 'Cultivo / cosecha', fr: 'Culture / récolte', de: 'Anbau / Ernte', it: 'Coltivazione / raccolto' },
+  'Add to stock': { es: 'Añadir al stock', fr: 'Ajouter au stock', de: 'Zum Bestand', it: 'Aggiungi alle scorte' },
   'Intake Ingredients/Stock': { es: 'Registrar ingredientes/existencias', fr: 'Réception d’ingrédients / stock', de: 'Zutaten/Warenzugang erfassen', it: 'Carico ingredienti/scorte' },
   'How this works': { es: 'Cómo funciona', fr: 'Comment ça marche', de: 'So funktioniert es', it: 'Come funziona' },
   'Void this sale': { es: 'Anular esta venta', fr: 'Annuler cette vente', de: 'Verkauf stornieren', it: 'Annulla vendita' },

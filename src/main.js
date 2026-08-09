@@ -295,11 +295,22 @@ route('/pos', (container) => {
   renderPos(container, { me: state.me, mode: 'sell' });
 });
 
-// The register's other half — stock coming IN. Its own route rather than a tab,
-// so Back works and a half-built cart survives a look at the deliveries.
+// The register's other sides — stock coming in, grown, or made. Each its own
+// route rather than a tab, so Back works and a half-built cart survives a look
+// at the deliveries.
 route('/pos/buy', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
   renderPos(container, { me: state.me, mode: 'buy' });
+});
+
+route('/pos/harvest', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  renderPos(container, { me: state.me, mode: 'harvest' });
+});
+
+route('/pos/craft', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  renderPos(container, { me: state.me, mode: 'craft' });
 });
 
 route('/admin/settings', (container) => {

@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.0', date: '2026-08-09', notes: [
+    'The register has four sides: Selling, Buying, Harvest and Craft. Everything that changes your stock is now in one place, on its own page, instead of two of them being buttons on the Inventory list.',
+    'Harvest and Craft are pages rather than pop-up windows, and both stay open after you use them — bring in a second crop or make a second batch without reopening anything. Craft re-reads your stock after each one, so what you just made is available to use straight away.',
+    'Inventory is what your shop HOLDS. It still corrects a count, a price or a listing, and still transfers stock to another company — but buying, growing, making and selling all happen at the register now.',
+    'Inventory: the bulk Import/Export has been removed.',
+  ] },
   { version: '2.9', date: '2026-08-09', notes: [
     'Sales Log: a delivery that brought several items is now ONE entry with its items listed inside it, headed with the date, the supplier and what the whole trip cost. It used to be one row per item, with nothing saying they arrived together and the figure you actually handed over nowhere on the screen. Each item still has its own Delete, since the usual mistake is one wrong quantity among several right ones.',
     'The recent deliveries on the Buying page group the same way — one line per trip, with its items and its total.',

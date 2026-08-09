@@ -215,8 +215,6 @@ export const api = {
   setPayRate: (uid, rate) => request('POST', '/business/employees/rate', { uid, rate }),
   /** Owner/admin: correct an item's stock by hand (a stocktake, breakage, spoilage). */
   setStock: (item, stock, note) => request('POST', '/inventory/stock', { item, stock, note }),
-  /** Owner/admin: bulk import inventory rows [{item, price, stock, lowStock}]. */
-  importInventory: (rows) => request('POST', '/inventory/import', { rows }),
   /** Owner/admin: per-employee sales performance. */
   getEmployeePerformance: () => request('GET', '/business/employees/performance'),
   /** Owner/admin: low + out-of-stock report ({ out, low }). */
