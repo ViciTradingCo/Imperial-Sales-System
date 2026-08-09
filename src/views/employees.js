@@ -74,6 +74,11 @@ export function renderEmployees(container, { me }) {
         const who = u.character || u.email; // character name is the display identity
         const label = el('span', { html:
           '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(u.role) + '</span> · ' + statusBadge(u.status) +
+          // The hourly rate their shifts are valued at. Said plainly when unset,
+          // because 0 and "nobody has decided yet" look identical on a wage line.
+          '<br><span class="note">' + (u.payRate
+            ? esc(money(u.payRate)) + ' an hour'
+            : 'No pay rate set') + '</span>' +
           (u.notes ? '<br><span class="note">📝 ' + esc(u.notes) + '</span>' : '') });
         const row = el('div.emp-row', {}, []);
         if (u.status === 'pending') {
@@ -94,6 +99,7 @@ export function renderEmployees(container, { me }) {
           }, 'Activate');
           actions.appendChild(btn);
         }
+        actions.appendChild(el('button.secondary-btn.small', { onclick: () => openRateModal(u, refresh) }, 'Pay rate'));
         actions.appendChild(el('button.secondary-btn.small', { onclick: () => openNoteModal(u, refresh) }, 'Notes'));
         row.appendChild(actions);
         return row;
@@ -133,6 +139,44 @@ export function renderEmployees(container, { me }) {
 }
 
 /** Focus modal to view/edit an owner-private note on one employee. */
+/**
+ * What this person is paid per hour.
+ *
+ * Applies to shifts from HERE ON. A finished shift keeps the rate it was
+ * stamped with when it ended, so giving someone a raise never quietly restates
+ * what last month's work was worth — an owner who has already agreed a figure
+ * still owes that figure.
+ */
+function openRateModal(u, onSaved) {
+  const rate = el('input', { type: 'number', step: '0.01', min: '0', value: String(u.payRate || 0) });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save rate');
+
+  let modal;
+  async function doSave() {
+    save.disabled = true;
+    status.className = ''; status.textContent = 'Saving…';
+    try {
+      await api.setPayRate(u.uid, rate.value);
+      onSaved();
+      modal.close();
+      toast('Pay rate saved.', 'ok');
+    } catch (e) {
+      save.disabled = false;
+      status.className = 'error'; status.textContent = e.message || String(e);
+    }
+  }
+
+  modal = openModal([
+    el('h3', {}, 'Pay rate — ' + (u.character || u.email)),
+    el('p', { class: 'note' }, 'What they earn per hour on the time card. This applies to shifts from now ' +
+      'on; shifts already finished keep the rate they were recorded at, so a raise never changes what ' +
+      'past work was worth.'),
+    el('label', {}, 'Per hour'), rate,
+    save, status,
+  ]);
+}
+
 function openNoteModal(u, onSaved) {
   const who = u.character || u.email || u.uid;
   const note = el('textarea', { rows: '5', placeholder: 'Private notes about ' + who + '…' });

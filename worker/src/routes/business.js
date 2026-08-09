@@ -5,14 +5,14 @@
  * MOTD banners, the Court hold report, and the owner CSV export.
  */
 import { requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
-import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid } from '../users.js';
+import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate } from '../users.js';
 import { renameBusiness, listBusinessCards } from '../registry.js';
 import { realmOf } from '../realm.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport, convertItems, setStock } from '../inventory.js';
-import { recordIntake, listIntake, deleteIntake } from '../intake.js';
+import { recordIntake, recordHarvest, listIntake, deleteIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
 import { checkCertification } from '../cert.js';
@@ -25,6 +25,7 @@ import { readMotd, readWarnDays, activeNoticesForBusiness,
   listMotdsForBusiness, addMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
 import { holdReport, businessReport } from '../market.js';
 import { lastWeekWindow, isWeekTurnover } from '../week.js';
+import { openShift, clockIn, clockOut, myShifts, shopShifts, markPaid, editShift, deleteShift } from '../timecard.js';
 import { requireCourt, courtCompanies, courtShop } from '../oversight.js';
 import {
   SPEND_CATEGORIES, STANDINGS, readCourtSettings, writeCourtSettings,
@@ -49,7 +50,7 @@ async function listEmployees({ request, env, url }) {
   const users = await listUsersByBusiness(env, business, realmIdOf(caller, env));
   return {
     business,
-    employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status, notes: u.notes || '' })),
+    employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status, notes: u.notes || '', payRate: u.payRate || 0 })),
   };
 }
 async function activateEmployee({ request, env, body }) {
@@ -132,11 +133,14 @@ async function deleteIntakeRoute({ request, env, body }) {
 
 /**
  * Crafting: consume ingredients from this shop's stock, produce something else.
- * Owner/admin only — it destroys stock, which an employee ringing up sales has
- * no reason to do.
+ *
+ * Any ACTIVE member. Crafting is shop-floor work — the person at the bench is
+ * usually not the owner — and it is not a money path: stock becomes other
+ * stock, nothing is bought or sold, and the ingredients have to be there. An
+ * employee who can sell the shop's goods can certainly make them.
  */
 async function convertInventory({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireActive(request, env);
   const realmId = realmIdOf(caller, env);
   const res = await convertItems(env, caller.business, body, realmId);
   if (!res.duplicate) {
@@ -144,6 +148,104 @@ async function convertInventory({ request, env, body }) {
       action: 'inventory.craft', detail: res.detail, realmId });
   }
   return res;
+}
+
+/* ---- Farm / Harvest: stock produced rather than bought ---- */
+async function harvestRoute({ request, env, body }) {
+  // Any active member: bringing in a crop is shop-floor work, like ringing up
+  // a sale. It moves no money, so there is nothing here an owner must gate.
+  const caller = await requireActive(request, env);
+  const realmId = realmIdOf(caller, env);
+  const intake = await recordHarvest(env, caller.business, body, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'inventory.harvest', detail: body.item + ' ×' + body.numItems, realmId });
+  return { intake, inventory: await listInventory(env, caller.business, realmId) };
+}
+
+/* ---- time cards ---- */
+
+/** Whoever is asking, plus the shift they are currently working (or none). */
+async function myTimecard({ request, env }) {
+  const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
+  return {
+    open: await openShift(env, caller.uid, realmId),
+    shifts: await myShifts(env, caller.uid, realmId),
+    rate: caller.payRate || 0,
+  };
+}
+
+async function clockInRoute({ request, env }) {
+  const caller = await requireActive(request, env);
+  const realmId = realmIdOf(caller, env);
+  const open = await clockIn(env, {
+    uid: caller.uid, employee: caller.character || caller.email,
+    business: caller.business, rate: caller.payRate || 0,
+  }, realmId);
+  return { open, shifts: await myShifts(env, caller.uid, realmId) };
+}
+
+async function clockOutRoute({ request, env, body }) {
+  const caller = await requireActive(request, env);
+  const realmId = realmIdOf(caller, env);
+  // The rate is read NOW, not at clock-in, so a correction made during the
+  // shift still applies to it.
+  await clockOut(env, { uid: caller.uid, rate: caller.payRate || 0, note: body.note }, realmId);
+  return { open: null, shifts: await myShifts(env, caller.uid, realmId) };
+}
+
+/** The owner's log: every shift at this shop, with who is owed what. */
+async function timecardLog({ request, env }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return await shopShifts(env, caller.business, realmIdOf(caller, env));
+}
+
+/**
+ * Marks wages settled. Records only — no coffer entry, same rule as the Court's
+ * levy: the app says what is owed and a person confirms it was actually paid.
+ */
+async function timecardPay({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await markPaid(env, { business: caller.business, uid: body.uid, ids: body.ids }, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'timecard.paid', detail: body.uid ? 'uid ' + body.uid : (body.ids || []).length + ' shift(s)', realmId });
+  return res;
+}
+
+async function timecardEdit({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await editShift(env, { business: caller.business, ...body }, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'timecard.edit', detail: 'shift ' + body.id, realmId });
+  return res;
+}
+
+async function timecardDelete({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await deleteShift(env, { business: caller.business, id: body.id }, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'timecard.delete', detail: 'shift ' + body.id, realmId });
+  return res;
+}
+
+/** The owner sets what someone is paid per hour. */
+async function payRateRoute({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  // Their OWN roster only — the same check the note and activate routes make.
+  const roster = await listUsersByBusiness(env, caller.business, realmId);
+  const target = roster.find((u) => u.uid === String(body.uid || '').trim());
+  if (!target) {
+    const e = new Error('That employee is not part of your business.');
+    e.forbidden = true; throw e;
+  }
+  const rate = await setPayRate(env, target.uid, body.rate, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'employee.rate', detail: (target.character || target.uid) + ' → ' + rate, realmId });
+  return { ok: true, uid: target.uid, rate };
 }
 
 /* ---- feedback on the app ---- */
@@ -684,6 +786,15 @@ export const routes = [
   { method: 'POST', path: '/inventory', handler: saveItem },
   { method: 'POST', path: '/inventory/delete', handler: deleteItemRoute },
   { method: 'POST', path: '/inventory/stock', handler: adjustStock },
+  { method: 'POST', path: '/inventory/harvest', handler: harvestRoute },
+  { method: 'GET', path: '/timecard', handler: myTimecard },
+  { method: 'POST', path: '/timecard/in', handler: clockInRoute },
+  { method: 'POST', path: '/timecard/out', handler: clockOutRoute },
+  { method: 'GET', path: '/timecard/log', handler: timecardLog },
+  { method: 'POST', path: '/timecard/pay', handler: timecardPay },
+  { method: 'POST', path: '/timecard/edit', handler: timecardEdit },
+  { method: 'POST', path: '/timecard/delete', handler: timecardDelete },
+  { method: 'POST', path: '/business/employees/rate', handler: payRateRoute },
   { method: 'POST', path: '/inventory/import', handler: importInventoryRoute },
   { method: 'GET', path: '/intake', handler: getIntake },
   { method: 'POST', path: '/intake', handler: recordIntakeRoute },

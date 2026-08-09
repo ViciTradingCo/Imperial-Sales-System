@@ -36,9 +36,17 @@ export async function recordIntake(env, business, { item, vendor, hold, fromBusi
     sale = Number(askedSale);
     if (!isFinite(sale) || sale < 0) throw new Error('Sale price must be a number ≥ 0.');
   }
-  // An INGREDIENT is stock the shop holds to craft with and does not sell. The
-  // flag is set per delivery because that is when you know what the stock is
-  // for; it can be changed later from the item's own editor.
+  /**
+   * An INGREDIENT is stock the shop holds to craft with and does not sell.
+   *
+   * Only applied when the caller actually says so. It used to be written on
+   * every delivery from a checkbox that defaults to off, which silently UNDID
+   * the flag: an owner marked something an ingredient in the item editor, took
+   * a routine delivery of it, and it quietly became sellable again — back in
+   * the register, back on the storefront, back in the pricing statistics. A
+   * restock is not a re-classification, exactly as it is not a repricing.
+   */
+  const ingGiven = ingredient !== undefined && ingredient !== null && ingredient !== '';
   const ing = ingredient ? 1 : 0;
   // Bought from a REGISTERED company, when it was. Resolved against the realm's
   // own companies so it is a real join rather than a second free-text field —
@@ -55,6 +63,20 @@ export async function recordIntake(env, business, { item, vendor, hold, fromBusi
     }
     from = known.business;
   }
+  /**
+   * The name this shop ALREADY lists it under, if it does.
+   *
+   * The inventory's uniqueness is on the raw name, so "iron sword" and "Iron
+   * Sword" are two rows to SQLite. A delivery typed with different casing was
+   * silently creating a second listing with its own stock and its own price —
+   * which reads exactly like "I recorded the intake and the stock did not go
+   * up", because the stock went up on a row nobody was looking at.
+   */
+  const existing = await db.prepare(
+    'SELECT item FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
+    .bind(realmId, business, name.toLowerCase()).first();
+  const invName = existing ? existing.item : name;
+
   const ts = new Date().toISOString();
 
   await db.batch([
@@ -70,8 +92,9 @@ export async function recordIntake(env, business, { item, vendor, hold, fromBusi
        ON CONFLICT (realm_id, business, item) DO UPDATE SET
          stock = stock + excluded.stock,
          price = CASE WHEN ? THEN excluded.price ELSE inventory.price END,
-         ingredient = excluded.ingredient`
-    ).bind(realmId, business, name, sale === null ? per : sale, qty, ing, sale === null ? 0 : 1),
+         ingredient = CASE WHEN ? THEN excluded.ingredient ELSE inventory.ingredient END`
+    ).bind(realmId, business, invName, sale === null ? per : sale, qty, ing,
+      sale === null ? 0 : 1, ingGiven ? 1 : 0),
     // Debit the shop's coffers for what was paid.
     db.prepare(
       `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'intake', ?, ?)`
@@ -80,6 +103,66 @@ export async function recordIntake(env, business, { item, vendor, hold, fromBusi
 
   return listIntake(env, business, realmId);
 }
+
+/**
+ * FARM / HARVEST — stock that was produced, not bought.
+ *
+ * A farm brings in a crop; a mine brings up ore; a hunter comes back with
+ * hides. No vendor, no region of purchase, and above all no COST: nobody was
+ * paid, so nothing leaves the coffer. Recording these as an intake at 0 was the
+ * only way before, and it lied twice — it invented a purchase from an empty
+ * vendor, and it dragged the item's average value toward zero in every market
+ * report, because a free thing looks like a thing worth nothing.
+ *
+ * So it is a different verb with its own row: the stock goes up, and that is
+ * all that happens.
+ */
+export async function recordHarvest(env, business, { item, numItems, ingredient, idempotencyKey }, realmId) {
+  const db = await getDb(env);
+  const idem = String(idempotencyKey || '').trim();
+  if (idem) {
+    const prior = await db.prepare('SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem = ? LIMIT 1')
+      .bind(realmId, business, idem).first();
+    if (prior) return listIntake(env, business, realmId);
+  }
+  const name = String(item || '').trim();
+  if (!name) throw new Error('Which item did you bring in?');
+  const qty = Math.floor(Number(numItems));
+  if (!isFinite(qty) || qty < 1) throw new Error('How many? Enter a whole number of 1 or more.');
+
+  const ingGiven = ingredient !== undefined && ingredient !== null && ingredient !== '';
+  const ing = ingredient ? 1 : 0;
+  // Same case-insensitive match as a delivery: a harvest must land on the
+  // listing the owner is already looking at.
+  const existing = await db.prepare(
+    'SELECT item FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
+    .bind(realmId, business, name.toLowerCase()).first();
+  const invName = existing ? existing.item : name;
+  const ts = new Date().toISOString();
+
+  await db.batch([
+    // Logged as intake with HARVEST as the vendor and no price, so it appears
+    // in the delivery history and can be deleted like any other mistake — but
+    // priced at nothing, which market.js already excludes from valuation.
+    db.prepare(
+      `INSERT INTO intake (realm_id, business, ts, item, vendor, source_hold, num_items, price_per, idem, from_business)
+       VALUES (?, ?, ?, ?, ?, '', ?, 0, ?, '')`
+    ).bind(realmId, business, ts, name, HARVEST_VENDOR, qty, idem || null),
+    db.prepare(
+      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient)
+       VALUES (?, ?, ?, 0, ?, 0, ?)
+       ON CONFLICT (realm_id, business, item) DO UPDATE SET
+         stock = stock + excluded.stock,
+         ingredient = CASE WHEN ? THEN excluded.ingredient ELSE inventory.ingredient END`
+    ).bind(realmId, business, invName, qty, ing, ingGiven ? 1 : 0),
+    // No coffer entry. Nobody was paid.
+  ]);
+
+  return listIntake(env, business, realmId);
+}
+
+/** How a harvested delivery is labelled in the log. */
+export const HARVEST_VENDOR = 'Farm/Harvest';
 
 /** The most recent intake transactions for a business. */
 export async function listIntake(env, business, realmId, limit = 20) {

@@ -329,6 +329,7 @@ const TILE_KEYS = [
   // Sales Log's own two sections
   ['log-sales', 'Sales Log · Sales'], ['log-intake', 'Sales Log · Deliveries'],
   ['emp-code', 'Employees · Staff code'],
+  ['tc-mine', 'Time Cards · Mine'], ['tc-log', 'Time Cards · Shift log'],
   // Network Settings sections
   ['set-branding', 'Settings · Branding'],
   ['set-about', 'Settings · About page'],

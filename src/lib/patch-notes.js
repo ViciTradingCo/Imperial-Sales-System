@@ -3,6 +3,17 @@
  * entry at the top as features ship.
  */
 const PATCH_NOTES = [
+  { version: '2.1', date: '2026-08-09', notes: [
+    'Fixed: a delivery recorded with different capitalisation ("iron sword" against "Iron Sword") was creating a SECOND listing with its own stock and price. The stock went up on a row nobody was looking at, which is why intake looked like it was not updating. Deliveries now always land on the listing you already have.',
+    'Fixed: an ordinary restock was silently clearing an item\'s Ingredient flag, putting it back into the register and the storefront. A restock is not a re-classification — the flag only changes when the form actually says so.',
+    'Inventory: Farm/Harvest. For stock you produced rather than bought — a crop, a hunt, a dig. Item and quantity, nothing else. No money leaves your coffer, and it is not counted as a purchase in the market figures.',
+    'Inventory: Buy Ingredients. Build a basket and watch it total as you go, with prices starting at what you have paid before. Record it once and every line becomes a delivery with the stock added.',
+    'Inventory: ingredients now show what they cost you — the average of your own deliveries, weighted by quantity — since a sale price says nothing about something you never sell.',
+    'Intake accepts an item the index has never heard of, the same way the register now does.',
+    'Time Cards, next to Register and Inventory. Clock on and off, see your own hours and what you are owed. Owners get a shift log with hours and wages per person, and can correct a forgotten clock-out. Marking wages paid records that it happened — it does not move coin.',
+    'Employees: an hourly Pay rate on each person. It applies to shifts from then on, so a raise never changes what past work was worth.',
+    'Employees can craft. The person at the bench is usually not the owner.',
+  ] },
   { version: '2.0', date: '2026-08-07', notes: [
     'The register can sell something that is not in the item index. Type the name, give the price, and the sale goes through — the item is added to the index flagged as new, for an admin to confirm or remove. Previously the only options were to abandon the sale or ring it up under the wrong name, and the item was left out of every report forever.',
     'Admins get a "New from the register" queue at the top of the Master Item Index, with a banner when anything is waiting. Each entry shows what it might be a duplicate of, so a misspelling can be told from a genuinely new thing at a glance. Keep it, or remove it — the sales are kept either way.',

@@ -206,6 +206,17 @@ body {
 .review-card h3 { margin-top: 0; color: var(--warn); }
 .note.warn { color: var(--warn); }
 
+/* The ingredient basket: a running total you can read while shopping. */
+.buy-total {
+  margin: var(--sp-3) 0; padding: var(--sp-2) var(--sp-3);
+  background: rgba(122, 74, 31, 0.08); border-radius: var(--radius);
+  font-weight: bold; font-size: 17px; color: var(--accent);
+}
+.buy-sub { flex: 0 0 auto; min-width: 70px; text-align: right; color: var(--note); font-size: 13px; }
+
+/* A shift in progress, so the state is obvious before reading a word. */
+.shift-open { border-left: 4px solid var(--warn); }
+
 /* Line chart (per-item trends) */
 .line-chart-wrap { margin: var(--sp-2) 0 0; }
 .line-chart {

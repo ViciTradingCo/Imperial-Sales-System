@@ -140,7 +140,8 @@ const SCHEMA = [
      email TEXT NOT NULL, business TEXT,
      role TEXT NOT NULL DEFAULT 'employee', is_owner INTEGER NOT NULL DEFAULT 0,
      status TEXT NOT NULL DEFAULT 'active', char_name TEXT, notes TEXT,
-     created TEXT, last_seen TEXT, active_realm TEXT NOT NULL DEFAULT '')`,
+     created TEXT, last_seen TEXT, active_realm TEXT NOT NULL DEFAULT '',
+     pay_rate REAL NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`,
   `CREATE INDEX IF NOT EXISTS idx_users_business ON users (business)`,
   // Registered businesses + their Vici Trading Co. certification (subscription).
@@ -239,6 +240,20 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS realms (
      id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT, created TEXT,
      join_code TEXT)`,
+  // ---- Time cards ----
+  // One row per shift: clocked in, and clocked out later (open while `out` is
+  // NULL). The RATE IS COPIED ONTO THE ROW when the shift ends, not read from
+  // the employee's current rate at payout — a raise must not silently restate
+  // what last month's work was worth.
+  `CREATE TABLE IF NOT EXISTS time_card (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     business TEXT NOT NULL, uid TEXT NOT NULL, employee TEXT,
+     clock_in TEXT NOT NULL, clock_out TEXT,
+     rate REAL NOT NULL DEFAULT 0, note TEXT,
+     paid INTEGER NOT NULL DEFAULT 0, paid_ts TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_time_card_shop ON time_card (realm_id, business)`,
+  `CREATE INDEX IF NOT EXISTS idx_time_card_open ON time_card (realm_id, uid, clock_out)`,
   // ---- Sessions (staying signed in) ----
   // A Google ID token lasts an hour; a shift at the register lasts longer. So
   // signing in trades the Google token for one of ours, which lasts a day.
@@ -260,6 +275,7 @@ const SCHEMA = [
 export const REALM_TABLES = [
   'inventory', 'sales', 'intake', 'transfers', 'coffer_entries', 'discounts',
   'shop_style', 'audit', 'master_item', 'item_type', 'hold_index', 'users', 'companies',
+  'time_card',
   'master_settings', 'business_settings', 'motd_list', 'feedback',
   'court_settings', 'court_status', 'court_price', 'court_dues', 'court_spend',
 ];
@@ -273,6 +289,7 @@ const BUSINESS_TABLES = [
   ['inventory', 'business'], ['sales', 'business'], ['intake', 'business'],
   ['transfers', 'from_business'], ['transfers', 'to_business'],
   ['coffer_entries', 'business'], ['discounts', 'business'], ['shop_style', 'business'],
+  ['time_card', 'business'],
   ['companies', 'business'], ['users', 'business'], ['business_settings', 'business'],
   ['motd_list', 'business'],
 ];
@@ -285,6 +302,7 @@ const MIGRATIONS = [
   'ALTER TABLE master_item ADD COLUMN first_seen TEXT',
   'ALTER TABLE master_item ADD COLUMN first_by TEXT',
   'ALTER TABLE master_item ADD COLUMN first_shop TEXT',
+  'ALTER TABLE users ADD COLUMN pay_rate REAL NOT NULL DEFAULT 0',
   'ALTER TABLE sales ADD COLUMN idem TEXT',
   'CREATE INDEX IF NOT EXISTS idx_sales_idem ON sales (business, idem)',
   'ALTER TABLE intake ADD COLUMN idem TEXT',

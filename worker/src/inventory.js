@@ -40,6 +40,24 @@ export async function listInventory(env, business, realmId) {
     .prepare('SELECT item, price, stock, low_stock, ingredient FROM inventory WHERE realm_id = ? AND business = ? ORDER BY item COLLATE NOCASE')
     .bind(realmId, business)
     .all();
+  /**
+   * What this shop has actually PAID per unit, averaged over its own deliveries.
+   *
+   * An ingredient is never sold, so its sale price says nothing about it — the
+   * number somebody restocking needs is what it costs. Weighted by quantity
+   * (SUM of spend ÷ SUM of units), so one small emergency purchase at a bad
+   * price does not become the figure. Harvested stock is excluded: it cost
+   * nothing, and counting it would drag the average toward zero and suggest
+   * ingredients are cheaper to buy than they are.
+   */
+  const { results: costs } = await db.prepare(
+    `SELECT item, SUM(num_items * price_per) AS spend, SUM(num_items) AS units
+       FROM intake WHERE realm_id = ? AND business = ? AND price_per > 0
+      GROUP BY lower(item)`).bind(realmId, business).all();
+  const avgByName = new Map((costs || [])
+    .filter((c) => Number(c.units) > 0)
+    .map((c) => [String(c.item).toLowerCase(), Number(c.spend) / Number(c.units)]));
+
   return (results || []).map((r) => ({
     item: r.item,
     price: r.price,
@@ -49,6 +67,11 @@ export async function listInventory(env, business, realmId) {
     // one shop's ingredient is another's stock-in-trade, so it could never live
     // on the shared item index.
     ingredient: !!r.ingredient,
+    // Null rather than 0 when nothing has ever been bought — "no data" and
+    // "free" are different answers and the UI shows only one of them.
+    avgCost: avgByName.has(String(r.item).toLowerCase())
+      ? Math.round(avgByName.get(String(r.item).toLowerCase()) * 100) / 100
+      : null,
     status: statusFor(r.stock, r.low_stock),
   }));
 }

@@ -194,6 +194,21 @@ export const api = {
   saveItem: (item) => request('POST', '/inventory', item),
   /** Owner/admin: delete an inventory item. */
   deleteItem: (item) => request('POST', '/inventory/delete', { item }),
+  /** Any active member: stock produced rather than bought (a crop, a hunt, a dig). */
+  harvest: (payload) => request('POST', '/inventory/harvest', payload),
+  /* ---- time cards ---- */
+  /** Whoever is asking: their open shift, their history, and their rate. */
+  getTimecard: () => request('GET', '/timecard'),
+  clockIn: () => request('POST', '/timecard/in', {}),
+  clockOut: (note) => request('POST', '/timecard/out', { note }),
+  /** Owner/admin: every shift at this shop, with who is owed what. */
+  getTimecardLog: () => request('GET', '/timecard/log'),
+  /** Owner/admin: mark wages settled. Records only — it moves no money. */
+  payTimecard: (uid, ids) => request('POST', '/timecard/pay', { uid, ids }),
+  editShift: (shift) => request('POST', '/timecard/edit', shift),
+  deleteShift: (id) => request('POST', '/timecard/delete', { id }),
+  /** Owner/admin: set an employee's hourly rate. */
+  setPayRate: (uid, rate) => request('POST', '/business/employees/rate', { uid, rate }),
   /** Owner/admin: correct an item's stock by hand (a stocktake, breakage, spoilage). */
   setStock: (item, stock, note) => request('POST', '/inventory/stock', { item, stock, note }),
   /** Owner/admin: bulk import inventory rows [{item, price, stock, lowStock}]. */

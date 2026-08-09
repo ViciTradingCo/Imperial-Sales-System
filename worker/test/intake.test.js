@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { makeD1 } from './d1shim.js';
 import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
-import { recordIntake, listIntake, deleteIntake } from '../src/intake.js';
+import { recordIntake, recordHarvest, listIntake, deleteIntake, HARVEST_VENDOR } from '../src/intake.js';
 import { listInventory } from '../src/inventory.js';
 import { cofferBalance } from '../src/coffers.js';
 
@@ -129,9 +129,11 @@ describe('ingredients', () => {
     expect((await itemRow('Iron Sword')).ingredient).toBe(false);
   });
 
-  it('can be turned back into sellable stock by a later delivery', async () => {
+  it('can be turned back into sellable stock by a delivery that SAYS SO', async () => {
+    // Explicitly, not by omission. A delivery that does not mention the flag
+    // leaves it alone — see "a restock updates the listing you already have".
     await take({ ingredient: true });
-    await take({ salePrice: 30 });
+    await take({ ingredient: false, salePrice: 30 });
     const row = await itemRow('Iron Sword');
     expect(row.ingredient).toBe(false);
     expect(row.price).toBe(30);
@@ -189,5 +191,132 @@ describe('the supplying company', () => {
       `INSERT INTO companies (id, realm_id, business, hold, court, priority, perpetual, status)
        VALUES ('co-x', 'rlm-other', 'Far Traders', 'Elsewhere', 0, 0, 1, 'VALID')`).run();
     await expect(take({ fromBusiness: 'Far Traders' })).rejects.toThrow(/no registered company/i);
+  });
+});
+
+/**
+ * Two ways a delivery used to fail to update what the owner was looking at.
+ * Both were reported as "I entered the intake and nothing changed", and both
+ * were real: one wrote to a row nobody could see, the other silently undid a
+ * setting.
+ */
+describe('a restock updates the listing you already have', () => {
+  it('adds to the existing item however the name is cased', async () => {
+    // The inventory's uniqueness is on the raw name, so "iron sword" and "Iron
+    // Sword" were two rows — the stock went up on the one nobody was looking at.
+    await recordIntake(env, SHOP, { item: 'Iron Sword', numItems: 5, pricePer: 10 }, R);
+    await recordIntake(env, SHOP, { item: 'iron sword', numItems: 4, pricePer: 10 }, R);
+    const inv = await listInventory(env, SHOP, R);
+    expect(inv).toHaveLength(1);
+    expect(inv[0]).toMatchObject({ item: 'Iron Sword', stock: 9 });
+  });
+
+  it('keeps the listing under its ORIGINAL spelling', async () => {
+    await recordIntake(env, SHOP, { item: 'Iron Sword', numItems: 1, pricePer: 10 }, R);
+    await recordIntake(env, SHOP, { item: 'IRON SWORD', numItems: 1, pricePer: 10 }, R);
+    expect((await listInventory(env, SHOP, R))[0].item).toBe('Iron Sword');
+  });
+
+  it('does not clear the Ingredient flag on an ordinary restock', async () => {
+    // The flag is set in the item editor and the delivery form's checkbox
+    // defaults to off — so every restock was quietly making an ingredient
+    // sellable again, back into the register and the pricing statistics.
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 5, pricePer: 2, ingredient: true }, R);
+    expect((await listInventory(env, SHOP, R))[0].ingredient).toBe(true);
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 3, pricePer: 2 }, R);
+    expect((await listInventory(env, SHOP, R))[0]).toMatchObject({ stock: 8, ingredient: true });
+  });
+
+  it('still lets a delivery SET the flag when it says so', async () => {
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 5, pricePer: 2 }, R);
+    expect((await listInventory(env, SHOP, R))[0].ingredient).toBe(false);
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 1, pricePer: 2, ingredient: true }, R);
+    expect((await listInventory(env, SHOP, R))[0].ingredient).toBe(true);
+  });
+
+  it('and can still turn it off explicitly', async () => {
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 5, pricePer: 2, ingredient: true }, R);
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 1, pricePer: 2, ingredient: false }, R);
+    expect((await listInventory(env, SHOP, R))[0].ingredient).toBe(false);
+  });
+});
+
+/**
+ * FARM / HARVEST — stock produced rather than bought.
+ *
+ * The point of a separate verb: nobody was paid. Recording these as an intake
+ * at 0 lied twice — it invented a purchase from an empty vendor, and a free
+ * thing looks to the market like a thing worth nothing.
+ */
+describe('farm / harvest', () => {
+  it('adds stock and takes nothing from the coffer', async () => {
+    await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 20 }, R);
+    expect((await listInventory(env, SHOP, R))[0]).toMatchObject({ item: 'Wheat', stock: 20 });
+    expect(await cofferBalance(env, SHOP, R)).toBe(0);
+  });
+
+  it('records no purchase price, so it cannot drag the item\'s value down', async () => {
+    await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 20 }, R);
+    const [entry] = await listIntake(env, SHOP, R);
+    expect(entry).toMatchObject({ item: 'Wheat', numItems: 20, pricePer: 0 });
+  });
+
+  it('is labelled as a harvest in the delivery log', async () => {
+    await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 5 }, R);
+    expect((await listIntake(env, SHOP, R))[0].vendor).toBe(HARVEST_VENDOR);
+  });
+
+  it('adds to an existing listing however the name is cased', async () => {
+    await recordIntake(env, SHOP, { item: 'Wheat', numItems: 5, pricePer: 2 }, R);
+    await recordHarvest(env, SHOP, { item: 'wheat', numItems: 10 }, R);
+    const inv = await listInventory(env, SHOP, R);
+    expect(inv).toHaveLength(1);
+    expect(inv[0]).toMatchObject({ item: 'Wheat', stock: 15 });
+  });
+
+  it('never re-prices what it lands on', async () => {
+    // A harvest is free; letting it write a price would zero the sale price of
+    // anything the shop also buys.
+    await recordIntake(env, SHOP, { item: 'Wheat', numItems: 5, pricePer: 2, salePrice: 9 }, R);
+    await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 10 }, R);
+    expect((await listInventory(env, SHOP, R))[0].price).toBe(9);
+  });
+
+  it('leaves an existing Ingredient flag alone', async () => {
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 1, pricePer: 2, ingredient: true }, R);
+    await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 9 }, R);
+    expect((await listInventory(env, SHOP, R))[0]).toMatchObject({ stock: 10, ingredient: true });
+  });
+
+  it('refuses nothing and refuses none', async () => {
+    await expect(recordHarvest(env, SHOP, { item: '', numItems: 5 }, R)).rejects.toThrow(/which item/i);
+    await expect(recordHarvest(env, SHOP, { item: 'Wheat', numItems: 0 }, R)).rejects.toThrow(/1 or more/i);
+  });
+
+  it('is idempotent on a repeated key', async () => {
+    await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 5, idempotencyKey: 'h1' }, R);
+    await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 5, idempotencyKey: 'h1' }, R);
+    expect((await listInventory(env, SHOP, R))[0].stock).toBe(5);
+  });
+});
+
+/** What an ingredient COSTS — the number you need when you go to buy more. */
+describe('what a shop pays for its ingredients', () => {
+  it('averages its own deliveries, weighted by quantity', async () => {
+    // 10 at 2 and 90 at 4 is 3.8, not the 3 a plain mean of the two would give.
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 10, pricePer: 2, ingredient: true }, R);
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 90, pricePer: 4 }, R);
+    expect((await listInventory(env, SHOP, R))[0].avgCost).toBe(3.8);
+  });
+
+  it('leaves harvested stock out of the average', async () => {
+    await recordIntake(env, SHOP, { item: 'Nirnroot', numItems: 10, pricePer: 4, ingredient: true }, R);
+    await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 90 }, R);
+    expect((await listInventory(env, SHOP, R))[0].avgCost).toBe(4);
+  });
+
+  it('is null, not zero, when nothing has ever been bought', async () => {
+    await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 5 }, R);
+    expect((await listInventory(env, SHOP, R))[0].avgCost).toBe(null);
   });
 });

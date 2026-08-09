@@ -32,6 +32,9 @@ export function setOpsActions(me) {
   // member (the person who mis-rang it is usually the one who notices), while
   // deleting a delivery is owner-only, since it rewrites the coffer.
   items.push({ label: 'Sales Log', path: '/sales-log', onClick: () => navigate('/sales-log') });
+  // Clocking on and off is everyone's; the shop-wide log inside it is the
+  // owner's, gated on the page and in the Worker.
+  items.push({ label: 'Time Cards', path: '/timecard', onClick: () => navigate('/timecard') });
   if (me.role === 'owner' || me.role === 'admin') {
     items.push({ label: 'Employees', path: '/employees', onClick: () => navigate('/employees') });
   }

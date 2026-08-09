@@ -34,6 +34,10 @@ function rowToUser(r) {
     status: String(r.status || '').trim().toLowerCase() || 'active',
     character: String(r.char_name || '').trim(),
     notes: String(r.notes || '').trim(),
+    // What this person is paid per hour, for the time card. Set by their owner
+    // on the roster; 0 means nobody has set one, and the log says so rather
+    // than quietly valuing their shifts at nothing.
+    payRate: Number(r.pay_rate) || 0,
     // The realm this account BELONGS to. It comes only from this row, never
     // from the request, so it is the caller's permanent home.
     realmId: String(r.realm_id || DEFAULT_REALM_ID).trim() || DEFAULT_REALM_ID,
@@ -149,6 +153,28 @@ export async function setUserCharacter(env, uid, character) {
 }
 
 /** Sets a user's owner-only note by uid. */
+/**
+ * Sets an employee's hourly pay rate. Owner's call, on their own roster.
+ *
+ * Applies to shifts from here on: a finished shift keeps the rate it was
+ * stamped with, so a raise never restates what past work was worth.
+ */
+export async function setPayRate(env, uid, rate, realmId) {
+  const target = String(uid || '').trim();
+  if (!target) throw new Error('Which employee?');
+  const n = Number(rate);
+  if (!isFinite(n) || n < 0) throw new Error('A pay rate must be a number ≥ 0.');
+  const db = await getDb(env);
+  const existing = await db.prepare('SELECT uid FROM users WHERE uid = ? AND realm_id = ?')
+    .bind(target, String(realmId || DEFAULT_REALM_ID)).first();
+  if (!existing) throw new Error('Member not found.');
+  await db.prepare('UPDATE users SET pay_rate = ? WHERE uid = ? AND realm_id = ?')
+    .bind(n, target, String(realmId || DEFAULT_REALM_ID)).run();
+  bustUserCache();
+  return n;
+}
+
+
 export async function setUserNote(env, uid, note) {
   const db = await getDb(env);
   await db.prepare('UPDATE users SET notes = ? WHERE uid = ?').bind(String(note || '').trim(), uid).run();

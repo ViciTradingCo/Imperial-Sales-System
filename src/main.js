@@ -38,6 +38,7 @@ import { renderItemIndex } from './views/item-index.js';
 import { renderLedgerSettings, renderShopSettingsPage } from './views/ledger-settings.js';
 import { renderMarketInfo } from './views/market-info.js';
 import { renderSalesLog } from './views/sales-log.js';
+import { renderTimecard } from './views/timecard.js';
 import { startUpdateWatch } from './lib/update-check.js';
 
 const appEl = document.getElementById('app');
@@ -271,6 +272,13 @@ route('/market-info', (container) => {
 route('/sales-log', (container) => {
   if (!state.me || !state.me.registered) { navigate('/'); return; }
   renderSalesLog(container, { me: state.me });
+});
+
+// Clocking on and off. Everyone who works a shift; the shop-wide log inside is
+// owner-only, enforced per section rather than at the door.
+route('/timecard', (container) => {
+  if (!state.me || !state.me.registered) { navigate('/'); return; }
+  renderTimecard(container, { me: state.me });
 });
 
 // The Shop Ledger — performance, notices, coffers. Distinct from Shop Settings
