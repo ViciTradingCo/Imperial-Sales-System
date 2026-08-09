@@ -18,7 +18,7 @@ import { createTransfer, listTransfers, acceptTransfer } from '../src/transfers.
 import { listItemIndex, upsertItem as upsertMasterItem } from '../src/item-index.js';
 import { readRegions, writeRegions } from '../src/regions.js';
 import { readSettings, writeSettings } from '../src/settings.js';
-import { readMotd, writeMotd } from '../src/motd.js';
+import { addGlobalMotd, activeGlobalNotices } from '../src/motd.js';
 import { logAudit, listAudit } from '../src/audit.js';
 import { marketAnalysis } from '../src/market.js';
 import { cacheBust } from '../src/cache.js';
@@ -204,10 +204,10 @@ describe('operational data is realm-scoped', () => {
   });
 
   it('keeps the MOTD separate and refuses cross-realm audit reads', async () => {
-    await writeMotd(env, 'Realm A news', A);
-    await writeMotd(env, 'Realm B news', REALM_B);
-    expect(await readMotd(env, A)).toBe('Realm A news');
-    expect(await readMotd(env, REALM_B)).toBe('Realm B news');
+    await addGlobalMotd(env, { message: 'Realm A news' }, A);
+    await addGlobalMotd(env, { message: 'Realm B news' }, REALM_B);
+    expect(await activeGlobalNotices(env, A)).toEqual(['Realm A news']);
+    expect(await activeGlobalNotices(env, REALM_B)).toEqual(['Realm B news']);
 
     await logAudit(env, { actor: 'Ann', business: SHOP, action: 'test.a', detail: 'x', realmId: A });
     await logAudit(env, { actor: 'Bex', business: SHOP, action: 'test.b', detail: 'y', realmId: REALM_B });

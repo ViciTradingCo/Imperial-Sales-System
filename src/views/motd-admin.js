@@ -1,10 +1,17 @@
 /**
  * Messages of the Day (admin). Three parts:
- *   • Global message — one banner shown to everyone on Home.
+ *   • Global notices — shown to everyone on Home. A LIST: several can run at
+ *     once, each with its own schedule, each editable and removable. It used to
+ *     be a single box that could only be overwritten or cleared, so there was
+ *     no record of what was announced and no way to take one notice down
+ *     without retyping the others.
+ *   • Individual messages — per-business notices, optionally scheduled.
  *   • Expiry warning — how many days before a subscription lapses to auto-warn
  *     that business's owner/employees (a banner that persists on every page).
- *   • Individual messages — per-business notices, optionally scheduled with a
- *     start and end, managed in a focus modal.
+ *
+ * Both kinds of notice are the SAME editor, differing only in whether a
+ * business is chosen — they are the same thing to write and the same thing to
+ * schedule, and two editors would have drifted.
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
@@ -16,6 +23,7 @@ import { tileGrid, sectionTiles } from '../lib/tiles.js';
 export function renderMotdAdmin(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
   const listHost = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
+  const globalHost = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
   let companies = [];
 
   const gridHost = el('div', {});
@@ -31,8 +39,14 @@ export function renderMotdAdmin(container) {
     ]));
 
   const sections = [
-    { key: 'motd-global', label: 'Global notice', hint: 'Shown to everyone', glyph: '📣',
-      open: (host) => mount(host, globalCard(cfg || {})) },
+    { key: 'motd-global', label: 'Global notices', hint: 'Shown to everyone', glyph: '📣',
+      open: (host) => mount(host, el('div.card', {}, [
+        el('h3', {}, 'Global notices'),
+        el('p', { class: 'note' }, 'Shown to everyone on Home. Post as many as you need — each can be ' +
+          'scheduled, edited and taken down on its own.'),
+        el('button.primary', { onclick: () => openEntryModal(null, { global: true }) }, 'Post a notice'),
+        globalHost,
+      ])) },
     { key: 'motd-individual', label: 'Individual messages', hint: 'Per-business, scheduled', glyph: '✉️',
       open: (host) => mount(host, el('div.card', {}, [
         el('h3', {}, 'Individual messages'),
@@ -57,31 +71,60 @@ export function renderMotdAdmin(container) {
         cfg = config;
         companies = (cs.companies || []).map((c) => c.business).filter(Boolean);
         renderList(cfg.individual || []);
+        renderGlobal(cfg.global || []);
       })
       .catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
   }
 
-  function renderList(items) {
-    if (!items.length) { mount(listHost, el('p', { class: 'note' }, 'No individual messages yet.')); return; }
-    mount(listHost, ...items.map((m) => el('div', { class: 'member-row' }, [
+  /**
+   * One notice, as a row.
+   *
+   * The schedule is on the row rather than behind the Edit button, because
+   * "which of these is actually showing right now" is the question this page is
+   * open to answer.
+   */
+  function noticeRow(m, { global }) {
+    return el('div', { class: 'member-row' }, [
       el('p', { html:
-        '<b>' + esc(m.business || '—') + '</b><br>' +
-        '<span class="note">' + esc(m.message) + '</span><br>' +
+        (global ? '' : '<b>' + esc(m.business || '—') + '</b><br>') +
+        esc(m.message) + '<br>' +
         '<span class="note">' + esc(windowLabel(m)) + '</span>' }),
       el('span', { class: 'row-actions' }, [
-        el('button.primary.small', { onclick: () => openEntryModal(m) }, 'Edit'),
-        el('button.danger.small', { onclick: () => remove(m) }, 'Delete'),
+        el('button.primary.small', { onclick: () => openEntryModal(m, { global }) }, 'Edit'),
+        el('button.danger.small', { onclick: () => remove(m, { global }) }, 'Delete'),
       ]),
-    ])));
+    ]);
   }
 
-  async function remove(m) {
-    if (!window.confirm('Delete this message for ' + (m.business || 'this business') + '?')) return;
-    try { renderList((await api.deleteIndividualMotd(m.id)).individual || []); }
-    catch (e) { alert(e.message || e); }
+  function renderGlobal(items) {
+    if (!items.length) {
+      mount(globalHost, el('p', { class: 'note' }, 'Nothing posted to everyone right now.'));
+      return;
+    }
+    mount(globalHost, ...items.map((m) => noticeRow(m, { global: true })));
   }
 
-  function openEntryModal(entry) {
+  function renderList(items) {
+    if (!items.length) { mount(listHost, el('p', { class: 'note' }, 'No individual messages yet.')); return; }
+    mount(listHost, ...items.map((m) => noticeRow(m, { global: false })));
+  }
+
+  async function remove(m, { global }) {
+    if (!window.confirm(global
+      ? 'Take this notice down for everyone?'
+      : 'Delete this message for ' + (m.business || 'this business') + '?')) return;
+    try {
+      if (global) renderGlobal((await api.deleteGlobalMotd(m.id)).global || []);
+      else renderList((await api.deleteIndividualMotd(m.id)).individual || []);
+    } catch (e) { alert(e.message || e); }
+  }
+
+  /**
+   * Write or edit one notice. `global` decides whether it asks who it is for —
+   * everything else about a notice is the same either way.
+   */
+  function openEntryModal(entry, how) {
+    const global = !!(how && how.global);
     const isEdit = !!entry;
     const biz = el('select', {});
     biz.appendChild(el('option', { value: '' }, 'Pick a business…'));
@@ -103,16 +146,23 @@ export function renderMotdAdmin(container) {
 
     let modal;
     async function doSubmit() {
-      if (!biz.value) { setStatus('Pick a business.', 'error'); return; }
+      if (!global && !biz.value) { setStatus('Pick a business.', 'error'); return; }
       if (!message.value.trim()) { setStatus('Enter a message.', 'error'); return; }
       submit.disabled = true;
       setStatus('Saving…', '');
-      const payload = { business: biz.value, message: message.value.trim(), start: toIso(start.value), end: toIso(end.value) };
+      const payload = { message: message.value.trim(), start: toIso(start.value), end: toIso(end.value) };
       try {
-        const res = isEdit
-          ? await api.updateIndividualMotd({ id: entry.id, ...payload })
-          : await api.addIndividualMotd(payload);
-        renderList(res.individual || []);
+        if (global) {
+          const res = isEdit
+            ? await api.updateGlobalMotd({ id: entry.id, ...payload })
+            : await api.addGlobalMotd(payload);
+          renderGlobal(res.global || []);
+        } else {
+          const res = isEdit
+            ? await api.updateIndividualMotd({ id: entry.id, business: biz.value, ...payload })
+            : await api.addIndividualMotd({ business: biz.value, ...payload });
+          renderList(res.individual || []);
+        }
         modal.close();
       } catch (e) {
         submit.disabled = false;
@@ -121,11 +171,14 @@ export function renderMotdAdmin(container) {
     }
 
     modal = openModal([
-      el('h3', {}, isEdit ? 'Edit message' : 'New message'),
-      el('label', {}, 'Business'), biz,
+      el('h3', {}, (isEdit ? 'Edit ' : 'New ') + (global ? 'global notice' : 'message')),
+      ...(global
+        ? [el('p', { class: 'note' }, 'Everyone on this realm sees this on their Home page.')]
+        : [el('label', {}, 'Business'), biz]),
       el('label', {}, 'Message'), message,
       el('label', {}, 'Starts appearing (optional)'), start,
       el('label', {}, 'Stops appearing (optional)'), end,
+      el('p', { class: 'note' }, 'Leave both blank to show it from now until you take it down.'),
       submit,
       status,
     ]);
@@ -158,29 +211,7 @@ function toIso(local) {
   return isNaN(d.getTime()) ? '' : d.toISOString();
 }
 
-/* ---- global + warn cards ---- */
-function globalCard(cfg) {
-  const box = el('textarea', { rows: '3', placeholder: 'A notice shown to everyone on their Home page…' });
-  box.value = (cfg && cfg.motd) || '';
-  const status = el('p', {});
-  const save = el('button.primary', { onclick: () => doSave() }, 'Save message');
-  const clear = el('button.secondary-btn', { onclick: () => { box.value = ''; doSave(); } }, 'Clear');
-  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
-  async function doSave() {
-    save.disabled = true; setStatus('Saving…', '');
-    try { await api.setMotd(box.value.trim()); setStatus('Saved ✓', 'ok'); }
-    catch (e) { setStatus(e.message || String(e), 'error'); }
-    finally { save.disabled = false; }
-  }
-  return el('div.card', {}, [
-    el('h3', {}, 'Global message'),
-    el('p', { class: 'note' }, 'Shown to everyone on Home. Leave blank (or Clear) to hide it.'),
-    box,
-    el('div', { class: 'row-actions' }, [save, clear]),
-    status,
-  ]);
-}
-
+/* ---- the expiry-warning card ---- */
 function warnCard(cfg) {
   // No local default: the server owns it, and hardcoding one here would show a
   // number that disagrees with what the banner actually uses.

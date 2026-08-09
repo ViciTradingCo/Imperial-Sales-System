@@ -14,7 +14,8 @@ import { marketAnalysis, itemReport } from '../market.js';
 import { systemStatus, clearErrors } from '../status.js';
 import { shopOverview } from '../oversight.js';
 import { listAllFeedback, setFeedbackComplete } from '../feedback.js';
-import { readMotd, writeMotd, readWarnDays, writeWarnDays, listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
+import { readWarnDays, writeWarnDays, listGlobalMotds, addGlobalMotd, updateGlobalMotd, deleteGlobalMotd,
+  listIndividualMotds, addIndividualMotd, updateIndividualMotd, deleteIndividualMotd } from '../motd.js';
 import { upsertItem as upsertMasterItem, deleteItemIndex, purgeItemIndex, importItemIndex, analyzeItemImport,
   listItemIndex, moveItems, addItemType, updateItemType, deleteItemType,
   listPendingItems, approveItem } from '../item-index.js';
@@ -230,14 +231,22 @@ async function motdConfig({ request, env }) {
   const caller = await requireAdmin(request, env);
   const realmId = realmIdOf(caller, env);
   return {
-    motd: await readMotd(env, realmId),
+    global: await listGlobalMotds(env, realmId),
     warnDays: await readWarnDays(env, realmId),
     individual: await listIndividualMotds(env, realmId),
   };
 }
-async function setMotd({ request, env, body }) {
+async function addGlobal({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  return { motd: await writeMotd(env, body.motd, realmIdOf(caller, env)) };
+  return { global: await addGlobalMotd(env, body, realmIdOf(caller, env)) };
+}
+async function updateGlobal({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  return { global: await updateGlobalMotd(env, body, realmIdOf(caller, env)) };
+}
+async function deleteGlobal({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  return { global: await deleteGlobalMotd(env, body.id, realmIdOf(caller, env)) };
 }
 async function setWarnDays({ request, env, body }) {
   const caller = await requireAdmin(request, env);
@@ -613,7 +622,9 @@ export const routes = [
   { method: 'POST', path: '/admin/status/errors/clear', handler: clearErrorsRoute },
   { method: 'POST', path: '/admin/data/wipe', handler: wipeData },
   { method: 'GET', path: '/admin/motd', handler: motdConfig },
-  { method: 'POST', path: '/admin/motd', handler: setMotd },
+  { method: 'POST', path: '/admin/motd/global', handler: addGlobal },
+  { method: 'POST', path: '/admin/motd/global/update', handler: updateGlobal },
+  { method: 'POST', path: '/admin/motd/global/delete', handler: deleteGlobal },
   { method: 'POST', path: '/admin/motd/warn', handler: setWarnDays },
   { method: 'POST', path: '/admin/motd/individual', handler: addIndividual },
   { method: 'POST', path: '/admin/motd/individual/update', handler: updateIndividual },

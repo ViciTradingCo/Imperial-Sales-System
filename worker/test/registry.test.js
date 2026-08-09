@@ -11,7 +11,7 @@ import { findUserByEmail, appendUser, listAllUsers } from '../src/users.js';
 import { registerUser, listCompanies, updateCompany, archiveCompany, findBusinessByName, listBusinessNames } from '../src/registry.js';
 import { checkCertification } from '../src/cert.js';
 import { readSettings, writeSettings } from '../src/settings.js';
-import { readMotd, writeMotd, addIndividualMotd, activeNoticesForBusiness } from '../src/motd.js';
+import { addGlobalMotd, activeGlobalNotices, addIndividualMotd, listIndividualMotds, activeNoticesForBusiness } from '../src/motd.js';
 import { cacheBust } from '../src/cache.js';
 
 let env;
@@ -108,11 +108,22 @@ describe('settings + motd', () => {
     await expect(writeSettings(env, [{ label: overLabel, value: 0.5 }], 'default')).rejects.toThrow();
   });
 
-  it('stores the global MOTD and per-business notices', async () => {
-    await writeMotd(env, 'Welcome to Skyrim', 'default');
-    expect(await readMotd(env, 'default')).toBe('Welcome to Skyrim');
+  it('stores global notices and per-business notices', async () => {
+    await addGlobalMotd(env, { message: 'Welcome to Skyrim' }, 'default');
+    expect(await activeGlobalNotices(env, 'default')).toContain('Welcome to Skyrim');
     await addIndividualMotd(env, { business: 'Iron Hearth', message: 'Restock Tuesday' }, 'default');
     expect(await activeNoticesForBusiness(env, 'iron hearth', 'default')).toContain('Restock Tuesday');
     expect(await activeNoticesForBusiness(env, 'Other Co', 'default')).not.toContain('Restock Tuesday');
+  });
+
+  it('keeps a global notice out of the per-business list, and vice versa', async () => {
+    // They share a table; an empty business is what makes a row global. Mixing
+    // the two would offer a global notice for editing under a business
+    // dropdown with nothing to show.
+    await addGlobalMotd(env, { message: 'Everyone' }, 'default');
+    await addIndividualMotd(env, { business: 'Iron Hearth', message: 'Just them' }, 'default');
+    expect((await listIndividualMotds(env, 'default')).map((m) => m.message)).toEqual(['Just them']);
+    expect(await activeGlobalNotices(env, 'default')).toEqual(['Everyone']);
+    expect(await activeNoticesForBusiness(env, 'Iron Hearth', 'default')).not.toContain('Everyone');
   });
 });

@@ -172,8 +172,12 @@ export const api = {
   bustMotd: () => { _motd = null; },
   /** Admin: read the MOTD config { motd, warnDays, individual[] }. */
   getMotdConfig: () => request('GET', '/admin/motd'),
-  /** Admin: set the global message of the day (blank clears it). */
-  setMotd: (motd) => request('POST', '/admin/motd', { motd }),
+  /** Admin: post a global notice (shown to everyone), optionally scheduled. */
+  addGlobalMotd: (m) => request('POST', '/admin/motd/global', m),
+  /** Admin: edit a global notice. */
+  updateGlobalMotd: (m) => request('POST', '/admin/motd/global/update', m),
+  /** Admin: remove a global notice. */
+  deleteGlobalMotd: (id) => request('POST', '/admin/motd/global/delete', { id }),
   /** Admin: set the expiry-warning lead time (days). */
   setWarnDays: (days) => request('POST', '/admin/motd/warn', { days }),
   /** Admin: add an individual (per-business, scheduled) message. */
@@ -224,6 +228,7 @@ export const api = {
   /** Owner/admin: post a notice to this shop's staff. */
   addShopNotice: (n) => request('POST', '/business/notices', n),
   /** Owner/admin: delete one of this shop's notices. */
+  updateShopNotice: (n) => request('POST', '/business/notices/update', n),
   deleteShopNotice: (id) => request('POST', '/business/notices/delete', { id }),
   /** Owner/admin: download this shop's sales or coffer ledger as a CSV Blob. */
   exportBusinessCsvBlob: async (type) => {

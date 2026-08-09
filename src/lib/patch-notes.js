@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '2.6', date: '2026-08-09', notes: [
+    'Admins: global notices are a list you manage, not one box. Post several, schedule each with a start and an end, edit one without retyping the rest, and take one down on its own. Before this there was a single message that could only be overwritten or cleared, so the only record of what had been announced was remembering it.',
+    'The notices already posted are kept — your current global message becomes the first entry in the list.',
+    'Shop owners can edit a notice on their board instead of deleting it and writing it again, which used to throw away its schedule too.',
+  ] },
   { version: '2.5', date: '2026-08-09', notes: [
     'Admins: the Master Item Index is one table on the page. It was a tile per type, each opening its own list in a window — so seeing what the index held cost a click per type, and two items filed differently could not be looked at together. Now every item is listed at once, sorted by name, with the table it is filed under as a column.',
     'The types are still there as a filter beside the search. Picking one narrows the list in place, and Add, Import/Export and Empty follow whatever is on screen — each button says which, so none of them can act on something you are not looking at.',

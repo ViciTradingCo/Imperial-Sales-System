@@ -187,6 +187,19 @@ THE MONEY NEVER MOVES ON ITS OWN. A levy records what a shop OWES; a Court marks
 it paid when it actually is. A levy of 0 is the feature DISABLED — checkout skips
 it entirely rather than working out 0% of every sale, and the UI says "Disabled".
 
+## Notices are rows, not settings
+
+Global MOTDs, per-business MOTDs and a shop's own board are all `motd_list`
+rows; an EMPTY `business` means everyone. One table so scheduling, editing and
+deleting are the same code for all three — the global notice was a lone
+`sys_flags` string for months and never gained a schedule or an edit because it
+was not shaped like the others. Each endpoint re-checks the KIND of row it is
+touching (`business = ''` or not), since an id alone reaches both.
+
+The retired `motd_global:<realm>` flag is migrated to a row on first read,
+guarded on there being no global rows yet, so it runs once per realm and cannot
+resurrect a notice an admin deleted.
+
 ## Store data, present labels
 
 Never write a realm's wording into a stored value. Sale lines are JSON numbers,

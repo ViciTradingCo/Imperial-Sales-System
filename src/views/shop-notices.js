@@ -2,8 +2,12 @@
  * Shop notice board (owner) — post a message to your own staff. These are the
  * same per-business notices admins can set, but scoped so an owner only ever
  * sees and edits their OWN shop's board.
+ *
+ * A notice can be EDITED, not just deleted and rewritten: fixing a typo used to
+ * mean posting it again, which lost whatever schedule it had with it.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { openModal } from '../lib/modal.js';
 import { navigate } from '../lib/router.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { api } from '../lib/api.js';
@@ -56,7 +60,10 @@ export function renderShopNotices(container) {
     mount(listHost, ...notices.map((n) => el('div', { class: 'member-row' }, [
       el('p', { html: esc(n.message) + '<br><span class="note">' +
         (n.start ? 'from ' + esc(n.start) : 'active now') + (n.end ? ' until ' + esc(n.end) : '') + '</span>' }),
-      el('button.danger.small', { onclick: () => remove(n.id) }, 'Delete'),
+      el('span', { class: 'row-actions' }, [
+        el('button.primary.small', { onclick: () => openEdit(n) }, 'Edit'),
+        el('button.danger.small', { onclick: () => remove(n.id) }, 'Delete'),
+      ]),
     ])));
   }
 
@@ -76,6 +83,34 @@ export function renderShopNotices(container) {
       toast('Notice posted', 'ok');
     } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
     finally { post.disabled = false; }
+  }
+
+  function openEdit(n) {
+    const body = el('textarea', { rows: '3' });
+    body.value = n.message || '';
+    const from = el('input', { type: 'date', value: n.start || '' });
+    const until = el('input', { type: 'date', value: n.end || '' });
+    const st = el('p', {});
+    const save = el('button.primary', { onclick: doSave }, 'Save changes');
+    let modal;
+    async function doSave() {
+      if (!body.value.trim()) { st.className = 'error'; st.textContent = 'Enter a message.'; return; }
+      save.disabled = true; st.className = ''; st.textContent = 'Saving…';
+      try {
+        const r = await api.updateShopNotice({ id: n.id, message: body.value.trim(), start: from.value, end: until.value });
+        draw(r.notices || []);
+        toast('Notice updated', 'ok');
+        modal.close();
+      } catch (e) { save.disabled = false; st.className = 'error'; st.textContent = e.message || String(e); }
+    }
+    modal = openModal([
+      el('h3', {}, 'Edit notice'),
+      el('label', {}, 'Message'), body,
+      el('label', {}, 'Show from (optional)'), from,
+      el('label', {}, 'Until (optional)'), until,
+      save,
+      st,
+    ]);
   }
 
   async function remove(id) {

@@ -20,8 +20,8 @@ import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineT
 import { cofferSummary, adjustCoffer } from '../coffers.js';
 import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
 import { getShopStyle, setShopStyle } from '../shop-style.js';
-import { readMotd, readWarnDays, activeNoticesForBusiness,
-  listMotdsForBusiness, addMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
+import { activeGlobalNotices, readWarnDays, activeNoticesForBusiness,
+  listMotdsForBusiness, addMotdForBusiness, updateMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
 import { holdReport, businessReport } from '../market.js';
 import { lastWeekWindow, isWeekTurnover } from '../week.js';
 import { openShift, clockIn, clockOut, myShifts, shopShifts, markPaid, editShift, deleteShift } from '../timecard.js';
@@ -109,6 +109,10 @@ async function listShopNotices({ request, env }) {
 async function addShopNotice({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
   return { notices: await addMotdForBusiness(env, caller.business, body, realmIdOf(caller, env)) };
+}
+async function updateShopNotice({ request, env, body }) {
+  const caller = await requireOwnerOrAdmin(request, env);
+  return { notices: await updateMotdForBusiness(env, caller.business, body, realmIdOf(caller, env)) };
 }
 async function deleteShopNotice({ request, env, body }) {
   const caller = await requireOwnerOrAdmin(request, env);
@@ -665,8 +669,7 @@ async function getMotd({ request, env }) {
   const caller = await requireRegistered(request, env);
   const realmId = realmIdOf(caller, env);
   const notices = [];
-  const global = await readMotd(env, realmId);
-  if (global) notices.push(global);
+  notices.push(...(await activeGlobalNotices(env, realmId)));
   notices.push(...(await activeNoticesForBusiness(env, caller.business, realmId)));
   // The Court's notice to its region — announcements from the government of
   // the place you trade in, alongside the network's own.
@@ -766,6 +769,7 @@ export const routes = [
   { method: 'GET', path: '/business/report', handler: shopReport },
   { method: 'GET', path: '/business/notices', handler: listShopNotices },
   { method: 'POST', path: '/business/notices', handler: addShopNotice },
+  { method: 'POST', path: '/business/notices/update', handler: updateShopNotice },
   { method: 'POST', path: '/business/notices/delete', handler: deleteShopNotice },
   { method: 'GET', path: '/business/settings', handler: getLedgerSettings },
   { method: 'POST', path: '/business/settings', handler: saveLedgerSettings },
