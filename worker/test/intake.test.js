@@ -427,3 +427,37 @@ describe('a delivery of several items', () => {
     )).rejects.toThrow(/no registered company/i);
   });
 });
+
+describe('which trip a line arrived on', () => {
+  it('gives every line of one delivery the same key', async () => {
+    await recordIntakeLines(env, SHOP, {
+      vendor: 'Smith', idempotencyKey: 'trip-a',
+      items: [
+        { item: 'Iron Sword', numItems: 1, pricePer: 5 },
+        { item: 'Steel Axe', numItems: 1, pricePer: 5 },
+      ],
+    }, R);
+    const rows = await listIntake(env, SHOP, R);
+    expect(new Set(rows.map((r) => r.delivery)).size).toBe(1);
+  });
+
+  it('keeps two separate trips apart, even from the same vendor', async () => {
+    await recordIntakeLines(env, SHOP, {
+      vendor: 'Smith', idempotencyKey: 'trip-a', items: [{ item: 'Iron Sword', numItems: 1, pricePer: 5 }],
+    }, R);
+    await recordIntakeLines(env, SHOP, {
+      vendor: 'Smith', idempotencyKey: 'trip-b', items: [{ item: 'Steel Axe', numItems: 1, pricePer: 5 }],
+    }, R);
+    expect(new Set((await listIntake(env, SHOP, R)).map((r) => r.delivery)).size).toBe(2);
+  });
+
+  it('leaves a keyless row standing alone rather than folding it into another', async () => {
+    // Deliveries recorded before the form could hold several items have no key,
+    // and two on the same day were never one trip.
+    await recordIntake(env, SHOP, { item: 'Iron Sword', numItems: 1, pricePer: 5 }, R);
+    await recordIntake(env, SHOP, { item: 'Steel Axe', numItems: 1, pricePer: 5 }, R);
+    const rows = await listIntake(env, SHOP, R);
+    expect(new Set(rows.map((r) => r.delivery)).size).toBe(2);
+    expect(rows.every((r) => r.delivery.startsWith('row:'))).toBe(true);
+  });
+});

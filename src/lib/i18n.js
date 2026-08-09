@@ -70,6 +70,11 @@ const T = {
   'Record delivery': { es: 'Registrar entrega', fr: 'Enregistrer la livraison', de: 'Lieferung erfassen', it: 'Registra consegna' },
   '+ Add another item': { es: '+ Añadir otro artículo', fr: '+ Ajouter un autre article', de: '+ Weiteren Artikel', it: '+ Aggiungi un altro articolo' },
   'Sells for': { es: 'Se vende a', fr: 'Vendu à', de: 'Verkaufspreis', it: 'Prezzo di vendita' },
+  // Intake's line columns.
+  'Item': { es: 'Artículo', fr: 'Article', de: 'Artikel', it: 'Articolo' },
+  'Qty': { es: 'Cant.', fr: 'Qté', de: 'Anz.', it: 'Qtà' },
+  'Cost each': { es: 'Coste unitario', fr: 'Coût unitaire', de: 'Kosten je Stück', it: 'Costo unitario' },
+  'Line total': { es: 'Total de línea', fr: 'Total de la ligne', de: 'Zeilensumme', it: 'Totale riga' },
   // Feedback review: the three queues, and the delivery report's own subject.
   'Active': { es: 'Activos', fr: 'En cours', de: 'Offen', it: 'Attivi' },
   'Appointments': { es: 'Citas', fr: 'Rendez-vous', de: 'Termine', it: 'Appuntamenti' },

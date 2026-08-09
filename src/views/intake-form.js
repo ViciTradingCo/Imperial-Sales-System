@@ -156,16 +156,28 @@ function buildIntake(me, onRecorded) {
     });
     picker.setItems(master);
 
-    const qty = el('input', { type: 'number', step: '1', min: '1', value: '1', placeholder: 'Qty' });
-    const per = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Cost each' });
-    const sub = el('span', { class: 'buy-sub' }, '');
-    const remove = el('button.secondary-btn.small', { type: 'button', onclick: () => {
-      const i = lines.indexOf(line);
-      if (i < 0) return;
-      lines.splice(i, 1);
-      wrap.remove();
-      sync();
-    } }, '×');
+    // Labelled per field as well as headed per column. The heading says what
+    // the column is; the label is what a screen reader reads out and what a
+    // narrow phone falls back to when the columns stack.
+    const qty = el('input', {
+      type: 'number', step: '1', min: '1', value: '1',
+      placeholder: 'Qty', 'aria-label': 'Quantity that arrived',
+    });
+    const per = el('input', {
+      type: 'number', step: '0.01', min: '0',
+      placeholder: 'Cost each', 'aria-label': 'Cost per item, what you paid',
+    });
+    const sub = el('span', { class: 'buy-sub', title: 'Line total' }, '');
+    const remove = el('button.secondary-btn.small', {
+      type: 'button', title: 'Remove this line', 'aria-label': 'Remove this line',
+      onclick: () => {
+        const i = lines.indexOf(line);
+        if (i < 0) return;
+        lines.splice(i, 1);
+        wrap.remove();
+        sync();
+      },
+    }, '×');
     const wrap = el('div', { class: 'craft-row' }, [picker.el, qty, per, sub, remove]);
     // One listener for the whole row: input events bubble, so this covers the
     // picker's own box as well as the two numbers without reaching inside it.
@@ -384,6 +396,15 @@ function buildIntake(me, onRecorded) {
       el('h3', {}, '1 · What arrived?'),
       el('p', { class: 'note' }, 'One line per item. Add as many as the delivery brought.'),
       guidePanel(GUIDE.arrived, unseen),
+      // The rows are bare boxes once a placeholder is typed over, so the
+      // columns are named above them and stay named.
+      el('div', { class: 'craft-row line-head' }, [
+        el('span', {}, 'Item'),
+        el('span', {}, 'Qty'),
+        el('span', {}, 'Cost each'),
+        el('span', {}, 'Line total'),
+        el('span', {}, ''),
+      ]),
       linesHost,
       el('div', { class: 'row-actions' }, [addBtn]),
       totalLine,
@@ -451,6 +472,14 @@ export function renderBuying(host, { me }) {
     ]),
   );
 
+  /**
+   * ONE ROW PER DELIVERY, not per line.
+   *
+   * This is a receipt for "did the thing I just recorded land", and a trip that
+   * brought six items answering that with six rows is the wrong shape — the
+   * figure you actually handed over is not on any of them. The lines carry the
+   * trip they belong to, so this is a grouping rather than a guess.
+   */
   function draw(rows) {
     if (!rows.length) {
       mount(listHost, emptyState({
@@ -459,17 +488,28 @@ export function renderBuying(host, { me }) {
       }));
       return;
     }
+    const order = [];
+    const by = new Map();
+    rows.forEach((r) => {
+      if (!by.has(r.delivery)) { by.set(r.delivery, []); order.push(r.delivery); }
+      // Unshift: the query is newest-first, so a delivery's own lines arrive
+      // backwards. Within one trip they should read in the order they were typed.
+      by.get(r.delivery).unshift(r);
+    });
     mount(listHost, el('div', { class: 'table-scroll' }, tableEl(
-      ['When', 'Item', 'Qty', 'Cost each', 'From'],
-      rows.slice(0, 8).map((r) => [
-        String(r.ts || '').slice(0, 10),
-        r.item || '',
-        String(r.numItems || 0),
-        money(r.pricePer || 0),
-        // A registered supplier is worth marking: it is the one that shows up in
-        // its own region's figures as having supplied you.
-        (r.fromBusiness || r.vendor || '—') + (r.fromBusiness ? ' ✓' : ''),
-      ]),
+      ['When', 'Items', 'Total', 'From'],
+      order.slice(0, 8).map((k) => {
+        const ls = by.get(k);
+        const first = ls[0];
+        return [
+          String(first.ts || '').slice(0, 10),
+          el('span', { class: 'wrap-cell' }, ls.map((r) => r.item + ' ×' + r.numItems).join(', ')),
+          money(ls.reduce((n, r) => n + coins(r.numItems * r.pricePer), 0)),
+          // A registered supplier is worth marking: it is the one that shows up
+          // in its own region's figures as having supplied you.
+          (first.fromBusiness || first.vendor || '—') + (first.fromBusiness ? ' ✓' : ''),
+        ];
+      }),
     )));
   }
 

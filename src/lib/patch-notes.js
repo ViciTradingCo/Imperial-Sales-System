@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '2.9', date: '2026-08-09', notes: [
+    'Sales Log: a delivery that brought several items is now ONE entry with its items listed inside it, headed with the date, the supplier and what the whole trip cost. It used to be one row per item, with nothing saying they arrived together and the figure you actually handed over nowhere on the screen. Each item still has its own Delete, since the usual mistake is one wrong quantity among several right ones.',
+    'The recent deliveries on the Buying page group the same way — one line per trip, with its items and its total.',
+    'Intake: the item lines have proper column headings — Item, Qty, Cost each, Line total — so the boxes still say what they are once you have typed over the placeholder.',
+  ] },
   { version: '2.8', date: '2026-08-09', notes: [
     'Intake is the Buying page itself — three cards down the page instead of a pop-up asking one question at a time. You can see what you have already typed, the deliveries list you are checking against is right below it, and there is no window to open first.',
     'What arrived, what you will charge, and where it came from are cards 1, 2 and 3. The second one fills itself in from the first as you add lines, and the summary above the Record button keeps up as you type.',

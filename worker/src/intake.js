@@ -228,13 +228,21 @@ export async function listIntake(env, business, realmId, limit = 20) {
   const db = await getDb(env);
   const { results } = await db
     .prepare(
-      `SELECT id, ts, item, vendor, source_hold, num_items, price_per, from_business
+      `SELECT id, ts, item, vendor, source_hold, num_items, price_per, idem, from_business
        FROM intake WHERE realm_id = ? AND business = ? ORDER BY id DESC LIMIT ?`
     )
     .bind(realmId, business, limit)
     .all();
   return (results || []).map((r) => ({
     id: r.id,
+    // WHICH TRIP this line arrived on. Every line of one delivery shares the
+    // idempotency key and differs only in the `#n` suffix, so the stem is the
+    // delivery — the screens group on it rather than guessing from a matching
+    // timestamp and vendor.
+    //
+    // A row with no key stands alone: single-item deliveries predate the
+    // multi-line form, and two of them on the same day were never one trip.
+    delivery: r.idem ? String(r.idem).split('#')[0] : 'row:' + r.id,
     ts: r.ts, item: r.item, vendor: r.vendor, hold: r.source_hold,
     fromBusiness: r.from_business || '',
     numItems: r.num_items, pricePer: r.price_per,

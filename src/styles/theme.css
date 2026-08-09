@@ -146,6 +146,12 @@ body {
 .date-row input[type="date"] { flex: 1 1 170px; width: auto; margin: 0; }
 .date-row button { flex: 0 0 auto; margin: 0; }
 
+/* One delivery on the Sales Log: a heading saying when, from whom and what it
+   came to, then a line per item. Bordered so a trip that brought six things
+   reads as one thing rather than six rows that happen to be adjacent. */
+.delivery-card { border-left: 4px solid var(--accent); }
+.delivery-head { margin: 0 0 var(--sp-2); }
+
 /* ---- Master Item Index ----
    Search and the table filter side by side above the list, so narrowing it is
    one row of controls rather than a screen of its own. */
@@ -160,6 +166,9 @@ body {
 .data-table td input[type="checkbox"] { width: auto; margin: 0; }
 .data-table td .row-actions { display: flex; gap: 6px; margin: 0; }
 .data-table td .row-actions button { margin: 0; }
+/* A cell that holds a list rather than a value — let it wrap instead of
+   stretching the table sideways past the edge of the screen. */
+.data-table td .wrap-cell { white-space: normal; display: inline-block; max-width: 340px; }
 
 /* ---- Market Analysis ---- */
 .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 4px; }
@@ -193,6 +202,22 @@ body {
 .craft-row .item-picker { flex: 1 1 auto; min-width: 0; }
 .craft-row input[type="number"] { flex: 0 0 84px; width: 84px; margin: 0; }
 .craft-row button { flex: 0 0 auto; margin: 0; }
+
+/* Column names above a list of line rows. A placeholder disappears the moment
+   something is typed over it, so the heading is what still says which box is
+   which on the tenth line of a delivery. The widths mirror .craft-row's. */
+.line-head {
+  font-size: 12px; color: var(--note); text-transform: uppercase;
+  letter-spacing: 0.04em; margin-bottom: var(--sp-1);
+}
+.line-head span:nth-child(1) { flex: 1 1 auto; min-width: 0; }
+.line-head span:nth-child(2), .line-head span:nth-child(3) { flex: 0 0 84px; }
+.line-head span:nth-child(4) { flex: 0 0 auto; min-width: 70px; text-align: right; }
+.line-head span:nth-child(5) { flex: 0 0 auto; width: 30px; }
+@media (max-width: 600px) {
+  /* No room for four columns on a phone; the per-field labels carry it. */
+  .line-head { display: none; }
+}
 
 /* A delivery's running total, and each line's own subtotal — the thing that
    lets you check the form against what you actually handed over. */
