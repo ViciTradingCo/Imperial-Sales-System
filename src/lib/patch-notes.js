@@ -1,8 +1,20 @@
 /**
  * Patch notes — a static changelog rendered as its own nav page. Add a new
  * entry at the top as features ship.
+ *
+ * WRITTEN FOR THE PEOPLE USING THE APP, not for whoever maintains it. Each line
+ * says what is different when they next open it, and what that is for. Anything
+ * a shopkeeper cannot see is not a patch note: no refactors, no test coverage,
+ * no build or audit tooling, no internal renames. A fix belongs here when the
+ * broken thing was visible — describe what was wrong and what it does now, and
+ * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '2.4', date: '2026-08-09', notes: [
+    'A delivery can hold as many items as the trip brought. Add a line each — item, quantity, cost — and the total keeps up as you type, so you can check the form against what you actually handed over. The supplier and the region are asked once, because a crate comes from one person on one day.',
+    'The second step now asks what each item will sell for, one at a time, with the Ingredient tick beside it. An ingredient run is one delivery again rather than a trip back to the form per reagent.',
+    'The whole delivery lands or none of it does. Every line is checked before anything is written, and a mistake tells you which line it is on — so a typo on the fourth item can no longer leave the first three recorded with nothing saying so.',
+  ] },
   { version: '2.3', date: '2026-08-09', notes: [
     'Intake explains itself. Every step of the form now has a "How this step works" panel — what the step is for, which number goes where, and what goes wrong. It opens itself the first time and stays shut once you have recorded a delivery, so it teaches without nagging.',
     'Recording a delivery is now one button, named for what it actually covers: Intake Ingredients/Stock. Buy Ingredients is gone — it recorded the same thing by a different door, and you could not tell from the tiles which door your purchase went through. An ingredient run is several intakes, one per reagent.',
@@ -17,7 +29,6 @@ const PATCH_NOTES = [
     'Public storefronts are shelved. The share link, the network switch, and the public shop page are gone from the site; nothing else changes, and no shop data was touched. We will revisit it.',
     'Fixed: Market Analysis did not open for admins at all — the page threw before it drew anything, and had done since the Sales Log release on 7 August. The region tab was asking a question nobody had imported the answer to.',
     'Fixed: a shop, character or region whose name has an apostrophe in it was shown with "&#39;" where the apostrophe should be, on the register, Inventory, Employees, Home, the Shop Ledger and Court Tools. Grim&#39;s Forge is now Grim\'s Forge.',
-    'The bloat audit now catches both of those before they ship: a function called but never imported, and text escaped twice.',
   ] },
   { version: '2.1', date: '2026-08-09', notes: [
     'Fixed: a delivery recorded with different capitalisation ("iron sword" against "Iron Sword") was creating a SECOND listing with its own stock and price. The stock went up on a row nobody was looking at, which is why intake looked like it was not updating. Deliveries now always land on the listing you already have.',
@@ -58,7 +69,7 @@ const PATCH_NOTES = [
     'The rounding happens once, on the total, so a cart of three items at 10.5 takes 31 rather than losing a coin on every line. A percentage discount rounds down the same way, and voiding a sale gives back exactly what was taken.',
   ] },
   { version: '1.6', date: '2026-08-04', notes: [
-    'Fixed: the Record Intake button did nothing. A rename in the last release left the form calling something that no longer existed, so it failed before it could open. There is now a test that catches this whole class of mistake before it ships.',
+    'Fixed: the Record Intake button did nothing. A rename in the last release left the form calling something that no longer existed, so it failed before it could open.',
     'Recording intake is now three short steps — what arrived, what it cost, where it came from — with Previous and Next, and a summary of the whole delivery before anything is recorded.',
     'You stay signed in for 24 hours. Signing in with Google now issues a session that lasts a day, so reloading, closing the tab, or leaving the app on your phone no longer signs you out. Sign Out still signs you out immediately, everywhere.',
   ] },

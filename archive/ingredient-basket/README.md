@@ -27,9 +27,10 @@ own weighted average, falling back to the index's valuation for something never
 bought before. That is `held()` and the picker's `meta` / `onPick` in
 `src/views/intake-form.js`.
 
-**What is genuinely gone is the running total** — recording a five-reagent trip
-is five intakes, and nothing adds them up as you go. That is the thing to weigh
-if this comes back.
+**The running total came back too.** For one day it did not: a five-reagent trip
+was five separate intakes with nothing adding them up. Intake now takes as many
+items as the trip brought, on one screen, totalling as you type — so the basket
+has nothing left that intake does not do.
 
 ## Restoring it
 
@@ -61,20 +62,8 @@ its `TILE_KEYS` entry in `src/views/admin-settings.js`:
   ['buy-basket', 'Register · Buy ingredients'],
 ```
 
-and its two style rules, removed from `src/styles/theme.css`:
-
-```css
-/* The ingredient basket: a running total you can read while shopping. */
-.buy-total {
-  margin: var(--sp-3) 0; padding: var(--sp-2) var(--sp-3);
-  background: rgba(122, 74, 31, 0.08); border-radius: var(--radius);
-  font-weight: bold; font-size: 17px; color: var(--accent);
-}
-.buy-sub { flex: 0 0 auto; min-width: 70px; text-align: right; color: var(--note); font-size: 13px; }
-```
-
-It reuses `.craft-row` for its line layout, which is still live — the craft form
-uses it.
+Its styles need nothing: `.buy-total`, `.buy-sub` and `.craft-row` are all live
+again, because intake grew a line list with a running total of its own.
 
 ## One thing to fix if it returns
 

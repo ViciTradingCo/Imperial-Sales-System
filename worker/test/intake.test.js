@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { makeD1 } from './d1shim.js';
 import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
-import { recordIntake, recordHarvest, listIntake, deleteIntake, HARVEST_VENDOR } from '../src/intake.js';
+import { recordIntake, recordIntakeLines, recordHarvest, listIntake, deleteIntake, HARVEST_VENDOR } from '../src/intake.js';
 import { listInventory } from '../src/inventory.js';
 import { cofferBalance } from '../src/coffers.js';
 
@@ -318,5 +318,112 @@ describe('what a shop pays for its ingredients', () => {
   it('is null, not zero, when nothing has ever been bought', async () => {
     await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 5 }, R);
     expect((await listInventory(env, SHOP, R))[0].avgCost).toBe(null);
+  });
+});
+
+/**
+ * A DELIVERY IS ONE TRIP, and a trip brings back a crate.
+ *
+ * The rules that matter are about the delivery landing WHOLE: every line is
+ * checked before any of it is written, the supplier is shared, and a retry of
+ * the same trip cannot double any of it.
+ */
+describe('a delivery of several items', () => {
+  const many = (items, over) => recordIntakeLines(env, SHOP, {
+    vendor: 'Smith', hold: 'Whiterun', items, ...over,
+  }, R);
+
+  it('records every line and stocks every item', async () => {
+    await many([
+      { item: 'Iron Sword', numItems: 2, pricePer: 5, salePrice: 30 },
+      { item: 'Steel Axe', numItems: 3, pricePer: 10, salePrice: 50 },
+      { item: 'Nirnroot', numItems: 4, pricePer: 2, ingredient: true },
+    ]);
+    expect(await itemRow('Iron Sword')).toMatchObject({ stock: 2, price: 30 });
+    expect(await itemRow('Steel Axe')).toMatchObject({ stock: 3, price: 50 });
+    expect(await itemRow('Nirnroot')).toMatchObject({ stock: 4, ingredient: true });
+    expect(await listIntake(env, SHOP, R)).toHaveLength(3);
+  });
+
+  it('debits the coffer once per line, so removing one refunds only that line', async () => {
+    await many([
+      { item: 'Iron Sword', numItems: 2, pricePer: 5 },   // 10
+      { item: 'Steel Axe', numItems: 3, pricePer: 10 },   // 30
+    ]);
+    expect(await cofferBalance(env, SHOP, R)).toBe(-40);
+    const axe = (await listIntake(env, SHOP, R)).find((r) => r.item === 'Steel Axe');
+    await deleteIntake(env, SHOP, axe.id, R);
+    expect(await cofferBalance(env, SHOP, R)).toBe(-10);
+  });
+
+  it('shares the supplier across every line — one trip, one vendor', async () => {
+    await many([
+      { item: 'Iron Sword', numItems: 1, pricePer: 5 },
+      { item: 'Steel Axe', numItems: 1, pricePer: 5 },
+    ]);
+    const rows = await listIntake(env, SHOP, R);
+    expect(rows.every((r) => r.vendor === 'Smith' && r.hold === 'Whiterun')).toBe(true);
+  });
+
+  it('WRITES NOTHING when any line is bad', async () => {
+    // The whole point of validating up front: a typo on line three must not
+    // leave lines one and two recorded, with no record saying so.
+    await expect(many([
+      { item: 'Iron Sword', numItems: 2, pricePer: 5 },
+      { item: 'Steel Axe', numItems: 3, pricePer: 10 },
+      { item: 'Nirnroot', numItems: 0, pricePer: 2 },
+    ])).rejects.toThrow(/whole number/i);
+    expect(await listIntake(env, SHOP, R)).toEqual([]);
+    expect(await listInventory(env, SHOP, R)).toEqual([]);
+    expect(await cofferBalance(env, SHOP, R)).toBe(0);
+  });
+
+  it('says WHICH line is bad, since a long list is worth searching', async () => {
+    await expect(many([
+      { item: 'Iron Sword', numItems: 2, pricePer: 5 },
+      { item: '', numItems: 1, pricePer: 5 },
+    ])).rejects.toThrow(/item 2/);
+  });
+
+  it('refuses an empty delivery', async () => {
+    await expect(many([])).rejects.toThrow(/at least one item/i);
+  });
+
+  it('folds two lines for the same item onto ONE listing, whatever the casing', async () => {
+    // Neither line is in the inventory table yet for the other to find, so the
+    // delivery has to remember what it has already claimed.
+    await many([
+      { item: 'Iron Sword', numItems: 2, pricePer: 5 },
+      { item: 'iron sword', numItems: 3, pricePer: 5 },
+    ]);
+    const inv = await listInventory(env, SHOP, R);
+    expect(inv).toHaveLength(1);
+    expect(inv[0]).toMatchObject({ item: 'Iron Sword', stock: 5 });
+  });
+
+  it('does not record the same trip twice', async () => {
+    const trip = [
+      { item: 'Iron Sword', numItems: 2, pricePer: 5 },
+      { item: 'Steel Axe', numItems: 3, pricePer: 10 },
+    ];
+    await many(trip, { idempotencyKey: 'trip-1' });
+    await many(trip, { idempotencyKey: 'trip-1' });
+    expect(await listIntake(env, SHOP, R)).toHaveLength(2);
+    expect(await itemRow('Iron Sword')).toMatchObject({ stock: 2 });
+  });
+
+  it('still honours a key written before deliveries could have several items', async () => {
+    // A retry spanning the deploy: the original row stored the key unsuffixed.
+    await recordIntake(env, SHOP, { item: 'Iron Sword', numItems: 2, pricePer: 5, idempotencyKey: 'k' }, R);
+    await env.DB.prepare("UPDATE intake SET idem = 'k' WHERE idem = 'k#0'").run();
+    await recordIntake(env, SHOP, { item: 'Iron Sword', numItems: 2, pricePer: 5, idempotencyKey: 'k' }, R);
+    expect(await itemRow('Iron Sword')).toMatchObject({ stock: 2 });
+  });
+
+  it('checks the supplier once for the whole delivery, not per line', async () => {
+    await expect(many(
+      [{ item: 'Iron Sword', numItems: 1, pricePer: 5 }],
+      { fromBusiness: 'Nobody At All' },
+    )).rejects.toThrow(/no registered company/i);
   });
 });

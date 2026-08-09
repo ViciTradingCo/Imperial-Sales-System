@@ -11,50 +11,46 @@ import { getDb } from './db.js';
 import { listInventory } from './inventory.js';
 import { coin } from './money.js';
 
-/** Records one intake transaction. Returns the recent intake list. */
-export async function recordIntake(env, business, { item, vendor, hold, fromBusiness, numItems, pricePer, salePrice, ingredient, idempotencyKey }, realmId) {
+/**
+ * Records a delivery — ONE OR MANY items — as a single atomic write.
+ *
+ * A trip to a supplier brings back a crate, not an item. Recording it as five
+ * separate calls is what the ingredient basket did, and it had the flaw every
+ * client-side loop has: a dropped connection between line three and line four
+ * leaves a delivery that half happened, with no record saying so. Here every
+ * line is validated BEFORE anything is written and all of them go in one
+ * `db.batch`, so a delivery either lands whole or not at all.
+ *
+ * The SUPPLIER is per delivery, not per line — one trip, one vendor, one
+ * region. Everything that differs item by item (cost, sale price, whether it is
+ * an ingredient) is on the line.
+ */
+export async function recordIntakeLines(env, business, { items, vendor, hold, fromBusiness, idempotencyKey }, realmId) {
   const db = await getDb(env);
+  const lines = (Array.isArray(items) ? items : []).filter(Boolean);
+  if (!lines.length) throw new Error('Add at least one item to the delivery.');
+
+  // One key for the whole delivery; each row stores `key#n`. Because the lines
+  // are written atomically, the presence of line 0 proves the rest landed too —
+  // so one lookup is enough to make a retry harmless.
   const idem = String(idempotencyKey || '').trim();
   if (idem) {
-    const prior = await db.prepare('SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem = ? LIMIT 1')
-      .bind(realmId, business, idem).first();
+    // The bare key too: single-item deliveries stored it unsuffixed until this
+    // became multi-line, and a retry that spans the deploy must still not
+    // double the stock.
+    const prior = await db.prepare(
+      'SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem IN (?, ?) LIMIT 1')
+      .bind(realmId, business, idem + '#0', idem).first();
     if (prior) return listIntake(env, business, realmId); // already recorded — no double stock
   }
-  const name = String(item || '').trim();
-  if (!name) throw new Error('Item name is required.');
-  const qty = Math.floor(Number(numItems));
-  if (!isFinite(qty) || qty < 1) throw new Error('Number of items must be a whole number ≥ 1.');
-  const per = Number(pricePer);
-  if (!isFinite(per) || per < 0) throw new Error('$ per item must be a number ≥ 0.');
-  // What the shop will CHARGE, as opposed to what it paid. Optional: left blank
-  // it keeps whatever price the item already carries, and a first delivery falls
-  // back to the cost. Blank must not clobber a price the owner already set —
-  // restocking is not repricing.
-  const askedSale = String(salePrice === undefined || salePrice === null ? '' : salePrice).trim();
-  let sale = null;
-  if (askedSale !== '') {
-    sale = Number(askedSale);
-    if (!isFinite(sale) || sale < 0) throw new Error('Sale price must be a number ≥ 0.');
-  }
-  /**
-   * An INGREDIENT is stock the shop holds to craft with and does not sell.
-   *
-   * Only applied when the caller actually says so. It used to be written on
-   * every delivery from a checkbox that defaults to off, which silently UNDID
-   * the flag: an owner marked something an ingredient in the item editor, took
-   * a routine delivery of it, and it quietly became sellable again — back in
-   * the register, back in the pricing statistics. A restock is not a
-   * re-classification, exactly as it is not a repricing.
-   */
-  const ingGiven = ingredient !== undefined && ingredient !== null && ingredient !== '';
-  const ing = ingredient ? 1 : 0;
+
   // Bought from a REGISTERED company, when it was. Resolved against the realm's
   // own companies so it is a real join rather than a second free-text field —
   // and a shop cannot record buying from itself, which would credit its own
   // region for supply that never moved.
   let from = String(fromBusiness || '').trim();
   if (from) {
-    const known = await (await getDb(env)).prepare(
+    const known = await db.prepare(
       'SELECT business FROM companies WHERE realm_id = ? AND lower(business) = ?')
       .bind(realmId, from.toLowerCase()).first();
     if (!known) throw new Error('No registered company called "' + from + '" in this realm.');
@@ -63,45 +59,108 @@ export async function recordIntake(env, business, { item, vendor, hold, fromBusi
     }
     from = known.business;
   }
+
   /**
-   * The name this shop ALREADY lists it under, if it does.
+   * The name this shop ALREADY lists an item under, if it does.
    *
    * The inventory's uniqueness is on the raw name, so "iron sword" and "Iron
    * Sword" are two rows to SQLite. A delivery typed with different casing was
    * silently creating a second listing with its own stock and its own price —
    * which reads exactly like "I recorded the intake and the stock did not go
    * up", because the stock went up on a row nobody was looking at.
+   *
+   * `claimed` extends that WITHIN one delivery: two lines for the same item in
+   * different cases must land on one row, and neither is in the inventory table
+   * yet for the other to find.
    */
-  const existing = await db.prepare(
-    'SELECT item FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
-    .bind(realmId, business, name.toLowerCase()).first();
-  const invName = existing ? existing.item : name;
+  const claimed = new Map();
+  const resolveName = async (name) => {
+    const key = name.toLowerCase();
+    if (claimed.has(key)) return claimed.get(key);
+    const existing = await db.prepare(
+      'SELECT item FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
+      .bind(realmId, business, key).first();
+    const invName = existing ? existing.item : name;
+    claimed.set(key, invName);
+    return invName;
+  };
+
+  // VALIDATE EVERYTHING FIRST. A bad line 4 must not leave lines 1-3 recorded,
+  // and the message has to say which line so it can be found on a long list.
+  const plan = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const where = lines.length > 1 ? ' (item ' + (i + 1) + ')' : '';
+    const name = String(l.item || '').trim();
+    if (!name) throw new Error('Item name is required.' + where);
+    const qty = Math.floor(Number(l.numItems));
+    if (!isFinite(qty) || qty < 1) throw new Error('Number of items must be a whole number ≥ 1.' + where);
+    const per = Number(l.pricePer);
+    if (!isFinite(per) || per < 0) throw new Error('$ per item must be a number ≥ 0.' + where);
+    // What the shop will CHARGE, as opposed to what it paid. Optional: left
+    // blank it keeps whatever price the item already carries, and a first
+    // delivery falls back to the cost. Blank must not clobber a price the owner
+    // already set — restocking is not repricing.
+    const askedSale = String(l.salePrice === undefined || l.salePrice === null ? '' : l.salePrice).trim();
+    let sale = null;
+    if (askedSale !== '') {
+      sale = Number(askedSale);
+      if (!isFinite(sale) || sale < 0) throw new Error('Sale price must be a number ≥ 0.' + where);
+    }
+    /**
+     * An INGREDIENT is stock the shop holds to craft with and does not sell.
+     *
+     * Only applied when the caller actually says so. It used to be written on
+     * every delivery from a checkbox that defaults to off, which silently UNDID
+     * the flag: an owner marked something an ingredient in the item editor, took
+     * a routine delivery of it, and it quietly became sellable again — back in
+     * the register, back in the pricing statistics. A restock is not a
+     * re-classification, exactly as it is not a repricing.
+     */
+    const ingGiven = l.ingredient !== undefined && l.ingredient !== null && l.ingredient !== '';
+    plan.push({ name, qty, per, sale, ing: l.ingredient ? 1 : 0, ingGiven, invName: await resolveName(name) });
+  }
 
   const ts = new Date().toISOString();
-
-  await db.batch([
-    db.prepare(
+  const stmts = [];
+  plan.forEach((p, i) => {
+    stmts.push(db.prepare(
       `INSERT INTO intake (realm_id, business, ts, item, vendor, source_hold, num_items, price_per, idem, from_business)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(realmId, business, ts, name, String(vendor || '').trim(), String(hold || '').trim(), qty, per, idem || null, from),
+    ).bind(realmId, business, ts, p.name, String(vendor || '').trim(), String(hold || '').trim(),
+      p.qty, p.per, idem ? idem + '#' + i : null, from));
     // New item → priced at the sale price given, or at the cost paid if none.
     // Existing item → stock only, unless a sale price was explicitly given.
-    db.prepare(
+    stmts.push(db.prepare(
       `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient)
        VALUES (?, ?, ?, ?, ?, 0, ?)
        ON CONFLICT (realm_id, business, item) DO UPDATE SET
          stock = stock + excluded.stock,
          price = CASE WHEN ? THEN excluded.price ELSE inventory.price END,
          ingredient = CASE WHEN ? THEN excluded.ingredient ELSE inventory.ingredient END`
-    ).bind(realmId, business, invName, sale === null ? per : sale, qty, ing,
-      sale === null ? 0 : 1, ingGiven ? 1 : 0),
-    // Debit the shop's coffers for what was paid.
-    db.prepare(
+    ).bind(realmId, business, p.invName, p.sale === null ? p.per : p.sale, p.qty, p.ing,
+      p.sale === null ? 0 : 1, p.ingGiven ? 1 : 0));
+    // Debit the shop's coffers for what was paid. ONE ENTRY PER LINE, rounded
+    // per line: each line is its own intake row, and deleting one refunds
+    // exactly what that line took. A single combined debit could not be undone
+    // a line at a time without the two disagreeing by a coin.
+    stmts.push(db.prepare(
       `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'intake', ?, ?)`
-    ).bind(realmId, business, ts, -coin(qty * per), name),
-  ]);
+    ).bind(realmId, business, ts, -coin(p.qty * p.per), p.name));
+  });
 
+  await db.batch(stmts);
   return listIntake(env, business, realmId);
+}
+
+/**
+ * Records one intake transaction. Returns the recent intake list.
+ *
+ * The single-item shape, kept because most deliveries are one thing and a
+ * caller should not have to build an array to say so.
+ */
+export async function recordIntake(env, business, entry, realmId) {
+  return recordIntakeLines(env, business, { ...entry, items: [entry] }, realmId);
 }
 
 /**

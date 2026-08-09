@@ -67,7 +67,9 @@ const T = {
   'Activate': { es: 'Activar', fr: 'Activer', de: 'Aktivieren', it: 'Attiva' },
   'Add to order': { es: 'Añadir al pedido', fr: 'Ajouter à la commande', de: 'Zur Bestellung', it: 'Aggiungi all’ordine' },
   'Complete sale': { es: 'Completar venta', fr: 'Finaliser la vente', de: 'Verkauf abschließen', it: 'Completa vendita' },
-  'Record intake': { es: 'Registrar entrada', fr: 'Enregistrer un achat', de: 'Wareneingang', it: 'Registra carico' },
+  'Record delivery': { es: 'Registrar entrega', fr: 'Enregistrer la livraison', de: 'Lieferung erfassen', it: 'Registra consegna' },
+  '+ Add another item': { es: '+ Añadir otro artículo', fr: '+ Ajouter un autre article', de: '+ Weiteren Artikel', it: '+ Aggiungi un altro articolo' },
+  'Sells for': { es: 'Se vende a', fr: 'Vendu à', de: 'Verkaufspreis', it: 'Prezzo di vendita' },
   // The register's two sides.
   'Selling': { es: 'Vendiendo', fr: 'Vente', de: 'Verkauf', it: 'Vendita' },
   'Buying': { es: 'Comprando', fr: 'Achat', de: 'Einkauf', it: 'Acquisto' },

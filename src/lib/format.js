@@ -51,5 +51,18 @@ export function regionsOn() { return region.shown; }
 export function money(n) {
   const v = Number(n);
   if (!isFinite(v)) return '0' + unit;
-  return String(Math.floor(Math.round(v * 1e6) / 1e6)) + unit;
+  return String(coins(v)) + unit;
+}
+
+/**
+ * The numeric half of `money()` — whole coins, rounded down, no denomination.
+ *
+ * For a screen that has to ADD amounts up and show both the parts and the sum:
+ * summing the raw figures and flooring once would print a total that is a coin
+ * off the lines above it. The rule lives in one place so the two cannot drift.
+ */
+export function coins(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return 0;
+  return Math.floor(Math.round(v * 1e6) / 1e6);
 }

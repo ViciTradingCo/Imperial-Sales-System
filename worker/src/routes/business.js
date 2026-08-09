@@ -11,7 +11,7 @@ import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, importInventory, lowStockReport, convertItems, setStock } from '../inventory.js';
-import { recordIntake, recordHarvest, listIntake, deleteIntake } from '../intake.js';
+import { recordIntakeLines, recordHarvest, listIntake, deleteIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
 import { checkCertification } from '../cert.js';
@@ -361,7 +361,10 @@ async function recordIntakeRoute({ request, env, body }) {
     e.forbidden = true; throw e;
   }
   const realmId = realmIdOf(caller, env);
-  const intake = await recordIntake(env, caller.business, body, realmId);
+  // One delivery, one or many items. A body without `items` is the single-item
+  // shape and is wrapped here, so the handler has one path rather than two.
+  const lines = Array.isArray(body.items) ? body.items : [body];
+  const intake = await recordIntakeLines(env, caller.business, { ...body, items: lines }, realmId);
   return { intake, inventory: await listInventory(env, caller.business, realmId) };
 }
 

@@ -94,6 +94,12 @@ nothing on the tiles told you which one your purchase was; the basket is in
 `archive/ingredient-basket/`. A new kind of purchase is a step or a field in
 intake, not a second tile.
 
+A delivery is a TRIP, not an item: `recordIntakeLines` takes a list, the
+supplier and region are per delivery, and cost/sale price/ingredient are per
+line. Every line is validated before any is written and all of them go in one
+`db.batch`, so a delivery lands whole or not at all — never loop a client over
+a one-item endpoint to fake it, which is the flaw the basket had.
+
 ## Forms teach themselves (`guide`)
 
 A step in `openStepModal` may carry a `guide` — an array of paragraphs shown in
