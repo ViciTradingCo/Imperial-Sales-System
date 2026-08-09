@@ -3,6 +3,12 @@
  * entry at the top as features ship.
  */
 const PATCH_NOTES = [
+  { version: '2.3', date: '2026-08-09', notes: [
+    'Intake explains itself. Every step of the form now has a "How this step works" panel — what the step is for, which number goes where, and what goes wrong. It opens itself the first time and stays shut once you have recorded a delivery, so it teaches without nagging.',
+    'Recording a delivery is now one button, named for what it actually covers: Intake Ingredients/Stock. Buy Ingredients is gone — it recorded the same thing by a different door, and you could not tell from the tiles which door your purchase went through. An ingredient run is several intakes, one per reagent.',
+    'What the basket was good for was kept: picking an item shows what you usually pay for it and fills the cost in from your own past deliveries, falling back to the index for something you have never bought. What is genuinely gone is the running total as you shop.',
+    'Inventory no longer has a buying button at all. It is the list of what you have; what you spend is the register.',
+  ] },
   { version: '2.2', date: '2026-08-09', notes: [
     'The register has two sides: Selling and Buying. Selling is the till you already know. Buying is where deliveries are now recorded — a supplier, a price, coin leaving the coffer is a thing you do at the counter, not a property of a list.',
     'Record Intake and Buy Ingredients have moved off Inventory and onto the register\'s Buying side. Inventory keeps what makes stock without spending: Farm/Harvest, Craft, and correcting a count. The old Inventory button is still there and takes you straight to Buying.',

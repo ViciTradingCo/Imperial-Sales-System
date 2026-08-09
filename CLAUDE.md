@@ -88,6 +88,21 @@ Craft — costs nothing and has no vendor, so it stays on Inventory, which is th
 list of what the shop HAS. Adding a stock-creating feature: if coin leaves the
 coffer, it belongs on Buying.
 
+Buying is ONE door (`Intake Ingredients/Stock`), not one per kind of purchase.
+There were briefly two — a single delivery and an ingredient basket — and
+nothing on the tiles told you which one your purchase was; the basket is in
+`archive/ingredient-basket/`. A new kind of purchase is a step or a field in
+intake, not a second tile.
+
+## Forms teach themselves (`guide`)
+
+A step in `openStepModal` may carry a `guide` — an array of paragraphs shown in
+one collapsible panel that follows you from step to step. Not a tour with its
+own Next button: a tour makes you read everything before you may touch anything,
+and it is gone exactly when you need it. Pass `guideKey` and the panel opens
+itself for someone who has never FINISHED that wizard (opening and abandoning it
+does not count — that is often the person who needed it most).
+
 ## Shelved features live in `archive/`
 
 Code taken off the site but kept for later goes in `archive/<feature>/` with a

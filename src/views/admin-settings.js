@@ -325,7 +325,7 @@ const TILE_KEYS = [
   ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
   ['saleslog', 'Sales Log'], ['marketinfo', 'Market Info'], ['shopsettings', 'Shop Settings'],
   // The register's Buying side
-  ['buy-intake', 'Register · Record a delivery'], ['buy-basket', 'Register · Buy ingredients'],
+  ['buy-intake', 'Register · Intake'],
   // Sales Log's own two sections
   ['log-sales', 'Sales Log · Sales'], ['log-intake', 'Sales Log · Deliveries'],
   ['emp-code', 'Employees · Staff code'],

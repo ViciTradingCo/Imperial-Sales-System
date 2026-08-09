@@ -19,7 +19,6 @@ import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
 import { setOpsActions } from '../lib/sections.js';
-import { navigate } from '../lib/router.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
@@ -34,7 +33,7 @@ export function renderInventory(container, { me }) {
     el('h2', {}, 'Inventory'),
     el('p', { class: 'note' }, (me.business || 'Your shop') +
       ' — items, prices, and stock. "Low" means at or below an item’s own Low Stock number. ' +
-      'Bought a delivery? That is the register, under Buying.'),
+      'Bought something? Record it on the register, under Buying.'),
   ];
   // Crafting and harvesting are shop-floor work — the person at the bench or in
   // the field is usually not the owner — so they are open to any active member.
@@ -44,9 +43,6 @@ export function renderInventory(container, { me }) {
     el('button.secondary-btn', { onclick: () => openCraftModal(refreshInventory) }, 'Craft'),
   ];
   if (canEdit) {
-    // Not a duplicate of the register's Buying tile — it is the signpost for
-    // someone who came here looking for Record Intake, where it used to be.
-    tools.unshift(el('button.primary', { onclick: () => navigate('/pos/buy') }, 'Buy / Record a delivery'));
     tools.push(
       el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshInventory) }, 'Transfer'),
       el('button.secondary-btn', { onclick: () => openImportExportModal(refreshInventory) }, 'Import/Export'),

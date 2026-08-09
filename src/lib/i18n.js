@@ -71,10 +71,8 @@ const T = {
   // The register's two sides.
   'Selling': { es: 'Vendiendo', fr: 'Vente', de: 'Verkauf', it: 'Vendita' },
   'Buying': { es: 'Comprando', fr: 'Achat', de: 'Einkauf', it: 'Acquisto' },
-  'Record a delivery': { es: 'Registrar una entrega', fr: 'Enregistrer une livraison', de: 'Lieferung erfassen', it: 'Registra una consegna' },
-  'Buy / Record a delivery': { es: 'Comprar / registrar entrega', fr: 'Acheter / enregistrer une livraison', de: 'Einkaufen / Lieferung erfassen', it: 'Acquista / registra consegna' },
-  'Buy ingredients': { es: 'Comprar ingredientes', fr: 'Acheter des ingrédients', de: 'Zutaten kaufen', it: 'Compra ingredienti' },
-  'Buy & add to stock': { es: 'Comprar y añadir al stock', fr: 'Acheter et ajouter au stock', de: 'Kaufen und einlagern', it: 'Compra e aggiungi' },
+  'Intake Ingredients/Stock': { es: 'Registrar ingredientes/existencias', fr: 'Réception d’ingrédients / stock', de: 'Zutaten/Warenzugang erfassen', it: 'Carico ingredienti/scorte' },
+  'How this step works': { es: 'Cómo funciona este paso', fr: 'Comment fonctionne cette étape', de: 'So funktioniert dieser Schritt', it: 'Come funziona questo passaggio' },
   'Void this sale': { es: 'Anular esta venta', fr: 'Annuler cette vente', de: 'Verkauf stornieren', it: 'Annulla vendita' },
 
   // Headings

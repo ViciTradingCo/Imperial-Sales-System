@@ -7,11 +7,12 @@
  * a person, a supplier, a price agreed, coin leaving the coffer. It belongs
  * beside Selling, and the register now has both.
  *
- * Two doors because a purchase comes in two shapes:
- *   • a DELIVERY — one item, arriving with a vendor, a region, a cost, and a
- *     price it will be sold at. Nine answers, so it is asked in three steps.
- *   • a BASKET — a supply run for ingredients, where the question is what the
- *     lot comes to. It is the register's arithmetic pointed the other way.
+ * ONE DOOR. There were briefly two — a single delivery, and a basket for an
+ * ingredient run — and you could not tell from the tiles which one your purchase
+ * was. Intake covers both, which is why it is named for both, and its
+ * walk-through says so on the step where ingredients are actually decided. The
+ * basket's one real advantage (knowing what you usually pay) was moved into the
+ * form rather than shelved with it. See archive/ingredient-basket/.
  *
  * Producing stock rather than buying it (Farm/Harvest, Craft) stays on
  * Inventory: no coin moves, no supplier exists, and there is no sale to ring.
@@ -19,14 +20,12 @@
 import { money, regionLabel, regionWord, regionsOn } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { openModal } from '../lib/modal.js';
 import { openStepModal } from '../lib/steps.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { tileGrid } from '../lib/tiles.js';
-import { toast } from '../lib/toast.js';
 
 /**
  * Intake (restock), asked one step at a time.
@@ -39,6 +38,12 @@ import { toast } from '../lib/toast.js';
  */
 function openIntakeModal(onRecorded, me) {
   const idem = newIdem(); // one key per intake entry — retries won't double the stock
+  // What this shop already holds, so the form can say what an item usually costs
+  // it and what it currently charges. Declared before the picker because both of
+  // the picker's callbacks read it.
+  let current = [];
+  const held = (name) => current.find((i) => i.item.toLowerCase() === String(name).toLowerCase());
+
   // Items must be chosen from the master index so stock never lands under a typo.
   const picker = createItemPicker({
     // Same as the register: a delivery can contain something the index has
@@ -47,11 +52,22 @@ function openIntakeModal(onRecorded, me) {
     allowFree: true,
     freeHint: 'Not in the index — recording this will add it, for an admin to check.',
     placeholder: 'Search the item index…',
-    // The type only, to tell similarly named items apart. No price: this picks
-    // a name, and the cost and sale price have their own fields below.
-    meta: (it) => (it.category && it.category !== 'Unsorted' ? it.category : ''),
+    // What you usually pay for it, and its type to tell similar names apart.
+    // The cost belongs here for the same reason the ingredient basket showed it:
+    // you come to this form already knowing roughly what the crate should come
+    // to, and a figure you have to go and look up is a figure nobody checks.
+    meta: (it) => {
+      const have = held(it.name);
+      const usually = have && have.avgCost ? 'usually ' + money(have.avgCost) : '';
+      const type = it.category && it.category !== 'Unsorted' ? it.category : '';
+      return [usually, type].filter(Boolean).join(' · ');
+    },
     onPick: (it) => {
-      if (!per.value) per.value = String(it.baseValue);
+      // YOUR OWN average cost beats the index's valuation for the cost field —
+      // a shop buying reagents every week knows its price better than the index
+      // does. Falls back to the index for something never bought before.
+      const have = held(it.name);
+      if (!per.value) per.value = String(have && have.avgCost ? have.avgCost : it.baseValue);
       // Suggest the index's base value to charge, not the cost — a shop that
       // sells at what it paid makes nothing, and that was the old default.
       if (!sale.value) sale.value = String(it.baseValue);
@@ -119,10 +135,9 @@ function openIntakeModal(onRecorded, me) {
 
   // If the shop already lists this item, say what it currently charges, so a
   // blank field is an informed choice rather than a guess.
-  let current = [];
   api.getInventory().then((r) => { current = r.inventory || []; }).catch(() => {});
   function showKnownPrice(name) {
-    const have = current.find((i) => i.item.toLowerCase() === String(name).toLowerCase());
+    const have = held(name);
     saleHint.textContent = have
       ? 'You currently sell this at ' + money(have.price) + '. Leave blank to keep that.'
       : 'New to your shop — this becomes its price in the register.';
@@ -176,13 +191,25 @@ function openIntakeModal(onRecorded, me) {
   }
 
   return openStepModal({
-    title: 'Record intake (restock)',
+    title: 'Intake Ingredients/Stock',
     finishLabel: 'Record intake',
+    guideKey: 'intake',
     onFinish: doRecord,
     steps: [
       {
         title: 'What arrived?',
         hint: 'Pick the item from the index so the stock never lands under a typo.',
+        guide: [
+          'Intake is how anything you BOUGHT gets onto your shelf — a crate from a supplier, a sack of ' +
+            'reagents, one sword from a traveller. It adds the stock and takes the cost out of your coffer, ' +
+            'in one record.',
+          'Start typing and the item index narrows as you go. Picking a match matters: it is what keeps ' +
+            '"Iron Sword" and "iron sword" the same item, so your stock and your prices stay on one line ' +
+            'instead of quietly splitting in two.',
+          'If nobody has ever entered it, type the name anyway — the sale is not held up. It is added to ' +
+            'the index flagged as new, and an admin confirms it or merges it with whatever it duplicates.',
+          'Quantity is how many arrived, not how many you now have. The stock you already hold is added to.',
+        ],
         nodes: [
           el('label', {}, 'Item'), picker.el,
           el('label', {}, '# of items'), qty,
@@ -196,6 +223,22 @@ function openIntakeModal(onRecorded, me) {
       {
         title: 'What did it cost?',
         hint: 'The cost is what you paid. The sale price is what the register will charge — they are not the same number.',
+        guide: [
+          'Two different numbers, and mixing them up is the most common mistake on this form. The COST is ' +
+            'what left your coffer, per item. The SALE PRICE is what the register will charge a customer. ' +
+            'Put the cost in both and your shop makes nothing on every sale.',
+          'A price may be typed with a fraction — 22.5 is fine — but every amount the ledger stores is a ' +
+            'whole coin with the fraction dropped, and the rounding happens once on the total.',
+          'Tick INGREDIENT for stock you hold to craft with rather than to sell. It is kept out of the ' +
+            'register so nobody rings it up by accident, and out of the market pricing figures, which are ' +
+            'about what things SELL for. The sale price disappears when you tick it, because there is no ' +
+            'sale to price.',
+          'That is where ingredients live now: there is no separate ingredient form. Buying a basket of ' +
+            'reagents is several intakes, one per reagent — each with its own cost, which is what makes ' +
+            'the average you are shown on Inventory worth anything.',
+          'Leaving the sale price blank keeps whatever the item is already priced at. For something new to ' +
+            'your shop, it becomes its price.',
+        ],
         nodes: [
           el('label', {}, 'Cost per item — what you paid'), per,
           el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
@@ -208,6 +251,18 @@ function openIntakeModal(onRecorded, me) {
       {
         title: 'Where did it come from?',
         hint: 'All optional. Fill in what you know.',
+        guide: [
+          'Everything on this step can be left blank. The delivery records fine without it — this is for ' +
+            'the figures your ' + regionWord() + ' and the network read, not for your own stock.',
+          'Naming a REGISTERED shop credits it for the supply in its own ' + regionWord() + '’s trade, and ' +
+            'fills in where the goods came from. Anyone else — an NPC smith, a traveller, a mine — just ' +
+            'type the name and it is recorded as written.',
+          'Read the summary at the bottom before you finish. A quantity in the cost field or a cost in the ' +
+            'sale-price field is obvious here and nowhere else. If something is wrong, Previous goes back ' +
+            'and nothing has been recorded yet.',
+          'Recorded a delivery you should not have? Sales Log has the full history, and an owner can delete ' +
+            'one — the stock comes back out and the coffer is refunded.',
+        ],
         nodes: [
           el('label', {}, 'Vendor'), vendor.el,
           el('p', { class: 'note' }, 'Start typing — shops on this network will appear as you go. Naming one ' +
@@ -219,135 +274,6 @@ function openIntakeModal(onRecorded, me) {
       },
     ],
   });
-}
-
-
-/**
- * BUYING INGREDIENTS — a shopping list that totals as you build it.
- *
- * The job this replaces: standing at a supplier working out what a basket comes
- * to, then going home and recording each line as a separate intake. It is the
- * register's arithmetic pointed the other way — add lines, watch the total, and
- * when you actually buy it, record the lot in one go.
- *
- * It defaults every price to what this shop has ACTUALLY PAID before, which is
- * the whole reason the cost is worth showing on the item line: you arrive
- * knowing what it should come to.
- */
-function openIngredientBuyModal(onDone) {
-  const idem = newIdem();
-  let stock = [];
-  const rows = [];              // [{ el, name, qty, price }]
-  const rowsHost = el('div', {});
-  const totalLine = el('p', { class: 'buy-total' }, '');
-  const status = el('p', {});
-  const save = el('button.primary', { onclick: doBuy }, 'Buy & add to stock');
-  function setStatus(m, c) { status.className = c || ''; status.textContent = m; }
-
-  const lineTotal = (r) => (Number(r.qty.value) || 0) * (Number(r.price.value) || 0);
-
-  function retotal() {
-    const n = rows.reduce((sum, r) => sum + lineTotal(r), 0);
-    totalLine.textContent = 'Basket: ' + money(n);
-    rows.forEach((r) => {
-      r.sub.textContent = lineTotal(r) ? money(lineTotal(r)) : '';
-    });
-  }
-
-  function addRow() {
-    const picker = createItemPicker({
-      allowFree: true,
-      placeholder: 'Ingredient…',
-      freeHint: 'Not in the index — it will be added for an admin to check.',
-      // What you last paid, so the price fills itself in.
-      meta: (it) => {
-        const held = stock.find((s) => s.item.toLowerCase() === it.name.toLowerCase());
-        return held && held.avgCost ? 'usually ' + money(held.avgCost) : '';
-      },
-      onPick: (it) => {
-        const held = stock.find((s) => s.item.toLowerCase() === it.name.toLowerCase());
-        if (held && held.avgCost && !row.price.value) row.price.value = String(held.avgCost);
-        retotal();
-      },
-    });
-    const qty = el('input', { type: 'number', step: '1', min: '1', value: '1' });
-    const price = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Each' });
-    const sub = el('span', { class: 'buy-sub' }, '');
-    qty.addEventListener('input', retotal);
-    price.addEventListener('input', retotal);
-    const remove = el('button.secondary-btn.small', { onclick: () => {
-      const i = rows.indexOf(row);
-      if (i >= 0) { rows.splice(i, 1); wrap.remove(); retotal(); }
-    } }, '×');
-    const wrap = el('div', { class: 'craft-row' }, [picker.el, qty, price, sub, remove]);
-    const row = { el: wrap, picker, qty, price, sub };
-    rows.push(row);
-    rowsHost.appendChild(wrap);
-    retotal();
-  }
-
-  api.getInventory().then((r) => {
-    stock = r.inventory || [];
-    // Seed the picker of every row already on screen.
-    const items = stock.map((s) => ({ name: s.item, avgCost: s.avgCost }));
-    rows.forEach((r) => r.picker.setItems(items));
-  }).catch(() => {});
-  api.getItems().then((r) => {
-    const idx = r.items || [];
-    rows.forEach((row) => row.picker.setItems(idx));
-    addRowSeeded = (row) => row.picker.setItems(idx);
-  }).catch(() => {});
-  let addRowSeeded = null;
-
-  async function doBuy() {
-    const lines = rows
-      .map((r) => ({
-        item: r.picker.selected() ? r.picker.selected().name : r.picker.value(),
-        qty: Math.floor(Number(r.qty.value) || 0),
-        price: Number(r.price.value),
-      }))
-      .filter((l) => l.item && l.qty > 0);
-    if (!lines.length) { setStatus('Add at least one ingredient.', 'error'); return; }
-    const bad = lines.find((l) => !isFinite(l.price) || l.price < 0);
-    if (bad) { setStatus('What did "' + bad.item + '" cost each?', 'error'); return; }
-
-    save.disabled = true;
-    setStatus('Recording…', '');
-    try {
-      // One intake per line, sharing a key prefix so a retry cannot double any
-      // of them. They are separate deliveries in the log because they are
-      // separate items — the basket is a convenience, not a record.
-      for (let i = 0; i < lines.length; i++) {
-        await api.recordIntake({
-          item: lines[i].item,
-          numItems: lines[i].qty,
-          pricePer: lines[i].price,
-          ingredient: true,
-          idempotencyKey: idem + '-' + i,
-        });
-      }
-      onDone();
-      modal.close();
-      toast(lines.length + ' ingredient(s) added to stock.', 'ok');
-    } catch (e) {
-      save.disabled = false;
-      setStatus(e.message || String(e), 'error');
-    }
-  }
-
-  addRow();
-  const modal = openModal([
-    el('h3', {}, 'Buy ingredients'),
-    el('p', { class: 'note' }, 'Build the basket and watch it total. Prices start at what you have paid ' +
-      'before. When you record it, each line becomes a delivery and the stock goes in — marked as ' +
-      'ingredients, so they stay out of the register.'),
-    rowsHost,
-    el('button.secondary-btn.small', { onclick: () => { addRow(); if (addRowSeeded) addRowSeeded(rows[rows.length - 1]); } }, '+ Add another'),
-    totalLine,
-    save,
-    status,
-  ]);
-  return modal;
 }
 
 
@@ -369,15 +295,12 @@ export function renderBuying(host, { me }) {
   const doors = el('div', {});
   const drawDoors = (images) => mount(doors, canBuy
     ? tileGrid([
-      { key: 'buy-intake', label: 'Record a delivery', glyph: '📦',
-        hint: 'One item — vendor, cost, price',
+      { key: 'buy-intake', label: 'Intake Ingredients/Stock', glyph: '📦',
+        hint: 'Anything you bought — to sell or to craft with',
         onOpen: () => openIntakeModal(refresh, me) },
-      { key: 'buy-basket', label: 'Buy ingredients', glyph: '🧺',
-        hint: 'A basket that totals as you build it',
-        onOpen: () => openIngredientBuyModal(refresh) },
     ], images)
     : el('p', { class: 'note' }, 'Recording what the shop buys is the owner’s — it moves coin out of the ' +
-      'coffer. Ask them to record a delivery; what has already arrived is below.'));
+      'coffer. Ask them to record an intake; what has already arrived is below.'));
   // Glyphs first so the page is usable immediately; artwork replaces them when
   // it arrives. Only the tiles are redrawn — the deliveries below are fetched
   // once, not twice.
@@ -386,8 +309,9 @@ export function renderBuying(host, { me }) {
 
   mount(host,
     el('div.card', {}, [
-      el('p', { class: 'note' }, 'Stock coming IN, and the coin going out for it. Grown or crafted rather than ' +
-        'bought? That is Farm/Harvest and Craft, on Inventory — no coin moves, so there is nothing to ring up.'),
+      el('p', { class: 'note' }, 'Stock coming IN, and the coin going out for it — whether you will sell it or ' +
+        'craft with it. First time? The form explains itself as you go. Grown or crafted rather than bought? ' +
+        'That is Farm/Harvest and Craft, on Inventory — no coin moves, so there is nothing to ring up.'),
       doors,
     ]),
     el('div.card', {}, [

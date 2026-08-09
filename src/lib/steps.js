@@ -16,6 +16,17 @@
  * Validation is per step, on the way FORWARD only: a step that cannot be
  * completed stops you there rather than at the end, and going back is always
  * free. Returning a string from `validate` shows it as the step's error.
+ *
+ * THE WALK-THROUGH. A step may carry a `guide` — the longer explanation of what
+ * it is for and what goes wrong. It is one panel that follows you from step to
+ * step rather than a tour with its own Next button, because a tour that sits on
+ * top of the form makes you read it all before you can touch anything, and then
+ * it is gone exactly when you need it.
+ *
+ * It opens itself for someone who has never finished this wizard and stays shut
+ * for everyone else (`guideKey`, remembered per device). Opening or closing it
+ * by hand wins for the rest of the session — the app should not argue with a
+ * person who has just told it what they want.
  */
 import { el } from './dom.js';
 import { openModal } from './modal.js';
@@ -26,9 +37,11 @@ import { openModal } from './modal.js';
  * @param {Array}  opts.steps        [{ title, hint, nodes, validate, onEnter }]
  * @param {string} opts.finishLabel  label of the button on the last step
  * @param {Function} opts.onFinish   async; throwing shows the message and stays open
+ * @param {string} [opts.guideKey]   remembers whether this wizard has been finished
+ *                                   before, to decide if the guide starts open
  * @returns the modal handle (`.close()`)
  */
-export function openStepModal({ title, steps, finishLabel = 'Done', onFinish }) {
+export function openStepModal({ title, steps, finishLabel = 'Done', onFinish, guideKey }) {
   const live = steps.filter(Boolean);
   const last = live.length - 1;
   let at = 0;
@@ -41,6 +54,39 @@ export function openStepModal({ title, steps, finishLabel = 'Done', onFinish }) 
   const stepTitle = el('p', { class: 'step-title' }, '');
   const hint = el('p', { class: 'note' }, '');
   const status = el('p', {});
+
+  // ---- the walk-through panel -------------------------------------------
+  const seenKey = guideKey ? 'eec.guide.' + guideKey : '';
+  const firstTime = () => {
+    if (!seenKey) return false;
+    try { return !localStorage.getItem(seenKey); } catch (e) { return false; }
+  };
+  const markSeen = () => {
+    if (!seenKey) return;
+    try { localStorage.setItem(seenKey, '1'); } catch (e) { /* private mode */ }
+  };
+  let guideOpen = firstTime();
+  const guideBody = el('div', { class: 'guide-body' }, '');
+  // The caret is its own node so the LABEL is a text node on its own — the
+  // translator matches whole text nodes, and '▾ How this step works' is not a
+  // phrase any dictionary will ever have a row for.
+  const guideCaret = el('span', { class: 'guide-caret', 'aria-hidden': 'true' }, '');
+  const guideToggle = el('button', {
+    type: 'button', class: 'guide-toggle',
+    onclick: () => { guideOpen = !guideOpen; paintGuide(); },
+  }, [guideCaret, el('span', {}, 'How this step works')]);
+  const guide = el('div', { class: 'guide' }, [guideToggle, guideBody]);
+
+  function paintGuide() {
+    const lines = live[at].guide || [];
+    guide.hidden = !lines.length;
+    if (!lines.length) return;
+    guideCaret.textContent = guideOpen ? '▾' : '▸';
+    guideToggle.setAttribute('aria-expanded', guideOpen ? 'true' : 'false');
+    guideBody.hidden = !guideOpen;
+    guideBody.innerHTML = '';
+    lines.forEach((line) => guideBody.appendChild(el('p', {}, line)));
+  }
 
   const panes = live.map((s, i) => {
     const pane = el('div', { class: 'step-pane' }, s.nodes);
@@ -81,6 +127,7 @@ export function openStepModal({ title, steps, finishLabel = 'Done', onFinish }) 
     stepTitle.textContent = live[at].title || '';
     hint.textContent = live[at].hint || '';
     hint.hidden = !live[at].hint;
+    paintGuide();
     back.disabled = at === 0;
     next.textContent = at === last ? finishLabel : 'Next';
   }
@@ -92,6 +139,10 @@ export function openStepModal({ title, steps, finishLabel = 'Done', onFinish }) 
     setStatus('Working…', '');
     try {
       await onFinish();
+      // Finishing once is what proves the walk-through is no longer needed.
+      // Opening the form and abandoning it does not — that is often the person
+      // who needed it most.
+      markSeen();
       modal.close();
     } catch (e) {
       busy = false;
@@ -124,7 +175,7 @@ export function openStepModal({ title, steps, finishLabel = 'Done', onFinish }) 
 
   const body = el('div', { class: 'step-form' }, [
     el('div', { class: 'step-head' }, [counter, dots]),
-    stepTitle, hint,
+    stepTitle, hint, guide,
     ...panes,
     nav, status,
   ]);
