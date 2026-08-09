@@ -310,19 +310,11 @@ function openIntakeModal(onRecorded, me) {
         title: 'What arrived?',
         hint: 'One line per item. Add as many as the delivery brought.',
         guide: [
-          'Intake is how anything you BOUGHT gets onto your shelf — a crate from a supplier, a sack of ' +
-            'reagents, one sword from a traveller. It adds the stock and takes the cost out of your coffer, ' +
-            'in one record.',
-          'A delivery can hold as many items as you like. Add a line each and the total at the bottom keeps ' +
-            'up as you type, so you can check it against what you actually handed over. It is recorded as ' +
-            'one trip: either the whole delivery lands or none of it does.',
-          'Start typing and the item index narrows as you go. Picking a match matters: it is what keeps ' +
-            '"Iron Sword" and "iron sword" the same item, so your stock and your prices stay on one line ' +
-            'instead of quietly splitting in two.',
-          'If nobody has ever entered it, type the name anyway — nothing is held up. It is added to the ' +
-            'index flagged as new, and an admin confirms it or merges it with whatever it duplicates.',
-          'Quantity is how many arrived, not how many you now have. Cost is what you paid PER ITEM, and it ' +
-            'is what leaves your coffer — what you will charge for it is the next step.',
+          'Anything you bought. The stock goes on your shelf and the cost comes out of your coffer, as one ' +
+            'record — the whole delivery lands, or none of it does.',
+          'Pick from the index where you can: it keeps "Iron Sword" and "iron sword" one item instead of ' +
+            'two. A name nobody has entered yet is fine — it is added for an admin to check.',
+          'Quantity is how many arrived. Cost is what you paid EACH.',
         ],
         nodes: [
           linesHost,
@@ -348,20 +340,10 @@ function openIntakeModal(onRecorded, me) {
         title: 'What will you charge?',
         hint: 'Per item. Leave a price blank to keep whatever it is already listed at.',
         guide: [
-          'Two different numbers, and mixing them up is the most common mistake on this form. The COST on ' +
-            'the last step is what left your coffer. The SALE PRICE here is what the register will charge a ' +
-            'customer. Put the cost in both and your shop makes nothing on every sale.',
-          'A price may be typed with a fraction — 22.5 is fine — but every amount the ledger stores is a ' +
-            'whole coin with the fraction dropped, and the rounding happens once per line.',
-          'Tick INGREDIENT for stock you hold to craft with rather than to sell. It is kept out of the ' +
-            'register so nobody rings it up by accident, and out of the market pricing figures, which are ' +
-            'about what things SELL for. The sale price disappears when you tick it, because there is no ' +
-            'sale to price.',
-          'That is where ingredients live: there is no separate ingredient form. A supply run is one ' +
-            'delivery with a line per reagent, each with its own cost — which is what makes the average ' +
-            'you are shown on Inventory worth anything.',
-          'Leaving a sale price blank keeps whatever that item is already priced at. For something new to ' +
-            'your shop, it becomes its price.',
+          'Cost was what you paid; this is what the register charges. The same number in both means the ' +
+            'shop makes nothing on every sale.',
+          'INGREDIENT is stock you craft with rather than sell — kept out of the register and out of the ' +
+            'pricing figures, so it has no sale price to give.',
         ],
         nodes: [priceHost],
         onEnter: fillPricing,
@@ -370,23 +352,15 @@ function openIntakeModal(onRecorded, me) {
         title: 'Where did it come from?',
         hint: 'All optional, and asked once for the whole delivery.',
         guide: [
-          'Everything on this step can be left blank. The delivery records fine without it — this is for ' +
-            'the figures your ' + regionWord() + ' and the network read, not for your own stock.',
-          'One supplier for the trip, not one per item: a crate came from a person, on a day. If two items ' +
-            'genuinely came from different people, they are two deliveries.',
-          'Naming a REGISTERED shop credits it for the supply in its own ' + regionWord() + '’s trade, and ' +
-            'fills in where the goods came from. Anyone else — an NPC smith, a traveller, a mine — just ' +
-            'type the name and it is recorded as written.',
-          'Read the summary at the bottom before you finish. A quantity in the cost field or a cost in the ' +
-            'sale-price field is obvious here and nowhere else. If something is wrong, Previous goes back ' +
-            'and nothing has been recorded yet.',
-          'Recorded a delivery you should not have? Sales Log has the full history, and an owner can delete ' +
-            'a line from it — the stock comes back out and the coffer is refunded.',
+          'Naming a REGISTERED shop credits it for the supply in its own ' + regionWord() + '’s trade. ' +
+            'Anyone else — an NPC smith, a traveller, a mine — is recorded as typed.',
+          'Nothing is written until you finish, so read the summary. A delivery entered by mistake can be ' +
+            'removed in Sales Log.',
         ],
         nodes: [
           el('label', {}, 'Vendor'), vendor.el,
-          el('p', { class: 'note' }, 'Start typing — shops on this network will appear as you go. Naming one ' +
-            'credits it for the supply in its ' + regionWord() + '’s figures. Anyone else, just type the name.'),
+          el('p', { class: 'note' }, 'Start typing — shops on this network appear as you go. Anyone else, ' +
+            'just type the name.'),
           ...(regionsOn() ? [el('label', {}, regionLabel() + ' purchased in'), hold] : []),
           review,
         ],
@@ -428,9 +402,8 @@ export function renderBuying(host, { me }) {
 
   mount(host,
     el('div.card', {}, [
-      el('p', { class: 'note' }, 'Stock coming IN, and the coin going out for it — whether you will sell it or ' +
-        'craft with it. First time? The form explains itself as you go. Grown or crafted rather than bought? ' +
-        'That is Farm/Harvest and Craft, on Inventory — no coin moves, so there is nothing to ring up.'),
+      el('p', { class: 'note' }, 'Stock coming IN, and the coin going out for it — to sell or to craft with. ' +
+        'Grown or crafted rather than bought? That is Farm/Harvest and Craft, on Inventory.'),
       doors,
     ]),
     el('div.card', {}, [
