@@ -70,6 +70,13 @@ const T = {
   'Record delivery': { es: 'Registrar entrega', fr: 'Enregistrer la livraison', de: 'Lieferung erfassen', it: 'Registra consegna' },
   '+ Add another item': { es: '+ Añadir otro artículo', fr: '+ Ajouter un autre article', de: '+ Weiteren Artikel', it: '+ Aggiungi un altro articolo' },
   'Sells for': { es: 'Se vende a', fr: 'Vendu à', de: 'Verkaufspreis', it: 'Prezzo di vendita' },
+  // Feedback review: the three queues, and the delivery report's own subject.
+  'Active': { es: 'Activos', fr: 'En cours', de: 'Offen', it: 'Attivi' },
+  'Appointments': { es: 'Citas', fr: 'Rendez-vous', de: 'Termine', it: 'Appuntamenti' },
+  'Archive': { es: 'Archivo', fr: 'Archives', de: 'Archiv', it: 'Archivio' },
+  'Report Delivery': { es: 'Notificar una entrega', fr: 'Signaler une livraison', de: 'Lieferung melden', it: 'Segnala una consegna' },
+  'Mark complete': { es: 'Marcar completado', fr: 'Marquer terminé', de: 'Als erledigt markieren', it: 'Segna completato' },
+  'Reopen': { es: 'Reabrir', fr: 'Rouvrir', de: 'Wieder öffnen', it: 'Riapri' },
   // The register's two sides.
   'Selling': { es: 'Vendiendo', fr: 'Vente', de: 'Verkauf', it: 'Vendita' },
   'Buying': { es: 'Comprando', fr: 'Achat', de: 'Einkauf', it: 'Acquisto' },

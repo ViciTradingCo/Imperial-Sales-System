@@ -15,11 +15,21 @@
 import { getDb } from './db.js';
 
 /**
+ * A delivery report is not feedback about the app — it is a REQUEST, with
+ * something to do at the end of it. It arrives through this form because that
+ * is the form people already know, but it gets its own queue (Appointments)
+ * rather than sitting among the bug reports, where a thing waiting on someone
+ * looks identical to a thing waiting on nobody.
+ */
+const APPOINTMENT_SUBJECT = 'Report Delivery';
+
+/**
  * The subjects offered in the dropdown, served to the client so there is ONE
  * list: a client-side copy would drift, and the server has to validate anyway.
  * Deliberately short — a long menu makes people pick "Other".
  */
 export const FEEDBACK_SUBJECTS = [
+  APPOINTMENT_SUBJECT,
   'Bug / something is broken',
   'Feature request',
   'Confusing or hard to use',
@@ -28,6 +38,9 @@ export const FEEDBACK_SUBJECTS = [
   'Praise',
   'Other',
 ];
+
+/** Where an unrecognised subject lands. */
+const FALLBACK_SUBJECT = 'Other';
 
 const MAX_BODY = 4000;
 
@@ -46,6 +59,10 @@ function rowToFeedback(r) {
     role: r.role || '',
     status: r.status || '',
     subject: r.subject || '',
+    // Which QUEUE this belongs to, decided here so the browser never has to
+    // hold a copy of the subject string — the same reason the dropdown's
+    // options are served rather than hardcoded.
+    appointment: String(r.subject || '').trim() === APPOINTMENT_SUBJECT,
     body: r.body || '',
     completed: !!r.completed,
     completedAt: r.completed_at || '',
@@ -63,9 +80,12 @@ export async function submitFeedback(env, caller, { subject, body }, realmId) {
   if (!text) throw new Error('Write your feedback before submitting.');
   // An unknown subject means a stale page, not a new category: pin it to the
   // catch-all rather than inventing one that no filter will ever match.
+  // Named, not "the last one in the array". It used to be positional, which
+  // meant adding a subject to the end silently changed where every unrecognised
+  // submission went — and one of them now has a queue attached.
   const chosen = FEEDBACK_SUBJECTS.includes(String(subject || '').trim())
     ? String(subject).trim()
-    : FEEDBACK_SUBJECTS[FEEDBACK_SUBJECTS.length - 1];
+    : FALLBACK_SUBJECT;
   const db = await getDb(env);
   await db.prepare(
     `INSERT INTO feedback (id, realm_id, ts, uid, email, char_name, business, role, status, subject, body)
@@ -86,7 +106,12 @@ export async function listOwnFeedback(env, uid, realmId) {
 }
 
 /**
- * Everything submitted, split into Active and Archive.
+ * Everything submitted, split into Active, Appointments and Archive.
+ *
+ * The split is by SUBJECT for the two open queues and by COMPLETED for the
+ * third: an appointment that has been dealt with is archived exactly like any
+ * other submission, so there is one place where finished things go and one
+ * button that puts them there.
  *
  * Deployment-wide, because the System Admin is the only reader and their job
  * spans realms. Each row carries its realm so the page can say where it came
@@ -101,15 +126,20 @@ export async function listAllFeedback(env) {
   const { results } = await db.prepare('SELECT * FROM feedback ORDER BY ts DESC, id DESC LIMIT 500').all();
   const all = (results || []).map(rowToFeedback);
   return {
-    active: all.filter((f) => !f.completed),
+    active: all.filter((f) => !f.completed && !f.appointment),
+    appointments: all.filter((f) => !f.completed && f.appointment),
     archive: all.filter((f) => f.completed),
   };
 }
 
 /**
- * Marks feedback complete (or puts it back), moving it between Active and
+ * Marks a submission complete (or puts it back), moving it into or out of the
  * Archive. Reopening exists because "done" is a judgement, and one that is
  * sometimes made too early.
+ *
+ * Reopening returns it to the queue its SUBJECT belongs to, not to whichever
+ * one it was archived from — a reopened delivery report is an appointment
+ * again, which is the only place anyone would go looking for it.
  */
 export async function setFeedbackComplete(env, id, complete, actor) {
   const target = String(id || '').trim();

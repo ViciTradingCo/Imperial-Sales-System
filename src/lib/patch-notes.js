@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '2.7', date: '2026-08-09', notes: [
+    'The feedback form has a "Report Delivery" subject. Use it to tell the network about a delivery rather than about the app.',
+    'Those reports go to their own Appointments tab on the admin review page instead of sitting in the middle of the bug reports — a thing waiting on somebody looked exactly like a thing waiting on nobody. Its button says Archive, since the delivery is what gets completed and the button only files the report.',
+    'Everything still archives to the same place, and reopening a delivery report puts it back in Appointments rather than in with the feedback.',
+  ] },
   { version: '2.6', date: '2026-08-09', notes: [
     'Admins: global notices are a list you manage, not one box. Post several, schedule each with a start and an end, edit one without retyping the rest, and take one down on its own. Before this there was a single message that could only be overwritten or cleared, so the only record of what had been announced was remembering it.',
     'The notices already posted are kept — your current global message becomes the first entry in the list.',

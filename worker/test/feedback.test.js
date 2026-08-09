@@ -129,3 +129,62 @@ describe('the Active / Archive split', () => {
     expect(d.active.map((f) => f.body)).toEqual(['first']);
   });
 });
+
+/**
+ * Delivery reports come through the same form but are not opinions about the
+ * app — they are requests with an errand at the end. They get their own queue,
+ * and they archive exactly like everything else.
+ */
+describe('Appointments', () => {
+  const report = (who, body) => submitFeedback(env, who, { subject: 'Report Delivery', body }, A);
+
+  it('is a subject the form actually offers', async () => {
+    expect(FEEDBACK_SUBJECTS).toContain('Report Delivery');
+  });
+
+  it('keeps delivery reports out of Active and in their own list', async () => {
+    await report(ANN, 'Ten crates of ale, Tuesday');
+    await submitFeedback(env, BEX, { subject: 'Bug / something is broken', body: 'a bug' }, A);
+    const d = await listAllFeedback(env);
+    expect(d.appointments.map((f) => f.body)).toEqual(['Ten crates of ale, Tuesday']);
+    expect(d.active.map((f) => f.body)).toEqual(['a bug']);
+  });
+
+  it('marks the row so the page never has to know the subject string', async () => {
+    await report(ANN, 'a delivery');
+    await submitFeedback(env, BEX, { subject: 'Praise', body: 'nice' }, A);
+    const d = await listAllFeedback(env);
+    expect(d.appointments[0].appointment).toBe(true);
+    expect(d.active[0].appointment).toBe(false);
+  });
+
+  it('archives to the SAME archive as everything else', async () => {
+    await report(ANN, 'a delivery');
+    const id = (await listAllFeedback(env)).appointments[0].id;
+    const d = await setFeedbackComplete(env, id, true, 'Root Admin');
+    expect(d.appointments).toEqual([]);
+    expect(d.archive.map((f) => f.body)).toEqual(['a delivery']);
+    expect(d.archive[0].completedBy).toBe('Root Admin');
+  });
+
+  it('reopens into Appointments, not into Active', async () => {
+    // The subject decides the queue, so a reopened delivery report goes back
+    // where anyone would look for it rather than into the feedback pile.
+    await report(ANN, 'a delivery');
+    const id = (await listAllFeedback(env)).appointments[0].id;
+    await setFeedbackComplete(env, id, true, 'Root Admin');
+    const d = await setFeedbackComplete(env, id, false, 'Root Admin');
+    expect(d.appointments.map((f) => f.body)).toEqual(['a delivery']);
+    expect(d.active).toEqual([]);
+  });
+
+  it('does not become the home for every unrecognised subject', async () => {
+    // The fallback used to be "the last entry in the list", so adding a subject
+    // at the end would silently redirect every stale submission into it — and
+    // this one has a queue with an errand attached.
+    await submitFeedback(env, ANN, { subject: 'Nonsense From A Stale Page', body: 'x' }, A);
+    const d = await listAllFeedback(env);
+    expect(d.appointments).toEqual([]);
+    expect(d.active[0].subject).toBe('Other');
+  });
+});
