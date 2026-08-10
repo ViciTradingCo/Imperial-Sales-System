@@ -74,6 +74,13 @@
      (the scroll sets it transparent), which would leave those controls with no
      visible edge at all. */
   --edge: rgba(122, 74, 31, 0.38);
+  /* The DESK the leaves lie on. Only painted on a wide screen — see the wood
+     block near the foot of this file — so a phone, where the page fills the
+     glass and there is no desk to see, is not carrying a texture nobody can
+     look at. */
+  --desk: #6b4526;
+  --desk-dark: rgba(0, 0, 0, 0.34);
+  --desk-light: rgba(255, 222, 170, 0.07);
   /* Where the ruled lines start under a card's padding, so the first line of
      text lands on the first rule. */
   --rule-top: 20px;
@@ -116,6 +123,8 @@
    while the module loads; and a surface added to the script but not the
    stylesheet cannot half-exist. theme.js sets `data-theme` and nothing else. */
 [data-theme="scroll"] {
+  /* An older, redder bench for the older document. */
+  --desk: #5d3a1e;
   --paper: #d9c193;
   --paper-raised: #f3e3bf;
   --header-bg: #4a3520;
@@ -130,6 +139,11 @@
   --margin-rule: transparent;
 }
 [data-theme="tome"] {
+  /* Dark wood at the edge of the candlelight; the grain is picked out by it
+     rather than by daylight, so the highlight is warmer and the shadow deeper. */
+  --desk: #241610;
+  --desk-dark: rgba(0, 0, 0, 0.55);
+  --desk-light: rgba(255, 196, 120, 0.055);
   --edge: rgba(220, 190, 130, 0.30);
   --paper: #17130d;
   --paper-raised: #241d14;
@@ -152,6 +166,22 @@
 }
 
 * { box-sizing: border-box; }
+
+/* `hidden` MUST ACTUALLY HIDE.
+ *
+ * The browser's own `[hidden] { display: none }` is an author-defeatable
+ * default: any rule of ours that sets `display` beats it, because ours is not
+ * a UA rule. `.actionbar` sets `display: flex`, so the bar every page hides
+ * when it has no buttons went on being laid out — a sticky, empty strip with a
+ * background and a shadow, following you down the page. Easy to miss on a
+ * desktop as a hairline under the header; on a phone it is a bar across the top
+ * of the screen with nothing on it.
+ *
+ * !important is right here. This is a correctness floor rather than a style
+ * choice: an element told to be hidden is not a layout question, and every
+ * `display` rule in this file would otherwise have to remember to defer to it.
+ */
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -1103,3 +1133,53 @@ img, table { max-width: 100%; }
   padding: 12px; width: 100%;
 }
 
+
+/* ---- THE DESK (wide screens only) ----
+ *
+ * The leaves of the ledger lie on a wooden bench. Planks run left to right with
+ * a seam between them, and the grain runs along each plank, so every layer here
+ * varies in the SAME axis — which is what wood does and what a naive crosshatch
+ * gets wrong.
+ *
+ * The grain is three repeating gradients whose periods (11px, 19px, 31px) share
+ * no common factor for a long way. Their beat against each other is what stops
+ * it reading as corduroy: one repeating gradient at any period is a fabric, and
+ * three that never line up is a plank.
+ *
+ * Gated at the desktop breakpoint on purpose. A phone screen IS the page — the
+ * leaf fills the glass edge to edge, there is no desk visible around it, and a
+ * texture nobody can see is bytes and paint time spent on nothing.
+ */
+@media (min-width: 901px) {
+  body {
+    background-color: var(--desk);
+  }
+  /* One rule for every surface: each supplies its own --desk and its own light,
+     so the bench is the same bench in a different room. */
+  [data-theme="ledger"] body,
+  [data-theme="scroll"] body,
+  [data-theme="tome"] body,
+  :root:not([data-theme]) body {
+    background-image:
+      /* Light falling from above and slightly left, as a lamp on a desk does. */
+      radial-gradient(75% 55% at 34% -5%, var(--desk-light), transparent 62%),
+      /* The seam between planks: a dark line with the lit edge of the next
+         plank just under it. 230px apart, so a tall page shows a few. */
+      repeating-linear-gradient(0.4deg,
+        var(--desk-dark) 0 2px,
+        var(--desk-light) 2px 4px,
+        transparent 4px 230px),
+      /* Grain, three periods that do not line up. */
+      repeating-linear-gradient(0.4deg,
+        transparent 0 6px, var(--desk-dark) 6px 7px, transparent 7px 11px),
+      repeating-linear-gradient(0.2deg,
+        transparent 0 13px, var(--desk-light) 13px 15px, transparent 15px 19px),
+      repeating-linear-gradient(0.6deg,
+        transparent 0 22px, var(--desk-dark) 22px 24px, transparent 24px 31px);
+    /* The desk does not scroll with the pages laid on it. */
+    background-attachment: fixed;
+  }
+  /* A leaf on a desk casts a shadow; on a screen-filling page there is nothing
+     for it to fall on. */
+  .card { box-shadow: 0 2px 3px rgba(0, 0, 0, 0.18), 0 14px 28px rgba(30, 16, 6, 0.28); }
+}

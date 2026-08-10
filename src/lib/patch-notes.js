@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.2', date: '2026-08-09', notes: [
+    'On a computer, the pages now lie on a wooden desk — planks, grain and a lamp above them, with each leaf casting a shadow onto the bench. Each surface gets its own timber: worn oak for the ledger, an older redder bench for the scroll, dark wood at the edge of the candlelight for the tome.',
+    'Not on a phone, where the page fills the screen edge to edge and there is no desk to see around it.',
+    'Fixed: an empty bar sat across the top of the screen on pages with no buttons, and followed you as you scrolled. It was the contextual button bar, being told to hide and going on taking up the room anyway.',
+  ] },
   { version: '3.1', date: '2026-08-09', notes: [
     'The Ledger looks like a ledger. Every page is now a ruled leaf of an account book with a red margin, entries written by hand, and headings set in a printer\'s type.',
     'Anything you TYPE INTO — every field, every table, every sum — stays in a plain upright face with figures that line up in a column. Handwriting is for reading; numbers are for working with, and a quantity is no place for calligraphy.',
