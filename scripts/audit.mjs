@@ -194,7 +194,11 @@ function apiClientDrift() {
 function unusedCss() {
   const cssPath = join(SRC, 'styles', 'theme.css');
   if (!existsSync(cssPath)) return;
-  const css = read(cssPath);
+  // Strip what only LOOKS like a class: a file extension inside url(...) or
+  // format(...) is a dot followed by letters, and `.woff2` is not a selector.
+  const css = read(cssPath)
+    .replace(/url\([^)]*\)/g, 'url()')
+    .replace(/format\([^)]*\)/g, 'format()');
   const used = jsFiles(SRC).map(read).join('\n') + read(join(ROOT, 'index.html'));
   // The leading \s* matters: the real-world shape is `' toast-' + kind`, with
   // the separating space inside the quotes.

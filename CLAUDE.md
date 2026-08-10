@@ -61,6 +61,34 @@ cd worker && npx wrangler deploy                # deploy the API
 No test suite exists yet. Setup (Google Cloud, Cloudflare, Pages) is in
 `docs/SETUP.md`.
 
+## The look: a ledger you can type into
+
+The app IS an account book, and it reads as one. `src/styles/theme.css` holds
+the whole of it; its header comment is the brief.
+
+THREE FACES, and which one a thing is set in says what KIND of thing it is:
+
+- `--font-hand` (Caveat, bundled) — prose, labels, buttons, nav. Written.
+- `--font-book` (IM Fell English, bundled) — headings and the masthead. Printed.
+- `--font-data` (the reader's own system face, tabular figures) — every input,
+  every table, every sum. Upright means you are working with it; written means
+  you are reading it. Never set a field in the hand: a quantity is not
+  calligraphy, and columns of money have to line up.
+
+Fonts are SELF-HOSTED in `src/styles/fonts/` (licences bundled beside them) —
+the PWA's offline shell needs its own typefaces, and a font CDN is a third
+party watching every page load. Put them under `src/styles/`, never `public/`:
+Vite fingerprints and rewrites what it processes, and `base` is `./`.
+
+SURFACES are `[data-theme]` blocks — `ledger` (default), `scroll`, `tome` —
+each a palette AND a page texture, both in the stylesheet. `theme.js` sets the
+attribute and nothing else, so a surface paints before any JS runs and cannot
+half-exist. `index.html` names the default on `<html>` for the same reason.
+Textures are CSS gradients, never images.
+
+`--rule` is the page's ruled line and a surface may set it `transparent` (the
+scroll does). A control that needs a visible hairline uses `--edge`.
+
 ## UI convention: buttons and focal menus
 
 Any page with more than one distinct section renders those sections as a grid of

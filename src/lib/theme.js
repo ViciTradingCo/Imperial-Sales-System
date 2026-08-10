@@ -1,40 +1,42 @@
 /**
- * GUI theming — per-user appearance preferences, stored client-side
- * (localStorage) so they apply instantly and follow the browser. Themes set the
- * same CSS custom properties the whole app is built on, so every view — and
- * every view added later — picks them up for free.
+ * SURFACES — what the ledger is written ON. Stored client-side (localStorage)
+ * so the choice applies instantly and follows the browser rather than the
+ * account.
+ *
+ * THE COLOURS ARE NOT HERE. Each surface's palette and texture live in
+ * `theme.css` under `[data-theme="…"]`, and this module's only job at apply
+ * time is to set that attribute. Two things follow: the surface is painted
+ * before a line of this file runs, so there is no flash of the default page
+ * while the module loads; and a surface listed here but never styled cannot
+ * half-exist, because there is nothing here to half-apply.
+ *
+ * What IS here is the list a person chooses from, and what each one is called.
  */
 const KEY = 'eec.prefs';
 
-// Each theme is a full set of the CSS variables theme.css declares on :root.
 export const THEMES = {
-  parchment: {
-    label: 'Parchment (light)',
-    vars: {
-      '--paper': '#f5e6c8', '--paper-raised': '#fffaf0', '--header-bg': '#3d2f23',
-      '--header-text': '#f5e6c8', '--accent': '#7a4a1f', '--ink': '#2b2118',
-      '--note': '#7a6a4f', '--good': '#2f5c3a', '--warn': '#a05c1f', '--bad': '#8c2f2f',
-    },
-  },
-  midnight: {
-    label: 'Midnight (dark)',
-    vars: {
-      '--paper': '#17130d', '--paper-raised': '#221c14', '--header-bg': '#0e0b07',
-      '--header-text': '#f5e6c8', '--accent': '#c1873f', '--ink': '#eadcc2',
-      '--note': '#c0b295', '--good': '#6cc08a', '--warn': '#d69a5a', '--bad': '#e58484',
-    },
-  },
-  slate: {
-    label: 'Slate (cool dark)',
-    vars: {
-      '--paper': '#12161b', '--paper-raised': '#1b212a', '--header-bg': '#0c0f13',
-      '--header-text': '#e7eef7', '--accent': '#5b8fb0', '--ink': '#dbe3ec',
-      '--note': '#a9b6c6', '--good': '#5bbf8a', '--warn': '#cf9a54', '--bad': '#e07b7b',
-    },
-  },
+  ledger: { label: 'Ledger book', hint: 'Ruled cream leaves, red margin' },
+  scroll: { label: 'Scroll', hint: 'Unruled vellum, darker at the edges' },
+  tome: { label: 'Midnight tome', hint: 'Dark binding, read by candlelight' },
 };
 
-const DEFAULT_PREFS = { theme: 'parchment' };
+const DEFAULT_THEME = 'ledger';
+const DEFAULT_PREFS = { theme: DEFAULT_THEME };
+
+/**
+ * Surfaces that have been renamed, mapped to what replaced them.
+ *
+ * A stored choice must not silently reset because the option it names was
+ * rebuilt: someone who picked the dark theme wants the dark one, and `slate`
+ * was the cool-toned dark the tome now covers.
+ */
+const RENAMED = { parchment: 'ledger', midnight: 'tome', slate: 'tome' };
+
+/** The surface a stored preference means, after renames and fallbacks. */
+export function resolveTheme(name) {
+  const key = RENAMED[name] || name;
+  return THEMES[key] ? key : DEFAULT_THEME;
+}
 
 export function loadPrefs() {
   try {
@@ -51,11 +53,8 @@ export function savePrefs(prefs) {
   return merged;
 }
 
-/** Applies a prefs object to the document root by setting CSS variables. */
+/** Applies a prefs object by naming the surface on <html>; CSS does the rest. */
 export function applyPrefs(prefs) {
   const p = prefs || loadPrefs();
-  const theme = THEMES[p.theme] || THEMES.parchment;
-  const root = document.documentElement;
-  Object.keys(theme.vars).forEach((k) => root.style.setProperty(k, theme.vars[k]));
-  root.setAttribute('data-theme', p.theme);
+  document.documentElement.setAttribute('data-theme', resolveTheme(p.theme));
 }

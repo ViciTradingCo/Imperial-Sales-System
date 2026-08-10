@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.1', date: '2026-08-09', notes: [
+    'The Ledger looks like a ledger. Every page is now a ruled leaf of an account book with a red margin, entries written by hand, and headings set in a printer\'s type.',
+    'Anything you TYPE INTO — every field, every table, every sum — stays in a plain upright face with figures that line up in a column. Handwriting is for reading; numbers are for working with, and a quantity is no place for calligraphy.',
+    'Three surfaces to choose from under Profile → Appearance: Ledger book, Scroll (unruled vellum, no margin), and Midnight tome for reading in the dark. If you had already picked a theme, yours has been carried over to whichever of the three it became.',
+  ] },
   { version: '3.0', date: '2026-08-09', notes: [
     'The register has four sides: Selling, Buying, Harvest and Craft. Everything that changes your stock is now in one place, on its own page, instead of two of them being buttons on the Inventory list.',
     'Harvest and Craft are pages rather than pop-up windows, and both stay open after you use them — bring in a second crop or make a second batch without reopening anything. Craft re-reads your stock after each one, so what you just made is available to use straight away.',

@@ -1,12 +1,56 @@
 /*
- * The Vici parchment theme — carried over from the Apps Script sidebars so the
- * web app reads as the same product. These are STATIC defaults; once the Core
- * palette (_config / Master Settings) is wired in (later phase) the live colors
- * will be injected as CSS custom properties by palette.js.
+ * The Vici Ledger — a fantasy account book you can type into.
+ *
+ * THE CONCEIT. Every page is a leaf of a ledger: a ruled cream page, a red
+ * margin rule down the left, entries written in a hand and headings set in the
+ * printer's type of the period. It is not decoration for its own sake — the
+ * app IS a ledger, and a shopkeeper reading their own accounts should feel
+ * like they are reading their own accounts.
+ *
+ * TWO HANDS AND A CLERK'S PRINT. Prose, labels and buttons are WRITTEN
+ * (--font-hand). Headings are PRINTED in a 17th-century face (--font-book).
+ * And anything that is DATA — every input, every table, every sum — is set in
+ * the reader's own system face with tabular figures (--font-data), because a
+ * quantity you are about to type is not a place for calligraphy, and columns
+ * of money have to line up. The three are a deliberate contrast: if it is
+ * handwritten you are reading it, if it is upright you are working with it.
+ *
+ * SURFACES. `data-theme` on <html> selects one — ledger (the default), scroll,
+ * tome — and each is a palette and a page texture, BOTH DEFINED HERE. Textures
+ * are CSS GRADIENTS, never images: they cost nothing to download, they tint
+ * with the palette instead of fighting it, and they stay sharp at any zoom.
+ *
+ * Adding a surface means a `[data-theme="…"]` palette block, a body texture to
+ * match, and its name and label in `src/lib/theme.js` — which sets the
+ * attribute and nothing else. Anything that reads a variable, which is
+ * everything, picks it up for free.
  */
+
+/* ---- the bundled faces (see fonts/README.md for why they are bundled) ---- */
+@font-face {
+  font-family: 'Caveat';
+  /* Caveat is VARIABLE: one file covers the whole range. Declaring the range
+     rather than a single weight is what stops the browser synthesising a fake
+     bold out of a weight it already has. */
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/caveat-var.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IM Fell English';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/imfell-400.woff2') format('woff2');
+}
+
 :root {
-  --paper: #f5e6c8;
-  --paper-raised: #fffaf0;
+  /* Palette — the LEDGER surface, which is both the default and the base every
+     other surface overrides a few values of. A surface that omits a value gets
+     this one, so a new surface only has to declare what it actually changes. */
+  --paper: #e8d8b0;
+  --paper-raised: #fbf3df;
   --header-bg: #3d2f23;
   --header-text: #f5e6c8;
   --accent: #7a4a1f;
@@ -16,6 +60,34 @@
   --warn: #a05c1f;
   --bad: #8c2f2f;
   --radius: 8px;
+
+  /* The ruled line and the margin rule. A COLOUR — it used to be read as one
+     by the item picker while nothing defined it, so that border never drew. */
+  --rule: rgba(70, 105, 140, 0.30);
+  --margin-rule: rgba(164, 52, 44, 0.60);
+  /* The height of one ruled line. Body text in a card is set to exactly this
+     so the writing sits ON the rules instead of drifting across them — which
+     is the whole difference between a ledger and a striped background. */
+  --rule-step: 28px;
+  /* A hairline on a control — a tile's edge, a dropdown's border. NOT --rule:
+     that one is the page's ruled line, and a surface is allowed to have none
+     (the scroll sets it transparent), which would leave those controls with no
+     visible edge at all. */
+  --edge: rgba(122, 74, 31, 0.38);
+  /* Where the ruled lines start under a card's padding, so the first line of
+     text lands on the first rule. */
+  --rule-top: 20px;
+
+  /* Type. The stacks matter: a font that has not arrived yet, or a realm
+     needing glyphs the latin subset lacks, falls through to something with
+     the same feel rather than to whatever the browser picks. */
+  --font-hand: 'Caveat', 'Segoe Script', 'Bradley Hand', 'Snell Roundhand', cursive;
+  --font-book: 'IM Fell English', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --font-data: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Handwriting runs small for its point size; data has to be readable at a
+     glance. One knob each rather than a magic number at every call site. */
+  --hand-size: 18px;
+  --data-size: 14px;
 
   /* Spacing scale — use these instead of ad-hoc pixel values so the vertical
      rhythm stays consistent across cards, modals, and tile grids. */
@@ -38,16 +110,84 @@
   --status-info-soft: #e2ecf2;
 }
 
+/* ---- THE OTHER SURFACES ----
+   Palettes live HERE, not in theme.js, for two reasons: a surface applies
+   before a line of JavaScript runs, so there is no flash of the wrong page
+   while the module loads; and a surface added to the script but not the
+   stylesheet cannot half-exist. theme.js sets `data-theme` and nothing else. */
+[data-theme="scroll"] {
+  --paper: #d9c193;
+  --paper-raised: #f3e3bf;
+  --header-bg: #4a3520;
+  --header-text: #f7ead0;
+  --accent: #8a5320;
+  --ink: #33260f;
+  --note: #7d6a44;
+  --warn: #9c5a1c;
+  /* A scroll is one unruled sheet. Set rather than left undefined, so anything
+     reading them gets a colour instead of an invalid value. */
+  --rule: transparent;
+  --margin-rule: transparent;
+}
+[data-theme="tome"] {
+  --edge: rgba(220, 190, 130, 0.30);
+  --paper: #17130d;
+  --paper-raised: #241d14;
+  --header-bg: #0e0b07;
+  --header-text: #f5e6c8;
+  --accent: #c1873f;
+  --ink: #ecdfc6;
+  --note: #bfae8d;
+  --good: #6cc08a;
+  --warn: #d69a5a;
+  --bad: #e58484;
+  --rule: rgba(220, 190, 130, 0.13);
+  --margin-rule: rgba(200, 90, 70, 0.38);
+  /* The soft status washes are built for a cream page; on a dark one they have
+     to be dark too or a warning pill turns into a white slab. */
+  --status-ok-soft: #1d2f22;
+  --status-warn-soft: #33240f;
+  --status-danger-soft: #331a1a;
+  --status-info-soft: #16242c;
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-hand);
+  font-size: var(--hand-size);
+  line-height: var(--rule-step);
   background: var(--paper);
   color: var(--ink);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* ---- THE PAGE ITSELF ----
+   Each surface paints the desk under the leaves. The ruled lines belong to the
+   CARD rather than the body, because a card is a leaf of the book and its
+   rules have to start where its padding does. */
+[data-theme="ledger"] body,
+:root:not([data-theme]) body {
+  /* A desk of worn board under the pages. */
+  background-image:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 250, 235, 0.35), transparent 70%),
+    repeating-linear-gradient(92deg, rgba(90, 60, 30, 0.035) 0 3px, transparent 3px 9px);
+}
+[data-theme="scroll"] body {
+  /* Aged vellum: a warm middle, darker at the edges where it was rolled. */
+  background-image:
+    radial-gradient(130% 100% at 50% 12%, rgba(255, 248, 226, 0.55), transparent 68%),
+    radial-gradient(100% 60% at 50% 100%, rgba(120, 85, 45, 0.16), transparent 70%),
+    repeating-linear-gradient(88deg, rgba(120, 85, 45, 0.030) 0 2px, transparent 2px 7px);
+}
+[data-theme="tome"] body {
+  /* Candlelight falling on a dark leather binding. */
+  background-image:
+    radial-gradient(105% 70% at 50% -5%, rgba(210, 150, 70, 0.16), transparent 65%),
+    repeating-linear-gradient(94deg, rgba(255, 235, 190, 0.022) 0 3px, transparent 3px 10px);
 }
 
 .topbar {
@@ -62,7 +202,11 @@ body {
   align-items: center;
   gap: 12px;
 }
-.topbar h1 { margin: 0; font-size: 20px; text-align: center; }
+/* The masthead is the name stamped on the cover. */
+.topbar h1 {
+  margin: 0; font-size: 23px; text-align: center;
+  font-family: var(--font-book); font-weight: 400; letter-spacing: 0.02em;
+}
 #navToggle { justify-self: start; }
 #userBadge { justify-self: end; }
 
@@ -186,7 +330,13 @@ body {
 .table-scroll { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .data-table th, .data-table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid rgba(122,74,31,0.2); white-space: nowrap; }
-.data-table th { color: var(--accent); }
+/* Column headers are printed, the figures under them are not handwritten —
+   this is the one place in the app that is pure bookkeeping. */
+.data-table th {
+  color: var(--accent); font-family: var(--font-book); font-weight: 400;
+  font-size: 13px; letter-spacing: 0.03em;
+}
+.data-table td { font-size: var(--data-size); }
 .alert-list { margin: 0; padding-left: 18px; }
 .alert-list li { margin: 4px 0; }
 .alert-list li.bad { color: var(--bad); }
@@ -231,7 +381,12 @@ body {
   background: rgba(122, 74, 31, 0.08); border-radius: var(--radius);
   font-weight: bold; font-size: 17px; color: var(--accent);
 }
-.buy-sub { flex: 0 0 auto; min-width: 70px; text-align: right; color: var(--note); font-size: 13px; }
+.buy-sub {
+  flex: 0 0 auto; min-width: 70px; text-align: right; color: var(--note); font-size: 13px;
+  /* The row aligns to flex-start so the pickers line up; without this the line
+     total floats above the boxes whose total it is. */
+  align-self: center;
+}
 
 /* One item's pricing on the intake form: which line this is, then its two
    questions. Separated so five items read as five blocks, not one long form. */
@@ -447,16 +602,55 @@ body.has-nav .sidenav { display: flex; }
 .feature-list { margin: 0; padding-left: 20px; }
 .feature-list li { margin: 6px 0; }
 
+/* ---- A CARD IS A LEAF OF THE BOOK ----
+   Ruled lines, and a red margin rule down the left with the writing starting
+   clear of it. `background-attachment: local` pins the rules to the CONTENT,
+   so a card that scrolls internally takes its lines with it instead of letting
+   the text slide across a fixed pattern. */
 .card {
-  background: var(--paper-raised);
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--rule-step) - 1px),
+      var(--rule) calc(var(--rule-step) - 1px) var(--rule-step)
+    ),
+    linear-gradient(var(--paper-raised), var(--paper-raised));
+  background-attachment: local;
+  background-position: 0 var(--rule-top);
   border: 1px solid var(--accent);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: var(--rule-top) 20px 20px 34px;
   margin-bottom: 18px;
+  position: relative;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.10), 0 6px 14px rgba(60, 40, 20, 0.10);
 }
+/* The margin rule. A pseudo-element rather than another gradient layer so it
+   sits at a fixed distance from the edge whatever the page scrolls. */
+.card::before {
+  content: '';
+  position: absolute; top: 0; bottom: 0; left: 22px;
+  border-left: 1px solid var(--margin-rule);
+  pointer-events: none;
+}
+/* A scroll has no ruled lines and no margin — it is one continuous sheet. */
+[data-theme="scroll"] .card {
+  background: linear-gradient(var(--paper-raised), var(--paper-raised));
+  padding: 20px;
+  border-radius: 3px 14px 3px 14px;
+}
+[data-theme="scroll"] .card::before { display: none; }
 
+/* Headings are PRINTED, not written: they are the ledger's ruled-in column
+   headers and section titles, and the contrast is what makes the hand below
+   them read as an entry. */
+h1, h2, h3, h4, .card h2, .card h3 {
+  font-family: var(--font-book);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
 .card h2 { margin-top: 0; color: var(--accent); }
 .card h3 { color: var(--accent); }
+.card h4 { color: var(--accent); margin-bottom: var(--sp-1); }
 
 .signin-wrap {
   text-align: center;
@@ -486,33 +680,78 @@ body.has-nav .sidenav { display: flex; }
   border-radius: 20px;
 }
 
+/* Buttons are WRITTEN — they are the shopkeeper's own instruction to the book,
+   not one of its printed headings.
+   
+   The rest of this rule is the DEFAULT for a button nobody gave a class: the
+   drawer toggle, the sign-out chip on the signed-out header. Left alone they
+   render as the browser's own grey-white box, which on the ledger is merely
+   out of place and on the midnight tome is a hole burnt in the page. Every
+   styled button class sets its own background, so none of them lose theirs. */
+button {
+  font-family: var(--font-hand);
+  font-size: calc(var(--hand-size) - 1px);
+  background: var(--paper-raised);
+  color: var(--ink);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  cursor: pointer;
+}
 button.primary {
-  font: inherit;
   background: var(--accent);
   color: var(--header-text);
   border: none;
   border-radius: var(--radius);
-  padding: 10px 16px;
+  padding: 9px 18px;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
 }
+button.primary:hover:not(:disabled) { filter: brightness(1.06); }
 button.primary:disabled { opacity: 0.6; cursor: default; }
 
-label { display: block; font-weight: bold; margin: 12px 0 4px; }
+label { display: block; font-weight: 700; margin: 12px 0 4px; }
+
+/* ---- ANYTHING THAT IS DATA ----
+   Every field, every table, every figure. Set in the reader's own system face
+   with TABULAR FIGURES, because a column of money that does not line up is a
+   column you cannot read down, and a quantity you are about to type is not a
+   place for calligraphy. The switch from the hand is the signal: upright means
+   you are working with it, written means you are reading it. */
+input, select, textarea,
+.data-table, .step-review-row b, .buy-sub, .buy-total,
+.coffer-balance, .stat-value, code, .role-pill, .pill {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
 input, select, textarea {
   width: 100%;
-  padding: 8px;
+  padding: 9px 10px;
   border: 1px solid var(--accent);
   border-radius: 6px;
-  background: var(--paper-raised);
+  /* Faintly inset, like something written into a ruled box on the page. */
+  background: color-mix(in srgb, var(--paper-raised) 88%, var(--paper));
+  box-shadow: inset 0 1px 2px rgba(60, 40, 20, 0.10);
   color: var(--ink);
-  font: inherit;
+  font-size: var(--data-size);
+  line-height: 1.4;
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  background: var(--paper-raised);
 }
 /* The dropdown list is OS-rendered; set colors so it's readable on dark themes. */
 select option { background: var(--paper-raised); color: var(--ink); }
 
+/* A note is an annotation in the margin of the entry it belongs to — smaller
+   and lighter than the writing, but still written. */
+.note { font-size: calc(var(--hand-size) - 2px); color: var(--note); }
+
 .warn { color: var(--warn); font-weight: bold; }
-code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9em; }
+code { font-size: 0.85em; }
 
 /* Registration role choice */
 .choice { margin: 4px 0; }
@@ -533,7 +772,7 @@ label.inline input { width: auto; }
 .item-picker-input { width: 100%; }
 .item-picker-list {
   position: absolute; z-index: 40; left: 0; right: 0; top: 100%;
-  background: var(--paper-raised); border: 1px solid var(--rule);
+  background: var(--paper-raised); border: 1px solid var(--edge);
   border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,0.25);
   max-height: 260px; overflow-y: auto; padding: 4px;
 }
@@ -703,7 +942,7 @@ img, table { max-width: 100%; }
   align-items: center; justify-content: center; gap: var(--sp-2);
   padding: var(--sp-4);
   background: var(--paper-raised);
-  border: 1px solid var(--rule, rgba(0,0,0,0.12));
+  border: 1px solid var(--edge);
   border-radius: 14px;
   cursor: pointer;
   font: inherit; color: inherit; text-align: center;

@@ -12,7 +12,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
-import { THEMES, loadPrefs, savePrefs } from '../lib/theme.js';
+import { THEMES, loadPrefs, savePrefs, resolveTheme } from '../lib/theme.js';
 import { LANGS, getLang, setLang } from '../lib/i18n.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 
@@ -89,10 +89,14 @@ function factRow(label, value) {
 function appearanceCard() {
   const prefs = loadPrefs();
 
+  // Through resolveTheme, so a surface stored under its old name shows the one
+  // it actually became rather than falling back to the first in the list.
+  const current = resolveTheme(prefs.theme);
   const themeSel = el('select', {});
   Object.keys(THEMES).forEach((key) => {
-    const opt = el('option', { value: key }, THEMES[key].label);
-    if (key === prefs.theme) opt.selected = true;
+    const t = THEMES[key];
+    const opt = el('option', { value: key }, t.label + (t.hint ? ' — ' + t.hint : ''));
+    if (key === current) opt.selected = true;
     themeSel.appendChild(opt);
   });
   themeSel.addEventListener('change', () => savePrefs({ theme: themeSel.value }));
@@ -109,9 +113,11 @@ function appearanceCard() {
 
   return el('div.card', {}, [
     el('h2', {}, 'Appearance'),
-    el('p', { class: 'note' }, 'Choose a theme and language for this device.'),
-    el('label', {}, 'Theme'),
+    el('p', { class: 'note' }, 'What the ledger is written on, and the language it is written in. ' +
+      'Both are for this device only.'),
+    el('label', {}, 'Surface'),
     themeSel,
+    el('p', { class: 'note' }, 'The writing stays the same; the page under it changes.'),
     el('label', {}, 'Language'),
     langSel,
     el('p', { class: 'note' }, 'Translations cover the interface; names and some ' +
