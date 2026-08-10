@@ -11,6 +11,8 @@
  * half-exist, because there is nothing here to half-apply.
  *
  * What IS here is the list a person chooses from, and what each one is called.
+ * TEXT SIZE works the same way: `--type-scale` and its steps are in the
+ * stylesheet, and this only names one.
  */
 const KEY = 'eec.prefs';
 
@@ -20,8 +22,25 @@ export const THEMES = {
   tome: { label: 'Midnight tome', hint: 'Dark binding, read by candlelight' },
 };
 
+/**
+ * How big the writing is. One scale drives the hand, the data face AND the
+ * ruled line, so a larger size still sits on the rules.
+ *
+ * A handwritten face is harder to read small than an upright one, so this is
+ * worth having however good anyone's eyes are — and it is per device, because
+ * the phone in someone's hand and the monitor on their desk are not the same
+ * reading distance.
+ */
+export const TEXT_SIZES = {
+  small: { label: 'Small' },
+  normal: { label: 'Normal' },
+  large: { label: 'Large' },
+  larger: { label: 'Largest' },
+};
+
 const DEFAULT_THEME = 'ledger';
-const DEFAULT_PREFS = { theme: DEFAULT_THEME };
+const DEFAULT_TEXT = 'normal';
+const DEFAULT_PREFS = { theme: DEFAULT_THEME, text: DEFAULT_TEXT };
 
 /**
  * Surfaces that have been renamed, mapped to what replaced them.
@@ -36,6 +55,11 @@ const RENAMED = { parchment: 'ledger', midnight: 'tome', slate: 'tome' };
 export function resolveTheme(name) {
   const key = RENAMED[name] || name;
   return THEMES[key] ? key : DEFAULT_THEME;
+}
+
+/** The text size a stored preference means. */
+export function resolveText(name) {
+  return TEXT_SIZES[name] ? name : DEFAULT_TEXT;
 }
 
 export function loadPrefs() {
@@ -53,8 +77,10 @@ export function savePrefs(prefs) {
   return merged;
 }
 
-/** Applies a prefs object by naming the surface on <html>; CSS does the rest. */
+/** Applies a prefs object by naming both choices on <html>; CSS does the rest. */
 export function applyPrefs(prefs) {
   const p = prefs || loadPrefs();
-  document.documentElement.setAttribute('data-theme', resolveTheme(p.theme));
+  const root = document.documentElement;
+  root.setAttribute('data-theme', resolveTheme(p.theme));
+  root.setAttribute('data-text', resolveText(p.text));
 }

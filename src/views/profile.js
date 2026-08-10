@@ -12,7 +12,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
-import { THEMES, loadPrefs, savePrefs, resolveTheme } from '../lib/theme.js';
+import { THEMES, TEXT_SIZES, loadPrefs, savePrefs, resolveTheme, resolveText } from '../lib/theme.js';
 import { LANGS, getLang, setLang } from '../lib/i18n.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 
@@ -101,6 +101,17 @@ function appearanceCard() {
   });
   themeSel.addEventListener('change', () => savePrefs({ theme: themeSel.value }));
 
+  // Text size. Applies live rather than on a save button — the thing you are
+  // judging is the size of the words in front of you, so you have to see it.
+  const currentText = resolveText(prefs.text);
+  const textSel = el('select', {});
+  Object.keys(TEXT_SIZES).forEach((key) => {
+    const opt = el('option', { value: key }, TEXT_SIZES[key].label);
+    if (key === currentText) opt.selected = true;
+    textSel.appendChild(opt);
+  });
+  textSel.addEventListener('change', () => savePrefs({ text: textSel.value }));
+
   // Language — swaps the interface language for this device. Reloads so every
   // surface re-renders cleanly in the new language.
   const langSel = el('select', {});
@@ -118,6 +129,10 @@ function appearanceCard() {
     el('label', {}, 'Surface'),
     themeSel,
     el('p', { class: 'note' }, 'The writing stays the same; the page under it changes.'),
+    el('label', {}, 'Text size'),
+    textSel,
+    el('p', { class: 'note' }, 'Sets the writing, the figures and the ruled lines together, so the ' +
+      'entries still sit on the lines.'),
     el('label', {}, 'Language'),
     langSel,
     el('p', { class: 'note' }, 'Translations cover the interface; names and some ' +

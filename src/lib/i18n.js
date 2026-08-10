@@ -86,6 +86,13 @@ const T = {
   'Selling': { es: 'Vendiendo', fr: 'Vente', de: 'Verkauf', it: 'Vendita' },
   'Buying': { es: 'Comprando', fr: 'Achat', de: 'Einkauf', it: 'Acquisto' },
   'Harvest': { es: 'Cosecha', fr: 'Récolte', de: 'Ernte', it: 'Raccolto' },
+  // Appearance: the text-size steps.
+  'Text size': { es: 'Tamaño del texto', fr: 'Taille du texte', de: 'Schriftgröße', it: 'Dimensione del testo' },
+  'Small': { es: 'Pequeño', fr: 'Petit', de: 'Klein', it: 'Piccolo' },
+  'Normal': { es: 'Normal', fr: 'Normal', de: 'Normal', it: 'Normale' },
+  'Large': { es: 'Grande', fr: 'Grand', de: 'Groß', it: 'Grande' },
+  'Largest': { es: 'El más grande', fr: 'Très grand', de: 'Am größten', it: 'Massimo' },
+  'Surface': { es: 'Superficie', fr: 'Support', de: 'Untergrund', it: 'Superficie' },
   'Craft': { es: 'Fabricar', fr: 'Fabriquer', de: 'Herstellen', it: 'Fabbrica' },
   'Farm / Harvest': { es: 'Cultivo / cosecha', fr: 'Culture / récolte', de: 'Anbau / Ernte', it: 'Coltivazione / raccolto' },
   'Add to stock': { es: 'Añadir al stock', fr: 'Ajouter au stock', de: 'Zum Bestand', it: 'Aggiungi alle scorte' },

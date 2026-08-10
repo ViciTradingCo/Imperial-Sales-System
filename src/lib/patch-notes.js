@@ -10,6 +10,10 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.3', date: '2026-08-09', notes: [
+    'Text size, under Profile → Appearance: Small, Normal, Large or Largest. It sets the writing, the figures, the menu and the ruled lines together, so the entries still sit on the lines at every size. Per device, since a phone in your hand and a monitor on your desk are not the same reading distance.',
+    'Fixed: the side menu had no page under it. That was invisible while everything was cream, and became dark ink on dark wood the moment the desk arrived behind it. It is a leaf of the book now, like the pages beside it.',
+  ] },
   { version: '3.2', date: '2026-08-09', notes: [
     'On a computer, the pages now lie on a wooden desk — planks, grain and a lamp above them, with each leaf casting a shadow onto the bench. Each surface gets its own timber: worn oak for the ledger, an older redder bench for the scroll, dark wood at the edge of the candlelight for the tome.',
     'Not on a phone, where the page fills the screen edge to edge and there is no desk to see around it.',

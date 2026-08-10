@@ -68,7 +68,7 @@
   /* The height of one ruled line. Body text in a card is set to exactly this
      so the writing sits ON the rules instead of drifting across them — which
      is the whole difference between a ledger and a striped background. */
-  --rule-step: 28px;
+  --rule-step: calc(28px * var(--type-scale));
   /* A hairline on a control — a tile's edge, a dropdown's border. NOT --rule:
      that one is the page's ruled line, and a surface is allowed to have none
      (the scroll sets it transparent), which would leave those controls with no
@@ -92,9 +92,14 @@
   --font-book: 'IM Fell English', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
   --font-data: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   /* Handwriting runs small for its point size; data has to be readable at a
-     glance. One knob each rather than a magic number at every call site. */
-  --hand-size: 18px;
-  --data-size: 14px;
+     glance. One knob each rather than a magic number at every call site.
+     
+     Both are multiplied by --type-scale, which a reader sets in Appearance —
+     so text size is ONE number rather than a second set of sizes to keep in
+     step, and the ruled lines scale with the writing that sits on them. */
+  --type-scale: 1;
+  --hand-size: calc(18px * var(--type-scale));
+  --data-size: calc(14px * var(--type-scale));
 
   /* Spacing scale — use these instead of ad-hoc pixel values so the vertical
      rhythm stays consistent across cards, modals, and tile grids. */
@@ -116,6 +121,15 @@
   --status-danger-soft: #f6e3e3;
   --status-info-soft: #e2ecf2;
 }
+
+/* ---- TEXT SIZE ----
+   Set by the reader in Appearance. Scales the writing, the data and the ruled
+   line together, so bigger text still lands on the rules instead of drifting
+   across them. Same arrangement as the surfaces: the values live here and
+   theme.js only names one on <html>. */
+[data-text="small"] { --type-scale: 0.9; }
+[data-text="large"] { --type-scale: 1.15; }
+[data-text="larger"] { --type-scale: 1.32; }
 
 /* ---- THE OTHER SURFACES ----
    Palettes live HERE, not in theme.js, for two reasons: a surface applies
@@ -234,7 +248,7 @@ body {
 }
 /* The masthead is the name stamped on the cover. */
 .topbar h1 {
-  margin: 0; font-size: 23px; text-align: center;
+  margin: 0; font-size: calc(23px * var(--type-scale)); text-align: center;
   font-family: var(--font-book); font-weight: 400; letter-spacing: 0.02em;
 }
 #navToggle { justify-self: start; }
@@ -257,7 +271,7 @@ body {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 .action-btn {
-  font: inherit; font-size: 13px; cursor: pointer;
+  font: inherit; font-size: calc(13px * var(--type-scale)); cursor: pointer;
   background: var(--accent); color: var(--header-text);
   border: none; border-radius: var(--radius); padding: 8px 14px;
 }
@@ -285,7 +299,7 @@ body {
 @media (max-width: 600px) { #globalBanner { padding: 0 14px; } }
 
 /* ---- Shop Ledger ---- */
-.coffer-balance { font-size: 20px; font-weight: bold; color: var(--accent); margin: 4px 0; }
+.coffer-balance { font-size: calc(20px * var(--type-scale)); font-weight: bold; color: var(--accent); margin: 4px 0; }
 .shop-tagline {
   font-style: italic; font-weight: bold; margin: 6px 0 0;
   border-left: 3px solid var(--accent); padding-left: 10px;
@@ -302,7 +316,7 @@ body {
 .mode-btn {
   margin: 0; border: none; border-radius: 0;
   background: transparent; color: var(--accent);
-  padding: 8px 22px; font-weight: bold; font-size: 15px; cursor: pointer;
+  padding: 8px 22px; font-weight: bold; font-size: calc(15px * var(--type-scale)); cursor: pointer;
 }
 .mode-btn + .mode-btn { border-left: 1px solid var(--accent); }
 .mode-btn:hover:not(.active) { background: rgba(122, 74, 31, 0.08); }
@@ -355,7 +369,7 @@ body {
   flex: 1 1 140px; background: var(--paper-raised);
   border: 1px solid var(--accent); border-radius: var(--radius); padding: 14px 16px;
 }
-.stat-value { font-size: 22px; font-weight: bold; color: var(--accent); }
+.stat-value { font-size: calc(22px * var(--type-scale)); font-weight: bold; color: var(--accent); }
 .stat-label { font-size: 12px; color: var(--note); text-transform: uppercase; letter-spacing: 0.04em; }
 .table-scroll { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -364,7 +378,7 @@ body {
    this is the one place in the app that is pure bookkeeping. */
 .data-table th {
   color: var(--accent); font-family: var(--font-book); font-weight: 400;
-  font-size: 13px; letter-spacing: 0.03em;
+  font-size: calc(13px * var(--type-scale)); letter-spacing: 0.03em;
 }
 .data-table td { font-size: var(--data-size); }
 .alert-list { margin: 0; padding-left: 18px; }
@@ -392,7 +406,7 @@ body {
    something is typed over it, so the heading is what still says which box is
    which on the tenth line of a delivery. The widths mirror .craft-row's. */
 .line-head {
-  font-size: 12px; color: var(--note); text-transform: uppercase;
+  font-size: calc(12px * var(--type-scale)); color: var(--note); text-transform: uppercase;
   letter-spacing: 0.04em; margin-bottom: var(--sp-1);
 }
 .line-head span:nth-child(1) { flex: 1 1 auto; min-width: 0; }
@@ -409,10 +423,10 @@ body {
 .buy-total {
   margin: var(--sp-3) 0; padding: var(--sp-2) var(--sp-3);
   background: rgba(122, 74, 31, 0.08); border-radius: var(--radius);
-  font-weight: bold; font-size: 17px; color: var(--accent);
+  font-weight: bold; font-size: calc(17px * var(--type-scale)); color: var(--accent);
 }
 .buy-sub {
-  flex: 0 0 auto; min-width: 70px; text-align: right; color: var(--note); font-size: 13px;
+  flex: 0 0 auto; min-width: 70px; text-align: right; color: var(--note); font-size: var(--data-size);
   /* The row aligns to flex-start so the pickers line up; without this the line
      total floats above the boxes whose total it is. */
   align-self: center;
@@ -425,7 +439,7 @@ body {
   border-top: 1px solid rgba(122, 74, 31, 0.18);
 }
 .price-block:first-child { border-top: none; padding-top: 0; }
-.price-head { margin: 0; font-weight: bold; color: var(--accent); font-size: 15px; }
+.price-head { margin: 0; font-weight: bold; color: var(--accent); font-size: calc(15px * var(--type-scale)); }
 
 /* A checkbox and its label on one line, rather than the label stacked above
    the control the way the text fields are. */
@@ -440,7 +454,7 @@ body {
    you are supposed to be reading. Closed it is a single line of text. */
 .guide { margin: 0 0 var(--sp-3); }
 .guide-toggle {
-  font: inherit; font-size: 13px; cursor: pointer;
+  font: inherit; font-size: calc(13px * var(--type-scale)); cursor: pointer;
   margin: 0; padding: 0; border: none; background: none;
   color: var(--accent); text-decoration: underline; text-underline-offset: 3px;
 }
@@ -451,7 +465,7 @@ body {
   background: rgba(122, 74, 31, 0.06);
   border-left: 3px solid rgba(122, 74, 31, 0.35); border-radius: 0 var(--radius) var(--radius) 0;
 }
-.guide-body p { margin: 0 0 var(--sp-2); font-size: 14px; line-height: 1.5; color: var(--ink); }
+.guide-body p { margin: 0 0 var(--sp-2); font-size: calc(var(--hand-size) - 3px); line-height: 1.5; color: var(--ink); }
 .guide-body p:last-child { margin-bottom: 0; }
 
 /* The read-back above the Record button: what is about to be written. */
@@ -559,32 +573,45 @@ body {
   background: none; border: none; color: var(--header-text);
   font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px;
 }
+/* ---- the side nav is a leaf too ----
+   It carried NO background of its own, which was invisible while the body was
+   the same cream as everything else — and became dark ink on dark wood the
+   moment there was a desk under it. It lies on that desk like the pages do, so
+   it gets the same paper, edge and shadow: the contents page of the book. */
 .sidenav {
   display: none;
   flex: none;
   width: 210px;
   flex-direction: column;
   gap: 4px;
-  padding: 20px 12px;
+  padding: var(--sp-3);
+  margin: var(--sp-5) 0 var(--sp-5) var(--sp-4);
+  background: var(--paper-raised);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.10), 0 6px 14px rgba(60, 40, 20, 0.10);
 }
 body.has-nav .sidenav { display: flex; }
 .sidenav button {
   display: block; width: 100%; text-align: left;
-  font: inherit; font-size: 15px;
+  font: inherit; font-size: calc(15px * var(--type-scale));
   background: none; border: none; color: var(--ink); cursor: pointer;
   padding: 10px 12px; border-radius: var(--radius);
 }
-.sidenav button:hover { background: var(--paper-raised); }
+/* A wash of the accent, NOT --paper-raised: that is the panel's own colour
+   now, so hovering used to paint a button the exact shade it already sat on. */
+.sidenav button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .sidenav button.active { background: var(--accent); color: var(--header-text); font-weight: bold; }
 
 /* Sign Out lives in the nav menu on both desktop and mobile. */
 .nav-signout {
   display: block; width: 100%; text-align: left;
-  font: inherit; font-size: 15px; background: none; border: none;
+  font: inherit; font-size: calc(15px * var(--type-scale)); background: none; border: none;
   color: var(--bad); cursor: pointer; padding: 10px 12px;
   border-radius: var(--radius); margin-top: 8px;
-  border-top: 1px solid rgba(122, 74, 31, 0.2);
+  border-top: 1px solid var(--edge);
 }
+.nav-signout:hover { background: color-mix(in srgb, var(--bad) 12%, transparent); }
 
 .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 45; }
 
@@ -909,7 +936,11 @@ img, table { max-width: 100%; }
     display: flex;
     position: fixed; top: 0; left: 0; bottom: 0; width: 250px; z-index: 50;
     background: var(--paper-raised);
-    border-right: 1px solid rgba(122, 74, 31, 0.3);
+    border-right: 1px solid var(--edge);
+    /* The drawer is its own sheet lifted over the page, not a panel resting on
+       the desk, so it drops the resting-leaf margin and shadow. */
+    margin: 0;
+    border-radius: 0;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     padding-top: 16px;

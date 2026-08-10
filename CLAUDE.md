@@ -89,6 +89,12 @@ Textures are CSS gradients, never images.
 `--rule` is the page's ruled line and a surface may set it `transparent` (the
 scroll does). A control that needs a visible hairline uses `--edge`.
 
+TEXT SIZE is one number, `--type-scale`, set from Appearance the same way a
+surface is (`data-text` on `<html>`, steps in the stylesheet). `--hand-size`,
+`--data-size` and `--rule-step` are all multiplied by it, so bigger writing
+still lands on the rules. A new fixed `font-size` in px should be
+`calc(Npx * var(--type-scale))` unless it is genuinely decorative.
+
 ## UI convention: buttons and focal menus
 
 Any page with more than one distinct section renders those sections as a grid of
