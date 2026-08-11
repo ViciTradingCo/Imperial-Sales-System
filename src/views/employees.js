@@ -68,11 +68,15 @@ export function renderEmployees(container, { me }) {
         return;
       }
       // Bulk activation — onboarding a group one row at a time is tedious.
+      // It only EXISTS above one pending account, though: with a single one to
+      // approve there is nothing to bulk, and the tick box that came with it
+      // was a control with no button behind it and no way to guess that.
       const pending = rows.filter((u) => u.status === 'pending');
+      const bulk = pending.length > 1;
       const checks = new Map();
       const items = rows.map((u) => {
         const who = u.character || u.email; // character name is the display identity
-        const label = el('span', { html:
+        const label = el('span', { class: 'emp-who', html:
           '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(u.role) + '</span> · ' + statusBadge(u.status) +
           // The hourly rate their shifts are valued at. Said plainly when unset,
           // because 0 and "nobody has decided yet" look identical on a wage line.
@@ -81,7 +85,7 @@ export function renderEmployees(container, { me }) {
             : 'No pay rate set') + '</span>' +
           (u.notes ? '<br><span class="note">📝 ' + esc(u.notes) + '</span>' : '') });
         const row = el('div.emp-row', {}, []);
-        if (u.status === 'pending') {
+        if (u.status === 'pending' && bulk) {
           const cb = el('input', { type: 'checkbox', class: 'bulk-check', title: 'Select for bulk activation' });
           checks.set(u.uid, cb);
           row.appendChild(cb);
@@ -106,14 +110,17 @@ export function renderEmployees(container, { me }) {
       });
 
       const nodes = [];
-      if (pending.length > 1) {
-        const selectAll = el('input', { type: 'checkbox', title: 'Select all pending' });
+      if (bulk) {
+        const selectAll = el('input', { type: 'checkbox' });
         selectAll.addEventListener('change', () => {
           checks.forEach((cb) => { cb.checked = selectAll.checked; });
         });
         const bulkBtn = el('button.primary.small', { onclick: doBulk }, 'Activate selected');
         nodes.push(el('div', { class: 'bulk-bar' }, [
-          selectAll,
+          // Labelled, like the item index's. A bare tick box at the head of a
+          // list does not say what it would select, and a `title` only tells
+          // someone who already thought to hover it.
+          el('label', { class: 'bulk-all' }, [selectAll, el('span', {}, 'Select all pending')]),
           el('span', { class: 'note' }, pending.length + ' pending'),
           bulkBtn,
         ]));

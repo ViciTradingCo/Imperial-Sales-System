@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.5', date: '2026-08-11', notes: [
+    'Fixed: you could not approve a new employee. Anyone waiting to be activated showed up on the Roster as a blank line with a stray tick box on it — their name, their pending badge and the Activate button beside it were all there, squeezed to nothing by a tick box that had stretched itself across the whole row. Every roster row now reads properly and Activate is where it should be.',
+    'The same stretched tick box could have turned up anywhere a new one was added. It is fixed once, for all of them, rather than on the Roster alone.',
+    'The tick box for activating several people at once now only appears when there are several people to activate, and it says "Select all pending" instead of sitting there unlabelled. With one person waiting there is just their Activate button, which was always the only thing that could have worked.',
+  ] },
   { version: '3.4', date: '2026-08-11', notes: [
     'Shops can pay their own people for what they bring in. Owners set an Employee harvest value on any item in Inventory — what one of your staff earns for each one — and the item then says so wherever it is picked.',
     'On the register\'s Harvest side, the search marks the items your shop pays for, and the total tells you what you are owed before you record anything. Bring in twenty of something at 5 a piece and it says so.',

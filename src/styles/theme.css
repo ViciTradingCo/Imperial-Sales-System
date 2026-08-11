@@ -356,7 +356,6 @@ body {
 .index-filters select { flex: 1 1 160px; margin: 0; }
 /* A tick box in a table cell must not stretch to the input width every other
    field on the page uses. */
-.data-table td input[type="checkbox"] { width: auto; margin: 0; }
 .data-table td .row-actions { display: flex; gap: 6px; margin: 0; }
 .data-table td .row-actions button { margin: 0; }
 /* A cell that holds a list rather than a value — let it wrap instead of
@@ -447,7 +446,6 @@ body {
   display: flex; align-items: center; gap: 8px;
   margin: var(--sp-3) 0 var(--sp-2); font-weight: bold; cursor: pointer;
 }
-.check-row input { width: auto; margin: 0; }
 
 /* The walk-through panel. Deliberately quiet — it is help, sitting between a
    card's one-line hint and its fields, and it must never look like the thing
@@ -795,6 +793,27 @@ input, select, textarea {
   font-size: var(--data-size);
   line-height: 1.4;
 }
+/* A TICK BOX IS NOT A FIELD. The rule above sets `width: 100%` because almost
+   every control on the page is something you write into and those should fill
+   their line — but a checkbox has its own size, and stretching one turns it
+   into a rule across the row.
+
+   This has to be said ONCE, here, rather than undone where each checkbox
+   happens to live. Four separate rules had grown up doing exactly that, one
+   screen at a time, and the roster's checkbox — which nobody had thought to
+   write a fifth for — stretched across the whole row and squeezed the
+   employee's name and their Activate button to nothing, so a pending employee
+   could not be approved at all. A checkbox has to be right BY DEFAULT wherever
+   it is put, or the next one is the same bug again. */
+input[type="checkbox"], input[type="radio"] {
+  width: auto;
+  /* The UA's own margin; spacing between a box and its label is the parent's
+     `gap`, so that the two cannot disagree. */
+  margin: 0;
+  padding: 0;
+  flex: none;
+  box-shadow: none;
+}
 input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
@@ -816,7 +835,6 @@ label.inline {
   display: flex; align-items: center; gap: 8px;
   font-weight: normal; margin: 6px 0;
 }
-label.inline input { width: auto; }
 
 .pill {
   display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase;
@@ -849,6 +867,10 @@ label.inline input { width: auto; }
   gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(122,74,31,0.2);
 }
 .emp-row:last-child { border-bottom: none; }
+/* Takes the slack, so a row with a tick box in front of it starts its name in
+   the same column as one without — the row is `space-between`, and without
+   this the name drifts to the middle of whatever is left over. */
+.emp-who { flex: 1 1 auto; min-width: 0; }
 button.primary.small { padding: 5px 10px; font-size: 12px; margin: 0; width: auto; }
 button.secondary-btn.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto; }
 button.danger {
@@ -893,7 +915,6 @@ button.danger.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto;
   padding: 8px 0; border-bottom: 1px solid rgba(122, 74, 31, 0.2);
 }
 .bulk-bar .bulk-all { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 600; }
-.bulk-bar .bulk-all input { width: auto; margin: 0; }
 /* The move target sits inline with its label and button rather than filling the row. */
 .bulk-bar select { width: auto; margin: 0; }
 
