@@ -16,11 +16,25 @@
  *                   losing anomaly worth flagging).
  */
 import { getDb } from './db.js';
+import { HARVEST_VENDOR } from './intake.js';
 import { parseSaleItems } from './sales.js';
 import { listItemIndex, matchMasterItem, normalizeItem } from './item-index.js';
 import { readSettings } from './settings.js';
 import { listBusinessCards } from './registry.js';
 import { lastWeekWindow } from './week.js';
+
+/**
+ * Harvests are logged as intake so they show in the delivery history, but they
+ * are NOT a purchase and must never be read as one here.
+ *
+ * They used to be excluded incidentally, by costing 0 — and `bought()` throws
+ * away a zero. Then a harvest gained a rate: what a shop pays its own people
+ * per unit. That is a WAGE, not a market price. It is set below what the goods
+ * fetch, on purpose, because the margin is the shop's; averaging it in would
+ * drag every item a shop farms toward its own labour cost and call that the
+ * item's worth. So the exclusion is now stated rather than assumed.
+ */
+const NOT_HARVEST = ` AND COALESCE(vendor, '') != '${HARVEST_VENDOR}'`;
 
 // Re-exported so callers reading a market report get the week from the same
 // place they get the report. The definition lives in week.js — one week, shared
@@ -354,6 +368,7 @@ export async function marketAnalysis(env, realmId) {
             i.price AS salePrice, AVG(k.price_per) AS avgCost
        FROM inventory i
        JOIN intake k ON k.business = i.business AND k.item = i.item AND k.realm_id = i.realm_id
+                    AND COALESCE(k.vendor, '') != '${HARVEST_VENDOR}'
       WHERE i.realm_id = ?
       GROUP BY i.business, i.item
      HAVING i.price < AVG(k.price_per)
@@ -371,7 +386,7 @@ export async function marketAnalysis(env, realmId) {
     `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
   // Intake is the buy side of the same items — what a shop paid to stock them.
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?` + NOT_HARVEST).bind(realmId).all()).results) || [];
   const transferRows = ((await db.prepare(
     `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
   const ranked = itemStats(saleRows, master, intakeRows, transferRows);
@@ -454,7 +469,7 @@ export async function itemReport(env, name, realmId) {
   const saleRows = ((await db.prepare(
     `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?`).bind(realmId).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?` + NOT_HARVEST).bind(realmId).all()).results) || [];
   const transferRows = ((await db.prepare(
     `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
   const found = itemStats(saleRows, master, intakeRows, transferRows).find((r) => r.item === hit.name);
@@ -495,7 +510,7 @@ export async function businessReport(env, business, realmId) {
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?`).bind(realmId, b).all()).results) || [];
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND business = ?`).bind(realmId, b).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND business = ?` + NOT_HARVEST).bind(realmId, b).all()).results) || [];
   // What this shop took IN from other companies counts as its buying too.
   const transferRows = ((await db.prepare(
     `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted' AND to_business = ?`)
@@ -596,7 +611,7 @@ export async function holdReport(env, hold, realmId, window) {
   const saleRows = ((await db.prepare(
     `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?` + w('ts')).bind(realmId, h, ...wp).all()).results) || [];
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?` + w('ts'))
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?` + NOT_HARVEST + w('ts'))
     .bind(realmId, h, ...wp).all()).results) || [];
 
   // Only items that actually SOLD here. An item sourced from the region but

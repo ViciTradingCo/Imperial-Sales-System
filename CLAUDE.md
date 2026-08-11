@@ -123,10 +123,20 @@ the shop HOLDS — a list you consult, whose only writes CORRECT it (a miscount,
 price, a listing that should not exist). Anything that adds or removes stock is
 a register side.
 
-What is still true is why Harvest and Craft are not intake: nobody was paid, so
-no vendor, no cost, no coffer entry, and no effect on what items are worth.
-Buying is owner/admin; Harvest and Craft are open to any ACTIVE member, because
-the person at the bench is usually not the owner.
+What is still true is why Harvest and Craft are not intake: nobody was BOUGHT
+FROM, so no vendor, no region, and no effect on what items are worth. Buying is
+owner/admin; Harvest and Craft are open to any ACTIVE member, because the person
+at the bench is usually not the owner.
+
+A harvest MAY cost the shop money. An owner sets `harvest_pay` on an inventory
+row — what the shop pays one of its own people per unit — and an employee
+claiming it gets a `harvest-pay` coffer entry. That is a WAGE, not a purchase:
+the coffer moves, the market figures do not. `market.js` excludes harvest rows
+by VENDOR (`NOT_HARVEST`), not by their price being zero, because the price is
+no longer zero — a rate is set below what the goods fetch on purpose, and
+averaging it in would call a shop's labour cost the item's worth. The Worker
+re-reads the rate from the item on every claim and refuses one on an item with
+no rate, so the client can never name a price.
 
 Buying is ONE door (`Intake Ingredients/Stock`), not one per kind of purchase.
 There were briefly two — a single delivery and an ingredient basket — and

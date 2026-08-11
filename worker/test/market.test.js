@@ -267,6 +267,50 @@ describe('employee purchases', () => {
   });
 });
 
+/**
+ * A harvest is logged as intake so it shows in the delivery history, but it is
+ * the shop producing goods, not buying them. Once an owner sets a harvest rate
+ * the row carries a non-zero price — a WAGE, deliberately under what the goods
+ * fetch — and nothing here may read that as what the item is worth.
+ */
+describe('harvests', () => {
+  const harvest = (qty, per) => env.DB.prepare(
+    `INSERT INTO intake (realm_id, business, ts, item, vendor, source_hold, num_items, price_per)
+     VALUES (?, 'Alpha', '2026-01-01T00:00:00Z', 'Iron Sword', 'Farm/Harvest', '', ?, ?)`)
+    .bind(R, qty, per).run();
+
+  it('do not drag the value down to what the shop pays its own people', async () => {
+    await sale([{ name: 'Iron Sword', qty: 2, price: 40 }]);
+    await harvest(50, 5);
+    const i = await itemRow();
+    expect(i.avgValue).toBe(40);
+    expect(i.boughtQty).toBe(0);
+  });
+
+  it('leave an item out of the market entirely if that is all it ever had', async () => {
+    await harvest(50, 5);
+    expect((await marketAnalysis(env, R)).items).toEqual([]);
+  });
+
+  it('are not a cost the underpriced report may compare a shelf price against', async () => {
+    await env.DB.prepare(
+      `INSERT INTO inventory (realm_id, business, item, price, stock) VALUES (?, 'Alpha', 'Iron Sword', 20, 5)`)
+      .bind(R).run();
+    await harvest(50, 5);
+    // A shelf price of 20 against a 5gp wage is a healthy margin, not a loss.
+    expect((await marketAnalysis(env, R)).underpriced).toEqual([]);
+    // …and a real delivery at 30 still flags it.
+    await intake(10, 30);
+    expect((await marketAnalysis(env, R)).underpriced.map((u) => u.item)).toEqual(['Iron Sword']);
+  });
+
+  it('still count as a purchase when they name a real vendor — the flag is the vendor', async () => {
+    await intake(10, 30);
+    const i = await itemRow();
+    expect(i.boughtQty).toBe(10);
+  });
+});
+
 describe('one item on demand', () => {
   it('returns the same figures as the list, plus the trend', async () => {
     await saleOn('2026-01-01', [{ name: 'Iron Sword', qty: 4, price: 25 }]);

@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { makeD1 } from './d1shim.js';
 import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
 import { recordIntake, recordIntakeLines, recordHarvest, listIntake, deleteIntake, HARVEST_VENDOR } from '../src/intake.js';
-import { listInventory } from '../src/inventory.js';
+import { listInventory, upsertItem } from '../src/inventory.js';
 import { cofferBalance } from '../src/coffers.js';
 
 let env;
@@ -459,5 +459,114 @@ describe('which trip a line arrived on', () => {
     const rows = await listIntake(env, SHOP, R);
     expect(new Set(rows.map((r) => r.delivery)).size).toBe(2);
     expect(rows.every((r) => r.delivery.startsWith('row:'))).toBe(true);
+  });
+});
+
+/**
+ * PAID HARVEST — the shop buying goods off its own people at a rate the owner
+ * set in advance.
+ *
+ * Unlike wages, which this system only ever records as OWED, this settles when
+ * the goods are handed over: it is a purchase, priced beforehand, and the
+ * coffer pays for it the same way it pays any other supplier.
+ */
+describe('a harvest the shop pays for', () => {
+  const setRate = (item, rate) => upsertItem(env, SHOP, { item, price: 10, harvestPay: rate }, R);
+
+  it('pays the rate the OWNER set, not one the request asks for', async () => {
+    await setRate('Nirnroot', 3);
+    // A generous self-assessment, ignored: the rate comes off the item.
+    const res = await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 10, claimPay: true, rate: 999, harvestPay: 999 }, R);
+    expect(res.rate).toBe(3);
+    expect(res.paid).toBe(30);
+    expect(await cofferBalance(env, SHOP, R)).toBe(-30);
+  });
+
+  it('adds the stock as well as paying for it', async () => {
+    await setRate('Nirnroot', 3);
+    await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 10, claimPay: true }, R);
+    expect(await itemRow('Nirnroot')).toMatchObject({ stock: 10 });
+  });
+
+  it('records the expense against the coffer with who and what', async () => {
+    await setRate('Nirnroot', 3);
+    await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 4, claimPay: true, employee: 'Ann' }, R);
+    const { results } = await env.DB.prepare('SELECT kind, amount, note FROM coffer_entries').all();
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ kind: 'harvest-pay', amount: -12 });
+    expect(results[0].note).toContain('Nirnroot');
+    expect(results[0].note).toContain('Ann');
+  });
+
+  it('rounds the payment down to whole coins, once, on the total', async () => {
+    // 7 at 2.5 is 17.5 — 17, not 7 lots of 2 and not 18.
+    await setRate('Nirnroot', 2.5);
+    const res = await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 7, claimPay: true }, R);
+    expect(res.paid).toBe(17);
+    expect(await cofferBalance(env, SHOP, R)).toBe(-17);
+  });
+
+  it('refuses to pay for an item with no rate set', async () => {
+    await upsertItem(env, SHOP, { item: 'Wheat', price: 4 }, R);
+    await expect(recordHarvest(env, SHOP, { item: 'Wheat', numItems: 5, claimPay: true }, R))
+      .rejects.toThrow(/no harvest rate/i);
+    // And nothing landed: no stock, no coffer line.
+    expect(await itemRow('Wheat')).toMatchObject({ stock: 0 });
+    expect(await cofferBalance(env, SHOP, R)).toBe(0);
+  });
+
+  it('refuses to pay for something the shop has never listed', async () => {
+    await expect(recordHarvest(env, SHOP, { item: 'Moon Sugar', numItems: 5, claimPay: true }, R))
+      .rejects.toThrow(/no harvest rate/i);
+  });
+
+  it('leaves an UNPAID harvest exactly as it was — free, and no coffer line', async () => {
+    await setRate('Nirnroot', 3);
+    const res = await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 10 }, R);
+    expect(res.paid).toBe(0);
+    expect(await cofferBalance(env, SHOP, R)).toBe(0);
+    // Still excluded from what the shop pays for its stock, since it paid
+    // nothing for this one.
+    expect((await listInventory(env, SHOP, R))[0].avgCost).toBe(null);
+  });
+
+  it('counts a PAID harvest toward what the stock cost the shop', async () => {
+    // It really did cost that, so the average an owner restocks against has to
+    // include it — this is the one difference a rate makes to the figures.
+    await setRate('Nirnroot', 3);
+    await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 10, claimPay: true }, R);
+    expect((await listInventory(env, SHOP, R))[0].avgCost).toBe(3);
+  });
+
+  it('does not pay twice for the same haul', async () => {
+    await setRate('Nirnroot', 3);
+    await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 10, claimPay: true, idempotencyKey: 'h1' }, R);
+    const again = await recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 10, claimPay: true, idempotencyKey: 'h1' }, R);
+    expect(again.duplicate).toBe(true);
+    expect(again.paid).toBe(0);
+    expect(await cofferBalance(env, SHOP, R)).toBe(-30);
+    expect(await itemRow('Nirnroot')).toMatchObject({ stock: 10 });
+  });
+});
+
+describe('the harvest rate on an item', () => {
+  it('is kept by an edit that does not mention it', async () => {
+    // Same rule the sale price follows on a restock: blank is "leave it", not 0.
+    await upsertItem(env, SHOP, { item: 'Nirnroot', price: 10, harvestPay: 3 }, R);
+    await upsertItem(env, SHOP, { item: 'Nirnroot', price: 12 }, R);
+    expect((await listInventory(env, SHOP, R))[0]).toMatchObject({ price: 12, harvestPay: 3 });
+  });
+
+  it('can be cleared back to nothing on purpose', async () => {
+    await upsertItem(env, SHOP, { item: 'Nirnroot', price: 10, harvestPay: 3 }, R);
+    await upsertItem(env, SHOP, { item: 'Nirnroot', price: 10, harvestPay: 0 }, R);
+    expect((await listInventory(env, SHOP, R))[0].harvestPay).toBe(0);
+    await expect(recordHarvest(env, SHOP, { item: 'Nirnroot', numItems: 1, claimPay: true }, R))
+      .rejects.toThrow(/no harvest rate/i);
+  });
+
+  it('refuses a negative rate', async () => {
+    await expect(upsertItem(env, SHOP, { item: 'Nirnroot', price: 10, harvestPay: -1 }, R))
+      .rejects.toThrow(/≥ 0/);
   });
 });

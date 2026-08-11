@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.4', date: '2026-08-11', notes: [
+    'Shops can pay their own people for what they bring in. Owners set an Employee harvest value on any item in Inventory — what one of your staff earns for each one — and the item then says so wherever it is picked.',
+    'On the register\'s Harvest side, the search marks the items your shop pays for, and the total tells you what you are owed before you record anything. Bring in twenty of something at 5 a piece and it says so.',
+    'Recording it adds the stock and takes the payment out of the shop coffer as a business expense, in one step, with your name on the entry. No item has a value until an owner sets one, so nothing about Harvest changes for a shop that does not buy from its staff.',
+    'The rate is the owner\'s and is read from the item when you record — you cannot name your own price, and a claim on an item with no value set is refused rather than paid at nothing.',
+    'What your shop pays its own people is a wage, not what the item is worth, so it stays out of Market Analysis and out of the underpriced-stock check. A harvest has never counted as a purchase there and still does not.',
+  ] },
   { version: '3.3', date: '2026-08-09', notes: [
     'Text size, under Profile → Appearance: Small, Normal, Large or Largest. It sets the writing, the figures, the menu and the ruled lines together, so the entries still sit on the lines at every size. Per device, since a phone in your hand and a monitor on your desk are not the same reading distance.',
     'Fixed: the side menu had no page under it. That was invisible while everything was cream, and became dark ink on dark wood the moment the desk arrived behind it. It is a leaf of the book now, like the pages beside it.',

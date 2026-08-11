@@ -155,13 +155,23 @@ async function convertInventory({ request, env, body }) {
 /* ---- Farm / Harvest: stock produced rather than bought ---- */
 async function harvestRoute({ request, env, body }) {
   // Any active member: bringing in a crop is shop-floor work, like ringing up
-  // a sale. It moves no money, so there is nothing here an owner must gate.
+  // a sale. Claiming the harvest rate is open to them too — the rate itself is
+  // the owner's decision, made in advance on the item, and this only applies
+  // it. Reading it from the request instead would let the person being paid
+  // name their own price.
   const caller = await requireActive(request, env);
   const realmId = realmIdOf(caller, env);
-  const intake = await recordHarvest(env, caller.business, body, realmId);
+  const res = await recordHarvest(env, caller.business, {
+    ...body,
+    // Stamped from the caller, never the form: this ends up on a coffer line
+    // saying who was paid.
+    employee: actorName(caller),
+  }, realmId);
   await logAudit(env, { actor: actorName(caller), business: caller.business,
-    action: 'inventory.harvest', detail: body.item + ' ×' + body.numItems, realmId });
-  return { intake, inventory: await listInventory(env, caller.business, realmId) };
+    action: 'inventory.harvest',
+    detail: body.item + ' ×' + body.numItems + (res.paid ? ' · paid ' + res.paid : ''), realmId });
+  return { intake: res.intake, paid: res.paid, rate: res.rate,
+    inventory: await listInventory(env, caller.business, realmId) };
 }
 
 /* ---- time cards ---- */

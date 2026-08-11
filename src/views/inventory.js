@@ -69,7 +69,10 @@ export function renderInventory(container, { me }) {
           ? '<span class="role-pill">Ingredient</span>' +
             (it.avgCost ? ' · bought at ' + money(it.avgCost) : '')
           : money(it.price)) +
-        ' · ' + it.stock + ' in stock · ' + statusTag(it.status) });
+        ' · ' + it.stock + ' in stock · ' + statusTag(it.status) +
+        // Which items a shop buys off its own people is worth seeing without
+        // opening every editor in turn.
+        (it.harvestPay ? '<br><span class="note">🌾 harvest pays ' + esc(money(it.harvestPay)) + ' each</span>' : '') });
       const row = el('div.emp-row', {}, [meta]);
       if (canEdit) {
         const edit = el('button.primary.small', { onclick: () => openItemModal(it, refreshInventory) }, 'Edit');
@@ -109,6 +112,19 @@ function openItemModal(it, onSaved) {
   const low = el('input', { type: 'number', step: '1', min: '0', value: String(it.lowStock || 0) });
   const ingredient = el('input', { type: 'checkbox' });
   ingredient.checked = !!it.ingredient;
+  /**
+   * What the shop pays one of its own people, per unit, for bringing this in.
+   *
+   * Set here rather than on the Harvest side because it is the OWNER's
+   * decision, made in advance — the person claiming it is the last one who
+   * should be able to say what their haul is worth. Blank or 0 means the shop
+   * does not pay for this, and Harvest offers no payment for it.
+   */
+  const harvestPay = el('input', {
+    type: 'number', step: '0.01', min: '0',
+    value: it.harvestPay ? String(it.harvestPay) : '',
+    placeholder: 'Leave blank if you do not pay for this',
+  });
   const priceWrap = el('div', {}, [
     el('label', {}, 'Sale price — the register’s default for this item'), price,
   ]);
@@ -127,6 +143,8 @@ function openItemModal(it, onSaved) {
       await api.saveItem({
         item: it.item, price: price.value, lowStock: low.value || 0,
         ingredient: ingredient.checked,
+        // Blank clears it; the Worker reads an empty string as "no rate".
+        harvestPay: harvestPay.value === '' ? 0 : harvestPay.value,
       });
       onSaved();
       modal.close();
@@ -143,6 +161,10 @@ function openItemModal(it, onSaved) {
     el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
     priceWrap,
     el('label', {}, 'Low stock threshold'), low,
+    el('label', {}, 'Employee harvest value — paid per item'), harvestPay,
+    el('p', { class: 'note' }, 'What you will pay one of your own people for each one they bring in. ' +
+      'They claim it on the register’s Harvest side, and it comes out of your coffer as a business ' +
+      'expense when they do. Leave it blank if you do not buy this from your staff.'),
     save,
     status,
   ]);

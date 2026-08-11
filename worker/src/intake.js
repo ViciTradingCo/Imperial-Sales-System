@@ -175,14 +175,29 @@ export async function recordIntake(env, business, entry, realmId) {
  *
  * So it is a different verb with its own row: the stock goes up, and that is
  * all that happens.
+ *
+ * UNLESS THE SHOP PAYS FOR IT. An owner can set a harvest rate on an item —
+ * what they will give one of their own people per unit for bringing it in —
+ * and a harvest claimed against that rate is a real cost: the coffer is debited
+ * and the intake row carries the price, so it counts toward what the stock
+ * actually cost the shop. That is the difference from wages, which this system
+ * only ever RECORDS as owed: this is not paying someone for their time, it is
+ * buying goods off them at a price the owner set in advance, and it settles the
+ * same way a delivery from any other supplier does.
+ *
+ * THE RATE IS READ FROM THE ITEM, never taken from the request. The person
+ * claiming the payment is the last person who should be able to say what it is
+ * worth.
  */
-export async function recordHarvest(env, business, { item, numItems, ingredient, idempotencyKey }, realmId) {
+export async function recordHarvest(env, business, { item, numItems, ingredient, claimPay, employee, idempotencyKey }, realmId) {
   const db = await getDb(env);
   const idem = String(idempotencyKey || '').trim();
   if (idem) {
     const prior = await db.prepare('SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem = ? LIMIT 1')
       .bind(realmId, business, idem).first();
-    if (prior) return listIntake(env, business, realmId);
+    // Same SHAPE as a first-time record, not a bare list: a caller that has to
+    // tell a retry apart from a real one has already lost the argument.
+    if (prior) return { intake: await listIntake(env, business, realmId), paid: 0, rate: 0, duplicate: true };
   }
   const name = String(item || '').trim();
   if (!name) throw new Error('Which item did you bring in?');
@@ -194,19 +209,30 @@ export async function recordHarvest(env, business, { item, numItems, ingredient,
   // Same case-insensitive match as a delivery: a harvest must land on the
   // listing the owner is already looking at.
   const existing = await db.prepare(
-    'SELECT item FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
+    'SELECT item, harvest_pay FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
     .bind(realmId, business, name.toLowerCase()).first();
   const invName = existing ? existing.item : name;
+
+  // The rate the OWNER set on this item, and what this haul therefore earns.
+  // Rounded once on the total, like every other amount in the ledger.
+  const rate = claimPay ? Number((existing && existing.harvest_pay) || 0) : 0;
+  if (claimPay && !(rate > 0)) {
+    throw new Error('There is no harvest rate set for "' + name + '". An owner sets one on the item in Inventory.');
+  }
+  const owed = coin(qty * rate);
+  const who = String(employee || '').trim();
   const ts = new Date().toISOString();
 
-  await db.batch([
-    // Logged as intake with HARVEST as the vendor and no price, so it appears
-    // in the delivery history and can be deleted like any other mistake — but
-    // priced at nothing, which market.js already excludes from valuation.
+  const stmts = [
+    // Logged as intake with HARVEST as the vendor, so it appears in the
+    // delivery history and can be deleted like any other mistake. The PRICE is
+    // the harvest rate when one was claimed and 0 otherwise — an unpaid
+    // harvest cost nothing, and market.js excludes a zero from valuation so a
+    // free thing never looks like a thing worth nothing.
     db.prepare(
       `INSERT INTO intake (realm_id, business, ts, item, vendor, source_hold, num_items, price_per, idem, from_business)
-       VALUES (?, ?, ?, ?, ?, '', ?, 0, ?, '')`
-    ).bind(realmId, business, ts, name, HARVEST_VENDOR, qty, idem || null),
+       VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, '')`
+    ).bind(realmId, business, ts, name, HARVEST_VENDOR, qty, rate, idem || null),
     db.prepare(
       `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient)
        VALUES (?, ?, ?, 0, ?, 0, ?)
@@ -214,10 +240,19 @@ export async function recordHarvest(env, business, { item, numItems, ingredient,
          stock = stock + excluded.stock,
          ingredient = CASE WHEN ? THEN excluded.ingredient ELSE inventory.ingredient END`
     ).bind(realmId, business, invName, qty, ing, ingGiven ? 1 : 0),
-    // No coffer entry. Nobody was paid.
-  ]);
+  ];
+  // Paid for, so the coffer pays for it — a business expense, recorded the
+  // moment the goods are handed over, exactly as a delivery from an outside
+  // supplier is. Nothing is written when nobody was paid.
+  if (owed > 0) {
+    stmts.push(db.prepare(
+      `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'harvest-pay', ?, ?)`
+    ).bind(realmId, business, ts, -owed, 'Harvest: ' + name + ' ×' + qty + (who ? ' by ' + who : '')));
+  }
 
-  return listIntake(env, business, realmId);
+  await db.batch(stmts);
+
+  return { intake: await listIntake(env, business, realmId), paid: owed, rate };
 }
 
 /** How a harvested delivery is labelled in the log. */

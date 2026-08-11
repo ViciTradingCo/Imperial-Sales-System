@@ -31,6 +31,7 @@ const SCHEMA = [
      price REAL NOT NULL DEFAULT 0, stock INTEGER NOT NULL DEFAULT 0,
      low_stock INTEGER NOT NULL DEFAULT 0,
      ingredient INTEGER NOT NULL DEFAULT 0,
+     harvest_pay REAL NOT NULL DEFAULT 0,
      UNIQUE (realm_id, business, item))`,
   `CREATE INDEX IF NOT EXISTS idx_inventory_business ON inventory (business)`,
   `CREATE TABLE IF NOT EXISTS sales (
@@ -343,6 +344,10 @@ const MIGRATIONS = [
   // of the shop's listing, not of the item itself: one shop's ingredient is
   // another's stock-in-trade, so this cannot live on the master index.
   'ALTER TABLE inventory ADD COLUMN ingredient INTEGER NOT NULL DEFAULT 0',
+  // What a shop pays one of its own people, per unit, for bringing this in.
+  // 0 is "we do not pay for this", which is also the default — a rate exists
+  // only where an owner has deliberately set one.
+  'ALTER TABLE inventory ADD COLUMN harvest_pay REAL NOT NULL DEFAULT 0',
   // Which REGISTERED COMPANY supplied a delivery, when one did. `vendor` stays
   // free text because most suppliers are NPCs with no account; this is the
   // joinable half, so a region's supply can be credited to the shop that

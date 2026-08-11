@@ -96,6 +96,8 @@ const T = {
   'Craft': { es: 'Fabricar', fr: 'Fabriquer', de: 'Herstellen', it: 'Fabbrica' },
   'Farm / Harvest': { es: 'Cultivo / cosecha', fr: 'Culture / récolte', de: 'Anbau / Ernte', it: 'Coltivazione / raccolto' },
   'Add to stock': { es: 'Añadir al stock', fr: 'Ajouter au stock', de: 'Zum Bestand', it: 'Aggiungi alle scorte' },
+  'Claim the harvest payment': { es: 'Reclamar el pago por la cosecha', fr: 'Réclamer le paiement de la récolte', de: 'Erntelohn beanspruchen', it: 'Richiedi il pagamento del raccolto' },
+  'Employee harvest value — paid per item': { es: 'Valor de cosecha para empleados — pagado por unidad', fr: 'Valeur de récolte pour l’employé — payée à l’unité', de: 'Erntewert für Mitarbeiter — je Stück gezahlt', it: 'Valore di raccolto per il dipendente — pagato a pezzo' },
   'Intake Ingredients/Stock': { es: 'Registrar ingredientes/existencias', fr: 'Réception d’ingrédients / stock', de: 'Zutaten/Warenzugang erfassen', it: 'Carico ingredienti/scorte' },
   'How this works': { es: 'Cómo funciona', fr: 'Comment ça marche', de: 'So funktioniert es', it: 'Come funziona' },
   'Void this sale': { es: 'Anular esta venta', fr: 'Annuler cette vente', de: 'Verkauf stornieren', it: 'Annulla vendita' },

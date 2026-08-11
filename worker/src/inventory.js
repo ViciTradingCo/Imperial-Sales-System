@@ -37,7 +37,7 @@ export async function lowStockReport(env, business, realmId) {
 export async function listInventory(env, business, realmId) {
   const db = await getDb(env);
   const { results } = await db
-    .prepare('SELECT item, price, stock, low_stock, ingredient FROM inventory WHERE realm_id = ? AND business = ? ORDER BY item COLLATE NOCASE')
+    .prepare('SELECT item, price, stock, low_stock, ingredient, harvest_pay FROM inventory WHERE realm_id = ? AND business = ? ORDER BY item COLLATE NOCASE')
     .bind(realmId, business)
     .all();
   /**
@@ -67,6 +67,10 @@ export async function listInventory(env, business, realmId) {
     // one shop's ingredient is another's stock-in-trade, so it could never live
     // on the shared item index.
     ingredient: !!r.ingredient,
+    // What the shop pays one of its own for bringing this in, per unit. 0 is
+    // "not paid for", and the Harvest side of the register offers payment only
+    // where this is set.
+    harvestPay: Number(r.harvest_pay) || 0,
     // Null rather than 0 when nothing has ever been bought — "no data" and
     // "free" are different answers and the UI shows only one of them.
     avgCost: avgByName.has(String(r.item).toLowerCase())
@@ -81,7 +85,7 @@ export async function listInventory(env, business, realmId) {
  * NOT set here — it's driven by intake (in) and sales (out). A brand-new item
  * starts at 0 stock; record an intake to stock it.
  */
-export async function upsertItem(env, business, { item, price, lowStock, ingredient }, realmId) {
+export async function upsertItem(env, business, { item, price, lowStock, ingredient, harvestPay }, realmId) {
   const db = await getDb(env);
   const name = String(item || '').trim();
   if (!name) throw new Error('Item name is required.');
@@ -90,14 +94,24 @@ export async function upsertItem(env, business, { item, price, lowStock, ingredi
   if (!isFinite(p) || p < 0) throw new Error('Price must be a number ≥ 0.');
   const low = isFinite(l) && l > 0 ? l : 0;
   const ing = ingredient ? 1 : 0;
+  // What a shop pays its own people per unit for bringing this in. Blank is
+  // not 0 by accident: an omitted field keeps whatever the item already has,
+  // the same rule the sale price follows on a restock.
+  const payGiven = harvestPay !== undefined && harvestPay !== null && String(harvestPay).trim() !== '';
+  let pay = 0;
+  if (payGiven) {
+    pay = Number(harvestPay);
+    if (!isFinite(pay) || pay < 0) throw new Error('Harvest pay must be a number ≥ 0.');
+  }
   await db
     .prepare(
-      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient)
-       VALUES (?, ?, ?, ?, 0, ?, ?)
+      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient, harvest_pay)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?)
        ON CONFLICT (realm_id, business, item)
-       DO UPDATE SET price = excluded.price, low_stock = excluded.low_stock, ingredient = excluded.ingredient`
+       DO UPDATE SET price = excluded.price, low_stock = excluded.low_stock, ingredient = excluded.ingredient,
+         harvest_pay = CASE WHEN ? THEN excluded.harvest_pay ELSE inventory.harvest_pay END`
     )
-    .bind(realmId, business, name, p, low, ing)
+    .bind(realmId, business, name, p, low, ing, pay, payGiven ? 1 : 0)
     .run();
   return listInventory(env, business, realmId);
 }
