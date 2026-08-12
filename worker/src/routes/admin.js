@@ -4,7 +4,7 @@
  * maintenance, and the system-status snapshot.
  */
 import { clearLogs, getFlag, purgeLogs, resetAllData, setFlag } from '../db.js';
-import { requireAdmin, requireSystemAdmin, requireOwnerOrAdmin, actorName, realmIdOf, isSystemAdmin, findBusinessMeta } from '../guards.js';
+import { requireAdmin, requireSystemAdmin, requireManages, requireOwner, actorName, realmIdOf, isSystemAdmin, findBusinessMeta } from '../guards.js';
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember, findUserByUid, isConfiguredAdmin } from '../users.js';
@@ -508,13 +508,15 @@ async function realmCodeReset({ request, env, body }) {
  * else asking gets nothing, since the code is what admits people to the shop.
  */
 async function businessCode({ request, env, url }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   const business = caller.role === 'admin' && url.searchParams.get('business')
     ? url.searchParams.get('business') : caller.business;
   return { business, joinCode: await businessJoinCode(env, business, realmIdOf(caller, env)) };
 }
 async function businessCodeReset({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  // Reading the code is manager work — they onboard people. REISSUING it kills
+  // the code every pending hire is holding, so it stays the owner's.
+  const caller = await requireOwner(request, env);
   const business = caller.role === 'admin' && body.business ? body.business : caller.business;
   const code = await regenerateBusinessCode(env, business, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business, action: 'business.code.reset', detail: business, realmId: realmIdOf(caller, env) });

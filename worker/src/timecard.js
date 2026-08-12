@@ -110,6 +110,24 @@ export async function clockOut(env, { uid, rate, note }, realmId) {
   return mapShift(r);
 }
 
+/**
+ * What one person is owed in COMMISSION, and over how many sales.
+ *
+ * Their own figure, for their own screen. An employee paid on results has to be
+ * able to see what they have earned without asking the owner to open the log
+ * for them — and someone paid only on commission has no shifts at all, so the
+ * shift list alone would tell them they were owed nothing.
+ */
+export async function myCommission(env, uid, realmId) {
+  const db = await getDb(env);
+  const r = await db.prepare(
+    `SELECT COALESCE(SUM(commission), 0) AS owed, COUNT(*) AS sales
+       FROM sales
+      WHERE realm_id = ? AND employee_uid = ? AND commission > 0 AND commission_paid = 0`)
+    .bind(realmId, uid).first();
+  return { owed: coin(Number((r && r.owed) || 0)), sales: Number((r && r.sales) || 0) };
+}
+
 /** One person's own shifts, newest first. */
 export async function myShifts(env, uid, realmId, limit = 40) {
   const db = await getDb(env);
@@ -134,13 +152,41 @@ export async function shopShifts(env, business, realmId, limit = 200) {
     .bind(realmId, business, limit).all();
   const shifts = (results || []).map(mapShift);
 
+  // WHAT THEY EARNED ON THE FLOOR, alongside what they earned by the clock.
+  //
+  // Two independent halves of one payout: somebody may be paid hourly, on
+  // commission, or both, and a shop that pays only commission has people with
+  // no shifts at all. That is why this is read separately and merged in rather
+  // than hung off the shift rows — keyed on those, anyone who never clocked in
+  // would be owed nothing however much they sold.
+  //
+  // A voided sale carries 0 (voiding clears it), so none needs filtering here.
+  const { results: earners } = await db.prepare(
+    `SELECT employee_uid AS uid, employee,
+            COALESCE(SUM(commission), 0) AS owed,
+            COUNT(*) AS sales
+       FROM sales
+      WHERE realm_id = ? AND business = ? AND commission > 0 AND commission_paid = 0
+      GROUP BY employee_uid`).bind(realmId, business).all();
+
   const byPerson = new Map();
-  for (const s of shifts) {
-    const cur = byPerson.get(s.uid) || {
-      uid: s.uid, employee: s.employee, rate: s.rate,
-      hours: 0, owedHours: 0, owed: 0, shifts: 0, open: false,
+  const person = (uid, name) => {
+    const cur = byPerson.get(uid) || {
+      uid, employee: name || '', rate: 0,
+      hours: 0, owedHours: 0,
+      // The three figures the payout is FOR. `owed` stays the TOTAL, because
+      // that is the number an owner acts on and every existing caller reads it.
+      owedHourly: 0, owedCommission: 0, owed: 0,
+      commissionSales: 0, shifts: 0, open: false,
     };
-    cur.employee = cur.employee || s.employee;
+    cur.employee = cur.employee || name || '';
+    byPerson.set(uid, cur);
+    return cur;
+  };
+
+  for (const s of shifts) {
+    const cur = person(s.uid, s.employee);
+    cur.rate = cur.rate || s.rate;
     cur.shifts += 1;
     // An open shift counts toward NOTHING financial — it is still being worked
     // — but the person must still appear, flagged as on shift. Skipping the row
@@ -149,12 +195,26 @@ export async function shopShifts(env, business, realmId, limit = 200) {
     if (s.open) cur.open = true;
     else {
       cur.hours += s.hours;
-      if (!s.paid) { cur.owedHours += s.hours; cur.owed += s.pay; }
+      if (!s.paid) { cur.owedHours += s.hours; cur.owedHourly += s.pay; }
     }
-    byPerson.set(s.uid, cur);
   }
+  for (const e of (earners || [])) {
+    // A sale rung up before commission existed carries no uid. It also carries
+    // no commission, so it never reaches this loop — but a blank uid would
+    // collapse several people into one row if it ever did.
+    if (!e.uid) continue;
+    const cur = person(e.uid, e.employee);
+    cur.owedCommission += coin(Number(e.owed) || 0);
+    cur.commissionSales += Number(e.sales) || 0;
+  }
+
   const people = [...byPerson.values()]
-    .map((p) => ({ ...p, hours: Math.round(p.hours * 100) / 100, owedHours: Math.round(p.owedHours * 100) / 100 }))
+    .map((p) => ({
+      ...p,
+      hours: Math.round(p.hours * 100) / 100,
+      owedHours: Math.round(p.owedHours * 100) / 100,
+      owed: p.owedHourly + p.owedCommission,
+    }))
     .sort((a, b) => b.owed - a.owed || a.employee.localeCompare(b.employee));
 
   return {
@@ -162,6 +222,8 @@ export async function shopShifts(env, business, realmId, limit = 200) {
     people,
     totals: {
       hours: Math.round(people.reduce((n, p) => n + p.hours, 0) * 100) / 100,
+      owedHourly: people.reduce((n, p) => n + p.owedHourly, 0),
+      owedCommission: people.reduce((n, p) => n + p.owedCommission, 0),
       owed: people.reduce((n, p) => n + p.owed, 0),
       open: shifts.filter((s) => s.open).length,
     },
@@ -178,6 +240,8 @@ export async function markPaid(env, { business, uid, ids }, realmId) {
   const db = await getDb(env);
   const stamp = now();
   if (Array.isArray(ids) && ids.length) {
+    // Named shifts only — a correction to part of a payout, which has nothing
+    // to say about commission.
     for (const id of ids) {
       await db.prepare(
         'UPDATE time_card SET paid = 1, paid_ts = ? WHERE id = ? AND realm_id = ? AND business = ? AND clock_out IS NOT NULL')
@@ -185,9 +249,19 @@ export async function markPaid(env, { business, uid, ids }, realmId) {
     }
   } else {
     if (!uid) throw new Error('Which employee?');
+    // SETTLING A PERSON SETTLES THE WHOLE PAYOUT — both halves.
+    //
+    // The figure an owner is looking at when they press this is Total, and
+    // marking the hours paid while leaving the commission outstanding would
+    // make the screen disagree with what they just did. The two are one debt to
+    // one person; they are settled together or not at all.
     await db.prepare(
       `UPDATE time_card SET paid = 1, paid_ts = ?
         WHERE realm_id = ? AND business = ? AND uid = ? AND paid = 0 AND clock_out IS NOT NULL`)
+      .bind(stamp, realmId, business, uid).run();
+    await db.prepare(
+      `UPDATE sales SET commission_paid = 1, commission_paid_ts = ?
+        WHERE realm_id = ? AND business = ? AND employee_uid = ? AND commission_paid = 0 AND commission > 0`)
       .bind(stamp, realmId, business, uid).run();
   }
   return shopShifts(env, business, realmId);

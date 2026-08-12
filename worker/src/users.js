@@ -3,7 +3,11 @@
  * (UID), a business, and a role. This is the source of truth for authorization;
  * every request resolves the caller here. Stored in D1 (`users`).
  *
- * Roles: 'admin' | 'owner' | 'employee'. Status: 'active' | 'pending'.
+ * Roles: 'admin' | 'owner' | 'manager' | 'employee'. Status: 'active' | 'pending'.
+ *
+ * A MANAGER is an employee an owner has appointed to run the shop: everything
+ * the owner does day to day, except what would let them change who has power
+ * or what people are paid. See guards.js — the line is drawn there, once.
  *
  * The first admin needs no hand-seeded row: any email listed in the
  * ADMIN_EMAILS worker var is treated as an admin, and auto-provisioned a row on
@@ -38,6 +42,10 @@ function rowToUser(r) {
     // on the roster; 0 means nobody has set one, and the log says so rather
     // than quietly valuing their shifts at nothing.
     payRate: Number(r.pay_rate) || 0,
+    // A share of what they SELL, as a percentage of the sale. Independent of
+    // the hourly rate on purpose: a shop may pay by the hour, by results, or
+    // both, and 0 for either simply means that half is not part of the deal.
+    commissionRate: Number(r.commission_rate) || 0,
     // The realm this account BELONGS to. It comes only from this row, never
     // from the request, so it is the caller's permanent home.
     realmId: String(r.realm_id || DEFAULT_REALM_ID).trim() || DEFAULT_REALM_ID,
@@ -159,21 +167,68 @@ export async function setUserCharacter(env, uid, character) {
  * Applies to shifts from here on: a finished shift keeps the rate it was
  * stamped with, so a raise never restates what past work was worth.
  */
-export async function setPayRate(env, uid, rate, realmId) {
+export async function setPayRate(env, uid, rate, realmId, commissionRate) {
   const target = String(uid || '').trim();
   if (!target) throw new Error('Which employee?');
   const n = Number(rate);
   if (!isFinite(n) || n < 0) throw new Error('A pay rate must be a number ≥ 0.');
+  // Omitted means "leave it alone", so a screen that only knows about the
+  // hourly rate can never silently wipe someone's commission.
+  const commGiven = commissionRate !== undefined && commissionRate !== null && String(commissionRate).trim() !== '';
+  let c = 0;
+  if (commGiven) {
+    c = Number(commissionRate);
+    // A percentage over 100 would pay out more than the sale took. Refused
+    // rather than clamped: it is a typo, and silently making it 100 would hide
+    // that from the person who typed it.
+    if (!isFinite(c) || c < 0) throw new Error('A commission must be a number ≥ 0.');
+    if (c > 100) throw new Error('A commission cannot be more than 100% of the sale.');
+  }
+  const realm = String(realmId || DEFAULT_REALM_ID);
   const db = await getDb(env);
   const existing = await db.prepare('SELECT uid FROM users WHERE uid = ? AND realm_id = ?')
-    .bind(target, String(realmId || DEFAULT_REALM_ID)).first();
+    .bind(target, realm).first();
   if (!existing) throw new Error('Member not found.');
-  await db.prepare('UPDATE users SET pay_rate = ? WHERE uid = ? AND realm_id = ?')
-    .bind(n, target, String(realmId || DEFAULT_REALM_ID)).run();
+  await db.prepare(
+    `UPDATE users SET pay_rate = ?,
+       commission_rate = CASE WHEN ? THEN ? ELSE commission_rate END
+     WHERE uid = ? AND realm_id = ?`)
+    .bind(n, commGiven ? 1 : 0, c, target, realm).run();
   bustUserCache();
-  return n;
+  return { rate: n, commissionRate: commGiven ? c : Number(existing.commission_rate) || 0 };
 }
 
+
+/**
+ * Promotes an employee to MANAGER, or puts a manager back to employee.
+ *
+ * Deliberately narrow: it moves a row between exactly those two roles and
+ * nothing else. An owner cannot make another owner or an admin here — that is
+ * a realm admin's job on the Member List — so the worst this can do inside one
+ * shop is give somebody the shop's own day-to-day powers, which is what
+ * appointing a manager IS.
+ *
+ * `is_owner` is left alone: a manager is not an owner, and the flag is what
+ * several screens read to decide whose shop it is.
+ */
+export async function setManagerRole(env, uid, makeManager, realmId) {
+  const target = String(uid || '').trim();
+  if (!target) throw new Error('Which employee?');
+  const realm = String(realmId || DEFAULT_REALM_ID);
+  const db = await getDb(env);
+  const row = await db.prepare('SELECT uid, role FROM users WHERE uid = ? AND realm_id = ?')
+    .bind(target, realm).first();
+  if (!row) throw new Error('Member not found.');
+  const role = String(row.role || '').toLowerCase();
+  // An owner or an admin is not something this may reach down and rewrite.
+  if (role !== 'employee' && role !== 'manager') {
+    throw new Error('Only an employee can be made a manager.');
+  }
+  const next = makeManager ? 'manager' : 'employee';
+  await db.prepare('UPDATE users SET role = ? WHERE uid = ? AND realm_id = ?').bind(next, target, realm).run();
+  bustUserCache();
+  return next;
+}
 
 export async function setUserNote(env, uid, note) {
   const db = await getDb(env);
@@ -186,7 +241,7 @@ export async function updateMember(env, { uid, character, business, role }, real
   const target = String(uid || '').trim();
   if (!target) throw new Error('Missing member uid.');
   const r = String(role || '').trim().toLowerCase();
-  if (!['admin', 'owner', 'employee'].includes(r)) throw new Error('Role must be admin, owner, or employee.');
+  if (!['admin', 'owner', 'manager', 'employee'].includes(r)) throw new Error('Role must be admin, owner, manager, or employee.');
   const realm = String(realmId || DEFAULT_REALM_ID);
   const db = await getDb(env);
   const existing = await db.prepare('SELECT uid FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).first();

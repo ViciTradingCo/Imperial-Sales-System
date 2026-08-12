@@ -230,3 +230,78 @@ describe('hoursBetween', () => {
     expect(hoursBetween('2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')).toBe(0);
   });
 });
+
+/**
+ * COMMISSION — the other half of a payout.
+ *
+ * A shop may pay by the hour, by results, or both, so the two halves are
+ * independent: somebody who never clocked in can still be owed, and the payout
+ * has to show which figure is which rather than one number an owner cannot
+ * check.
+ */
+describe('commission', () => {
+  /** A sale rung up by someone, with the commission already stamped on it. */
+  const sold = (uid, who, total, commission, opts) => env.DB.prepare(
+    `INSERT INTO sales (realm_id, business, ts, order_no, items, qty_total, total, employee, employee_uid, commission, commission_paid, status)
+     VALUES (?, ?, ?, ?, '', 1, ?, ?, ?, ?, ?, ?)`)
+    .bind(R, SHOP, new Date().toISOString(), 'S-' + Math.random().toString(36).slice(2, 7),
+      total, who, uid, commission, (opts && opts.paid) ? 1 : 0, (opts && opts.status) || '').run();
+
+  const ann = async () => (await shopShifts(env, SHOP, R)).people.find((p) => p.uid === 'u-ann');
+
+  it('is owed on its own, to someone who never clocked in', async () => {
+    await sold('u-ann', 'Ann', 100, 10);
+    const p = await ann();
+    expect(p).toMatchObject({ owedHourly: 0, owedCommission: 10, owed: 10, commissionSales: 1 });
+  });
+
+  it('adds to the hourly pay rather than replacing it', async () => {
+    await clockIn(env, { ...ANN, rate: 5 }, R);
+    await startedHoursAgo('u-ann', 4);
+    await clockOut(env, { uid: 'u-ann', rate: 5 }, R);
+    await sold('u-ann', 'Ann', 100, 10);
+    const p = await ann();
+    // Hourly = 20, Commission = 10, Total = 30 — and the three agree.
+    expect(p.owedHourly).toBe(20);
+    expect(p.owedCommission).toBe(10);
+    expect(p.owed).toBe(30);
+    expect(p.owedHourly + p.owedCommission).toBe(p.owed);
+  });
+
+  it('stops being owed once it is settled', async () => {
+    await sold('u-ann', 'Ann', 100, 10, { paid: true });
+    expect(await ann()).toBe(undefined); // nothing outstanding, so nothing to show
+  });
+
+  it('is settled together with the hours — a payout is one debt', async () => {
+    await clockIn(env, { ...ANN, rate: 5 }, R);
+    await startedHoursAgo('u-ann', 2);
+    await clockOut(env, { uid: 'u-ann', rate: 5 }, R);
+    await sold('u-ann', 'Ann', 100, 10);
+    expect((await ann()).owed).toBe(20);
+    await markPaid(env, { business: SHOP, uid: 'u-ann' }, R);
+    // Their shifts keep them on the log — it is a history as well as a bill —
+    // but every figure on the row is settled, commission included.
+    expect(await ann()).toMatchObject({ owedHourly: 0, owedCommission: 0, owed: 0 });
+  });
+
+  it('keeps the totals row in step with the people', async () => {
+    await sold('u-ann', 'Ann', 100, 10);
+    await sold('u-bo', 'Bo', 200, 25);
+    const t = (await shopShifts(env, SHOP, R)).totals;
+    expect(t.owedCommission).toBe(35);
+    expect(t.owedHourly).toBe(0);
+    expect(t.owed).toBe(35);
+  });
+
+  it('never leaks between realms', async () => {
+    await sold('u-ann', 'Ann', 100, 10);
+    await env.DB.prepare('UPDATE sales SET realm_id = ?').bind(OTHER).run();
+    expect((await shopShifts(env, SHOP, R)).people).toEqual([]);
+  });
+
+  it('ignores a sale with no seller on it rather than pooling them', async () => {
+    await sold('', '', 100, 10);
+    expect((await shopShifts(env, SHOP, R)).people).toEqual([]);
+  });
+});

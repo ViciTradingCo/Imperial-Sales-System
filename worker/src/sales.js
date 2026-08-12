@@ -224,16 +224,29 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   const itemSummary = encodeSaleItems(lines);
   const ts = new Date().toISOString();
   const employee = caller.character || caller.email;
+  // WHAT THE SELLER EARNS ON THIS SALE, worked out now and stored on the row.
+  //
+  // Read from the caller's own record, never from the request: the person at
+  // the register must not be able to name their own percentage. Settled to a
+  // whole coin once, on the sale total, because a sale is the thing an owner
+  // and an employee can both point at — a payout that disagreed with the sum
+  // of its sales is a payout nobody trusts.
+  //
+  // An employee purchase earns nothing: it took no money, so there is no share
+  // of it to take.
+  const commissionPct = staff ? 0 : Number(caller.commissionRate) || 0;
+  const commission = commissionPct > 0 ? coin(finalTotal * commissionPct / 100) : 0;
 
   const stmts = [];
   for (const item in need) {
     stmts.push(db.prepare('UPDATE inventory SET stock = stock - ? WHERE realm_id = ? AND business = ? AND item = ?').bind(need[item], realmId, business, item));
   }
   stmts.push(db.prepare(
-    `INSERT INTO sales (realm_id, business, ts, order_no, customer, hold, items, qty_total, total, employee, discount, status, idem, staff_purchase)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?)`
+    `INSERT INTO sales (realm_id, business, ts, order_no, customer, hold, items, qty_total, total, employee, discount, status, idem, staff_purchase, employee_uid, commission)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)`
   ).bind(realmId, business, ts, orderNo, String(customer || '').trim() || (staff ? employee : 'Walk-in'),
-    holdName, itemSummary, qtyTotal, finalTotal, employee, discountLabel, idem || null, staff ? 1 : 0));
+    holdName, itemSummary, qtyTotal, finalTotal, employee, discountLabel, idem || null, staff ? 1 : 0,
+    caller.uid || '', commission));
   // Credit the shop's coffers with the sale proceeds — nothing to credit on an
   // employee purchase, and a 0 entry would be noise in the ledger.
   if (!staff) {
@@ -333,7 +346,13 @@ export async function voidSale(env, business, orderNo, realmId) {
   const stmts = parsed.lines.map((l) =>
     db.prepare('UPDATE inventory SET stock = stock + ? WHERE realm_id = ? AND business = ? AND item = ?').bind(l.qty, realmId, business, l.name)
   );
-  stmts.push(db.prepare("UPDATE sales SET status = 'VOIDED' WHERE id = ?").bind(sale.id));
+  // The commission goes with the money. A voided sale is not a sale, so it
+  // cannot still be owed to whoever rang it up — and an already-settled one is
+  // left alone, since taking back a wage that has been paid is not this
+  // button's business.
+  stmts.push(db.prepare(
+    "UPDATE sales SET status = 'VOIDED', commission = CASE WHEN commission_paid = 1 THEN commission ELSE 0 END WHERE id = ?"
+  ).bind(sale.id));
   // Reverse the coffer credit from the original sale. A sale that took nothing
   // (an employee purchase, or a 100% discount) has nothing to reverse, and a 0
   // entry would only clutter the ledger.

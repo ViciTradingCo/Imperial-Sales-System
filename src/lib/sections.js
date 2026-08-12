@@ -13,6 +13,7 @@ import { navigate, currentPath } from './router.js';
 import { setActions } from './actions.js';
 import { toast } from './toast.js';
 import { api } from './api.js';
+import { canManage } from './roles.js';
 
 /**
  * Marks the button whose `path` matches the current route as active.
@@ -41,7 +42,7 @@ export function setOpsActions(me) {
   // Clocking on and off is everyone's; the shop-wide log inside it is the
   // owner's, gated on the page and in the Worker.
   items.push({ label: 'Time Cards', path: '/timecard', onClick: () => navigate('/timecard') });
-  if (me.role === 'owner' || me.role === 'admin') {
+  if (canManage(me)) {
     items.push({ label: 'Employees', path: '/employees', onClick: () => navigate('/employees') });
   }
   setActions(mark(items));

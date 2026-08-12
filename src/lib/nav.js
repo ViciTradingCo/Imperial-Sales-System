@@ -6,6 +6,7 @@
  */
 import { regionsOn } from './format.js';
 import { navigate, currentPath } from './router.js';
+import { canManage } from './roles.js';
 
 /** The nav destinations available to a given user, in order. */
 function navItems(me) {
@@ -35,10 +36,10 @@ function navItems(me) {
   if (me.court && me.role !== 'admin' && regionsOn()) items.push({ path: '/court', label: 'Court Tools' });
   // owner OR admin, like every other shop page — the route already admits both,
   // so gating the MENU on owner alone hid it from an admin who runs a shop.
-  if (me.role === 'owner' || me.role === 'admin') items.push({ path: '/ledger/settings', label: 'Shop Settings' });
+  if (canManage(me)) items.push({ path: '/ledger/settings', label: 'Shop Settings' });
   // The people who use the app every day are the ones with something to say
   // about it; an admin has the review screen instead.
-  if (me.role === 'owner' || me.role === 'employee') items.push({ path: '/feedback', label: 'Feedback' });
+  if (me.role !== 'admin') items.push({ path: '/feedback', label: 'Feedback' });
   items.push({ path: '/profile', label: 'Profile' });
   items.push({ path: '/patch-notes', label: 'Patch Notes' });
   items.push({ path: '/about', label: 'About' });

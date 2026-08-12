@@ -18,6 +18,7 @@ import { money, coins } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setOpsActions } from '../lib/sections.js';
+import { canManage } from '../lib/roles.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
@@ -25,7 +26,7 @@ import { toast } from '../lib/toast.js';
 
 export function renderSalesLog(container, { me }) {
   setOpsActions(me); // stays on the shop-tools bar with Register / Inventory
-  const canEdit = me.role === 'owner' || me.role === 'admin';
+  const canEdit = canManage(me);
   let tileImages = {};
 
   draw();

@@ -14,9 +14,14 @@ import { toast } from '../lib/toast.js';
 import { skeletonRows, skeletonLines } from '../lib/skeleton.js';
 import { staffCodePanel } from './staff-code.js';
 import { money } from '../lib/format.js';
+import { isOwner, roleLabel } from '../lib/roles.js';
 
 export function renderEmployees(container, { me }) {
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
+  // A manager keeps the roster — activating, annotating, reading it. What is
+  // the OWNER'S alone is what someone is PAID and who else becomes a manager,
+  // so those two buttons are the only thing on this page that asks.
+  const owner = isOwner(me);
   const list = el('div', {}, skeletonRows(3));
   const perfHost = el('div', {}, skeletonLines(3));
   const gridHost = el('div', {});
@@ -76,13 +81,16 @@ export function renderEmployees(container, { me }) {
       const checks = new Map();
       const items = rows.map((u) => {
         const who = u.character || u.email; // character name is the display identity
+        // What they earn, said plainly when nothing is set: 0 and "nobody has
+        // decided yet" look identical on a wage line. Either half may stand
+        // alone, so the two are listed rather than one being a fallback.
+        const earns = [
+          u.payRate ? money(u.payRate) + ' an hour' : '',
+          u.commissionRate ? u.commissionRate + '% commission' : '',
+        ].filter(Boolean).join(' · ') || 'No pay set';
         const label = el('span', { class: 'emp-who', html:
-          '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(u.role) + '</span> · ' + statusBadge(u.status) +
-          // The hourly rate their shifts are valued at. Said plainly when unset,
-          // because 0 and "nobody has decided yet" look identical on a wage line.
-          '<br><span class="note">' + (u.payRate
-            ? esc(money(u.payRate)) + ' an hour'
-            : 'No pay rate set') + '</span>' +
+          '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(roleLabel(u.role)) + '</span> · ' + statusBadge(u.status) +
+          '<br><span class="note">' + esc(earns) + '</span>' +
           (u.notes ? '<br><span class="note">📝 ' + esc(u.notes) + '</span>' : '') });
         const row = el('div.emp-row', {}, []);
         if (u.status === 'pending' && bulk) {
@@ -103,7 +111,16 @@ export function renderEmployees(container, { me }) {
           }, 'Activate');
           actions.appendChild(btn);
         }
-        actions.appendChild(el('button.secondary-btn.small', { onclick: () => openRateModal(u, refresh) }, 'Pay rate'));
+        if (owner) {
+          actions.appendChild(el('button.secondary-btn.small', { onclick: () => openRateModal(u, refresh) }, 'Pay'));
+          // Only for the people it can apply to. An owner is already above it
+          // and an admin is not on this shop's ladder at all, so offering it on
+          // their row would be a button that only ever refuses.
+          if (u.role === 'employee' || u.role === 'manager') {
+            actions.appendChild(el('button.secondary-btn.small', { onclick: () => openManagerModal(u, refresh) },
+              u.role === 'manager' ? 'Stand down' : 'Make manager'));
+          }
+        }
         actions.appendChild(el('button.secondary-btn.small', { onclick: () => openNoteModal(u, refresh) }, 'Notes'));
         row.appendChild(actions);
         return row;
@@ -147,27 +164,33 @@ export function renderEmployees(container, { me }) {
 
 /** Focus modal to view/edit an owner-private note on one employee. */
 /**
- * What this person is paid per hour.
+ * WHAT THIS PERSON EARNS — by the hour, by what they sell, or both.
  *
- * Applies to shifts from HERE ON. A finished shift keeps the rate it was
- * stamped with when it ended, so giving someone a raise never quietly restates
- * what last month's work was worth — an owner who has already agreed a figure
- * still owes that figure.
+ * Two independent halves, and either may be zero. A shop that pays a flat wage
+ * leaves the commission at 0; one that pays purely on results leaves the hourly
+ * rate at 0; plenty do both. Neither is a fallback for the other, which is why
+ * they are two fields rather than a choice between two modes.
+ *
+ * Both apply from HERE ON. A finished shift keeps the rate it was stamped with,
+ * and a sale keeps the commission it was rung up at — so giving someone a raise
+ * never quietly restates what last month's work was worth. An owner who has
+ * already agreed a figure still owes that figure.
  */
 function openRateModal(u, onSaved) {
   const rate = el('input', { type: 'number', step: '0.01', min: '0', value: String(u.payRate || 0) });
+  const commission = el('input', { type: 'number', step: '0.1', min: '0', max: '100', value: String(u.commissionRate || 0) });
   const status = el('p', {});
-  const save = el('button.primary', { onclick: doSave }, 'Save rate');
+  const save = el('button.primary', { onclick: doSave }, 'Save');
 
   let modal;
   async function doSave() {
     save.disabled = true;
     status.className = ''; status.textContent = 'Saving…';
     try {
-      await api.setPayRate(u.uid, rate.value);
+      await api.setPayRate(u.uid, rate.value, commission.value);
       onSaved();
       modal.close();
-      toast('Pay rate saved.', 'ok');
+      toast('Pay saved.', 'ok');
     } catch (e) {
       save.disabled = false;
       status.className = 'error'; status.textContent = e.message || String(e);
@@ -175,13 +198,60 @@ function openRateModal(u, onSaved) {
   }
 
   modal = openModal([
-    el('h3', {}, 'Pay rate — ' + (u.character || u.email)),
-    el('p', { class: 'note' }, 'What they earn per hour on the time card. This applies to shifts from now ' +
-      'on; shifts already finished keep the rate they were recorded at, so a raise never changes what ' +
-      'past work was worth.'),
-    el('label', {}, 'Per hour'), rate,
+    el('h3', {}, 'Pay — ' + (u.character || u.email)),
+    el('label', {}, 'Hourly rate'), rate,
+    el('p', { class: 'note' }, 'What they earn per hour on the time card. Leave it at 0 if you do not pay ' +
+      'by the hour.'),
+    el('label', {}, 'Commission — % of each sale they ring up'), commission,
+    el('p', { class: 'note' }, 'Their share of every sale they make, worked out on what the shop actually ' +
+      'took after any discount. It shows on the time card payout as its own figure beside the hours. ' +
+      'Leave it at 0 if you do not pay commission.'),
+    el('p', { class: 'note' }, 'Both apply from now on. Shifts already finished keep the rate they were ' +
+      'recorded at and sales already rung up keep the commission they earned, so a raise never changes ' +
+      'what past work was worth.'),
     save, status,
   ]);
+}
+
+/**
+ * Appointing a manager. The OWNER'S own — a manager who could appoint managers
+ * could appoint themselves out of every limit the role has.
+ */
+function openManagerModal(u, onSaved) {
+  const who = u.character || u.email;
+  const making = u.role !== 'manager';
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, making ? 'Make manager' : 'Stand down');
+
+  let modal;
+  async function doSave() {
+    save.disabled = true;
+    status.className = ''; status.textContent = 'Saving…';
+    try {
+      await api.setManager(u.uid, making);
+      onSaved();
+      modal.close();
+      toast(making ? who + ' is now a manager.' : who + ' is an employee again.', 'ok');
+    } catch (e) {
+      save.disabled = false;
+      status.className = 'error'; status.textContent = e.message || String(e);
+    }
+  }
+
+  modal = openModal([
+    el('h3', {}, (making ? 'Make manager — ' : 'Stand down — ') + who),
+    making
+      ? el('p', { class: 'note' }, 'A manager runs the shop as you do: buying, inventory, the roster, ' +
+          'notices, the ledger, transfers and the time card log.')
+      : el('p', { class: 'note' }, 'They go back to being an ordinary employee. Nothing they recorded ' +
+          'while a manager is changed.'),
+    making
+      ? el('p', { class: 'note' }, 'What stays yours: setting what people are paid, appointing other ' +
+          'managers, reissuing the staff code, renaming the shop, and exporting the books. A manager ' +
+          'cannot give themselves a raise or hand the shop to anyone.')
+      : null,
+    save, status,
+  ].filter(Boolean));
 }
 
 function openNoteModal(u, onSaved) {

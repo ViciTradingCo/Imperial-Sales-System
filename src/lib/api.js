@@ -212,7 +212,10 @@ export const api = {
   editShift: (shift) => request('POST', '/timecard/edit', shift),
   deleteShift: (id) => request('POST', '/timecard/delete', { id }),
   /** Owner/admin: set an employee's hourly rate. */
-  setPayRate: (uid, rate) => request('POST', '/business/employees/rate', { uid, rate }),
+  /** Owner: what an employee earns — an hourly rate, a commission percentage, or both. */
+  setPayRate: (uid, rate, commissionRate) => request('POST', '/business/employees/rate', { uid, rate, commissionRate }),
+  /** Owner: appoint an employee as a manager, or stand one down. */
+  setManager: (uid, manager) => request('POST', '/business/employees/manager', { uid, manager }),
   /** Owner/admin: correct an item's stock by hand (a stocktake, breakage, spoilage). */
   setStock: (item, stock, note) => request('POST', '/inventory/stock', { item, stock, note }),
   /** Owner/admin: per-employee sales performance. */

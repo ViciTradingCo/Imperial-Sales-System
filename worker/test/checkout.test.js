@@ -346,3 +346,68 @@ describe('a Court\'s rules at the register', () => {
     expect(res.levy).toBe(0);
   });
 });
+
+/**
+ * COMMISSION is stamped on the sale at checkout, not worked out at payout.
+ *
+ * Same rule as the shift rate: changing what someone earns applies to what they
+ * sell NEXT. If it were recomputed later, giving a raise would silently restate
+ * every sale they had already made, and an owner who had agreed a figure would
+ * owe a different one.
+ */
+describe('commission on a sale', () => {
+  const seller = { uid: 'u-sam', character: 'Sam', email: 's@example.com', commissionRate: 10 };
+  const saleRow = (orderNo) => env.DB.prepare('SELECT * FROM sales WHERE order_no = ?').bind(orderNo).first();
+
+  it('is worked out from the SELLER’S OWN rate, never from the request', async () => {
+    // A client naming its own percentage must have no effect whatsoever.
+    const res = await checkout(env, 'Alpha', seller,
+      { cart: [{ item: 'Iron Sword', qty: 2, price: 25 }], hold: 'Whiterun', commissionRate: 90, commission: 999 }, 'default');
+    const row = await saleRow(res.orderNo);
+    expect(row.commission).toBe(5);       // 10% of 50, not 90% and not 999
+    expect(row.employee_uid).toBe('u-sam');
+  });
+
+  it('is nothing for someone with no rate set', async () => {
+    const res = await checkout(env, 'Alpha', caller,
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 25 }], hold: 'Whiterun' }, 'default');
+    expect((await saleRow(res.orderNo)).commission).toBe(0);
+  });
+
+  it('follows the DISCOUNTED total — a share of what the shop actually took', async () => {
+    const res = await checkout(env, 'Alpha', seller,
+      { cart: [{ item: 'Iron Sword', qty: 4, price: 25 }], hold: 'Whiterun', discountPercent: 50 }, 'default');
+    const row = await saleRow(res.orderNo);
+    expect(row.total).toBe(50);
+    expect(row.commission).toBe(5);
+  });
+
+  it('is a whole coin, floored once like every other amount', async () => {
+    const res = await checkout(env, 'Alpha', { ...seller, commissionRate: 7.5 },
+      { cart: [{ item: 'Iron Sword', qty: 1, price: 25 }], hold: 'Whiterun' }, 'default');
+    expect((await saleRow(res.orderNo)).commission).toBe(1); // 1.875 → 1
+  });
+
+  it('earns nothing on an employee purchase — it took no money', async () => {
+    const res = await checkout(env, 'Alpha', seller,
+      { cart: [{ item: 'Iron Sword', qty: 2, price: 25 }], hold: 'Whiterun', staffPurchase: true }, 'default');
+    expect((await saleRow(res.orderNo)).commission).toBe(0);
+  });
+
+  it('is cleared when the sale is voided — a void is not a sale', async () => {
+    const res = await checkout(env, 'Alpha', seller,
+      { cart: [{ item: 'Iron Sword', qty: 2, price: 25 }], hold: 'Whiterun' }, 'default');
+    expect((await saleRow(res.orderNo)).commission).toBe(5);
+    await voidSale(env, 'Alpha', res.orderNo, 'default');
+    expect((await saleRow(res.orderNo)).commission).toBe(0);
+  });
+
+  it('is NOT clawed back by a void once it has been paid out', async () => {
+    const res = await checkout(env, 'Alpha', seller,
+      { cart: [{ item: 'Iron Sword', qty: 2, price: 25 }], hold: 'Whiterun' }, 'default');
+    await env.DB.prepare('UPDATE sales SET commission_paid = 1 WHERE order_no = ?').bind(res.orderNo).run();
+    await voidSale(env, 'Alpha', res.orderNo, 'default');
+    // Taking back a wage already handed over is not this button's business.
+    expect((await saleRow(res.orderNo)).commission).toBe(5);
+  });
+});

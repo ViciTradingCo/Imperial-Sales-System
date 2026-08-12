@@ -20,6 +20,7 @@
 import { money, coins, regionLabel, regionWord, regionsOn } from '../lib/format.js';
 import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { canManage } from '../lib/roles.js';
 import { guidePanel, guideUnseen, markGuideSeen } from '../lib/guide.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
@@ -447,7 +448,7 @@ function buildIntake(me, onRecorded) {
  * entered by mistake — stays in Sales Log rather than being built twice.
  */
 export function renderBuying(host, { me }) {
-  const canBuy = me.role === 'owner' || me.role === 'admin';
+  const canBuy = canManage(me);
   const listHost = el('div', {}, skeletonRows(3));
 
   // Not a security check — the Worker refuses the write from an employee. The

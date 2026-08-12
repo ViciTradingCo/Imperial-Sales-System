@@ -15,6 +15,7 @@
 import { regionWord, regionsOn } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { canManage } from '../lib/roles.js';
 import { navigate } from '../lib/router.js';
 import { tileGrid } from '../lib/tiles.js';
 import { setAdminActions, subscriptionCard, recentErrorsPanel } from '../lib/sections.js';
@@ -75,25 +76,25 @@ export function renderHome(container, { me }) {
     const tiles = [
       { key: 'register', label: 'Register', hint: 'Ring up a sale', glyph: '🪙', onOpen: go('/pos') },
       { key: 'inventory', label: 'Inventory', hint: 'Stock & intake', glyph: '📦', onOpen: go('/inventory') },
-      me.role === 'owner' ? { key: 'employees', label: 'Employees', hint: 'Your roster', glyph: '🧑‍🤝‍🧑',
+      canManage(me) ? { key: 'employees', label: 'Employees', hint: 'Your roster', glyph: '🧑‍🤝‍🧑',
         onOpen: go('/employees') } : null,
-      me.role === 'owner' ? { key: 'ledger', label: 'Shop Ledger', hint: 'Performance, notices, coffers', glyph: '📖',
+      canManage(me) ? { key: 'ledger', label: 'Shop Ledger', hint: 'Performance, notices, coffers', glyph: '📖',
         onOpen: go('/ledger') } : null,
       // Shop Settings was reachable ONLY from the side menu — which on a phone
       // is behind the hamburger — while its sibling the Shop Ledger had a tile.
       // Half an owner's tools being one click from home and half being hidden is
       // most of why things here were reported as hard to find.
-      me.role === 'owner' ? { key: 'shopsettings', label: 'Shop Settings', hint: 'Discounts, style, exports', glyph: '⚙️',
+      canManage(me) ? { key: 'shopsettings', label: 'Shop Settings', hint: 'Discounts, style, exports', glyph: '⚙️',
         onOpen: go('/ledger/settings') } : null,
       { key: 'saleslog', label: 'Sales Log', hint: 'Past sales & deliveries', glyph: '🧾',
         onOpen: go('/sales-log') },
-      me.role === 'owner' ? { key: 'restock', label: 'Restock', hint: 'Low & out of stock', glyph: '🔔',
+      canManage(me) ? { key: 'restock', label: 'Restock', hint: 'Low & out of stock', glyph: '🔔',
         onOpen: go('/restock') } : null,
       // Last week's trade in this shop's own region. Owner-level — it is what
       // the person setting prices needs, not the person ringing them up — and
       // hidden in realms that do not divide trade by region, where the page
       // would have nothing to report on.
-      me.role === 'owner' && regionsOn()
+      canManage(me) && regionsOn()
         ? { key: 'marketinfo', label: 'Market Info', hint: 'Your ' + regionWord() + '’s market, last week', glyph: '📈',
             onOpen: go('/market-info') }
         : null,

@@ -117,11 +117,48 @@ export function homeRealmOf(caller) {
   return (caller && caller.realmId) || DEFAULT_REALM_ID;
 }
 
-/** Requires the caller to be an owner or admin; returns the caller record. */
-export async function requireOwnerOrAdmin(request, env) {
+/**
+ * WHO RUNS A SHOP — the owner, a MANAGER they appointed, or an admin.
+ *
+ * A manager acts as the owner in the day-to-day: the register's Buying side,
+ * inventory, the roster, notices, the time card log, transfers, the coffer,
+ * discounts. Their limit is not "less trusted with money" — it is that they
+ * cannot change WHO HAS POWER or WHAT PEOPLE ARE PAID. Those are `requireOwner`
+ * below, and they are deliberately a short list.
+ *
+ * This is a PREDICATE rather than a third role spelled out at each call site.
+ * There were about forty `role !== 'owner' && role !== 'admin'` checks before
+ * this, and adding a role to thirty-nine of them is how the fortieth becomes a
+ * hole nobody notices.
+ */
+export function managesBusiness(caller) {
+  return !!caller && (caller.role === 'owner' || caller.role === 'manager' || caller.role === 'admin');
+}
+
+/** Requires someone who runs the shop — owner, manager or admin. */
+export async function requireManages(request, env) {
+  const caller = await requireRegistered(request, env);
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a business owner, a manager or an admin can do that.');
+    e.forbidden = true;
+    throw e;
+  }
+  return caller;
+}
+
+/**
+ * THE OWNER'S OWN — what a manager must not reach.
+ *
+ * Kept to the things that would let a manager rewrite the terms of their own
+ * employment or hand the shop to someone else: appointing and removing
+ * managers, setting pay and commission, reissuing the staff code, and taking
+ * the shop's whole book away as a file. An admin still passes, because an admin
+ * administers the realm and someone has to be able to act when an owner cannot.
+ */
+export async function requireOwner(request, env) {
   const caller = await requireRegistered(request, env);
   if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a business owner or an admin can do that.');
+    const e = new Error('Only the business owner or an admin can do that — a manager cannot.');
     e.forbidden = true;
     throw e;
   }

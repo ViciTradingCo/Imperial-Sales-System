@@ -14,11 +14,30 @@ import { money } from '../lib/format.js';
 import { el, mount, esc, statTiles } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setOpsActions } from '../lib/sections.js';
+import { canManage } from '../lib/roles.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 import { openModal } from '../lib/modal.js';
+
+/**
+ * How this person is paid, in one line.
+ *
+ * Either half may stand alone — a shop can pay by the hour, on results, or
+ * both — so this says what is actually set rather than assuming an hourly rate
+ * exists and calling its absence an error.
+ */
+function terms(rate, commissionRate) {
+  const parts = [];
+  if (rate) parts.push(money(rate) + ' an hour');
+  if (commissionRate) parts.push(commissionRate + '% of what you sell');
+  if (!parts.length) {
+    return 'No pay set — ask your owner to set an hourly rate, a commission, or both, or your work is ' +
+      'worth nothing on the log.';
+  }
+  return 'You are paid ' + parts.join(' and ') + '.';
+}
 
 /** "3h 25m" — hours as people say them, not as a decimal. */
 function hm(hours) {
@@ -35,7 +54,7 @@ function when(ts) {
 
 export function renderTimecard(container, { me }) {
   setOpsActions(me);
-  const isOwner = me.role === 'owner' || me.role === 'admin';
+  const isOwner = canManage(me); // the shop's log; a manager keeps it too
   let tileImages = {};
 
   const sections = [
@@ -82,6 +101,7 @@ function renderMine(host) {
     // Unpaid, finished work — what an employee actually wants to know.
     const owed = shifts.filter((s) => !s.open && !s.paid);
     const owedHours = owed.reduce((n, s) => n + s.hours, 0);
+    const comm = d.commission || { owed: 0, sales: 0 };
 
     mount(body,
       el('div.card', { class: 'card ' + (open ? 'shift-open' : '') }, [
@@ -89,14 +109,17 @@ function renderMine(host) {
         el('p', { class: 'note' }, open
           ? 'Since ' + when(open.clockIn) + ' · ' + hm(open.hours) + ' so far.'
           : 'Clock in when you start work.'),
-        el('p', { class: 'note' }, rate
-          ? 'Your rate: ' + money(rate) + ' an hour.'
-          : 'No pay rate set — ask your owner to set one, or your shifts are worth nothing on the log.'),
+        el('p', { class: 'note' }, terms(rate, d.commissionRate)),
         action,
       ]),
+      // Their own two halves, the same way the owner's log breaks them out.
+      // Commission only appears once there is a rate for it, so someone on a
+      // flat wage sees exactly what they saw before.
       statTiles([
         ['Unpaid hours', hm(owedHours)],
-        ['Unpaid wage', money(owed.reduce((n, s) => n + s.pay, 0))],
+        ['Hourly owed', money(owed.reduce((n, s) => n + s.pay, 0))],
+        ...(comm.owed || d.commissionRate ? [['Commission owed', money(comm.owed || 0)]] : []),
+        ...(comm.owed ? [['Total owed', money(owed.reduce((n, s) => n + s.pay, 0) + comm.owed)]] : []),
       ]),
       el('h4', {}, 'Your shifts'),
       shifts.length
@@ -147,13 +170,21 @@ function renderLog(host) {
     const t = d.totals || {};
 
     mount(body,
+      // The three figures broken out, not just the total. An owner settling a
+      // payout has to be able to see WHERE it came from — a number that is
+      // hours plus commission and says neither is a number you cannot check.
+      // The commission tile is only shown once some exists, so a shop that
+      // pays a flat wage is not carrying a column of zeroes.
       statTiles([
         ['Hours logged', hm(t.hours)],
-        ['Wages owed', money(t.owed)],
+        ['Hourly owed', money(t.owedHourly || 0)],
+        ...(t.owedCommission ? [['Commission owed', money(t.owedCommission)]] : []),
+        ['Total payout', money(t.owed)],
         ['On shift now', String(t.open || 0)],
       ]),
-      el('p', { class: 'note' }, 'Marking wages paid records that it happened — it does not move coin. ' +
-        'Pay from your coffer however your shop actually pays people.'),
+      el('p', { class: 'note' }, 'Marking a payout paid records that it happened — it does not move coin. ' +
+        'Pay from your coffer however your shop actually pays people. Settling somebody settles both ' +
+        'halves of what they are owed, the hours and the commission together.'),
 
       el('h4', {}, 'By employee'),
       people.length
@@ -168,20 +199,36 @@ function renderLog(host) {
     );
   }
 
+  /**
+   * One person's payout, itemised: Hourly = X, Commission = Y, Total = Z.
+   *
+   * The breakdown is spelled out whenever there IS a commission, and left off
+   * entirely when there is not — a shop paying a flat wage should see the same
+   * single figure it always saw, not a sum with a zero in it.
+   */
   function personRow(p) {
+    const worked = hm(p.hours) + ' logged · ' + hm(p.owedHours) + ' unpaid' +
+      (p.rate ? ' · rate ' + money(p.rate) : '');
+    const split = p.owedCommission
+      ? '<br><span class="note">Hourly ' + esc(money(p.owedHourly)) +
+        ' · Commission ' + esc(money(p.owedCommission)) +
+        ' on ' + esc(String(p.commissionSales)) + (p.commissionSales === 1 ? ' sale' : ' sales') + '</span>'
+      : '';
     const row = el('div.emp-row', {}, [
-      el('span', { html:
+      el('span', { class: 'emp-who', html:
         '<b>' + esc(p.employee || p.uid) + '</b>' + (p.open ? ' <span class="pill warn">ON SHIFT</span>' : '') +
-        '<br><span class="note">' + esc(hm(p.hours)) + ' logged · ' +
-        esc(hm(p.owedHours)) + ' unpaid · rate ' + esc(money(p.rate)) + '</span>' }),
+        '<br><span class="note">' + esc(worked) + '</span>' + split }),
       el('span', { html: '<b>' + esc(money(p.owed)) + '</b>' }),
     ]);
     if (p.owed > 0) {
       row.appendChild(el('span', { class: 'row-actions' }, [
         el('button.primary.small', {
           onclick: async () => {
-            if (!confirm('Mark ' + money(p.owed) + ' as paid to ' + (p.employee || p.uid) + '?\n\n' +
-              'This records the wage as settled. It does NOT move coin out of your coffer — ' +
+            const parts = p.owedCommission
+              ? ' (' + money(p.owedHourly) + ' hourly + ' + money(p.owedCommission) + ' commission)'
+              : '';
+            if (!confirm('Mark ' + money(p.owed) + parts + ' as paid to ' + (p.employee || p.uid) + '?\n\n' +
+              'This records the payout as settled. It does NOT move coin out of your coffer — ' +
               'pay them however your shop actually pays people.')) return;
             try { await api.payTimecard(p.uid); toast('Marked paid.', 'ok'); load(); }
             catch (e) { toast(e.message || String(e), 'error'); }

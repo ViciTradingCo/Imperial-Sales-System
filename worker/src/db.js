@@ -41,7 +41,15 @@ const SCHEMA = [
      customer TEXT, hold TEXT, items TEXT,
      qty_total INTEGER NOT NULL DEFAULT 0, total REAL NOT NULL DEFAULT 0,
      employee TEXT, discount TEXT, status TEXT NOT NULL DEFAULT '', idem TEXT,
-     staff_purchase INTEGER NOT NULL DEFAULT 0)`,
+     staff_purchase INTEGER NOT NULL DEFAULT 0,
+     -- Who rang it up, by uid rather than by name: a character rename must not
+     -- detach somebody from the commission they have already earned.
+     employee_uid TEXT,
+     -- The commission STAMPED ON THE SALE, not recomputed at payout. Same rule
+     -- as the shift rate: changing someone's percentage applies to what they
+     -- sell next, never to what an owner has already agreed they earned.
+     commission REAL NOT NULL DEFAULT 0,
+     commission_paid INTEGER NOT NULL DEFAULT 0, commission_paid_ts TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_sales_business ON sales (business)`,
   // NOTE: the idx_sales_idem index references the `idem` column, which is added
   // by an ALTER migration on pre-existing DBs — so it's created in MIGRATIONS,
@@ -142,7 +150,8 @@ const SCHEMA = [
      role TEXT NOT NULL DEFAULT 'employee', is_owner INTEGER NOT NULL DEFAULT 0,
      status TEXT NOT NULL DEFAULT 'active', char_name TEXT, notes TEXT,
      created TEXT, last_seen TEXT, active_realm TEXT NOT NULL DEFAULT '',
-     pay_rate REAL NOT NULL DEFAULT 0)`,
+     pay_rate REAL NOT NULL DEFAULT 0,
+     commission_rate REAL NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`,
   `CREATE INDEX IF NOT EXISTS idx_users_business ON users (business)`,
   // Registered businesses + their Vici Trading Co. certification (subscription).
@@ -304,6 +313,17 @@ const MIGRATIONS = [
   'ALTER TABLE master_item ADD COLUMN first_by TEXT',
   'ALTER TABLE master_item ADD COLUMN first_shop TEXT',
   'ALTER TABLE users ADD COLUMN pay_rate REAL NOT NULL DEFAULT 0',
+  // A share of what they sell, as a percentage. 0 is "no commission", which is
+  // also the default — a rate exists only where an owner has set one, and an
+  // employee may have this, an hourly rate, or both.
+  'ALTER TABLE users ADD COLUMN commission_rate REAL NOT NULL DEFAULT 0',
+  // Commission is stamped on the SALE, so a later change of rate cannot restate
+  // what was already earned. employee_uid is how a payout finds it after a
+  // character rename.
+  'ALTER TABLE sales ADD COLUMN employee_uid TEXT',
+  'ALTER TABLE sales ADD COLUMN commission REAL NOT NULL DEFAULT 0',
+  'ALTER TABLE sales ADD COLUMN commission_paid INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE sales ADD COLUMN commission_paid_ts TEXT',
   'ALTER TABLE sales ADD COLUMN idem TEXT',
   'CREATE INDEX IF NOT EXISTS idx_sales_idem ON sales (business, idem)',
   'ALTER TABLE intake ADD COLUMN idem TEXT',

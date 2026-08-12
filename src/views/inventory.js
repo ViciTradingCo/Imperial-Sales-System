@@ -20,13 +20,14 @@ import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
 import { setOpsActions } from '../lib/sections.js';
+import { canManage } from '../lib/roles.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 
 export function renderInventory(container, { me }) {
-  const canEdit = me.role === 'owner' || me.role === 'admin';
+  const canEdit = canManage(me);
   setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
   const listHost = el('div', {}, skeletonRows(4));
 

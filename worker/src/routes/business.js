@@ -4,8 +4,8 @@
  * discounts / style), per-shop settings, the item + hold lookups, certification,
  * MOTD banners, the Court hold report, and the owner CSV export.
  */
-import { requireRegistered, requireOwnerOrAdmin, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
-import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate } from '../users.js';
+import { requireRegistered, requireManages, requireOwner, managesBusiness, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
+import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate, setManagerRole } from '../users.js';
 import { renameBusiness, listBusinessCards } from '../registry.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
@@ -24,7 +24,7 @@ import { activeGlobalNotices, readWarnDays, activeNoticesForBusiness,
   listMotdsForBusiness, addMotdForBusiness, updateMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
 import { holdReport, businessReport } from '../market.js';
 import { lastWeekWindow, isWeekTurnover } from '../week.js';
-import { openShift, clockIn, clockOut, myShifts, shopShifts, markPaid, editShift, deleteShift } from '../timecard.js';
+import { openShift, clockIn, clockOut, myShifts, myCommission, shopShifts, markPaid, editShift, deleteShift } from '../timecard.js';
 import { requireCourt, courtCompanies, courtShop } from '../oversight.js';
 import {
   SPEND_CATEGORIES, STANDINGS, readCourtSettings, writeCourtSettings,
@@ -39,8 +39,8 @@ import { FEEDBACK_SUBJECTS, submitFeedback, listOwnFeedback } from '../feedback.
 /* ---- employees ---- */
 async function listEmployees({ request, env, url }) {
   const caller = await requireRegistered(request, env);
-  if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a business owner or an admin can view the employee roster.');
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a business owner, a manager or an admin can view the employee roster.');
     e.forbidden = true; throw e;
   }
   const business = caller.role === 'admin' && url.searchParams.get('business')
@@ -48,13 +48,13 @@ async function listEmployees({ request, env, url }) {
   const users = await listUsersByBusiness(env, business, realmIdOf(caller, env));
   return {
     business,
-    employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status, notes: u.notes || '', payRate: u.payRate || 0 })),
+    employees: users.map((u) => ({ uid: u.uid, email: u.email, character: u.character, role: u.role, isOwner: u.isOwner, status: u.status, notes: u.notes || '', payRate: u.payRate || 0, commissionRate: u.commissionRate || 0 })),
   };
 }
 async function activateEmployee({ request, env, body }) {
   const caller = await requireRegistered(request, env);
-  if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a business owner or an admin can activate employees.');
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a business owner, a manager or an admin can activate employees.');
     e.forbidden = true; throw e;
   }
   const targetUid = String(body.uid || '').trim();
@@ -72,8 +72,8 @@ async function activateEmployee({ request, env, body }) {
 }
 async function employeeNote({ request, env, body }) {
   const caller = await requireRegistered(request, env);
-  if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a business owner or an admin can add employee notes.');
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a business owner, a manager or an admin can add employee notes.');
     e.forbidden = true; throw e;
   }
   const targetUid = String(body.uid || '').trim();
@@ -89,33 +89,33 @@ async function employeeNote({ request, env, body }) {
   return { ok: true, uid: targetUid };
 }
 async function employeePerformanceRoute({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return { performance: await employeePerformance(env, caller.business, realmIdOf(caller, env)) };
 }
 async function lowStock({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return await lowStockReport(env, caller.business, realmIdOf(caller, env));
 }
 /** Owner/admin: this shop's own sales performance (totals, trend, top items). */
 async function shopReport({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return await businessReport(env, caller.business, realmIdOf(caller, env));
 }
 /* ---- a shop's own notice board (owner posts to their staff) ---- */
 async function listShopNotices({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return { notices: await listMotdsForBusiness(env, caller.business, realmIdOf(caller, env)) };
 }
 async function addShopNotice({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return { notices: await addMotdForBusiness(env, caller.business, body, realmIdOf(caller, env)) };
 }
 async function updateShopNotice({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return { notices: await updateMotdForBusiness(env, caller.business, body, realmIdOf(caller, env)) };
 }
 async function deleteShopNotice({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return { notices: await deleteMotdForBusiness(env, caller.business, body.id, realmIdOf(caller, env)) };
 }
 
@@ -124,7 +124,7 @@ async function deleteShopNotice({ request, env, body }) {
  * Owner/admin only: it rewrites the shop's books.
  */
 async function deleteIntakeRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   const realmId = realmIdOf(caller, env);
   const res = await deleteIntake(env, caller.business, body.id, realmId);
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'intake.delete',
@@ -184,6 +184,8 @@ async function myTimecard({ request, env }) {
     open: await openShift(env, caller.uid, realmId),
     shifts: await myShifts(env, caller.uid, realmId),
     rate: caller.payRate || 0,
+    commissionRate: caller.commissionRate || 0,
+    commission: await myCommission(env, caller.uid, realmId),
   };
 }
 
@@ -208,7 +210,7 @@ async function clockOutRoute({ request, env, body }) {
 
 /** The owner's log: every shift at this shop, with who is owed what. */
 async function timecardLog({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return await shopShifts(env, caller.business, realmIdOf(caller, env));
 }
 
@@ -217,7 +219,7 @@ async function timecardLog({ request, env }) {
  * levy: the app says what is owed and a person confirms it was actually paid.
  */
 async function timecardPay({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   const realmId = realmIdOf(caller, env);
   const res = await markPaid(env, { business: caller.business, uid: body.uid, ids: body.ids }, realmId);
   await logAudit(env, { actor: actorName(caller), business: caller.business,
@@ -226,7 +228,7 @@ async function timecardPay({ request, env, body }) {
 }
 
 async function timecardEdit({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   const realmId = realmIdOf(caller, env);
   const res = await editShift(env, { business: caller.business, ...body }, realmId);
   await logAudit(env, { actor: actorName(caller), business: caller.business,
@@ -235,7 +237,7 @@ async function timecardEdit({ request, env, body }) {
 }
 
 async function timecardDelete({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   const realmId = realmIdOf(caller, env);
   const res = await deleteShift(env, { business: caller.business, id: body.id }, realmId);
   await logAudit(env, { actor: actorName(caller), business: caller.business,
@@ -243,9 +245,12 @@ async function timecardDelete({ request, env, body }) {
   return res;
 }
 
-/** The owner sets what someone is paid per hour. */
+/** The owner sets what someone earns: an hourly rate, a commission, or both. */
 async function payRateRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  // requireOwner, not requireManages: what someone is paid is the owner's
+  // agreement with them. A manager who could set rates could give themselves
+  // a raise, which is the whole reason the manager role has a limit at all.
+  const caller = await requireOwner(request, env);
   const realmId = realmIdOf(caller, env);
   // Their OWN roster only — the same check the note and activate routes make.
   const roster = await listUsersByBusiness(env, caller.business, realmId);
@@ -254,10 +259,33 @@ async function payRateRoute({ request, env, body }) {
     const e = new Error('That employee is not part of your business.');
     e.forbidden = true; throw e;
   }
-  const rate = await setPayRate(env, target.uid, body.rate, realmId);
+  const paid = await setPayRate(env, target.uid, body.rate, realmId, body.commissionRate);
   await logAudit(env, { actor: actorName(caller), business: caller.business,
-    action: 'employee.rate', detail: (target.character || target.uid) + ' → ' + rate, realmId });
-  return { ok: true, uid: target.uid, rate };
+    action: 'employee.rate',
+    detail: (target.character || target.uid) + ' → ' + paid.rate + '/hr, ' + paid.commissionRate + '% commission',
+    realmId });
+  return { ok: true, uid: target.uid, rate: paid.rate, commissionRate: paid.commissionRate };
+}
+
+/**
+ * The owner appoints a manager, or stands one down.
+ *
+ * Owner-only for the obvious reason: a manager who could appoint managers
+ * could appoint themselves out of every limit this role has.
+ */
+async function managerRoleRoute({ request, env, body }) {
+  const caller = await requireOwner(request, env);
+  const realmId = realmIdOf(caller, env);
+  const roster = await listUsersByBusiness(env, caller.business, realmId);
+  const target = roster.find((u) => u.uid === String(body.uid || '').trim());
+  if (!target) {
+    const e = new Error('That employee is not part of your business.');
+    e.forbidden = true; throw e;
+  }
+  const role = await setManagerRole(env, target.uid, !!body.manager, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'employee.role', detail: (target.character || target.uid) + ' → ' + role, realmId });
+  return { ok: true, uid: target.uid, role };
 }
 
 /* ---- feedback on the app ---- */
@@ -288,8 +316,8 @@ async function postFeedback({ request, env, body }) {
 /* ---- per-shop settings + rename ---- */
 async function ledgerBusiness(request, env, override) {
   const caller = await requireRegistered(request, env);
-  if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a shop owner or an admin can manage ledger settings.');
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a shop owner, a manager or an admin can manage ledger settings.');
     e.forbidden = true; throw e;
   }
   return {
@@ -308,7 +336,10 @@ async function saveLedgerSettings({ request, env, body }) {
 async function renameBusinessRoute({ request, env, body }) {
   const caller = await requireRegistered(request, env);
   if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a shop owner or an admin can rename the company.');
+    // Deliberately NOT managesBusiness: the shop's name is its identity, and
+    // renaming moves every record it owns. A manager runs the shop; they do
+    // not get to decide what it is called.
+    const e = new Error('Only a shop owner or an admin can rename the company — a manager cannot.');
     e.forbidden = true; throw e;
   }
   const newName = String(body.name || '').trim();
@@ -325,16 +356,16 @@ async function getInventory({ request, env }) {
 }
 async function saveItem({ request, env, body }) {
   const caller = await requireRegistered(request, env);
-  if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a shop owner or an admin can edit inventory.');
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a shop owner, a manager or an admin can edit inventory.');
     e.forbidden = true; throw e;
   }
   return { inventory: await upsertItem(env, caller.business, body, realmIdOf(caller, env)) };
 }
 async function deleteItemRoute({ request, env, body }) {
   const caller = await requireRegistered(request, env);
-  if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a shop owner or an admin can edit inventory.');
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a shop owner, a manager or an admin can edit inventory.');
     e.forbidden = true; throw e;
   }
   return { inventory: await deleteItem(env, caller.business, body.item, realmIdOf(caller, env)) };
@@ -346,7 +377,7 @@ async function deleteItemRoute({ request, env, body }) {
  * mistake.
  */
 async function adjustStock({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   const realmId = realmIdOf(caller, env);
   const res = await setStock(env, caller.business, body, realmId);
   await logAudit(env, { actor: actorName(caller), business: caller.business,
@@ -364,8 +395,8 @@ async function getIntake({ request, env }) {
 }
 async function recordIntakeRoute({ request, env, body }) {
   const caller = await requireRegistered(request, env);
-  if (caller.role !== 'owner' && caller.role !== 'admin') {
-    const e = new Error('Only a shop owner or an admin can record intake.');
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a shop owner, a manager or an admin can record intake.');
     e.forbidden = true; throw e;
   }
   const realmId = realmIdOf(caller, env);
@@ -396,45 +427,45 @@ async function voidSaleRoute({ request, env, body }) {
 
 /* ---- transfers ---- */
 async function listTransfersRoute({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function createTransferRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   await createTransfer(env, caller.business, body, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.send', detail: (body.item || '') + ' ×' + (body.qty || '') + ' → ' + (body.toBusiness || ''), realmId: realmIdOf(caller, env) });
   return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function acceptTransferRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   await acceptTransfer(env, caller.business, body.id, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.accept', detail: 'id ' + body.id, realmId: realmIdOf(caller, env) });
   return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function cancelTransferRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   await cancelTransfer(env, caller.business, body.id, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.cancel', detail: 'id ' + body.id, realmId: realmIdOf(caller, env) });
   return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function declineTransferRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   await declineTransfer(env, caller.business, body.id, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.decline', detail: 'id ' + body.id, realmId: realmIdOf(caller, env) });
   return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function transferHistory({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return { history: await listTransferHistory(env, caller.business, realmIdOf(caller, env)) };
 }
 
 /* ---- shop ledger: coffers / discounts / style ---- */
 async function getCoffer({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return await cofferSummary(env, caller.business, realmIdOf(caller, env));
 }
 async function adjustCofferRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   const res = await adjustCoffer(env, caller.business, body, realmIdOf(caller, env));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'coffer.adjust', detail: (Number(body.amount) || 0) + 'gp ' + (body.note || ''), realmId: realmIdOf(caller, env) });
   return res;
@@ -444,11 +475,11 @@ async function getDiscounts({ request, env }) {
   return { discounts: await listDiscounts(env, caller.business, realmIdOf(caller, env)) };
 }
 async function addDiscountRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return { discounts: await addDiscount(env, caller.business, body, realmIdOf(caller, env)) };
 }
 async function deleteDiscountRoute({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return { discounts: await deleteDiscount(env, caller.business, body.id, realmIdOf(caller, env)) };
 }
 async function getStyle({ request, env }) {
@@ -456,13 +487,18 @@ async function getStyle({ request, env }) {
   return await getShopStyle(env, caller.business, realmIdOf(caller, env));
 }
 async function setStyle({ request, env, body }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   return await setShopStyle(env, caller.business, body, realmIdOf(caller, env));
 }
 
-/** Owner/admin: download this shop's sales or coffer ledger as a CSV. */
+/**
+ * Owner/admin: download this shop's sales or coffer ledger as a CSV.
+ *
+ * Owner-only. Reading the books on screen is manager work; carrying the whole
+ * of them out of the app as a file is not the same act.
+ */
 async function ownerExport({ request, env, url, cors }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireOwner(request, env);
   const type = url.searchParams.get('type') === 'coffer' ? 'coffer' : 'sales';
   const { filename, csv } = await businessCsv(env, caller.business, type, realmIdOf(caller, env));
   return new Response(csv, {
@@ -532,7 +568,7 @@ async function holdReportRoute({ request, env }) {
  * fair arrangement for the one company that also holds the live view.
  */
 async function weeklyRegionRoute({ request, env }) {
-  const caller = await requireOwnerOrAdmin(request, env);
+  const caller = await requireManages(request, env);
   const realmId = realmIdOf(caller, env);
   const meta = await findBusinessMeta(env, caller.business, realmId);
   if (!meta.hold) {
@@ -799,6 +835,7 @@ export const routes = [
   { method: 'POST', path: '/timecard/edit', handler: timecardEdit },
   { method: 'POST', path: '/timecard/delete', handler: timecardDelete },
   { method: 'POST', path: '/business/employees/rate', handler: payRateRoute },
+  { method: 'POST', path: '/business/employees/manager', handler: managerRoleRoute },
   { method: 'GET', path: '/intake', handler: getIntake },
   { method: 'POST', path: '/intake', handler: recordIntakeRoute },
   { method: 'GET', path: '/cert', handler: getCert },

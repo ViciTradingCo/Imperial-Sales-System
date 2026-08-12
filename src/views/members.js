@@ -4,6 +4,7 @@
  */
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
+import { roleLabel } from '../lib/roles.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
@@ -81,7 +82,7 @@ export function renderMembers(container, { me } = {}) {
 /** How a member's role reads in the list. */
 function memberRole(m) {
   if (m.role === 'admin') return m.systemAdmin ? 'System Admin' : 'Realm Admin';
-  return m.role === 'owner' ? 'Shop Owner' : 'Employee';
+  return roleLabel(m.role);
 }
 
 /**

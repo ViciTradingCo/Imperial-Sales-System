@@ -6,6 +6,7 @@ import { loadConfig } from './lib/config.js';
 import { initAuth, renderSignInButton, onAuthChange, getProfile, signOut } from './lib/auth.js';
 import { configureApi, api } from './lib/api.js';
 import { initRouter, route, navigate, render, onBeforeRender } from './lib/router.js';
+import { canManage } from './lib/roles.js';
 import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
@@ -242,7 +243,7 @@ route('/profile', (container) => {
 
 route('/employees', (container) => {
   const m = state.me;
-  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  if (!m || !m.registered || !canManage(m)) { navigate('/'); return; }
   renderEmployees(container, { me: m });
 });
 
@@ -256,7 +257,7 @@ route('/inventory', (container) => {
 // that would refuse.
 route('/market-info', (container) => {
   const m = state.me;
-  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  if (!m || !m.registered || !canManage(m)) { navigate('/'); return; }
   renderMarketInfo(container, { me: m });
 });
 
@@ -278,7 +279,7 @@ route('/timecard', (container) => {
 // at /ledger/settings, which is where the things you CHANGE live.
 route('/ledger', (container) => {
   const m = state.me;
-  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  if (!m || !m.registered || !canManage(m)) { navigate('/'); return; }
   renderLedgerSettings(container, { me: m });
 });
 
@@ -286,7 +287,7 @@ route('/ledger', (container) => {
 // banner nudge, where you are mid-task and need to dismiss it.
 route('/restock', (container) => {
   const m = state.me;
-  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  if (!m || !m.registered || !canManage(m)) { navigate('/'); return; }
   renderLowStock(container, { me: m });
 });
 
@@ -380,7 +381,7 @@ route('/admin/market/trends', adminMarket('trends'));
 
 route('/ledger/settings', (container) => {
   const m = state.me;
-  if (!m || !m.registered || (m.role !== 'owner' && m.role !== 'admin')) { navigate('/'); return; }
+  if (!m || !m.registered || !canManage(m)) { navigate('/'); return; }
   renderShopSettingsPage(container, {
     me: m,
     onBusinessRenamed: (me) => { state.me = me; renderBadge(); render(); },
