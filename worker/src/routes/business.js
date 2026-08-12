@@ -10,7 +10,7 @@ import { renameBusiness, listBusinessCards } from '../registry.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
-import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock } from '../inventory.js';
+import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock, stockText, planStockImport, importStockText } from '../inventory.js';
 import { recordIntakeLines, recordHarvest, listIntake, deleteIntake } from '../intake.js';
 import { readRegions } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
@@ -361,6 +361,39 @@ async function saveItem({ request, env, body }) {
     e.forbidden = true; throw e;
   }
   return { inventory: await upsertItem(env, caller.business, body, realmIdOf(caller, env)) };
+}
+/**
+ * A stocktake as plain text, both ways.
+ *
+ * `apply` is what separates a look from a change. The plan comes back either
+ * way and from the same code, so what the preview showed is exactly what the
+ * apply did — a preview that can disagree with its apply is worse than none.
+ */
+async function stockTextRoute({ request, env }) {
+  const caller = await requireRegistered(request, env);
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a shop owner, a manager or an admin can edit inventory.');
+    e.forbidden = true; throw e;
+  }
+  return { text: await stockText(env, caller.business, realmIdOf(caller, env)) };
+}
+async function stockImportRoute({ request, env, body }) {
+  const caller = await requireRegistered(request, env);
+  if (!managesBusiness(caller)) {
+    const e = new Error('Only a shop owner, a manager or an admin can edit inventory.');
+    e.forbidden = true; throw e;
+  }
+  const realmId = realmIdOf(caller, env);
+  if (!body.apply) {
+    const inventory = await listInventory(env, caller.business, realmId);
+    return { ...planStockImport(body.text, inventory), applied: 0, preview: true };
+  }
+  const res = await importStockText(env, caller.business, body.text, realmId);
+  if (res.applied) {
+    await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'inventory.stocktake',
+      detail: res.applied + ' count(s) set', realmId });
+  }
+  return res;
 }
 async function deleteItemRoute({ request, env, body }) {
   const caller = await requireRegistered(request, env);
@@ -836,6 +869,8 @@ export const routes = [
   { method: 'POST', path: '/timecard/delete', handler: timecardDelete },
   { method: 'POST', path: '/business/employees/rate', handler: payRateRoute },
   { method: 'POST', path: '/business/employees/manager', handler: managerRoleRoute },
+  { method: 'GET', path: '/inventory/stocktake', handler: stockTextRoute },
+  { method: 'POST', path: '/inventory/stocktake', handler: stockImportRoute },
   { method: 'GET', path: '/intake', handler: getIntake },
   { method: 'POST', path: '/intake', handler: recordIntakeRoute },
   { method: 'GET', path: '/cert', handler: getCert },

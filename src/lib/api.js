@@ -84,7 +84,12 @@ export const api = {
   /** Admin: edit a company (name + subscription). */
   updateCompany: (company) => request('POST', '/admin/companies/update', company),
   /** Admin: archive (delete) a company — data retained, name freed. */
-  deleteCompany: (id) => request('POST', '/admin/companies/delete', { id }),
+  /** Admin: archive a company — it stops trading, nothing is deleted. */
+  archiveCompany: (id) => request('POST', '/admin/companies/archive', { id }),
+  /** Admin: the archive, to restore from. */
+  getArchivedCompanies: () => request('GET', '/admin/companies/archived'),
+  /** Admin: bring an archived company back as it was. */
+  restoreCompany: (id) => request('POST', '/admin/companies/restore', { id }),
   /** Admin: download a gzipped full-data backup (returns a Blob). */
   exportBackupBlob: async (scope) => {
     const token = getIdToken();
@@ -194,6 +199,10 @@ export const api = {
   renameBusiness: (name) => request('POST', '/business/rename', { name }),
   /** Any registered user: read their business's inventory. */
   getInventory: () => request('GET', '/inventory'),
+  /** The shop's stock counts as `Name, Amount` text. */
+  getStocktake: () => request('GET', '/inventory/stocktake'),
+  /** Plan a pasted stocktake (apply=false) or carry it out (apply=true). */
+  importStocktake: (text, apply) => request('POST', '/inventory/stocktake', { text, apply: !!apply }),
   /** Owner/admin: add or update an inventory item. */
   saveItem: (item) => request('POST', '/inventory', item),
   /** Owner/admin: delete an inventory item. */

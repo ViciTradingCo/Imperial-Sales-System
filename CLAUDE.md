@@ -37,7 +37,8 @@ The only Google product still involved is **Sign-In** (identity). Full detail in
   are re-read from the `users` row on every request, which is what makes a
   day-long credential safe.
 - **Roles:** `admin` (Core Dashboard + Market Analysis + all), `owner` (their
-  business + manage employees), `employee` (their business only).
+  business + manage employees), `manager` (an employee the owner appointed to run
+  the shop — see Roles below), `employee` (their business only).
 - **Data:** everything is in D1 via `worker/src/db.js`. There is no
   service-account key. Registry modules (`users.js`, `registry.js`, `cert.js`,
   `settings.js`, `business-settings.js`, `motd.js`) are D1-backed.
@@ -58,8 +59,10 @@ cd worker && npm install && npx wrangler dev    # API locally (localhost:8787)
 cd worker && npx wrangler deploy                # deploy the API
 ```
 
-No test suite exists yet. Setup (Google Cloud, Cloudflare, Pages) is in
-`docs/SETUP.md`.
+Tests are Vitest against a `node:sqlite` D1 shim (`worker/test/d1shim.js`):
+`cd worker && npx vitest run`. `npm run audit` is the bloat audit — unused
+exports, dead CSS, stale translations, client/route drift. Setup (Google Cloud,
+Cloudflare, Pages) is in `docs/SETUP.md`.
 
 ## The look: a ledger you can type into
 
@@ -303,6 +306,10 @@ filters the session from then on.
 
 ## Roles
 
+- **Manager** — an employee the OWNER appointed to run the shop. Everything the
+  owner does day to day; what they cannot do is change WHO HAS POWER or WHAT
+  PEOPLE ARE PAID. Owner-only stays: setting pay/commission, appointing managers,
+  reissuing the staff code, renaming the shop, exporting the books.
 - **System Admin** — an address in the `ADMIN_EMAILS` worker var. Runs the
   deployment: creates/renames/deletes realms, moves people between them, and
   switches which realm they are viewing. Granted by config, never in-app, because
@@ -311,6 +318,55 @@ filters the session from then on.
   administrator of their OWN realm and nothing else; `guards.realmIdOf` refuses
   to return any realm but theirs, so the confinement is structural, not cosmetic.
 - **Shop Owner** / **Employee** — scoped to one business, as before.
+
+## Permission is ONE predicate per side, never a role list per call site
+
+`managesBusiness` / `requireManages` (worker `guards.js`) and `canManage` /
+`isOwner` (frontend `lib/roles.js`) are where the line lives. Before the manager
+role there were ~40 copies of `role !== 'owner' && role !== 'admin'`; adding a
+role to thirty-nine of them is how the fortieth becomes a hole nobody notices.
+A new capability picks one of these — it does not spell out roles again.
+
+`requireOwner` is the short dangerous list, and it is short ON PURPOSE. If a new
+route needs to be owner-only, say why in a comment where it is used.
+
+## Pay is stamped where it is EARNED, never recomputed at payout
+
+A finished shift keeps `time_card.rate`; a sale keeps `sales.commission`, worked
+out at checkout from the seller's own `users.commission_rate` (never from the
+request — the person at the register must not name their own percentage). A rate
+change therefore applies to what happens NEXT. Recomputing at payout would let a
+raise silently restate what an owner had already agreed to pay.
+
+Hourly and commission are INDEPENDENT halves — either may be 0, and a
+commission-only earner has no shifts at all, which is why `shopShifts` reads
+them separately and merges rather than hanging commission off shift rows.
+Settling a person settles both: it is one debt, and marking half would leave the
+screen disagreeing with what the owner just did.
+
+## Archiving is not deleting
+
+`archiveCompany` renames the shop and everything it owns to a unique key — which
+frees the name and stops a remade company inheriting the old one's history — and
+records `archived_from` / `archived_status` so `restoreCompany` can put it back
+as itself. Nothing is destroyed either way. Restore REFUSES when the old name has
+been taken rather than inventing a suffix; an admin decides what it is called.
+
+An archived shop does not trade: `checkCertification` returns EXPIRED for it
+BEFORE it looks at `perpetual`, or a perpetual archived shop goes on selling.
+
+## Bulk edits carry ONE kind of value
+
+The shelved inventory import (`archive/inventory-import/`) carried price, stock
+and low-stock on every line, so one paste could rewrite everything a shop
+charged. The stocktake that replaced it is `Name, Amount` and the Worker will not
+let a line move anything but a count. Anything the paste omits is LEFT ALONE — a
+partial list silently zeroing the rest is the worst thing it could do — and an
+unknown name is reported, never invented.
+
+`planStockImport` is the one planner for both preview and apply (the preview is
+the apply with the last step left off), so the two cannot promise different
+things.
 
 ## Join codes (registration)
 

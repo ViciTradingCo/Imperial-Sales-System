@@ -243,3 +243,110 @@ export async function convertItems(env, business, { inputs, output, idempotencyK
     inventory: await listInventory(env, business, realmId),
   };
 }
+
+/* ---- stock counts as plain text ---- */
+
+/**
+ * A stocktake, as text you can read: one `Name, Amount` line per item.
+ *
+ * Deliberately NAME AND COUNT ONLY. The old bulk import carried price, stock
+ * and the low-stock mark on every line, which made a paste into it able to
+ * rewrite every price a shop charged — that is why it was shelved (see
+ * `archive/inventory-import/`). Counting stock and pricing stock are different
+ * jobs, and this one only does the first: an import through here can move a
+ * count and can do nothing else whatever a line says.
+ */
+export async function stockText(env, business, realmId) {
+  const rows = await listInventory(env, business, realmId);
+  return rows.map((r) => r.item + ', ' + Math.floor(Number(r.stock) || 0)).join('\n');
+}
+
+/**
+ * Reads a pasted stocktake and works out what it would DO — without doing it.
+ *
+ * ONE planner for the preview and for the apply. They were separate functions
+ * in the shelved import, which is how a preview can promise one thing and the
+ * apply perform another; here the preview is literally the apply with the last
+ * step left off, so they cannot drift.
+ *
+ * The amount is the LAST number on the line, so an item whose name contains a
+ * comma still parses. A line that names nothing this shop stocks is REPORTED,
+ * not invented: creating inventory from a paste would go around the item index
+ * the register picks from, which is the same reason `setStock` refuses to.
+ */
+export function planStockImport(text, inventory) {
+  const have = new Map();
+  (inventory || []).forEach((r) => have.set(String(r.item).trim().toLowerCase(), r));
+
+  // Keyed by item, not appended, so the SAME item named twice resolves to ONE
+  // change — the last line. Appending gave a plan with two rows for it and an
+  // "applied" count that double-counted; the writes happened to land on the
+  // right number, so the only thing wrong was what the preview promised, which
+  // is the one thing a preview has to get right.
+  const decided = new Map();
+  const unknown = [];
+  const invalid = [];
+  const seen = new Set();
+
+  String(text || '').split('\n').forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line) return;
+    // A pasted spreadsheet usually brings its header with it. It parses as a
+    // line with no number, so it lands in `invalid` and says so rather than
+    // being silently dropped — but a first line that is exactly the header this
+    // export writes is a header, not a mistake.
+    if (i === 0 && /^\s*(item|name)\s*,?\s*(amount|qty|quantity|stock)?\s*$/i.test(line)) return;
+
+    const m = line.match(/^(.*?)[,\s]+(-?\d+(?:\.\d+)?)\s*$/);
+    if (!m) { invalid.push({ line, why: 'no amount on this line' }); return; }
+    const name = m[1].trim().replace(/,$/, '').trim();
+    const n = Math.floor(Number(m[2]));
+    if (!name) { invalid.push({ line, why: 'no item name' }); return; }
+    if (!isFinite(n) || n < 0) { invalid.push({ line, why: 'an amount cannot be negative' }); return; }
+
+    const key = name.toLowerCase();
+    // The same item twice in one paste: the last line wins, and both are shown
+    // so nobody is surprised by which.
+    if (seen.has(key)) invalid.push({ line, why: 'listed more than once — the last one wins' });
+    seen.add(key);
+
+    const row = have.get(key);
+    if (!row) { unknown.push({ item: name, stock: n }); return; }
+    const was = Math.floor(Number(row.stock) || 0);
+    decided.set(key, { item: row.item, was, now: n, delta: n - was });
+  });
+
+  const changes = [];
+  const unchanged = [];
+  decided.forEach((c) => {
+    if (c.was === c.now) unchanged.push({ item: c.item, stock: c.now });
+    else changes.push(c);
+  });
+
+  // What the paste did NOT mention. Left exactly as it is — a stocktake of the
+  // back room is not a claim that everything else is gone, and a partial list
+  // silently zeroing the rest is the worst thing this could possibly do.
+  const untouched = (inventory || []).filter((r) => !seen.has(String(r.item).trim().toLowerCase())).length;
+
+  return { changes, unchanged, unknown, invalid, untouched };
+}
+
+/**
+ * Applies a pasted stocktake: sets counts, and nothing else.
+ *
+ * Every line is planned before any is written and the writes go in one
+ * `db.batch`, so a stocktake lands whole or not at all — the same rule a
+ * delivery follows.
+ */
+export async function importStockText(env, business, text, realmId) {
+  const inventory = await listInventory(env, business, realmId);
+  const plan = planStockImport(text, inventory);
+  if (!plan.changes.length) return { ...plan, applied: 0, inventory };
+
+  const db = await getDb(env);
+  await db.batch(plan.changes.map((c) => db.prepare(
+    'UPDATE inventory SET stock = ? WHERE realm_id = ? AND business = ? AND item = ?')
+    .bind(c.now, realmId, business, c.item)));
+
+  return { ...plan, applied: plan.changes.length, inventory: await listInventory(env, business, realmId) };
+}

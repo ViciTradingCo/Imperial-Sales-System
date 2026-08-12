@@ -10,6 +10,19 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.6', date: '2026-08-12', notes: [
+    'MANAGERS. An owner can appoint any employee as a manager, from the Roster. A manager runs the shop as the owner does — buying, inventory, the roster, notices, the shop ledger, transfers, the time card log — so a shop no longer stops when its owner is not online.',
+    'What stays the owner\'s alone: setting what people are paid, appointing other managers, reissuing the staff code, renaming the shop, and exporting the books. A manager cannot give themselves a raise or hand the shop to anybody.',
+    'COMMISSION. Set a percentage beside an employee\'s hourly rate — one, the other, or both. They earn that share of every sale they ring up, worked out on what the shop actually took after any discount.',
+    'The time card payout now reads Hourly, Commission and Total, per person and across the shop, so the figure you settle is one you can check. Employees see the same split for their own work. Marking somebody paid settles both halves at once.',
+    'A rate change applies to what happens next, never to what has already been earned — a finished shift keeps its rate and a rung-up sale keeps its commission, so a raise never restates what you already agreed to pay. Voiding a sale takes its commission back with it, unless it has already been paid out.',
+    'STOCKTAKE. Inventory has a Stocktake button: your counts as plain text, one “Name, Amount” per line. Copy it out, count the back room, paste it back. It shows you exactly what will change before it changes anything.',
+    'It sets counts and nothing else — no prices are touched — and anything you leave out is left alone, so counting one shelf is safe to paste on its own. An item your shop does not stock is reported rather than invented.',
+    'ARCHIVING A COMPANY. What was the Company List\'s Delete button is now Archive, and it says what it does: the shop stops trading and leaves the list, and nothing is deleted.',
+    'New: Archived companies, beside the search. Restoring one brings it back exactly as it was — its people, its stock, its books and its settings all return with it, and it takes its old name back. For a shop that leaves the server and comes back later, nothing is lost in between.',
+    'Archiving still frees the shop\'s name for somebody else. If that name has been taken by the time you restore, you are told so and asked to sort it out, rather than the shop quietly coming back under a different one.',
+    'Fixed: an archived shop with a perpetual certification could still ring up sales. It cannot now.',
+  ] },
   { version: '3.5', date: '2026-08-11', notes: [
     'Fixed: you could not approve a new employee. Anyone waiting to be activated showed up on the Roster as a blank line with a stray tick box on it — their name, their pending badge and the Activate button beside it were all there, squeezed to nothing by a tick box that had stretched itself across the whole row. Every roster row now reads properly and Activate is where it should be.',
     'The same stretched tick box could have turned up anywhere a new one was added. It is fixed once, for all of them, rather than on the Roster alone.',

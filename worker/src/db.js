@@ -163,7 +163,11 @@ const SCHEMA = [
      business TEXT NOT NULL, point_of_contact TEXT,
      until TEXT, perpetual INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT '',
      hold TEXT, court INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0,
-     join_code TEXT)`,
+     join_code TEXT,
+     -- Archiving renames the shop (and everything it owns) to a unique key so
+     -- the original name is free for someone else. These remember what it WAS,
+     -- so a shop that comes back comes back as itself rather than as the key.
+     archived_from TEXT, archived_status TEXT, archived_at TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_companies_business ON companies (business)`,
   // Network Master Settings (label → value) PER REALM; schema lives in settings.js.
   `CREATE TABLE IF NOT EXISTS master_settings (
@@ -317,6 +321,11 @@ const MIGRATIONS = [
   // also the default — a rate exists only where an owner has set one, and an
   // employee may have this, an hourly rate, or both.
   'ALTER TABLE users ADD COLUMN commission_rate REAL NOT NULL DEFAULT 0',
+  // What an archived company was called, and what state it was in, so it can be
+  // put back exactly as it left.
+  'ALTER TABLE companies ADD COLUMN archived_from TEXT',
+  'ALTER TABLE companies ADD COLUMN archived_status TEXT',
+  'ALTER TABLE companies ADD COLUMN archived_at TEXT',
   // Commission is stamped on the SALE, so a later change of rate cannot restate
   // what was already earned. employee_uid is how a payout finds it after a
   // character rename.

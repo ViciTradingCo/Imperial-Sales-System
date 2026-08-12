@@ -15,6 +15,8 @@ import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { pager } from '../lib/paginate.js';
 import { openFocalMenu } from '../lib/tiles.js';
+import { toast } from '../lib/toast.js';
+import { emptyState } from '../lib/empty.js';
 
 const PAGE_SIZE = 25;
 const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
@@ -30,6 +32,9 @@ export function renderCompanies(container, { me } = {}) {
     el('h2', {}, 'Company List'),
     el('p', { class: 'note' }, 'Every registered business. Edit renames a company, Subscription sets its ' +
       'certification, and Ledger opens a read-only view of its books.'),
+    el('div', { class: 'row-actions' }, [
+      el('button.secondary-btn', { onclick: () => openArchiveModal(load) }, 'Archived companies'),
+    ]),
     search,
     listHost,
   ]));
@@ -68,21 +73,31 @@ export function renderCompanies(container, { me } = {}) {
           el('button.primary.small', { onclick: () => openNameModal(c, load) }, 'Edit'),
           el('button.secondary-btn.small', { onclick: () => openSubscriptionModal(c, load) }, 'Subscription'),
           el('button.secondary-btn.small', { onclick: () => openLedgerModal(c) }, 'Ledger'),
-          el('button.danger.small', { onclick: () => remove(c) }, 'Delete'),
+          el('button.danger.small', { onclick: () => remove(c) }, 'Archive'),
         ]),
       ]);
     }));
   }
 
+  /**
+   * Archiving is not deleting, and the wording has to say so — the button read
+   * "Delete" and warned that the records "can never be pulled back", which was
+   * true of a REMADE company pulling the old one's history, and read as "this
+   * is gone forever". Nothing is destroyed; the shop leaves the list and can be
+   * brought back exactly as it was.
+   */
   async function remove(c) {
-    if (!window.confirm('Delete "' + (c.business || 'this company') + '"?\n\n' +
-      'Its market data is kept for analysis but archived — the name is freed and ' +
-      'the archived records can never be pulled back if the company is remade.')) return;
+    if (!window.confirm('Archive "' + (c.business || 'this company') + '"?\n\n' +
+      'It stops trading and leaves this list. Nothing is deleted — its people, stock, books and ' +
+      'settings are all kept, and you can restore it exactly as it is from Archived companies.\n\n' +
+      'The name "' + (c.business || '') + '" becomes free for someone else. If it is taken before you ' +
+      'restore this one, you will be asked to sort that out first.')) return;
     mount(listHost, el('p', { class: 'note' }, 'Archiving…'));
     try {
-      const res = await api.deleteCompany(c.id);
+      const res = await api.archiveCompany(c.id);
       all = res.companies || [];
       draw();
+      toast('Archived. You can restore it from Archived companies.', 'ok');
     } catch (e) {
       mount(listHost, el('p', { class: 'error' }, e.message || String(e)));
     }
@@ -304,4 +319,77 @@ function openSubscriptionModal(company, onSaved) {
     save,
     status,
   ]);
+}
+
+/**
+ * THE ARCHIVE — shops that have left, and the way back.
+ *
+ * Archiving was a one-way door dressed up as a delete: it renamed the company
+ * and everything it owned to a unique key and there was no screen that could
+ * see the result, let alone undo it. A shop that leaves the server and comes
+ * back a month later is an ordinary thing to happen, and it should not cost
+ * everyone their inventory, their books and their roster.
+ *
+ * Restoring puts the NAME back, and everything follows it — the people, the
+ * stock, the sales, the coffer, the settings — because they were all renamed
+ * together and are renamed back together.
+ */
+function openArchiveModal(onRestored) {
+  const listHost = el('div', {}, skeletonRows(3));
+  let modal;
+
+  function load() {
+    api.getArchivedCompanies()
+      .then((r) => draw(r.archived || []))
+      .catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
+  }
+
+  function draw(rows) {
+    if (!rows.length) {
+      mount(listHost, emptyState({ glyph: '🗄️', title: 'Nothing archived',
+        hint: 'Companies you archive from the list appear here, ready to be restored.' }));
+      return;
+    }
+    mount(listHost, ...rows.map((c) => el('div', { class: 'member-row' }, [
+      el('p', { html:
+        '<b>' + esc(c.archivedFrom || c.business) + '</b>' +
+        '<br><span class="note">' + (c.archivedAt ? 'Archived ' + esc(c.archivedAt.slice(0, 10)) : 'Archived') +
+        (c.pointOfContact ? ' · ' + esc(c.pointOfContact) : '') + '</span>' }),
+      el('span', { class: 'row-actions' }, [
+        el('button.primary.small', { onclick: () => restore(c) }, 'Restore'),
+      ]),
+    ])));
+  }
+
+  async function restore(c) {
+    const name = c.archivedFrom || c.business;
+    if (!window.confirm('Restore "' + name + '"?\n\n' +
+      'It comes back exactly as it was — its people, stock, books and settings all return with it, ' +
+      'and it takes its old name back.')) return;
+    mount(listHost, el('p', { class: 'note' }, 'Restoring…'));
+    try {
+      const res = await api.restoreCompany(c.id);
+      draw(res.archived || []);
+      toast(res.business + ' is back.', 'ok');
+      onRestored(); // the main list has gained a company
+    } catch (e) {
+      // The likely failure is the name having been taken while it was away, and
+      // that message explains what to do about it — so it is shown in place
+      // rather than as a toast that vanishes before it can be read.
+      mount(listHost, el('p', { class: 'error' }, e.message || String(e)));
+      const back = el('button.secondary-btn.small', { onclick: load }, 'Back to the archive');
+      listHost.appendChild(el('div', { class: 'row-actions' }, [back]));
+    }
+  }
+
+  load();
+  modal = openModal([
+    el('h3', {}, '🗄️ Archived companies'),
+    el('p', { class: 'note' }, 'Shops that have left the network. Nothing here has been deleted — restoring ' +
+      'one brings it back exactly as it was, with its people, stock, books and settings.'),
+    el('p', { class: 'note' }, 'A restored company takes its old name back, so if somebody else has ' +
+      'registered under that name since, you will be asked to sort that out first.'),
+    listHost,
+  ]);
+  return modal;
 }

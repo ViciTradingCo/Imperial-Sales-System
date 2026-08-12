@@ -306,11 +306,17 @@ export async function updateCompany(env, { id, name, until, perpetual, hold, cou
 }
 
 /**
- * Archives (the delete action) a company. Its market data is RETAINED for
- * analysis but moved out of reach of any future company: we rename the business
- * — and all its records — to a unique archived key, mark the row ARCHIVED, and
- * free the original name for re-use. A remade company starts clean and can never
- * pull the archived company's history.
+ * ARCHIVES a company — it stops trading and leaves the active list, and nothing
+ * whatever is deleted.
+ *
+ * The name is what moves. The shop — and every record belonging to it — is
+ * renamed to a unique archived key, which does two things at once: it frees the
+ * original name for somebody else, and it means a company registered under that
+ * name later starts clean and can never pull the archived shop's history.
+ *
+ * What it WAS is remembered on the row, so a shop that comes back comes back as
+ * itself. Before this, the mangled name was all there was and archiving was a
+ * one-way door dressed up as a delete.
  */
 export async function archiveCompany(env, id, realmId) {
   const targetId = String(id || '').trim();
@@ -324,8 +330,75 @@ export async function archiveCompany(env, id, realmId) {
   const oldName = String(current.business || '').trim();
   const archivedName = oldName + ' [archived ' + Date.now().toString(36) + ']';
   await renameBusiness(env, oldName, archivedName, realm); // moves the name everywhere, incl. D1 data
-  await db.prepare("UPDATE companies SET status = 'ARCHIVED' WHERE id = ? AND realm_id = ?").bind(targetId, realm).run();
+  await db.prepare(
+    `UPDATE companies SET status = 'ARCHIVED', archived_from = ?, archived_status = ?, archived_at = ?
+      WHERE id = ? AND realm_id = ?`)
+    .bind(oldName, String(current.status || ''), new Date().toISOString(), targetId, realm).run();
 
   bustRegistryCache();
+  bustUserCache(); // its people moved with it
   return listCompanies(env, realm);
+}
+
+/** Companies that have been archived, newest first — the restore list. */
+export async function listArchivedCompanies(env, realmId) {
+  const db = await getDb(env);
+  const { results } = await db.prepare(
+    "SELECT * FROM companies WHERE upper(status) = 'ARCHIVED' AND realm_id = ? ORDER BY archived_at DESC")
+    .bind(String(realmId || DEFAULT_REALM_ID)).all();
+  return (results || []).map((r) => ({
+    ...rowToCompany(r),
+    // What it was called, and when it left. The stored `business` is the
+    // archived key, which is not a name anybody would recognise.
+    archivedFrom: String(r.archived_from || '').trim(),
+    archivedAt: String(r.archived_at || '').trim(),
+  }));
+}
+
+/**
+ * RESTORES an archived company, as it was.
+ *
+ * The name goes back, and everything that followed it into the archive follows
+ * it out — the roster, the inventory, the sales, the coffer, the settings — 
+ * because they were all renamed together and are renamed back together.
+ *
+ * REFUSED if the original name has been taken while it was away. That is a real
+ * situation, not a corner case: freeing the name is the point of archiving. It
+ * is refused rather than resolved with a suffix, because a shop quietly coming
+ * back as "The Forge (2)" is not the shop coming back — an admin has to decide
+ * what it should be called, and can rename it after restoring.
+ */
+export async function restoreCompany(env, id, realmId) {
+  const targetId = String(id || '').trim();
+  if (!targetId) throw new Error('Missing company id.');
+  const realm = String(realmId || DEFAULT_REALM_ID);
+  const db = await getDb(env);
+  const current = await db.prepare('SELECT * FROM companies WHERE id = ? AND realm_id = ?').bind(targetId, realm).first();
+  if (!current) throw new Error('Company not found.');
+  if (String(current.status || '').trim().toUpperCase() !== 'ARCHIVED') {
+    throw new Error('That company is not archived.');
+  }
+
+  const archivedName = String(current.business || '').trim();
+  // Older archives predate this being recorded; strip the key off the stored
+  // name so they can still be restored rather than being stuck forever.
+  const wanted = String(current.archived_from || '').trim()
+    || archivedName.replace(/\s*\[archived [^\]]*\]\s*$/, '').trim();
+  if (!wanted) throw new Error('There is no record of what this company was called.');
+
+  const clash = await findBusinessByName(env, wanted, realm);
+  if (clash && clash.ledgerId !== targetId) {
+    throw new Error('A company named "' + wanted + '" is registered again, so this one cannot take its ' +
+      'name back. Rename or archive that one first, or restore this one and rename it afterwards.');
+  }
+
+  await renameBusinessData(env, archivedName, wanted, realm);
+  await db.prepare(
+    `UPDATE companies SET business = ?, status = ?, archived_from = NULL, archived_status = NULL, archived_at = NULL
+      WHERE id = ? AND realm_id = ?`)
+    .bind(wanted, String(current.archived_status || ''), targetId, realm).run();
+
+  bustRegistryCache();
+  bustUserCache(); // its people came back with it
+  return { business: wanted, companies: await listCompanies(env, realm) };
 }

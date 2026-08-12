@@ -8,7 +8,7 @@ import { requireAdmin, requireSystemAdmin, requireManages, requireOwner, actorNa
 import { logAudit, listAudit, listAuditActions } from '../audit.js';
 import { readSettings, writeSettings } from '../settings.js';
 import { listAllUsers, updateMember, deleteMember, setActiveRealm, transferMember, findUserByUid, isConfiguredAdmin } from '../users.js';
-import { listCompanies, updateCompany, archiveCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
+import { listCompanies, listArchivedCompanies, updateCompany, archiveCompany, restoreCompany, transferCompany, businessJoinCode, regenerateBusinessCode } from '../registry.js';
 import { collectExport, restoreImport, previewImport, gzipJson } from '../export.js';
 import { marketAnalysis, itemReport } from '../market.js';
 import { systemStatus, clearErrors } from '../status.js';
@@ -125,11 +125,24 @@ async function updateCompanyRoute({ request, env, body }) {
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.update', detail: (body.name || '') + (body.court ? ' [Court]' : ''), realmId: realmIdOf(caller, env) });
   return { companies };
 }
-async function deleteCompanyRoute({ request, env, body }) {
+async function archiveCompanyRoute({ request, env, body }) {
   const caller = await requireAdmin(request, env);
-  const companies = await archiveCompany(env, body.id, realmIdOf(caller, env));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.archive', detail: 'id ' + body.id, realmId: realmIdOf(caller, env) });
-  return { companies };
+  const realmId = realmIdOf(caller, env);
+  const companies = await archiveCompany(env, body.id, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.archive', detail: 'id ' + body.id, realmId });
+  return { companies, archived: await listArchivedCompanies(env, realmId) };
+}
+/** The archive itself — what an admin picks from to bring a shop back. */
+async function archivedCompaniesRoute({ request, env }) {
+  const caller = await requireAdmin(request, env);
+  return { archived: await listArchivedCompanies(env, realmIdOf(caller, env)) };
+}
+async function restoreCompanyRoute({ request, env, body }) {
+  const caller = await requireAdmin(request, env);
+  const realmId = realmIdOf(caller, env);
+  const res = await restoreCompany(env, body.id, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'company.restore', detail: res.business, realmId });
+  return { ...res, archived: await listArchivedCompanies(env, realmId) };
 }
 
 /**
@@ -610,7 +623,9 @@ export const routes = [
   { method: 'GET', path: '/admin/companies', handler: listCompaniesRoute },
   { method: 'GET', path: '/admin/companies/ledger', handler: companyLedger },
   { method: 'POST', path: '/admin/companies/update', handler: updateCompanyRoute },
-  { method: 'POST', path: '/admin/companies/delete', handler: deleteCompanyRoute },
+  { method: 'POST', path: '/admin/companies/archive', handler: archiveCompanyRoute },
+  { method: 'GET', path: '/admin/companies/archived', handler: archivedCompaniesRoute },
+  { method: 'POST', path: '/admin/companies/restore', handler: restoreCompanyRoute },
   { method: 'GET', path: '/admin/export', handler: exportData },
   { method: 'POST', path: '/admin/import/preview', handler: importPreview },
   { method: 'POST', path: '/admin/import', handler: importData },

@@ -28,12 +28,19 @@ export async function checkCertification(env, business, realmId) {
   let row;
   try {
     const db = await getDb(env);
-    row = await db.prepare('SELECT perpetual, until FROM companies WHERE realm_id = ? AND lower(business) = ?')
+    row = await db.prepare('SELECT perpetual, until, status FROM companies WHERE realm_id = ? AND lower(business) = ?')
       .bind(realmId, target).first();
   } catch (e) {
     return { status: 'EXPIRED', until: '', error: 'Could not read the registry.' }; // transient — not cached
   }
   if (!row) return put({ status: 'EXPIRED', until: '' }); // business not certified yet
+  // AN ARCHIVED SHOP DOES NOT TRADE, whatever its certification says. This is
+  // checked BEFORE perpetual, which is the whole point: a perpetual shop that
+  // was archived kept returning VALID, so its staff could still ring up sales
+  // against a company that had left the network.
+  if (String(row.status || '').trim().toUpperCase() === 'ARCHIVED') {
+    return put({ status: 'EXPIRED', until: '', archived: true });
+  }
   if (Number(row.perpetual) === 1) return put({ status: 'VALID', perpetual: true });
   const d = new Date(String(row.until || ''));
   if (isNaN(d.getTime())) return put({ status: 'EXPIRED', until: '' });

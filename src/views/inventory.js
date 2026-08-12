@@ -15,7 +15,7 @@
  * list rather than a thing that happens at a counter.
  */
 import { money } from '../lib/format.js';
-import { el, mount, esc } from '../lib/dom.js';
+import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
@@ -42,6 +42,7 @@ export function renderInventory(container, { me }) {
   if (canEdit) {
     firstCard.push(el('div', { class: 'row-actions' }, [
       el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshInventory) }, 'Transfer'),
+      el('button.secondary-btn', { onclick: () => openStocktakeModal(refreshInventory) }, 'Stocktake'),
     ]));
   }
   firstCard.push(listHost);
@@ -336,5 +337,110 @@ function openTransferModal(me, onChanged) {
     el('hr', {}),
     el('h3', {}, 'Recent transfers'),
     historyHost,
+  ]);
+}
+
+/**
+ * STOCKTAKE — the counts as text, out and back in again.
+ *
+ * `Name, Amount`, and deliberately nothing else. A bulk import over this list
+ * existed once and was shelved (see `archive/inventory-import/`) because it
+ * carried prices too, so one bad paste could rewrite everything the shop
+ * charged. Counting stock and pricing stock are different jobs; this does the
+ * first, and the Worker will not let a line here do the second whatever it says.
+ *
+ * The paste is CHECKED BEFORE IT IS APPLIED, and the check is the same call
+ * with `apply` left off — so what the preview promises is what the apply does,
+ * rather than two code paths that can drift apart.
+ */
+function openStocktakeModal(onSaved) {
+  const text = el('textarea', { rows: '12', placeholder: 'Iron Sword, 12\nHealth Potion, 40' });
+  const status = el('p', {});
+  const report = el('div', {});
+  const check = el('button.secondary-btn', { onclick: () => run(false) }, 'Check this paste');
+  const apply = el('button.primary', { onclick: () => run(true) }, 'Apply');
+  apply.hidden = true; // nothing to apply until a check says there is
+  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
+
+  const copy = el('button.secondary-btn.small', { onclick: async () => {
+    try { await navigator.clipboard.writeText(current.value); toast('Copied.', 'ok'); }
+    catch (e) { current.select(); toast('Select and copy — the browser would not do it for us.', 'warn'); }
+  } }, 'Copy');
+  const current = el('textarea', { rows: '8', readonly: 'readonly' });
+  api.getStocktake().then((r) => { current.value = r.text || ''; })
+    .catch((e) => { current.value = e.message || String(e); });
+
+  let modal;
+  async function run(doIt) {
+    check.disabled = true; apply.disabled = true;
+    setStatus(doIt ? 'Applying…' : 'Checking…', '');
+    try {
+      const r = await api.importStocktake(text.value, doIt);
+      draw(r, doIt);
+      if (doIt) {
+        toast(r.applied ? 'Set ' + r.applied + ' count' + (r.applied === 1 ? '' : 's') + '.' : 'Nothing to change.', 'ok');
+        onSaved();
+        // The list underneath has moved on, so the "current" box must too or it
+        // is showing counts that are no longer true.
+        api.getStocktake().then((rr) => { current.value = rr.text || ''; }).catch(() => {});
+        text.value = '';
+        apply.hidden = true;
+      }
+    } catch (e) {
+      setStatus(e.message || String(e), 'error');
+      mount(report);
+    } finally {
+      check.disabled = false; apply.disabled = false;
+    }
+  }
+
+  function draw(r, applied) {
+    const nodes = [];
+    const line = (label, cls) => el('p', { class: cls || 'note' }, label);
+    if (r.changes.length) {
+      nodes.push(el('h4', {}, applied ? 'Changed' : 'Would change'));
+      nodes.push(el('div', { class: 'table-scroll' }, tableEl(
+        ['Item', 'From', 'To', ''],
+        r.changes.map((c) => [c.item, String(c.was), String(c.now),
+          (c.delta > 0 ? '+' : '') + c.delta]))));
+    } else {
+      nodes.push(line('Nothing to change — every count in the paste already matches.'));
+    }
+    if (r.unchanged.length) nodes.push(line(r.unchanged.length + ' already correct.'));
+    if (r.untouched) {
+      nodes.push(line(r.untouched + ' item' + (r.untouched === 1 ? '' : 's') +
+        ' in your inventory ' + (r.untouched === 1 ? 'was' : 'were') + ' not in the paste, and ' +
+        (r.untouched === 1 ? 'was' : 'were') + ' left exactly as ' + (r.untouched === 1 ? 'it is' : 'they are') + '.'));
+    }
+    if (r.unknown.length) {
+      nodes.push(el('h4', {}, 'Not in your inventory'));
+      nodes.push(line('These were skipped. A stocktake corrects what you hold; it cannot create a listing — ' +
+        'record an intake to stock something new.', 'warn'));
+      nodes.push(el('p', { class: 'note' }, r.unknown.map((u) => u.item).join(', ')));
+    }
+    if (r.invalid.length) {
+      nodes.push(el('h4', {}, 'Could not read'));
+      nodes.push(el('div', {}, r.invalid.map((i) =>
+        el('p', { class: 'note' }, '“' + i.line + '” — ' + i.why))));
+    }
+    mount(report, ...nodes);
+    apply.hidden = applied || !r.changes.length;
+    setStatus('');
+  }
+
+  modal = openModal([
+    el('h3', {}, '📋 Stocktake'),
+    el('p', { class: 'note' }, 'Your counts as plain text — one item per line, ' +
+      'as “Name, Amount”. Copy it out, count the back room, paste it back.'),
+    el('label', {}, 'What you hold now'),
+    current,
+    el('div', { class: 'row-actions' }, [copy]),
+    el('label', {}, 'Paste your counts here'),
+    text,
+    el('p', { class: 'note' }, 'This sets COUNTS and nothing else — no prices are touched. Anything you ' +
+      'leave out is left exactly as it is, so a count of one shelf is safe to paste on its own.'),
+    el('div', { class: 'row-actions' }, [check, apply]),
+    status,
+    report,
   ]);
 }
