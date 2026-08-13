@@ -118,20 +118,25 @@ export function renderPos(container, { me, mode }) {
   let discounts = [];
   let style = {};
   let master = [];
-  const cart = []; // [{ item, qty, price }]
+  let bundles = [];
+  // A line is either an ITEM — { item, qty, price } — or a BUNDLE, which carries
+  // { bundle, qty } and nothing about money: the Worker looks up what one costs.
+  const cart = [];
 
   Promise.all([
     api.getCert(), api.getInventory(), api.getRegions(),
     api.getDiscounts().catch(() => ({ discounts: [] })),
     api.getStyle().catch(() => ({})),
     api.getItems().catch(() => ({ items: [] })),
+    api.getBundles().catch(() => ({ bundles: [] })),
   ])
-    .then(([cert, inv, hs, dc, st, mi]) => {
+    .then(([cert, inv, hs, dc, st, mi, bn]) => {
       inventory = inv.inventory || [];
       holds = hs.holds || [];
       discounts = dc.discounts || [];
       style = st || {};
       master = mi.items || [];
+      bundles = bn.bundles || [];
       // Shop style: a tagline strip (coloured by the shop's accent) on the header.
       if (style.tagline) {
         const strip = el('p', { class: 'shop-tagline' }, style.tagline);
@@ -203,6 +208,36 @@ export function renderPos(container, { me, mode }) {
     }
     rebuildSuggestions();
     const addBtn = el('button.secondary-btn', { onclick: addToCart }, 'Add to order');
+
+    /**
+     * The shop's SPECIALS — a bundle goes into the cart as one line.
+     *
+     * Hidden entirely when the shop has none, rather than sitting there empty:
+     * a picker with nothing in it is a question nobody can answer.
+     */
+    const bundleSel = el('select', {}, el('option', { value: '' }, 'Pick a special…'));
+    bundles.forEach((b) => bundleSel.appendChild(el('option', { value: String(b.id) },
+      b.name + ' — ' + money(b.price) + ' for ' + b.units + ' item' + (b.units === 1 ? '' : 's'))));
+    const bundleQty = el('input', { type: 'number', min: '1', step: '1', value: '1', 'aria-label': 'How many of this special' });
+    const addBundle = el('button.secondary-btn', { onclick: () => {
+      const b = bundles.find((x) => String(x.id) === bundleSel.value);
+      if (!b) { setStatus('Pick a special first.', 'error'); return; }
+      const n = Math.floor(Number(bundleQty.value)) || 1;
+      if (n < 1) { setStatus('How many?', 'error'); return; }
+      if (!idemKey) idemKey = newIdem();
+      cart.push({ bundle: b.name, qty: n, price: b.price, parts: b.parts });
+      bundleSel.value = ''; bundleQty.value = '1';
+      setStatus('', '');
+      renderCart();
+    } }, 'Add special');
+    const bundleCard = el('div.card', {}, [
+      el('h3', {}, 'Specials'),
+      el('p', { class: 'note' }, 'A set of items for one price. It rings up as a single line and takes ' +
+        'everything in it out of stock.'),
+      el('label', {}, 'Special'), bundleSel,
+      el('label', {}, 'How many'), bundleQty,
+      el('div', { class: 'row-actions' }, [addBundle]),
+    ]);
 
     const cartHost = el('div', {}, emptyState({ glyph: '🧺', title: 'Cart is empty', hint: 'Search the item index above and add items to build the order.' }));
 
@@ -283,8 +318,14 @@ export function renderPos(container, { me, mode }) {
     function renderCart() {
       if (!cart.length) { mount(cartHost, emptyState({ glyph: '🧺', title: 'Cart is empty', hint: 'Search the item index above and add items to build the order.' })); return; }
       const rows = cart.map((line, i) => el('div.emp-row', {}, [
-        el('span', { html: '<b>' + esc(line.item) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
-          ' = ' + money(line.qty * line.price) }),
+        el('span', { class: 'emp-who', html: line.bundle
+          // A bundle says what is IN it, because "Feast ×1" alone does not tell
+          // the clerk what is about to leave the shelf.
+          ? '<b>' + esc(line.bundle) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
+            ' = ' + money(line.qty * line.price) +
+            '<br><span class="note">' + esc(line.parts.map((p) => p.item + ' ×' + p.qty * line.qty).join(', ')) + '</span>'
+          : '<b>' + esc(line.item) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
+            ' = ' + money(line.qty * line.price) }),
         el('button.secondary-btn.small', { onclick: () => { cart.splice(i, 1); renderCart(); } }, 'Remove'),
       ]));
       const total = cart.reduce((s, l) => s + l.qty * l.price, 0);
@@ -349,7 +390,11 @@ export function renderPos(container, { me, mode }) {
       setStatus('Completing…', '');
       // Snapshot the order so it can be queued verbatim if the network is down.
       const sale = {
-        cart: cart.slice(), customer: customer.value.trim(), hold: holdSel.value,
+        // A bundle line is sent as its NAME and how many. Its price and its
+        // contents are the shop's, read server-side — the till does not get to
+        // name either, and the copy held here is only for showing the cart.
+        cart: cart.map((l) => (l.bundle ? { bundle: l.bundle, qty: l.qty } : { item: l.item, qty: l.qty, price: l.price })),
+        customer: customer.value.trim(), hold: holdSel.value,
         discountName: discName.value.trim(), discountPercent: adjustment(),
         staffPurchase: staffBox.checked,
         idempotencyKey: idemKey,
@@ -406,6 +451,7 @@ export function renderPos(container, { me, mode }) {
         el('label', {}, 'Sold for per item (gp)'), price,
         addBtn,
       ]),
+      ...(bundles.length ? [bundleCard] : []),
       // Customer Details sits above the Order tab…
       el('div.card', {}, [
         el('h3', {}, 'Customer Details'),

@@ -19,6 +19,7 @@ import { checkout, listSales, voidSale, employeePerformance } from '../sales.js'
 import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory } from '../transfers.js';
 import { cofferSummary, adjustCoffer } from '../coffers.js';
 import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
+import { listBundles, saveBundle, deleteBundle } from '../bundles.js';
 import { getShopStyle, setShopStyle } from '../shop-style.js';
 import { activeGlobalNotices, readWarnDays, activeNoticesForBusiness,
   listMotdsForBusiness, addMotdForBusiness, updateMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
@@ -573,6 +574,26 @@ async function getDiscounts({ request, env }) {
   const caller = await requireRegistered(request, env);
   return { discounts: await listDiscounts(env, caller.business, realmIdOf(caller, env)) };
 }
+/* ---- bundles: several items, one price ---- */
+async function getBundles({ request, env }) {
+  // Readable by ANY member: the register offers them, and the person at the
+  // till is usually not the one who set them up.
+  const caller = await requireRegistered(request, env);
+  return { bundles: await listBundles(env, caller.business, realmIdOf(caller, env)) };
+}
+async function saveBundleRoute({ request, env, body }) {
+  const caller = await requireManages(request, env);
+  const realmId = realmIdOf(caller, env);
+  const bundles = await saveBundle(env, caller.business, body, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'bundle.save',
+    detail: String(body.name || '').trim() + ' at ' + Number(body.price || 0), realmId });
+  return { bundles };
+}
+async function deleteBundleRoute({ request, env, body }) {
+  const caller = await requireManages(request, env);
+  return { bundles: await deleteBundle(env, caller.business, body.id, realmIdOf(caller, env)) };
+}
+
 async function addDiscountRoute({ request, env, body }) {
   const caller = await requireManages(request, env);
   return { discounts: await addDiscount(env, caller.business, body, realmIdOf(caller, env)) };
@@ -935,6 +956,9 @@ export const routes = [
   { method: 'POST', path: '/timecard/delete', handler: timecardDelete },
   { method: 'POST', path: '/business/employees/rate', handler: payRateRoute },
   { method: 'POST', path: '/business/employees/manager', handler: managerRoleRoute },
+  { method: 'GET', path: '/business/bundles', handler: getBundles },
+  { method: 'POST', path: '/business/bundles/save', handler: saveBundleRoute },
+  { method: 'POST', path: '/business/bundles/delete', handler: deleteBundleRoute },
   { method: 'GET', path: '/business/leave', handler: leavePreviewRoute },
   { method: 'POST', path: '/business/leave', handler: leaveBusinessRoute },
   { method: 'GET', path: '/inventory/stocktake', handler: stockTextRoute },

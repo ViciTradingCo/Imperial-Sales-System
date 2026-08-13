@@ -285,6 +285,28 @@ Presentation settings are set once at sign-in from `/auth/me`'s `prefs`, not
 fetched per screen. Threading them through every render function is how the
 register ended up the only place that honoured them.
 
+## A bundle is ONE LINE, priced by the Worker
+
+`bundles` holds a name, a price, and `parts` (JSON `{item, qty}`). At checkout a
+cart line is EITHER `{item, qty, price}` or `{bundle, qty}` — the client names a
+bundle and nothing else, because its price and contents are the shop's to state
+(the same rule as the harvest rate and the commission percentage).
+
+Expanding a bundle into its parts at the till was the alternative and is wrong
+twice: it would invent a per-item price for each part, which is a lie the market
+analysis would believe, or leave the total disagreeing with its lines. So the
+sale records the BUNDLE — which also means `canon()` never matches it, and a
+bundle price is correctly no evidence of what any item is worth.
+
+`encodeSaleItems` carries `parts` on a bundle line ONLY, and `voidSale` puts
+those back rather than the line's own name — otherwise a voided bundle would try
+to restock an item called "Tavern Feast" and the ales inside it would stay gone.
+`qty_total` counts the UNITS that moved, not the number of bundles.
+
+A Court's price controls apply to a bundle in AGGREGATE (the sum of its parts'
+floors and caps), since it has no per-item price to check and selling ten capped
+items for one price must not be a way around the cap.
+
 ## A discount and an upcharge are ONE signed percent
 
 `discounts.percent` is positive to take money off, negative to put it on, and

@@ -21,6 +21,8 @@ import { money } from '../lib/format.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { renderShopReport } from './shop-report.js';
 import { renderShopNotices } from './shop-notices.js';
+import { createItemPicker } from '../lib/item-picker.js';
+import { toast } from '../lib/toast.js';
 
 /** Renders a tile page, with the admin-assigned artwork once it arrives. */
 function tilePage(container, { title, note, sections }) {
@@ -59,8 +61,12 @@ export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
     note: (me.business || 'Your shop') + ' — how your shop is set up. Day-to-day figures are on the ' +
       'Shop Ledger tile at home; your staff code is on the Employees page, where you invite people.',
     sections: [
-      { key: 'led-discounts', label: 'Discounts & upcharges', hint: 'Reusable adjustments', glyph: '🏷️',
-        open: (host) => mount(host, discountsCard()) },
+      // ONE tile for the two, because they answer the same question — "what do
+      // I charge for this, other than the list price?" — and an owner setting up
+      // a Friday deal should not have to know in advance whether the app files
+      // it under a percentage or a basket.
+      { key: 'led-discounts', label: 'Specials & Discounts', hint: 'Bundles, discounts, upcharges', glyph: '🏷️',
+        open: (host) => mount(host, bundlesCard(), discountsCard()) },
       { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
         open: (host) => mount(host, exportCard()) },
       // Name, look, and tunables are one job — "set my shop up" — and were three
@@ -277,4 +283,157 @@ function styleCard() {
 function shortDate(ts) {
   const d = new Date(ts);
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+}
+
+/* ---- Specials: several items, one price ---- */
+/**
+ * A BUNDLE — "five ales and five stews, sixty gold".
+ *
+ * The two halves of this screen are the two ways a shop charges something other
+ * than the list price: a PERCENTAGE off (or on) the whole order, and a FIXED
+ * PRICE for a named set of goods. They sit together because that is one question
+ * to an owner, even though the app has to hold them differently.
+ *
+ * What it costs SEPARATELY is worked out here rather than stored, and shown
+ * beside the bundle price so the saving is visible while you set it — a deal
+ * whose parts have quietly become cheaper than the bundle is worth noticing.
+ */
+function bundlesCard() {
+  const list = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
+  const name = el('input', { type: 'text', placeholder: 'e.g. Tavern Feast' });
+  const price = el('input', { type: 'number', min: '0', step: '1', placeholder: 'Price for the lot' });
+  const rowsHost = el('div', {});
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save bundle');
+  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
+
+  let stock = [];          // what this shop actually sells
+  const rows = [];         // [{ node, picker, qty }]
+
+  function addRow(item, qty) {
+    const picker = createItemPicker({
+      placeholder: 'Item…',
+      meta: (it) => money(it.price) + ' each',
+      items: stock,
+    });
+    if (item) picker.setValue(item);
+    const q = el('input', { type: 'number', min: '1', step: '1', value: String(qty || 1), 'aria-label': 'How many' });
+    q.addEventListener('input', paintSum);
+    const remove = el('button.secondary-btn.small', { type: 'button', onclick: () => {
+      const i = rows.findIndex((r) => r.picker === picker);
+      if (i >= 0) { rows.splice(i, 1); draw(); paintSum(); }
+    } }, 'Remove');
+    const node = el('div', { class: 'craft-row' }, [picker.el, q, remove]);
+    rows.push({ node, picker, qty: q });
+    draw();
+    return picker;
+  }
+  function draw() { mount(rowsHost, ...rows.map((r) => r.node)); }
+
+  const sumLine = el('p', { class: 'note' });
+  function paintSum() {
+    const byName = new Map(stock.map((s) => [s.name.toLowerCase(), s.price]));
+    let sep = 0;
+    let known = 0;
+    rows.forEach((r) => {
+      const p = byName.get(String(r.picker.value() || '').trim().toLowerCase());
+      const n = Math.floor(Number(r.qty.value)) || 0;
+      if (p !== undefined && n > 0) { sep += p * n; known++; }
+    });
+    const asked = Number(price.value);
+    if (!known || !isFinite(asked) || !asked) { sumLine.textContent = ''; return; }
+    const diff = sep - asked;
+    sumLine.textContent = diff > 0
+      ? 'Separately these come to ' + money(sep) + ' — the bundle saves a customer ' + money(diff) + '.'
+      : diff < 0
+        ? 'Separately these come to only ' + money(sep) + ', so the bundle costs ' + money(-diff) + ' MORE than buying them one by one.'
+        : 'Separately these come to the same ' + money(sep) + '.';
+  }
+  price.addEventListener('input', paintSum);
+  rowsHost.addEventListener('input', paintSum);
+
+  function render(bs) {
+    if (!bs.length) { mount(list, el('p', { class: 'note' }, 'No bundles yet.')); return; }
+    mount(list, ...bs.map((b) => el('div.emp-row', {}, [
+      el('span', { class: 'emp-who', html: '<b>' + esc(b.name) + '</b> · ' + esc(money(b.price)) +
+        ' for ' + b.units + ' item' + (b.units === 1 ? '' : 's') +
+        '<br><span class="note">' + esc(b.parts.map((p) => p.item + ' ×' + p.qty).join(', ')) + '</span>' }),
+      el('span', { class: 'row-actions' }, [
+        el('button.secondary-btn.small', { onclick: () => edit(b) }, 'Edit'),
+        el('button.danger.small', { onclick: () => remove(b) }, 'Delete'),
+      ]),
+    ])));
+  }
+
+  function edit(b) {
+    name.value = b.name;
+    price.value = String(b.price);
+    rows.splice(0, rows.length);
+    b.parts.forEach((p) => addRow(p.item, p.qty));
+    if (!rows.length) addRow();
+    paintSum();
+    setStatus('Editing “' + b.name + '”. Saving replaces it.', '');
+  }
+
+  function load() {
+    Promise.all([
+      api.getBundles().catch(() => ({ bundles: [] })),
+      api.getInventory().catch(() => ({ inventory: [] })),
+    ]).then(([bs, inv]) => {
+      // Only what the shop SELLS: an ingredient is stock to craft with, and a
+      // bundle containing one would be refused at the till.
+      stock = (inv.inventory || []).filter((i) => !i.ingredient)
+        .map((i) => ({ name: i.item, price: i.price }));
+      rows.forEach((r) => r.picker.setItems(stock));
+      render(bs.bundles || []);
+      if (!rows.length) addRow();
+    });
+  }
+
+  async function doSave() {
+    const parts = [];
+    for (const r of rows) {
+      const item = r.picker.value();
+      if (!item) continue;
+      parts.push({ item, qty: Math.floor(Number(r.qty.value)) || 0 });
+    }
+    if (!name.value.trim()) { setStatus('Give the bundle a name.', 'error'); return; }
+    if (!parts.length) { setStatus('Put at least one item in it.', 'error'); return; }
+    save.disabled = true; setStatus('Saving…', '');
+    try {
+      const res = await api.saveBundle(name.value.trim(), price.value, parts);
+      render(res.bundles || []);
+      name.value = ''; price.value = '';
+      rows.splice(0, rows.length); addRow(); paintSum();
+      setStatus('Saved ✓', 'ok');
+      toast('Bundle saved.', 'ok');
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
+    finally { save.disabled = false; }
+  }
+
+  async function remove(b) {
+    if (!window.confirm('Delete the “' + b.name + '” bundle?\n\nSales already rung up with it are untouched.')) return;
+    try { render((await api.deleteBundle(b.id)).bundles || []); }
+    catch (e) { setStatus(e.message || String(e), 'error'); }
+  }
+
+  load();
+  return el('div.card', {}, [
+    el('h2', {}, 'Specials'),
+    el('p', { class: 'note' }, 'Several items sold together for one price — five drinks and five meals for a ' +
+      'set figure, say. Your staff ring the whole thing up as one line at the register, and every item in ' +
+      'it still comes out of your stock.'),
+    list,
+    el('h4', {}, 'Add or edit a bundle'),
+    el('label', {}, 'Name'), name,
+    el('label', {}, 'What is in it'),
+    rowsHost,
+    el('div', { class: 'row-actions' }, [
+      el('button.secondary-btn.small', { type: 'button', onclick: () => addRow().focus() }, '+ Add item'),
+    ]),
+    el('label', {}, 'Price for the whole bundle'), price,
+    sumLine,
+    el('div', { class: 'row-actions' }, [save]),
+    status,
+  ]);
 }

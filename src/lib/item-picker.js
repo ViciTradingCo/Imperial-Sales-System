@@ -141,6 +141,13 @@ export function createItemPicker(opts) {
     // so typing a name in full counts as much as clicking it.
     selected: () => chosen || (allowFree ? exactMatch() : null),
     setItems: (next) => { items = next || []; },
+    // Fill the box in — used when EDITING something that already names an item.
+    // It resolves the choice rather than just writing text, so an edited row
+    // behaves exactly like one somebody clicked.
+    setValue: (name) => {
+      input.value = String(name || '');
+      chosen = exactMatch();
+    },
     clear: () => { chosen = null; input.value = ''; close(); },
     focus: () => input.focus(),
   };

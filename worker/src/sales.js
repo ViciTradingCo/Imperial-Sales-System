@@ -14,6 +14,7 @@ import { listItemIndex, matchMasterItem, notePendingItem } from './item-index.js
 import { logAudit } from './audit.js';
 import { courtRules, standingOf, accrueLevy } from './court.js';
 import { coin } from './money.js';
+import { findBundle } from './bundles.js';
 import { adjustmentLabel, MAX_UPCHARGE } from './discounts.js';
 
 /**
@@ -43,8 +44,17 @@ export function parseSaleItems(field) {
           const name = String((r && r.name) || '').trim();
           const qty = Number(r && r.qty);
           const price = Number(r && r.price);
-          if (name && isFinite(qty) && isFinite(price)) out.lines.push({ name, qty, price });
-          else out.unparsed++;
+          if (name && isFinite(qty) && isFinite(price)) {
+            const line = { name, qty, price };
+            // Older rows have no parts; a bundle's do, and everything that puts
+            // stock back reads them instead of the line's own name.
+            if (Array.isArray(r.parts) && r.parts.length) {
+              line.parts = r.parts
+                .map((x) => ({ item: String((x && x.item) || '').trim(), qty: Math.floor(Number(x && x.qty)) || 0 }))
+                .filter((x) => x.item && x.qty > 0);
+            }
+            out.lines.push(line);
+          } else out.unparsed++;
         });
         return out;
       }
@@ -64,7 +74,13 @@ export function parseSaleItems(field) {
 
 /** Serializes a sale's lines for storage. Numbers only — no unit. */
 export function encodeSaleItems(lines) {
-  return JSON.stringify((lines || []).map((l) => ({ name: l.name, qty: l.qty, price: l.price })));
+  return JSON.stringify((lines || []).map((l) => (
+    // `parts` rides along ONLY for a bundle. Without it a voided bundle sale
+    // would try to put "Tavern Feast" back on the shelf — an item that does not
+    // exist — and the ales and stews inside it would stay gone.
+    l.parts && l.parts.length
+      ? { name: l.name, qty: l.qty, price: l.price, parts: l.parts }
+      : { name: l.name, qty: l.qty, price: l.price })));
 }
 
 function stamp(d) {
@@ -156,6 +172,53 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   let subtotal = 0;
   let qtyTotal = 0;
   for (const line of cart) {
+    // A BUNDLE LINE. The client names one; everything about it — its price and
+    // what is in it — is read from the shop's own row, never from the request.
+    if (line.bundle) {
+      const b = await findBundle(env, business, line.bundle, realmId);
+      if (!b) throw new Error('"' + line.bundle + '" is not one of this shop\'s bundles.');
+      const bq = Math.floor(Number(line.qty)) || 1;
+      if (bq < 1) throw new Error('Bad quantity for ' + b.name + '.');
+      if (!b.parts.length) throw new Error(b.name + ' has nothing in it.');
+
+      let floor = 0, ceiling = null;
+      for (const part of b.parts) {
+        const inv0 = inv[part.item.toLowerCase()];
+        if (inv0 && inv0.ingredient) {
+          throw new Error(b.name + ' contains ' + inv0.item + ', which is marked as an ingredient — ' +
+            'stock you craft with, not stock you sell.');
+        }
+        if (inv0) need[inv0.item] = (need[inv0.item] || 0) + part.qty * bq;
+        else offInventory.push(part.item);
+        // A Court's price controls apply to a bundle in AGGREGATE: it has no
+        // per-item price to check, but selling ten capped items for one price
+        // must not be a way around the cap.
+        if (rules) {
+          const cap = rules.prices.get(part.item.toLowerCase());
+          if (cap && cap.min != null) floor += cap.min * part.qty;
+          if (cap && cap.max != null && ceiling !== null) ceiling += cap.max * part.qty;
+          else if (cap && cap.max == null) ceiling = null;
+        }
+      }
+      if (rules && floor && b.price < floor) {
+        throw new Error(rules.hold + ' Court sets a floor of ' + floor + ' on what is in ' + b.name +
+          ' — the bundle is priced at ' + b.price + '.');
+      }
+      if (rules && ceiling !== null && ceiling && b.price > ceiling) {
+        throw new Error(rules.hold + ' Court caps what is in ' + b.name + ' at ' + ceiling +
+          ' — the bundle is priced at ' + b.price + '.');
+      }
+
+      subtotal += b.price * bq;
+      // The UNITS that actually left the shelf. A bundle of ten sold once moved
+      // ten things, and the shop's "items sold" should say so.
+      qtyTotal += b.units * bq;
+      // Deliberately NOT added to newItems: a bundle is not an item and must
+      // never find its way into the realm's master index.
+      lines.push({ name: b.name, qty: bq, price: b.price, parts: b.parts });
+      continue;
+    }
+
     let name = String(line.item || '').trim();
     if (!name) throw new Error('Each line needs an item.');
     // Normalize typos/grammar to the canonical master name where we can.
@@ -349,8 +412,14 @@ export async function voidSale(env, business, orderNo, realmId) {
   }
 
   const parsed = parseSaleItems(sale.items);
-  const stmts = parsed.lines.map((l) =>
-    db.prepare('UPDATE inventory SET stock = stock + ? WHERE realm_id = ? AND business = ? AND item = ?').bind(l.qty, realmId, business, l.name)
+  // A bundle goes back as the things that were actually taken off the shelf.
+  const back = [];
+  parsed.lines.forEach((l) => {
+    if (l.parts && l.parts.length) l.parts.forEach((p) => back.push({ item: p.item, qty: p.qty * l.qty }));
+    else back.push({ item: l.name, qty: l.qty });
+  });
+  const stmts = back.map((l) =>
+    db.prepare('UPDATE inventory SET stock = stock + ? WHERE realm_id = ? AND business = ? AND item = ?').bind(l.qty, realmId, business, l.item)
   );
   // The commission goes with the money. A voided sale is not a sale, so it
   // cannot still be owed to whoever rang it up — and an already-settled one is

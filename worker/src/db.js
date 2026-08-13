@@ -86,6 +86,18 @@ const SCHEMA = [
      business TEXT NOT NULL, name TEXT NOT NULL, percent REAL NOT NULL DEFAULT 0,
      UNIQUE (realm_id, business, name))`,
   `CREATE INDEX IF NOT EXISTS idx_discounts_business ON discounts (business)`,
+  // A BUNDLE — several items sold together for one price ("5 ales and 5 stews,
+  // 60gp"). `parts` is a JSON array of {item, qty}: a list, not a table of its
+  // own, because a bundle is only ever read and written whole and a join would
+  // buy nothing. The PRICE is the bundle's, not the sum of its parts — that is
+  // the entire point of one.
+  `CREATE TABLE IF NOT EXISTS bundles (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     business TEXT NOT NULL, name TEXT NOT NULL,
+     price REAL NOT NULL DEFAULT 0, parts TEXT NOT NULL DEFAULT '[]',
+     UNIQUE (realm_id, business, name))`,
+  `CREATE INDEX IF NOT EXISTS idx_bundles_business ON bundles (business)`,
   // Per-shop style (tagline + accent colour), one row per business per realm.
   `CREATE TABLE IF NOT EXISTS shop_style (
      realm_id TEXT NOT NULL DEFAULT '${R}',
@@ -287,7 +299,7 @@ const SCHEMA = [
 
 /** Every table that holds realm-owned data (all get a realm_id column). */
 export const REALM_TABLES = [
-  'inventory', 'sales', 'intake', 'transfers', 'coffer_entries', 'discounts',
+  'inventory', 'sales', 'intake', 'transfers', 'coffer_entries', 'discounts', 'bundles',
   'shop_style', 'audit', 'master_item', 'item_type', 'hold_index', 'users', 'companies',
   'time_card',
   'master_settings', 'business_settings', 'motd_list', 'feedback',
@@ -302,7 +314,8 @@ export const REALM_TABLES = [
 const BUSINESS_TABLES = [
   ['inventory', 'business'], ['sales', 'business'], ['intake', 'business'],
   ['transfers', 'from_business'], ['transfers', 'to_business'],
-  ['coffer_entries', 'business'], ['discounts', 'business'], ['shop_style', 'business'],
+  ['coffer_entries', 'business'], ['discounts', 'business'], ['bundles', 'business'],
+  ['shop_style', 'business'],
   ['time_card', 'business'],
   ['companies', 'business'], ['users', 'business'], ['business_settings', 'business'],
   ['motd_list', 'business'],

@@ -1159,12 +1159,18 @@ img, table { max-width: 100%; }
 }
 .bulk-check { margin-right: var(--sp-2); flex: 0 0 auto; }
 
-/* Focal menus: sections written as full pages shouldn't repeat their own
-   page-level heading/intro inside the modal that already names them. */
-.modal-window .focal-body > .card > h2:first-child,
-.modal-window .focal-body > .card > h3:first-child { display: none; }
-.modal-window .focal-body > .card > h2:first-child + p.note,
-.modal-window .focal-body > .card > h3:first-child + p.note { margin-top: 0; }
+/* Focal menus: a section written as a full page shouldn't repeat its own
+   page-level heading inside the modal that already names it.
+
+   ONLY THE FIRST CARD. The rule used to hide the heading of every card in the
+   panel, which was invisible while each section was a single card and became a
+   problem the moment one held two — Specials & Discounts opened as two stacked
+   cards with nothing between them saying where one ended and the other began.
+   The first card's heading is the duplicate; the rest are structure. */
+.modal-window .focal-body > .card:first-child > h2:first-child,
+.modal-window .focal-body > .card:first-child > h3:first-child { display: none; }
+.modal-window .focal-body > .card:first-child > h2:first-child + p.note,
+.modal-window .focal-body > .card:first-child > h3:first-child + p.note { margin-top: 0; }
 
 /* ---- Realms (multi-server) ----
    Realm selection lives only on the Admin Panel, so it can afford to be big and

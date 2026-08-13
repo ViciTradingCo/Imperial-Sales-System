@@ -202,6 +202,11 @@ export const api = {
   leavePreview: () => request('GET', '/business/leave'),
   /** Leave the shop I work for. My membership goes; what I am owed does not. */
   leaveBusiness: () => request('POST', '/business/leave', { confirm: true }),
+  /** The shop's bundles — several items sold together for one price. */
+  getBundles: () => request('GET', '/business/bundles'),
+  /** Owner/manager: create or replace a bundle. */
+  saveBundle: (name, price, parts) => request('POST', '/business/bundles/save', { name, price, parts }),
+  deleteBundle: (id) => request('POST', '/business/bundles/delete', { id }),
   getInventory: () => request('GET', '/inventory'),
   /** The shop's stock counts as `Name, Amount` text. */
   getStocktake: () => request('GET', '/inventory/stocktake'),

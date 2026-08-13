@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.2', date: '2026-08-12', notes: [
+    'SPECIALS. Shop Settings → Specials & Discounts. Build a bundle — five drinks and five meals, say — give it one price, and your staff ring the whole thing up as a single line at the register.',
+    'The bundle price is the bundle’s, not the sum of its parts; that difference is the whole point of one. While you set it up the screen tells you what the same items would come to separately, so you can see the saving — or see that the deal has quietly stopped being one.',
+    'Everything in a special still comes out of your stock, and the register will not sell one you cannot cover. Voiding a sale puts every item in it back on the shelf.',
+    'A special can hold only things you actually sell — an ingredient is stock you craft with, and a bundle containing one is refused.',
+    'Discounts and upcharges have moved in beside it. They answer the same question — what do I charge for this, other than the list price? — so they are one section now instead of two places to look.',
+  ] },
   { version: '4.1', date: '2026-08-12', notes: [
     'You can leave the shop you work for. Profile → Leave your shop. It ends your place on the roster there and then — no waiting on anybody to remove you.',
     'ANYTHING YOU ARE OWED STAYS OWED. The screen tells you the figure before you decide. Your shifts and the sales you rang up stay on the shop’s books, your owner still sees what they owe you, and they can still settle it after you have gone. Leaving is not forfeiting.',
