@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { makeD1 } from './d1shim.js';
 import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
 import { planStockImport, stockText, importStockText, listInventory, upsertItem } from '../src/inventory.js';
+import { importItemIndex, listItemIndex, listPendingItems } from '../src/item-index.js';
 
 let env;
 const R = DEFAULT_REALM_ID;
@@ -19,6 +20,8 @@ const SHOP = 'Iron Hearth';
 beforeAll(async () => { env = { DB: makeD1(), ADMIN_EMAILS: '' }; await ensureSchema(env); });
 beforeEach(async () => {
   for (const t of REALM_TABLES) await env.DB.prepare('DELETE FROM ' + t).run();
+  // The realm knows about a Dwarven Helm; nobody has ever heard of a Sky Shard.
+  await importItemIndex(env, [{ name: 'Dwarven Helm', baseValue: 90 }], R);
   await upsertItem(env, SHOP, { item: 'Iron Sword', price: 25 }, R);
   await upsertItem(env, SHOP, { item: 'Health Potion', price: 5 }, R);
   await env.DB.prepare('UPDATE inventory SET stock = 4 WHERE item = ?').bind('Iron Sword').run();
@@ -26,6 +29,8 @@ beforeEach(async () => {
 });
 
 const inv = () => listInventory(env, SHOP, R);
+const master = () => listItemIndex(env, R);
+const plan = async (text) => planStockImport(text, await inv(), await master());
 const stockOf = async (name) => (await inv()).find((i) => i.item === name).stock;
 
 describe('exporting', () => {
@@ -41,8 +46,6 @@ describe('exporting', () => {
 });
 
 describe('reading a paste', () => {
-  const plan = async (text) => planStockImport(text, await inv());
-
   it('sets a count and says what it was', async () => {
     expect((await plan('Iron Sword, 12')).changes).toEqual([{ item: 'Iron Sword', was: 4, now: 12, delta: 8 }]);
   });
@@ -79,10 +82,19 @@ describe('reading a paste', () => {
     expect((await plan('Iron Sword, 7.9')).changes[0].now).toBe(7);
   });
 
-  it('REPORTS an item the shop does not stock instead of inventing it', async () => {
+  it('ADDS an item the shop does not stock — it was found on the shelf', async () => {
     const p = await plan('Dwarven Helm, 3');
-    expect(p.unknown).toEqual([{ item: 'Dwarven Helm', stock: 3 }]);
+    expect(p.creates).toEqual([{ item: 'Dwarven Helm', stock: 3, price: 90, known: true }]);
     expect(p.changes).toEqual([]);
+  });
+
+  it('takes a new listing’s price and spelling from the master index', async () => {
+    expect((await plan('dwarven HELM, 3')).creates[0]).toMatchObject({ item: 'Dwarven Helm', price: 90 });
+  });
+
+  it('adds something the index has never heard of at no price, flagged', async () => {
+    expect((await plan('Sky Shard, 2')).creates)
+      .toEqual([{ item: 'Sky Shard', stock: 2, price: 0, known: false }]);
   });
 
   it('counts what the paste never mentioned, and leaves it alone', async () => {
@@ -104,7 +116,7 @@ describe('applying it', () => {
     expect(await stockOf('Health Potion')).toBe(0);
   });
 
-  it('NEVER touches a price — that is the whole reason this shape exists', async () => {
+  it('NEVER touches the price of an item that already exists — the whole reason this shape exists', async () => {
     await importStockText(env, SHOP, 'Iron Sword, 99', R);
     expect((await inv()).find((i) => i.item === 'Iron Sword').price).toBe(25);
   });
@@ -116,17 +128,47 @@ describe('applying it', () => {
 
   it('applies exactly what the preview promised', async () => {
     const text = 'Iron Sword, 12\nDwarven Helm, 3\nrubbish line';
-    const preview = planStockImport(text, await inv());
+    const preview = planStockImport(text, await inv(), await master());
     const applied = await importStockText(env, SHOP, text, R);
     expect(applied.changes).toEqual(preview.changes);
-    expect(applied.unknown).toEqual(preview.unknown);
+    expect(applied.creates).toEqual(preview.creates);
     expect(applied.invalid).toEqual(preview.invalid);
   });
 
   it('does nothing at all for a paste with nothing to do', async () => {
-    const res = await importStockText(env, SHOP, 'Dwarven Helm, 3', R);
+    const res = await importStockText(env, SHOP, 'Iron Sword, 4', R);
     expect(res.applied).toBe(0);
+    expect(res.added).toBe(0);
     expect(await stockOf('Iron Sword')).toBe(4);
+  });
+
+  it('creates a listing for something found on the shelf', async () => {
+    const res = await importStockText(env, SHOP, 'Dwarven Helm, 3', R);
+    expect(res.added).toBe(1);
+    const row = (await inv()).find((i) => i.item === 'Dwarven Helm');
+    expect(row).toMatchObject({ item: 'Dwarven Helm', stock: 3, price: 90 });
+  });
+
+  it('adds an item the index has never seen, and flags it for an admin', async () => {
+    await importStockText(env, SHOP, 'Sky Shard, 2', R, 'Marcus');
+    expect((await inv()).find((i) => i.item === 'Sky Shard')).toMatchObject({ stock: 2, price: 0 });
+    // Same treatment the register gives an unlisted item sold at the till: it
+    // goes in, flagged, for a person to look at.
+    const pending = await listPendingItems(env, R);
+    expect(pending.map((p) => p.name)).toEqual(['Sky Shard']);
+  });
+
+  it('does NOT flag an item the index already knows', async () => {
+    await importStockText(env, SHOP, 'Dwarven Helm, 3', R);
+    expect(await listPendingItems(env, R)).toEqual([]);
+  });
+
+  it('sets a count and creates a listing in the same paste', async () => {
+    const res = await importStockText(env, SHOP, 'Iron Sword, 12\nDwarven Helm, 3', R);
+    expect(res.applied).toBe(1);
+    expect(res.added).toBe(1);
+    expect(await stockOf('Iron Sword')).toBe(12);
+    expect(await stockOf('Dwarven Helm')).toBe(3);
   });
 
   it('cannot reach another realm’s shop of the same name', async () => {

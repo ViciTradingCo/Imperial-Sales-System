@@ -4,7 +4,7 @@
  * Low Stock threshold, matching the original ledger's behavior.
  */
 import { getDb, getFlag, setFlag } from './db.js';
-import { listItemIndex, matchMasterItem } from './item-index.js';
+import { listItemIndex, matchMasterItem, normalizeItem, notePendingItem } from './item-index.js';
 
 const ts = () => new Date().toISOString();
 
@@ -270,21 +270,33 @@ export async function stockText(env, business, realmId) {
  * step left off, so they cannot drift.
  *
  * The amount is the LAST number on the line, so an item whose name contains a
- * comma still parses. A line that names nothing this shop stocks is REPORTED,
- * not invented: creating inventory from a paste would go around the item index
- * the register picks from, which is the same reason `setStock` refuses to.
+ * comma still parses.
+ *
+ * A NAME THE SHOP DOES NOT STOCK IS ADDED. A stocktake is a count of what is
+ * actually on the shelves, and finding something there that was never listed is
+ * an ordinary outcome of counting — reporting it and walking away left the
+ * owner with a list of things to go and type in by hand. What it CANNOT do is
+ * make up a price: a new listing takes its price from the master index if the
+ * item is known there, and 0 if it is not, for an owner to set. It still cannot
+ * touch the price of an item that already exists.
+ *
+ * An item the master index has never heard of is flagged `pending` when it is
+ * applied — the same thing the register does when a clerk sells something
+ * unlisted, and for the same reason: the usual cause is a near-duplicate of
+ * something already there, and a person has to look.
  */
-export function planStockImport(text, inventory) {
+export function planStockImport(text, inventory, master) {
   const have = new Map();
   (inventory || []).forEach((r) => have.set(String(r.item).trim().toLowerCase(), r));
+  const index = new Map();
+  (master || []).forEach((m) => index.set(normalizeItem(m.name), m));
 
   // Keyed by item, not appended, so the SAME item named twice resolves to ONE
-  // change — the last line. Appending gave a plan with two rows for it and an
+  // outcome — the last line. Appending gave a plan with two rows for it and an
   // "applied" count that double-counted; the writes happened to land on the
   // right number, so the only thing wrong was what the preview promised, which
   // is the one thing a preview has to get right.
   const decided = new Map();
-  const unknown = [];
   const invalid = [];
   const seen = new Set();
 
@@ -311,42 +323,84 @@ export function planStockImport(text, inventory) {
     seen.add(key);
 
     const row = have.get(key);
-    if (!row) { unknown.push({ item: name, stock: n }); return; }
-    const was = Math.floor(Number(row.stock) || 0);
-    decided.set(key, { item: row.item, was, now: n, delta: n - was });
+    if (row) {
+      decided.set(key, { kind: 'set', item: row.item, was: Math.floor(Number(row.stock) || 0), now: n });
+      return;
+    }
+    // Not stocked. Take the master index's spelling and base value where it
+    // knows the item, so a new listing joins the index rather than sitting
+    // beside it under a slightly different name.
+    const known = index.get(normalizeItem(name)) || null;
+    decided.set(key, {
+      kind: 'add',
+      item: known ? known.name : name,
+      stock: n,
+      price: known ? Number(known.baseValue) || 0 : 0,
+      known: !!known,
+    });
   });
 
   const changes = [];
   const unchanged = [];
-  decided.forEach((c) => {
-    if (c.was === c.now) unchanged.push({ item: c.item, stock: c.now });
-    else changes.push(c);
+  const creates = [];
+  decided.forEach((d) => {
+    if (d.kind === 'add') { creates.push({ item: d.item, stock: d.stock, price: d.price, known: d.known }); return; }
+    if (d.was === d.now) unchanged.push({ item: d.item, stock: d.now });
+    else changes.push({ item: d.item, was: d.was, now: d.now, delta: d.now - d.was });
   });
 
   // What the paste did NOT mention. Left exactly as it is — a stocktake of the
   // back room is not a claim that everything else is gone, and a partial list
-  // silently zeroing the rest is the worst thing this could possibly do.
+  // silently zeroing the rest is the worst thing this could do.
   const untouched = (inventory || []).filter((r) => !seen.has(String(r.item).trim().toLowerCase())).length;
 
-  return { changes, unchanged, unknown, invalid, untouched };
+  return { changes, unchanged, creates, invalid, untouched };
 }
 
 /**
- * Applies a pasted stocktake: sets counts, and nothing else.
+ * Applies a pasted stocktake: sets counts, adds listings it found on the
+ * shelves, and touches nothing else.
  *
  * Every line is planned before any is written and the writes go in one
  * `db.batch`, so a stocktake lands whole or not at all — the same rule a
  * delivery follows.
+ *
+ * An added listing takes its price from the master index, or 0 when the index
+ * has never heard of it. It CANNOT change the price of a listing that already
+ * exists: that is the line this whole shape was drawn around.
  */
-export async function importStockText(env, business, text, realmId) {
-  const inventory = await listInventory(env, business, realmId);
-  const plan = planStockImport(text, inventory);
-  if (!plan.changes.length) return { ...plan, applied: 0, inventory };
+export async function importStockText(env, business, text, realmId, actor) {
+  const [inventory, master] = await Promise.all([
+    listInventory(env, business, realmId),
+    listItemIndex(env, realmId),
+  ]);
+  const plan = planStockImport(text, inventory, master);
+  if (!plan.changes.length && !plan.creates.length) return { ...plan, applied: 0, added: 0, inventory };
 
   const db = await getDb(env);
-  await db.batch(plan.changes.map((c) => db.prepare(
+  const stmts = plan.changes.map((c) => db.prepare(
     'UPDATE inventory SET stock = ? WHERE realm_id = ? AND business = ? AND item = ?')
-    .bind(c.now, realmId, business, c.item)));
+    .bind(c.now, realmId, business, c.item));
+  // ON CONFLICT DO NOTHING rather than an upsert: if the row somehow exists by
+  // the time this runs, the paste must still not move its price.
+  plan.creates.forEach((c) => stmts.push(db.prepare(
+    `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock)
+     VALUES (?, ?, ?, ?, ?, 0)
+     ON CONFLICT (realm_id, business, item) DO NOTHING`)
+    .bind(realmId, business, c.item, c.price, c.stock)));
+  await db.batch(stmts);
 
-  return { ...plan, applied: plan.changes.length, inventory: await listInventory(env, business, realmId) };
+  // Anything the realm's index has never seen goes in flagged, exactly as the
+  // register does when a clerk sells something unlisted. Held up for an admin
+  // because the usual cause is a near-duplicate under a different spelling.
+  for (const c of plan.creates) {
+    if (!c.known) await notePendingItem(env, { name: c.item, baseValue: 0, by: actor || '', shop: business }, realmId);
+  }
+
+  return {
+    ...plan,
+    applied: plan.changes.length,
+    added: plan.creates.length,
+    inventory: await listInventory(env, business, realmId),
+  };
 }

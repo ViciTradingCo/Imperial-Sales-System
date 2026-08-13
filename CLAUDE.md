@@ -368,6 +368,13 @@ unknown name is reported, never invented.
 the apply with the last step left off), so the two cannot promise different
 things.
 
+A name the shop does not stock is ADDED — counting the shelves and finding
+something nobody wrote down is what a stocktake is FOR. The price comes from the
+master index, or 0 when the index has never heard of it either, in which case
+the item is also filed as `pending` exactly as the register files one sold at
+the till. What a paste still cannot do is change the price of a listing that
+already exists.
+
 ## Join codes (registration)
 
 Sign-up never lists realms or shops — a new user types a **Business Code** and

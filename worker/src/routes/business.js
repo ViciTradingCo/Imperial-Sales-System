@@ -385,13 +385,16 @@ async function stockImportRoute({ request, env, body }) {
   }
   const realmId = realmIdOf(caller, env);
   if (!body.apply) {
-    const inventory = await listInventory(env, caller.business, realmId);
-    return { ...planStockImport(body.text, inventory), applied: 0, preview: true };
+    const [inventory, master] = await Promise.all([
+      listInventory(env, caller.business, realmId),
+      listItemIndex(env, realmId),
+    ]);
+    return { ...planStockImport(body.text, inventory, master), applied: 0, added: 0, preview: true };
   }
-  const res = await importStockText(env, caller.business, body.text, realmId);
-  if (res.applied) {
+  const res = await importStockText(env, caller.business, body.text, realmId, actorName(caller));
+  if (res.applied || res.added) {
     await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'inventory.stocktake',
-      detail: res.applied + ' count(s) set', realmId });
+      detail: res.applied + ' count(s) set, ' + res.added + ' listing(s) added', realmId });
   }
   return res;
 }

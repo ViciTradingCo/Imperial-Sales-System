@@ -381,7 +381,11 @@ function openStocktakeModal(onSaved) {
       const r = await api.importStocktake(text.value, doIt);
       draw(r, doIt);
       if (doIt) {
-        toast(r.applied ? 'Set ' + r.applied + ' count' + (r.applied === 1 ? '' : 's') + '.' : 'Nothing to change.', 'ok');
+        const done = [
+          r.applied ? 'Set ' + r.applied + ' count' + (r.applied === 1 ? '' : 's') : '',
+          r.added ? 'added ' + r.added + ' listing' + (r.added === 1 ? '' : 's') : '',
+        ].filter(Boolean).join(', ');
+        toast(done ? done + '.' : 'Nothing to change.', 'ok');
         onSaved();
         // The list underneath has moved on, so the "current" box must too or it
         // is showing counts that are no longer true.
@@ -406,7 +410,7 @@ function openStocktakeModal(onSaved) {
         ['Item', 'From', 'To', ''],
         r.changes.map((c) => [c.item, String(c.was), String(c.now),
           (c.delta > 0 ? '+' : '') + c.delta]))));
-    } else {
+    } else if (!r.creates.length) {
       nodes.push(line('Nothing to change — every count in the paste already matches.'));
     }
     if (r.unchanged.length) nodes.push(line(r.unchanged.length + ' already correct.'));
@@ -415,11 +419,21 @@ function openStocktakeModal(onSaved) {
         ' in your inventory ' + (r.untouched === 1 ? 'was' : 'were') + ' not in the paste, and ' +
         (r.untouched === 1 ? 'was' : 'were') + ' left exactly as ' + (r.untouched === 1 ? 'it is' : 'they are') + '.'));
     }
-    if (r.unknown.length) {
-      nodes.push(el('h4', {}, 'Not in your inventory'));
-      nodes.push(line('These were skipped. A stocktake corrects what you hold; it cannot create a listing — ' +
-        'record an intake to stock something new.', 'warn'));
-      nodes.push(el('p', { class: 'note' }, r.unknown.map((u) => u.item).join(', ')));
+    if (r.creates.length) {
+      nodes.push(el('h4', {}, applied ? 'Added' : 'Would add'));
+      nodes.push(el('div', { class: 'table-scroll' }, tableEl(
+        ['Item', 'Amount', 'Price'],
+        r.creates.map((c) => [c.item, String(c.stock),
+          c.price ? money(c.price) : 'not priced']))));
+      // The price is the one thing a stocktake cannot know, so say where it
+      // came from and what to do when there was none to take.
+      const unpriced = r.creates.filter((c) => !c.known).length;
+      nodes.push(line('New listings take their price from the item index. ' +
+        (unpriced
+          ? unpriced + ' of these ' + (unpriced === 1 ? 'is' : 'are') + ' not in the index, so ' +
+            (unpriced === 1 ? 'it comes' : 'they come') + ' in unpriced and flagged for an admin to check — ' +
+            'set a price with Edit before selling ' + (unpriced === 1 ? 'it' : 'them') + '.'
+          : 'All of these are already in the index.')));
     }
     if (r.invalid.length) {
       nodes.push(el('h4', {}, 'Could not read'));
@@ -427,7 +441,7 @@ function openStocktakeModal(onSaved) {
         el('p', { class: 'note' }, '“' + i.line + '” — ' + i.why))));
     }
     mount(report, ...nodes);
-    apply.hidden = applied || !r.changes.length;
+    apply.hidden = applied || !(r.changes.length || r.creates.length);
     setStatus('');
   }
 
@@ -440,8 +454,10 @@ function openStocktakeModal(onSaved) {
     el('div', { class: 'row-actions' }, [copy]),
     el('label', {}, 'Paste your counts here'),
     text,
-    el('p', { class: 'note' }, 'This sets COUNTS and nothing else — no prices are touched. Anything you ' +
-      'leave out is left exactly as it is, so a count of one shelf is safe to paste on its own.'),
+    el('p', { class: 'note' }, 'This sets COUNTS. It never changes the price of something you already ' +
+      'list, and anything you leave out is left exactly as it is — so a count of one shelf is safe to ' +
+      'paste on its own. Anything you list that your shop does not stock yet is ADDED, priced from the ' +
+      'item index.'),
     report,
     status,
     // Last in the DOM and pinned to the floor of the modal, so the next thing

@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.8', date: '2026-08-12', notes: [
+    'The Stocktake ADDS what it finds. Paste a count for something your shop does not list yet and it creates the listing instead of skipping it — because finding something on the shelf that was never written down is exactly what a stocktake is for.',
+    'A new listing is priced from the Master Item Index. If the index has never heard of the item either, it comes in unpriced and is flagged for an admin to look at, the same way an item sold at the register for the first time is — set a price with Edit before you sell it.',
+    'It still never changes the price of something you already list, and still leaves anything you left out exactly as it is. The check tells you what would be added, and at what price, before anything happens.',
+  ] },
   { version: '3.7', date: '2026-08-12', notes: [
     'Fixed: the Stocktake would not do anything with what you pasted. The box took your counts perfectly well, but “Check this paste” and “Apply” sat below the bottom edge of the window — so you pasted, looked for the button, and there wasn\'t one. The two buttons are now pinned to the foot of the window and stay there however long the list of changes gets.',
     'The Stocktake window is wider and its two boxes are shorter, so the whole job fits on a phone screen without hunting for anything.',
