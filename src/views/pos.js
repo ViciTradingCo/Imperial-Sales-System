@@ -20,7 +20,7 @@
  * works, the address bar says which one you are on, and a half-built cart is
  * not silently thrown away by a click meant to check a delivery.
  */
-import { currency, money } from '../lib/format.js';
+import { currency, money, coins } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setOpsActions } from '../lib/sections.js';
@@ -217,16 +217,34 @@ export function renderPos(container, { me, mode }) {
     holds.forEach((h) => holdSel.appendChild(el('option', { value: h }, h)));
     const holdWrap = el('div', {}, [el('label', {}, regionLabel), holdSel]);
     holdWrap.hidden = !regionOn;
-    const discName = el('input', { type: 'text', placeholder: 'Discount name (optional)' });
-    const discPct = el('input', { type: 'number', min: '0', max: '100', step: '1', placeholder: 'Discount % (optional)' });
-    // Pick a saved discount to fill the fields (or leave blank for none / custom).
-    const discSel = el('select', {}, el('option', { value: '' }, 'No discount / custom'));
-    discounts.forEach((d) => discSel.appendChild(el('option', { value: d.id }, d.name + ' (' + d.percent + '%)')));
+    const discName = el('input', { type: 'text', placeholder: 'Name (optional)' });
+    // DIRECTION AND MAGNITUDE, not a signed number to type. The sign is how an
+    // adjustment is stored; asking a clerk to type a minus to charge MORE is
+    // the sort of thing that gets got wrong at speed.
+    const discDir = el('select', {}, [
+      el('option', { value: 'off' }, 'Take off'),
+      el('option', { value: 'on' }, 'Add on'),
+    ]);
+    const discPct = el('input', { type: 'number', min: '0', max: '1000', step: '1', placeholder: '% (optional)' });
+    // The signed percent this sale carries: positive off, negative on.
+    const adjustment = () => {
+      const n = Math.abs(Number(discPct.value));
+      if (!isFinite(n) || !n) return 0;
+      return discDir.value === 'on' ? -n : n;
+    };
+    // Pick a saved adjustment to fill the fields (or leave blank for none / custom).
+    const discSel = el('select', {}, el('option', { value: '' }, 'None / custom'));
+    discounts.forEach((d) => discSel.appendChild(el('option', { value: d.id },
+      d.name + ' (' + (d.percent < 0 ? '+' + Math.abs(d.percent) + '% upcharge' : '−' + d.percent + '%') + ')')));
     discSel.addEventListener('change', () => {
       const d = discounts.find((x) => String(x.id) === discSel.value);
       discName.value = d ? d.name : '';
-      discPct.value = d ? String(d.percent) : '';
+      discPct.value = d ? String(Math.abs(d.percent)) : '';
+      discDir.value = d && d.percent < 0 ? 'on' : 'off';
+      renderCart();
     });
+    discPct.addEventListener('input', () => renderCart());
+    discDir.addEventListener('change', () => renderCart());
 
     /**
      * Employee purchase — staff taking stock, at no charge.
@@ -250,8 +268,8 @@ export function renderPos(container, { me, mode }) {
     // Registered after `complete` exists, since it renames the button.
     staffBox.addEventListener('change', () => {
       const on = staffBox.checked;
-      [discSel, discName, discPct].forEach((f) => { f.disabled = on; });
-      if (on) { discSel.value = ''; discName.value = ''; discPct.value = ''; }
+      [discSel, discName, discPct, discDir].forEach((f) => { f.disabled = on; });
+      if (on) { discSel.value = ''; discName.value = ''; discPct.value = ''; discDir.value = 'off'; }
       complete.textContent = on ? 'Record employee purchase' : 'Complete sale';
       renderCart();
     });
@@ -272,10 +290,26 @@ export function renderPos(container, { me, mode }) {
       const total = cart.reduce((s, l) => s + l.qty * l.price, 0);
       // On an employee purchase the line prices still say what the goods are
       // worth; the total is what will actually be taken, which is nothing.
-      rows.push(staffBox.checked
-        ? el('p', { html: '<b>No charge</b> <span class="note">— employee purchase (would be ' +
-            esc(money(total)) + ')</span>' })
-        : el('p', { html: '<b>Subtotal: ' + money(total) + '</b>' }));
+      if (staffBox.checked) {
+        rows.push(el('p', { html: '<b>No charge</b> <span class="note">— employee purchase (would be ' +
+          esc(money(total)) + ')</span>' }));
+        mount(cartHost, ...rows);
+        return;
+      }
+      // WHAT THE CUSTOMER ACTUALLY PAYS, not just what the goods add up to.
+      // The subtotal alone was survivable while every adjustment took money
+      // OFF; with an upcharge it understates the bill, and the figure the
+      // clerk reads out has to be the figure that gets taken.
+      const pct = adjustment();
+      if (!pct) {
+        rows.push(el('p', { html: '<b>Total: ' + money(total) + '</b>' }));
+      } else {
+        rows.push(el('p', { class: 'buy-sub', html: 'Subtotal: ' + esc(money(total)) }));
+        rows.push(el('p', { class: 'buy-sub', html: (pct < 0 ? 'Upcharge +' : 'Discount −') +
+          esc(String(Math.abs(pct))) + '% · ' +
+          esc(money(Math.abs(coins(total * (100 - pct) / 100) - coins(total)))) }));
+        rows.push(el('p', { class: 'buy-total', html: '<b>Total: ' + money(total * (100 - pct) / 100) + '</b>' }));
+      }
       mount(cartHost, ...rows);
     }
 
@@ -316,7 +350,7 @@ export function renderPos(container, { me, mode }) {
       // Snapshot the order so it can be queued verbatim if the network is down.
       const sale = {
         cart: cart.slice(), customer: customer.value.trim(), hold: holdSel.value,
-        discountName: discName.value.trim(), discountPercent: discPct.value,
+        discountName: discName.value.trim(), discountPercent: adjustment(),
         staffPurchase: staffBox.checked,
         idempotencyKey: idemKey,
       };
@@ -324,9 +358,10 @@ export function renderPos(container, { me, mode }) {
         const res = await api.checkout(sale);
         idemKey = null; // next order gets a fresh key
         cart.length = 0;
-        customer.value = ''; discName.value = ''; discPct.value = '';
+        customer.value = ''; discName.value = ''; discPct.value = ''; discDir.value = 'off'; discSel.value = '';
         // Deliberately reset: the next order is a normal sale unless someone
-        // says otherwise. A sticky "no charge" is the expensive kind of bug.
+        // says otherwise. A sticky "no charge" — or a sticky upcharge — is the
+        // expensive kind of bug.
         staffBox.checked = false;
         staffBox.dispatchEvent(new Event('change'));
         renderCart();
@@ -350,7 +385,7 @@ export function renderPos(container, { me, mode }) {
           // Offline — stash the sale (with its idem key) to replay on reconnect.
           enqueueSale(sale, me);
           idemKey = null; cart.length = 0;
-          customer.value = ''; discName.value = ''; discPct.value = '';
+          customer.value = ''; discName.value = ''; discPct.value = ''; discDir.value = 'off'; discSel.value = '';
           staffBox.checked = false;
           staffBox.dispatchEvent(new Event('change'));
           renderCart();
@@ -377,9 +412,9 @@ export function renderPos(container, { me, mode }) {
         el('label', {}, 'Customer'), customer,
         holdWrap,
         staffWrap,
-        el('label', {}, 'Discount'), discSel,
-        el('label', {}, 'Discount name'), discName,
-        el('label', {}, 'Discount %'), discPct,
+        el('label', {}, 'Discount or upcharge'), discSel,
+        el('label', {}, 'What to call it'), discName,
+        el('label', {}, 'Adjust the price'), el('div', { class: 'row-actions' }, [discDir, discPct]),
       ]),
       // …and the Complete Sale button lives on the Order tab.
       el('div.card', {}, [

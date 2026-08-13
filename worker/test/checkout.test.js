@@ -411,3 +411,68 @@ describe('commission on a sale', () => {
     expect((await saleRow(res.orderNo)).commission).toBe(5);
   });
 });
+
+/**
+ * UPCHARGES — a discount with the sign flipped.
+ *
+ * Stored as ONE signed percent and applied by ONE sum, so there is no second
+ * branch for an upcharge to be forgotten in. What these pin down is that the
+ * sign is honoured all the way through: the coffer, the label, and the rounding
+ * — which must still fall in the customer's favour, since floor() on a larger
+ * number is still floor().
+ */
+describe('an upcharge', () => {
+  const saleRow = (orderNo) => env.DB.prepare('SELECT * FROM sales WHERE order_no = ?').bind(orderNo).first();
+  const ring = (opts) => checkout(env, 'Alpha', caller,
+    { cart: [{ item: 'Iron Sword', qty: 4, price: 25 }], hold: 'Whiterun', ...opts }, 'default');
+
+  it('adds to the total instead of taking off', async () => {
+    const res = await ring({ discountPercent: -20, discountName: 'Rush job' });
+    expect((await saleRow(res.orderNo)).total).toBe(120); // 100 + 20%
+  });
+
+  it('says so on the sale, in words rather than a minus sign', async () => {
+    const res = await ring({ discountPercent: -20, discountName: 'Rush job' });
+    expect((await saleRow(res.orderNo)).discount).toBe('Rush job (20% surcharge)');
+  });
+
+  it('still writes a plain discount the way it always did', async () => {
+    const res = await ring({ discountPercent: 20, discountName: 'Regular' });
+    const row = await saleRow(res.orderNo);
+    expect(row.total).toBe(80);
+    expect(row.discount).toBe('Regular (20%)');
+  });
+
+  it('credits the coffer with what was actually taken', async () => {
+    const res = await ring({ discountPercent: -50 });
+    const r = await env.DB.prepare("SELECT amount FROM coffer_entries WHERE note = ? AND kind = 'sale'")
+      .bind(res.orderNo).first();
+    expect(r.amount).toBe(150);
+  });
+
+  it('rounds DOWN, still in the customer’s favour', async () => {
+    // 100 + 12.5% = 112.5 → 112, not 113.
+    const res = await ring({ discountPercent: -12.5 });
+    expect((await saleRow(res.orderNo)).total).toBe(112);
+  });
+
+  it('pays commission on the upcharged total — it is what the shop took', async () => {
+    const res = await checkout(env, 'Alpha', { uid: 'u-sam', character: 'Sam', commissionRate: 10 },
+      { cart: [{ item: 'Iron Sword', qty: 4, price: 25 }], hold: 'Whiterun', discountPercent: -20 }, 'default');
+    expect((await saleRow(res.orderNo)).commission).toBe(12); // 10% of 120
+  });
+
+  it('is ignored on an employee purchase, like a discount is', async () => {
+    const res = await ring({ discountPercent: -50, staffPurchase: true });
+    const row = await saleRow(res.orderNo);
+    expect(row.total).toBe(0);
+    expect(row.discount).toBe('');
+  });
+
+  it('refuses to go beyond the stated ceiling rather than applying it', async () => {
+    // Out of range is treated as no adjustment at all — the sale still rings up
+    // at its honest price rather than at a number nobody meant.
+    const res = await ring({ discountPercent: -99999 });
+    expect((await saleRow(res.orderNo)).total).toBe(100);
+  });
+});

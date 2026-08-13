@@ -59,7 +59,7 @@ export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
     note: (me.business || 'Your shop') + ' — how your shop is set up. Day-to-day figures are on the ' +
       'Shop Ledger tile at home; your staff code is on the Employees page, where you invite people.',
     sections: [
-      { key: 'led-discounts', label: 'Discounts', hint: 'Reusable offers', glyph: '🏷️',
+      { key: 'led-discounts', label: 'Discounts & upcharges', hint: 'Reusable adjustments', glyph: '🏷️',
         open: (host) => mount(host, discountsCard()) },
       { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
         open: (host) => mount(host, exportCard()) },
@@ -185,28 +185,49 @@ function exportCard() {
   ]);
 }
 
-/* ---- Discounts ---- */
+/* ---- Discounts & upcharges ---- */
+/**
+ * Named price adjustments the register can pick.
+ *
+ * A discount and an upcharge are the same row with the sign flipped, so this is
+ * one form with a direction on it rather than two lists to keep in step. The
+ * owner picks Off or On and types a plain positive number; the sign is applied
+ * on the way to the Worker and never typed.
+ */
 function discountsCard() {
   const list = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
-  const name = el('input', { type: 'text', placeholder: 'Discount name' });
-  const pct = el('input', { type: 'number', min: '1', max: '100', step: '1', placeholder: '%' });
+  const name = el('input', { type: 'text', placeholder: 'Name' });
+  const dir = el('select', {}, [
+    el('option', { value: 'off' }, 'Take off'),
+    el('option', { value: 'on' }, 'Add on'),
+  ]);
+  const pct = el('input', { type: 'number', min: '1', max: '1000', step: '1', placeholder: '%' });
   const status = el('p', {});
   const add = el('button.primary', { onclick: doAdd }, 'Add');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
   function render(ds) {
-    if (!ds.length) { mount(list, el('p', { class: 'note' }, 'No discounts yet.')); return; }
+    if (!ds.length) { mount(list, el('p', { class: 'note' }, 'Nothing set up yet.')); return; }
     mount(list, ...ds.map((d) => el('div.emp-row', {}, [
-      el('span', { html: '<b>' + esc(d.name) + '</b> · ' + esc(String(d.percent)) + '%' }),
+      el('span', { class: 'emp-who', html: '<b>' + esc(d.name) + '</b> · ' +
+        // The sign is storage; the words are what an owner reads.
+        (d.percent < 0
+          ? '<span class="warn">+' + esc(String(Math.abs(d.percent))) + '% upcharge</span>'
+          : '<span class="ok">−' + esc(String(d.percent)) + '% discount</span>') }),
       el('button.danger.small', { onclick: () => remove(d.id) }, 'Delete'),
     ])));
   }
   function load() { api.getDiscounts().then((r) => render(r.discounts || [])).catch((e) => mount(list, el('p', { class: 'error' }, e.message || String(e)))); }
 
   async function doAdd() {
+    const n = Math.abs(Number(pct.value));
+    if (!n) { setStatus('Enter a percentage.', 'error'); return; }
     add.disabled = true; setStatus('Saving…', '');
-    try { render((await api.addDiscount(name.value.trim(), pct.value)).discounts || []); name.value = ''; pct.value = ''; setStatus('', ''); }
-    catch (e) { setStatus(e.message || String(e), 'error'); }
+    try {
+      const signed = dir.value === 'on' ? -n : n;
+      render((await api.addDiscount(name.value.trim(), signed)).discounts || []);
+      name.value = ''; pct.value = ''; setStatus('', '');
+    } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { add.disabled = false; }
   }
   async function remove(id) {
@@ -216,9 +237,11 @@ function discountsCard() {
 
   load();
   return el('div.card', {}, [
-    el('h2', {}, 'Discounts'),
-    el('p', { class: 'note' }, 'Named discounts your staff can pick at the register.'),
-    el('div', { class: 'row-actions' }, [name, pct, add]),
+    el('h2', {}, 'Discounts & upcharges'),
+    el('p', { class: 'note' }, 'Named price adjustments your staff can pick at the register. ' +
+      '“Take off” is a discount; “Add on” is an upcharge — a rush job, a rare commission, ' +
+      'a customer in bad standing.'),
+    el('div', { class: 'row-actions' }, [name, dir, pct, add]),
     status,
     list,
   ]);

@@ -275,6 +275,21 @@ Presentation settings are set once at sign-in from `/auth/me`'s `prefs`, not
 fetched per screen. Threading them through every render function is how the
 register ended up the only place that honoured them.
 
+## A discount and an upcharge are ONE signed percent
+
+`discounts.percent` is positive to take money off, negative to put it on, and
+checkout applies both with the same sum — `total × (100 − percent) ÷ 100`. A
+second kind of row would mean a second path through checkout, the sales log, the
+offline queue and the levy, and an upcharge some one of them forgot about would
+be an upcharge that silently did not happen.
+
+The SIGN IS STORAGE, never wording: `adjustmentLabel` turns −25 into
+"(25% surcharge)", and no screen asks anyone to type a minus to charge more.
+The wire field stays `discountPercent` so a sale queued offline before upcharges
+existed still replays. A discount cannot exceed 100% (you cannot take off more
+than the price); an upcharge has no natural ceiling so it gets a stated one,
+`MAX_UPCHARGE`.
+
 ## Money is whole coins, rounded down
 
 Fractional input is ACCEPTED — a price may be typed as 22.5 — but every amount

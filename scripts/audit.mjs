@@ -244,6 +244,33 @@ function staleTranslations() {
   }
 }
 
+/**
+ * The same English phrase keyed twice in the translation dictionary.
+ *
+ * A JS object literal takes the LAST of two duplicate keys, silently. So a
+ * second row for a word that already has one does not fail, does not warn, and
+ * quietly re-translates wherever the first was used — which is how adding
+ * "Archive" the verb would have changed "Archive" the tab into "Archivar" in
+ * Spanish with nothing anywhere to say so. The dictionary is keyed on the
+ * English phrase and cannot tell two senses of one word apart, so the fix is
+ * always to keep one row and word the other screen differently.
+ */
+function duplicateTranslations() {
+  const path = join(SRC, 'lib', 'i18n.js');
+  if (!existsSync(path)) return;
+  const body = read(path).slice(read(path).indexOf('const T = {'));
+  const seen = new Map();
+  for (const m of body.matchAll(/^\s*'((?:[^'\\]|\\.)*)':\s*\{/gm)) {
+    const phrase = m[1].replace(/\\'/g, "'");
+    seen.set(phrase, (seen.get(phrase) || 0) + 1);
+  }
+  const dupes = [...seen.entries()].filter(([, n]) => n > 1).map(([p]) => p);
+  if (dupes.length) {
+    add('bug', rel(path), `${dupes.length} phrase(s) keyed more than once: ${dupes.map((p) => `"${p}"`).join(', ')}`,
+      'The last one silently wins. Keep one row and reword the other screen so the two senses have different English.');
+  }
+}
+
 /** Dependencies declared but never imported. */
 function unusedDeps() {
   for (const dir of [ROOT, join(ROOT, 'worker')]) {
@@ -526,6 +553,7 @@ unusedLocals(all);
 apiClientDrift();
 unusedCss();
 staleTranslations();
+duplicateTranslations();
 unusedDeps();
 repeatedLiterals(all);
 bigFiles(all);

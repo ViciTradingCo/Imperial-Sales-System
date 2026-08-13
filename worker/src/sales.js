@@ -14,6 +14,7 @@ import { listItemIndex, matchMasterItem, notePendingItem } from './item-index.js
 import { logAudit } from './audit.js';
 import { courtRules, standingOf, accrueLevy } from './court.js';
 import { coin } from './money.js';
+import { adjustmentLabel, MAX_UPCHARGE } from './discounts.js';
 
 /**
  * A sale's lines, as DATA: [{name, qty, price}].
@@ -205,18 +206,23 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     }
   }
 
+  // `discountPercent` is a SIGNED adjustment: positive takes money off,
+  // negative puts it on. One number and one sum, so an upcharge cannot be the
+  // case some later branch forgot to handle. The wire name is unchanged on
+  // purpose — a sale sitting in somebody's offline queue from before upcharges
+  // existed still replays correctly.
   const pct = Number(discountPercent);
-  // A discount off nothing is nothing; an employee purchase ignores it rather
+  // An adjustment on nothing is nothing; an employee purchase ignores it rather
   // than recording a percentage that did no work.
-  const discPct = !staff && isFinite(pct) && pct > 0 && pct <= 100 ? pct : 0;
-  // The line arithmetic above is exact — fractional prices and percentage
-  // discounts are allowed to produce whatever they produce. It is settled to a
-  // whole coin ONCE, here, at the end: rounding every line would compound the
-  // loss, and rounding down at the total is the customer's favour, once.
+  const inRange = pct >= -MAX_UPCHARGE && pct <= 100;
+  const discPct = !staff && isFinite(pct) && pct !== 0 && inRange ? pct : 0;
+  // The line arithmetic above is exact — fractional prices and percentages are
+  // allowed to produce whatever they produce. It is settled to a whole coin
+  // ONCE, here, at the end: rounding every line would compound the loss, and
+  // rounding down at the total is the customer's favour, once. That favour
+  // holds for an upcharge too, which is the right way for it to fall.
   const finalTotal = staff ? 0 : coin(discPct ? subtotal * (100 - discPct) / 100 : subtotal);
-  const discountLabel = discPct
-    ? (String(discountName || '').trim() ? String(discountName).trim() + ' ' : '') + '(' + discPct + '%)'
-    : '';
+  const discountLabel = adjustmentLabel(discPct, discountName);
 
   const orderNo = newOrderNo(new Date());
   // Stored as data, not as a sentence: the denomination is applied when it is

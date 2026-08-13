@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.9', date: '2026-08-12', notes: [
+    'UPCHARGES. Shop Settings → Discounts & upcharges now takes both. Pick “Take off” for a discount or “Add on” for an upcharge, name it, and your staff can pick it at the register — a rush job, a rare commission, a customer in poor standing.',
+    'The register does the same either way: choose a saved one, or set a direction and a percentage by hand. An upcharge can go well past 100% if your shop really does charge triple for something; a discount still cannot take off more than the whole price.',
+    'The order now shows what the customer actually pays. It used to show only the subtotal, which was survivable while every adjustment took money off — with an upcharge it understated the bill. You now get the subtotal, the adjustment, and the total.',
+    'Totals still round down in the customer’s favour, upcharge or not, and the sale records it in words — “Rush job (25% surcharge)” — so your sales log reads the same way you set it up.',
+  ] },
   { version: '3.8', date: '2026-08-12', notes: [
     'The Stocktake ADDS what it finds. Paste a count for something your shop does not list yet and it creates the listing instead of skipping it — because finding something on the shelf that was never written down is exactly what a stocktake is for.',
     'A new listing is priced from the Master Item Index. If the index has never heard of the item either, it comes in unpriced and is flagged for an admin to look at, the same way an item sold at the register for the first time is — set a price with Edit before you sell it.',
