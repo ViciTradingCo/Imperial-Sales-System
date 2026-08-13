@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.0', date: '2026-08-12', notes: [
+    'Inventory is two tables: STOCK — what your shop sells — and INGREDIENTS, what it crafts with. They were one list with a small pill on some rows, so finding your stock meant reading past your ingredients and finding your ingredients meant reading past your stock.',
+    'They do not even want the same columns. Stock shows what you charge; an ingredient is never sold, so what matters is what it has cost you — its column reads “Bought at”, averaged over your own deliveries. Each table says how many items are in it, and the harvest column only appears where something in that table actually pays.',
+    'Move an item between the two the same way as before: tick or untick Ingredient with Edit.',
+    'Fixed: on a phone, the buttons in a table row stacked on top of each other and stretched every row to three times its height, pushing them out of reach. Table rows stay one line tall and the table scrolls sideways instead.',
+  ] },
   { version: '3.9', date: '2026-08-12', notes: [
     'UPCHARGES. Shop Settings → Discounts & upcharges now takes both. Pick “Take off” for a discount or “Add on” for an upcharge, name it, and your staff can pick it at the register — a rush job, a rare commission, a customer in poor standing.',
     'The register does the same either way: choose a saved one, or set a direction and a percentage by hand. An upcharge can go well past 100% if your shop really does charge triple for something; a discount still cannot take off more than the whole price.',

@@ -356,11 +356,22 @@ body {
 .index-filters select { flex: 1 1 160px; margin: 0; }
 /* A tick box in a table cell must not stretch to the input width every other
    field on the page uses. */
-.data-table td .row-actions { display: flex; gap: 6px; margin: 0; }
-.data-table td .row-actions button { margin: 0; }
+/* Buttons in a table cell stay on ONE line. The base `.row-actions` wraps,
+   which is right in a card and wrong here: squeezed into a narrow column the
+   three buttons stacked vertically and took every row of the table with them,
+   so an inventory row was 150px tall on a phone with its buttons pushed out of
+   reach. The table is inside `.table-scroll`, so the honest answer is to let it
+   be as wide as it needs and scroll sideways. */
+.data-table td .row-actions { display: flex; gap: 6px; margin: 0; flex-wrap: nowrap; }
+.data-table td .row-actions button { margin: 0; white-space: nowrap; }
 /* A cell that holds a list rather than a value — let it wrap instead of
    stretching the table sideways past the edge of the screen. */
 .data-table td .wrap-cell { white-space: normal; display: inline-block; max-width: 340px; }
+
+/* The two inventory tables — stock and ingredients — need air between them so
+   the second reads as its own table rather than a continuation of the first. */
+.inv-table + .inv-table { margin-top: var(--sp-5); }
+.inv-table h3 { margin-bottom: var(--sp-1); }
 
 /* ---- Market Analysis ---- */
 .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 4px; }

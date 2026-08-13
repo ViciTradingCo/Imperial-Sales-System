@@ -160,6 +160,16 @@ against. The form stays put after a successful record and RESETS — including a
 fresh idempotency key, or the next delivery looks like a retry of the last one
 and is silently discarded.
 
+## Inventory is TWO tables: Stock and Ingredients
+
+Split on the per-listing `ingredient` flag, and they do not want the same
+columns: stock shows what you CHARGE, an ingredient shows what it has COST
+(`avgCost`, averaged over the shop's own deliveries), because an ingredient is
+never sold. One table would carry both columns and leave one blank on every row.
+
+The flag is per LISTING, not per item — one shop's ingredient is another's
+stock-in-trade — which is why it could never live on the shared item index.
+
 ## Forms teach themselves (`guide`)
 
 `guidePanel(lines, open)` in `src/lib/guide.js` is a collapsible "How this

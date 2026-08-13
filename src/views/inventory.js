@@ -34,8 +34,8 @@ export function renderInventory(container, { me }) {
   const firstCard = [
     el('h2', {}, 'Inventory'),
     el('p', { class: 'note' }, (me.business || 'Your shop') +
-      ' — items, prices, and stock. "Low" means at or below an item’s own Low Stock number. ' +
-      'Bought, grew, made or sold something? All four are on the register.'),
+      ' — what you sell and what you craft with, in two tables. "Low" means at or below an ' +
+      'item’s own Low Stock number. Bought, grew, made or sold something? All four are on the register.'),
   ];
   // Moving stock to another company rewrites the listing, so it stays with the
   // owner.
@@ -50,6 +50,20 @@ export function renderInventory(container, { me }) {
 
   mount(container, ...nodes);
 
+  /**
+   * TWO TABLES: what the shop SELLS, and what it CRAFTS WITH.
+   *
+   * They were one list with a pill on some rows, which meant scanning past your
+   * ingredients to find your stock and past your stock to find your ingredients
+   * — and the two do not even want the same columns. An ingredient is never
+   * sold, so its sale price says nothing about it; the figure somebody
+   * restocking needs is what it COSTS. A single table would have to carry both
+   * columns and leave one of them blank on every row.
+   *
+   * The `ingredient` flag is per LISTING, not per item: one shop's ingredient is
+   * another's stock-in-trade, which is why it could never live on the shared
+   * item index. Move a row between the tables with Edit.
+   */
   function renderList(items) {
     if (!items.length) {
       // No action button here: the toolbar is a few pixels above, and the empty
@@ -61,39 +75,68 @@ export function renderInventory(container, { me }) {
           : 'Nothing stocked yet.' }));
       return;
     }
-    const rows = items.map((it) => {
-      const meta = el('span', { html:
-        '<b>' + esc(it.item) + '</b> · ' +
-        // An ingredient is never sold, so its sale price says nothing. What you
-        // need for one is what it COSTS — the figure you are about to spend the
-        // next time you go and buy more.
-        (it.ingredient
-          ? '<span class="role-pill">Ingredient</span>' +
-            (it.avgCost ? ' · bought at ' + money(it.avgCost) : '')
-          : money(it.price)) +
-        ' · ' + it.stock + ' in stock · ' + statusTag(it.status) +
-        // Which items a shop buys off its own people is worth seeing without
-        // opening every editor in turn.
-        (it.harvestPay ? '<br><span class="note">🌾 harvest pays ' + esc(money(it.harvestPay)) + ' each</span>' : '') });
-      const row = el('div.emp-row', {}, [meta]);
+    const stock = items.filter((it) => !it.ingredient);
+    const ingredients = items.filter((it) => it.ingredient);
+    mount(listHost,
+      table('Stock', 'What your shop sells.', stock, false,
+        'Nothing to sell yet — everything you hold is marked as an ingredient.'),
+      table('Ingredients', 'What your shop crafts with. These are not for sale, so what matters is ' +
+        'what they cost you, not what you would charge.', ingredients, true,
+        'Nothing marked as an ingredient. Tick Ingredient on an item with Edit to move it here.'),
+    );
+  }
+
+  /**
+   * One of the two tables.
+   *
+   * `cost` swaps the money column: an asking price for stock, what it has
+   * actually been bought at for ingredients. The harvest column appears only
+   * where some row in THIS table has a rate, so a shop that does not buy from
+   * its own people is not reading a column of blanks.
+   */
+  function table(title, note, rows, cost, emptyNote) {
+    const anyHarvest = rows.some((it) => it.harvestPay);
+    const head = ['Item', cost ? 'Bought at' : 'Price', 'In stock', 'Status'];
+    if (anyHarvest) head.push('Harvest pays');
+    if (canEdit) head.push('');
+
+    const body = rows.map((it) => {
+      const cells = [
+        el('span', { html: '<b>' + esc(it.item) + '</b>' }),
+        // "Never bought" and "free" are different answers, and only one of them
+        // is true — so an ingredient nobody has purchased says so rather than
+        // showing 0.
+        cost ? (it.avgCost ? money(it.avgCost) : '—') : money(it.price),
+        String(it.stock),
+        el('span', { html: statusTag(it.status) }),
+      ];
+      if (anyHarvest) cells.push(it.harvestPay ? money(it.harvestPay) : '—');
       if (canEdit) {
-        const edit = el('button.primary.small', { onclick: () => openItemModal(it, refreshInventory) }, 'Edit');
-        const count = el('button.secondary-btn.small', { onclick: () => openStockModal(it, refreshInventory) }, 'Stock');
-        const del = el('button.secondary-btn.small', {
-          onclick: async () => {
-            if (!confirm('Remove "' + it.item + '" from your inventory?\n\n' +
-              'This deletes the listing and its sale price. An item with no stock left is kept on ' +
-              'purpose — it stays priced and ready for the next delivery — so there is no need to ' +
-              'remove it just because it hit zero.')) return;
-            try { const res = await api.deleteItem(it.item); renderList(res.inventory || []); }
-            catch (e) { alert(e.message || e); }
-          },
-        }, 'Remove');
-        row.appendChild(el('span', { class: 'row-actions' }, [edit, count, del]));
+        cells.push(el('span', { class: 'row-actions' }, [
+          el('button.primary.small', { onclick: () => openItemModal(it, refreshInventory) }, 'Edit'),
+          el('button.secondary-btn.small', { onclick: () => openStockModal(it, refreshInventory) }, 'Stock'),
+          el('button.secondary-btn.small', {
+            onclick: async () => {
+              if (!confirm('Remove "' + it.item + '" from your inventory?\n\n' +
+                'This deletes the listing and its sale price. An item with no stock left is kept on ' +
+                'purpose — it stays priced and ready for the next delivery — so there is no need to ' +
+                'remove it just because it hit zero.')) return;
+              try { const res = await api.deleteItem(it.item); renderList(res.inventory || []); }
+              catch (e) { alert(e.message || e); }
+            },
+          }, 'Remove'),
+        ]));
       }
-      return row;
+      return cells;
     });
-    mount(listHost, ...rows);
+
+    return el('div', { class: 'inv-table' }, [
+      el('h3', {}, title + ' (' + rows.length + ')'),
+      el('p', { class: 'note' }, note),
+      rows.length
+        ? el('div', { class: 'table-scroll' }, tableEl(head, body))
+        : el('p', { class: 'note' }, emptyNote),
+    ]);
   }
 
   async function refreshInventory() {
