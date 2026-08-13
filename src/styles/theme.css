@@ -637,6 +637,24 @@ body.has-nav .sidenav { display: flex; }
 }
 .modal-window .focal-body > .card:last-child { margin-bottom: 0; }
 .modal-window .focal-body .link-back { display: none; } /* the ✕ is the way out */
+/* An action row PINNED TO THE FLOOR of a modal that scrolls.
+   A modal is `max-height: 90vh; overflow-y: auto`, so a tall form pushes its
+   own buttons out of sight — and a form whose Submit is below the fold reads
+   as a form that does not work, which is exactly how the stocktake was
+   reported: you could paste into it and then there was nothing to press.
+   The bar cancels the window's 22px padding so it sits flush on the floor
+   rather than leaving a strip of content scrolling past beneath it. */
+.modal-actions {
+  position: sticky;
+  bottom: -22px;
+  margin: var(--sp-3) -22px -22px;
+  padding: var(--sp-3) 22px;
+  background: var(--paper-raised);
+  border-top: 1px solid var(--edge);
+  display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center;
+}
+.modal-actions button { margin: 0; }
+
 .modal-close {
   position: absolute; top: 8px; right: 10px;
   background: none; border: none; color: var(--note);

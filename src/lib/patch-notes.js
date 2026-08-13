@@ -10,6 +10,10 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '3.7', date: '2026-08-12', notes: [
+    'Fixed: the Stocktake would not do anything with what you pasted. The box took your counts perfectly well, but “Check this paste” and “Apply” sat below the bottom edge of the window — so you pasted, looked for the button, and there wasn\'t one. The two buttons are now pinned to the foot of the window and stay there however long the list of changes gets.',
+    'The Stocktake window is wider and its two boxes are shorter, so the whole job fits on a phone screen without hunting for anything.',
+  ] },
   { version: '3.6', date: '2026-08-12', notes: [
     'MANAGERS. An owner can appoint any employee as a manager, from the Roster. A manager runs the shop as the owner does — buying, inventory, the roster, notices, the shop ledger, transfers, the time card log — so a shop no longer stops when its owner is not online.',
     'What stays the owner\'s alone: setting what people are paid, appointing other managers, reissuing the staff code, renaming the shop, and exporting the books. A manager cannot give themselves a raise or hand the shop to anybody.',

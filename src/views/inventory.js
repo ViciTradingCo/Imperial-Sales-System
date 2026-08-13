@@ -354,7 +354,10 @@ function openTransferModal(me, onChanged) {
  * rather than two code paths that can drift apart.
  */
 function openStocktakeModal(onSaved) {
-  const text = el('textarea', { rows: '12', placeholder: 'Iron Sword, 12\nHealth Potion, 40' });
+  // Both boxes are kept SHORT. They are scrollable and resizable, and every row
+  // of height here pushed the buttons further down a modal that was already
+  // taller than the window.
+  const text = el('textarea', { rows: '7', placeholder: 'Iron Sword, 12\nHealth Potion, 40' });
   const status = el('p', {});
   const report = el('div', {});
   const check = el('button.secondary-btn', { onclick: () => run(false) }, 'Check this paste');
@@ -366,7 +369,7 @@ function openStocktakeModal(onSaved) {
     try { await navigator.clipboard.writeText(current.value); toast('Copied.', 'ok'); }
     catch (e) { current.select(); toast('Select and copy — the browser would not do it for us.', 'warn'); }
   } }, 'Copy');
-  const current = el('textarea', { rows: '8', readonly: 'readonly' });
+  const current = el('textarea', { rows: '5', readonly: 'readonly' });
   api.getStocktake().then((r) => { current.value = r.text || ''; })
     .catch((e) => { current.value = e.message || String(e); });
 
@@ -439,8 +442,11 @@ function openStocktakeModal(onSaved) {
     text,
     el('p', { class: 'note' }, 'This sets COUNTS and nothing else — no prices are touched. Anything you ' +
       'leave out is left exactly as it is, so a count of one shelf is safe to paste on its own.'),
-    el('div', { class: 'row-actions' }, [check, apply]),
-    status,
     report,
-  ]);
+    status,
+    // Last in the DOM and pinned to the floor of the modal, so the next thing
+    // to press is on screen however long the report underneath the paste box
+    // grows.
+    el('div', { class: 'modal-actions' }, [check, apply]),
+  ], { wide: true });
 }
