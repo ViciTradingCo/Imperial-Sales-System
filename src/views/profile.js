@@ -15,6 +15,8 @@ import { navigate } from '../lib/router.js';
 import { THEMES, TEXT_SIZES, loadPrefs, savePrefs, resolveTheme, resolveText } from '../lib/theme.js';
 import { LANGS, getLang, setLang } from '../lib/i18n.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
+import { signOut } from '../lib/auth.js';
+import { money } from '../lib/format.js';
 
 export function renderProfile(container, { me, onProfileUpdated }) {
   const gridHost = el('div', {});
@@ -31,6 +33,14 @@ export function renderProfile(container, { me, onProfileUpdated }) {
     { key: 'prof-appearance', label: 'Appearance', hint: 'Theme, accent, language', glyph: '🎨',
       open: (host) => mount(host, appearanceCard()) },
   ];
+  // Leaving is YOUR OWN decision about your own account, so it belongs on your
+  // own page — but only where there is something to leave. An owner has no
+  // shop to walk away from (it would leave the shop with nobody running it) and
+  // an admin was never in one.
+  if (me.business && me.role !== 'owner' && !me.isOwner && me.role !== 'admin') {
+    sections.push({ key: 'prof-leave', label: 'Leave your shop', hint: 'Stop working here', glyph: '🚪',
+      open: (host) => mount(host, leaveCard(me)) });
+  }
 
   function draw(images) {
     mount(gridHost, tileGrid(sectionTiles(sections, navigate), images));
@@ -137,5 +147,83 @@ function appearanceCard() {
     langSel,
     el('p', { class: 'note' }, 'Translations cover the interface; names and some ' +
       'messages stay as written.'),
+  ]);
+}
+
+/**
+ * LEAVING THE SHOP YOU WORK FOR.
+ *
+ * The reassurance comes first and the button last, because the question anyone
+ * hesitates over is "do I lose what I am owed?" — and the answer is no. Their
+ * shifts and their sales carry the shop on the row, so the debt stays on the
+ * owner's log to be settled whether they are still employed there or not.
+ *
+ * What leaving actually does is end their MEMBERSHIP. They are unregistered
+ * again, which is the state the app already knows how to handle: the way back
+ * is a staff code, exactly as it was the first time.
+ */
+function leaveCard(me) {
+  const status = el('p', {});
+  const owedHost = el('div', {}, el('p', { class: 'note' }, 'Checking what you are owed…'));
+  const leave = el('button.danger', { onclick: doLeave }, 'Leave ' + (me.business || 'this shop'));
+  leave.disabled = true; // until we know where they stand
+  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
+
+  api.leavePreview().then((r) => {
+    const nodes = [];
+    if (r.owed && r.owed.total > 0) {
+      nodes.push(el('p', { class: 'buy-total' }, 'You are owed ' + money(r.owed.total)));
+      if (r.owed.hourly && r.owed.commission) {
+        nodes.push(el('p', { class: 'note' }, money(r.owed.hourly) + ' in hours and ' +
+          money(r.owed.commission) + ' in commission.'));
+      }
+      nodes.push(el('p', { class: 'note' }, 'Leaving does NOT cancel it. Your shifts and your sales stay ' +
+        'on the shop’s books, and your owner still sees what they owe you and can still settle it.'));
+    } else {
+      nodes.push(el('p', { class: 'note' }, 'You have nothing outstanding — everything you have worked ' +
+        'has been settled.'));
+    }
+    if (r.onShift) {
+      nodes.push(el('p', { class: 'warn' }, 'You are clocked in. Clock out on your time card first — a ' +
+        'shift left open would sit on the shop’s log with nobody able to close it.'));
+    }
+    // The server's own words for why not, rather than this screen guessing at
+    // them. It should not be reachable — the tile is not offered to anyone the
+    // rule refuses — but a stale page is exactly when it would be.
+    if (r.refusal) nodes.push(el('p', { class: 'error' }, r.refusal));
+    mount(owedHost, ...nodes);
+    leave.disabled = !r.canLeave || r.onShift;
+  }).catch((e) => {
+    mount(owedHost, el('p', { class: 'error' }, e.message || String(e)));
+  });
+
+  async function doLeave() {
+    if (!window.confirm('Leave ' + (me.business || 'this shop') + '?\n\n' +
+      'You stop being an employee here straight away. Anything the shop owes you stays owed — your ' +
+      'owner still sees it.\n\n' +
+      'To work anywhere again (including here) you will need a staff code from that shop.')) return;
+    leave.disabled = true;
+    setStatus('Leaving…', '');
+    try {
+      const res = await api.leaveBusiness();
+      // Their account is gone, so there is nothing left to render for. A reload
+      // takes them to sign-up, which is exactly where they now belong.
+      setStatus('You have left ' + res.left + '.', 'ok');
+      signOut();
+    } catch (e) {
+      leave.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  return el('div.card', {}, [
+    el('h2', {}, 'Leave ' + (me.business || 'your shop')),
+    el('p', { class: 'note' }, 'Stop working here. This ends your place on the roster — you will not be ' +
+      'able to ring up sales, see the shop’s stock, or clock on.'),
+    owedHost,
+    el('p', { class: 'note' }, 'You will be signed out. To join a shop again — this one or any other — ' +
+      'you will need its staff code, the same as when you first registered.'),
+    el('div', { class: 'row-actions' }, [leave]),
+    status,
   ]);
 }

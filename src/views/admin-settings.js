@@ -341,6 +341,7 @@ const TILE_KEYS = [
   ['motd-warn', 'MOTD · Expiry warning'],
   // Profile sections
   ['prof-identity', 'Profile · Character'], ['prof-appearance', 'Profile · Appearance'],
+  ['prof-leave', 'Profile · Leave your shop'],
   // Realm Management sections
   ['rlm-list', 'Realms · List'], ['rlm-add', 'Realms · Add'], ['transfers', 'Realms · Transfers'],
   ['rlm-settings', 'Realms · Network Settings'],

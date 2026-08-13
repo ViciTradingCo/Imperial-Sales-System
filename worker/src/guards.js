@@ -165,6 +165,31 @@ export async function requireOwner(request, env) {
   return caller;
 }
 
+/**
+ * Whether this person may walk away from the shop they work for — and if not,
+ * WHY NOT, in the words the refusal should use.
+ *
+ * One function rather than the same three conditions written out in the route
+ * that refuses and again in the screen that decides whether to offer the
+ * button. Two copies of a rule is how a screen ends up offering something the
+ * server will refuse.
+ *
+ * An OWNER is the case that matters. A shop whose owner walked out has nobody
+ * who can put it right from the inside, so this is an admin's job — archive the
+ * company, or move it to somebody else — and saying so is more use than a
+ * button that fails.
+ */
+export function leaveRefusal(caller) {
+  if (!caller) return 'You are not signed in.';
+  if (caller.role === 'admin') return 'An admin has no shop to leave.';
+  if (caller.role === 'owner' || caller.isOwner) {
+    return 'An owner cannot leave their own shop — it would leave the shop with nobody running it. ' +
+      'Ask an admin to archive the company or hand it to someone else.';
+  }
+  if (!caller.business) return 'You are not part of a shop.';
+  return '';
+}
+
 /** Requires a registered user whose account is active (can operate the register). */
 export async function requireActive(request, env) {
   const user = await requireRegistered(request, env);

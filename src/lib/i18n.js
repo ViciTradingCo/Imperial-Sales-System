@@ -105,6 +105,8 @@ const T = {
   'Total payout': { es: 'Pago total', fr: 'Versement total', de: 'Gesamtauszahlung', it: 'Pagamento totale' },
   'Total owed': { es: 'Total adeudado', fr: 'Total dû', de: 'Gesamt offen', it: 'Totale dovuto' },
   'Stocktake': { es: 'Recuento', fr: 'Inventaire', de: 'Bestandsaufnahme', it: 'Inventario' },
+  'Leave your shop': { es: 'Dejar tu tienda', fr: 'Quitter votre boutique', de: 'Laden verlassen', it: 'Lascia il negozio' },
+  'Stop working here': { es: 'Dejar de trabajar aquí', fr: 'Cesser d’y travailler', de: 'Hier aufhören', it: 'Smetti di lavorare qui' },
   'Check this paste': { es: 'Comprobar lo pegado', fr: 'Vérifier ce collage', de: 'Eingefügtes prüfen', it: 'Controlla l’incollato' },
   'Apply': { es: 'Aplicar', fr: 'Appliquer', de: 'Anwenden', it: 'Applica' },
   'Restore': { es: 'Restaurar', fr: 'Restaurer', de: 'Wiederherstellen', it: 'Ripristina' },

@@ -4,8 +4,8 @@
  * discounts / style), per-shop settings, the item + hold lookups, certification,
  * MOTD banners, the Court hold report, and the owner CSV export.
  */
-import { requireRegistered, requireManages, requireOwner, managesBusiness, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
-import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate, setManagerRole } from '../users.js';
+import { requireRegistered, requireManages, requireOwner, managesBusiness, leaveRefusal, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
+import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate, setManagerRole, deleteMember } from '../users.js';
 import { renameBusiness, listBusinessCards } from '../registry.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
@@ -286,6 +286,69 @@ async function managerRoleRoute({ request, env, body }) {
   await logAudit(env, { actor: actorName(caller), business: caller.business,
     action: 'employee.role', detail: (target.character || target.uid) + ' → ' + role, realmId });
   return { ok: true, uid: target.uid, role };
+}
+
+/**
+ * LEAVING A SHOP — the employee's own decision, about their own account.
+ *
+ * It removes their membership rather than blanking it: an account belonging to
+ * no shop is a state nothing else in the app knows what to do with, and the way
+ * back in already exists — a staff code, the same one that let them in the first
+ * time. So they sign out of a shop and are simply unregistered again, free to
+ * join anywhere (including back here) with a code.
+ *
+ * WHAT THEY LEAVE BEHIND STAYS. Their shifts and the sales they rang up carry
+ * the BUSINESS on the row, not a live link to their account, so the shop keeps
+ * its history and — importantly — keeps owing them whatever it owed them. An
+ * owner still sees the debt on the time card log and can still settle it. Going
+ * is not forfeiting.
+ *
+ * An OWNER may not use this. A shop with no owner is not a shop anyone can put
+ * right from inside, so that is an admin's job (archive it, or move the company
+ * to somebody else) and refusing here is the honest answer.
+ */
+async function leaveBusinessRoute({ request, env, body }) {
+  const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
+  const refusal = leaveRefusal(caller);
+  if (refusal) { const e = new Error(refusal); e.forbidden = true; throw e; }
+  // A shift still running would be left open forever, counting toward the
+  // shop's "on shift now" with nobody able to close it.
+  const open = await openShift(env, caller.uid, realmId);
+  if (open) throw new Error('You are still clocked in. Clock out first, then leave.');
+  // Said out loud by the client, so a stray request cannot end someone's
+  // membership by arriving.
+  if (body.confirm !== true) throw new Error('Leaving has to be confirmed.');
+
+  const business = caller.business;
+  await logAudit(env, { actor: actorName(caller), business,
+    action: 'employee.left', detail: (caller.character || caller.email) + ' left ' + business, realmId });
+  await deleteMember(env, caller.uid, realmId);
+  return { ok: true, left: business };
+}
+
+/**
+ * What leaving would cost them — read BEFORE they decide, never after.
+ *
+ * Unpaid work is the one thing somebody should know about before walking, and
+ * the answer is reassuring rather than a reason to stay: the shop still owes it.
+ */
+async function leavePreviewRoute({ request, env }) {
+  const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
+  const shifts = await myShifts(env, caller.uid, realmId, 200);
+  const hourly = shifts.filter((s) => !s.open && !s.paid).reduce((n, s) => n + s.pay, 0);
+  const commission = await myCommission(env, caller.uid, realmId);
+  const refusal = leaveRefusal(caller);
+  return {
+    business: caller.business || '',
+    canLeave: !refusal,
+    // The same words the server would refuse with, so the screen never has to
+    // guess at them and the two can never say different things.
+    refusal,
+    onShift: !!(await openShift(env, caller.uid, realmId)),
+    owed: { hourly, commission: commission.owed, total: hourly + commission.owed },
+  };
 }
 
 /* ---- feedback on the app ---- */
@@ -872,6 +935,8 @@ export const routes = [
   { method: 'POST', path: '/timecard/delete', handler: timecardDelete },
   { method: 'POST', path: '/business/employees/rate', handler: payRateRoute },
   { method: 'POST', path: '/business/employees/manager', handler: managerRoleRoute },
+  { method: 'GET', path: '/business/leave', handler: leavePreviewRoute },
+  { method: 'POST', path: '/business/leave', handler: leaveBusinessRoute },
   { method: 'GET', path: '/inventory/stocktake', handler: stockTextRoute },
   { method: 'POST', path: '/inventory/stocktake', handler: stockImportRoute },
   { method: 'GET', path: '/intake', handler: getIntake },

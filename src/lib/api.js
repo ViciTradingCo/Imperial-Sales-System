@@ -198,6 +198,10 @@ export const api = {
   /** Owner/admin: rename the company. */
   renameBusiness: (name) => request('POST', '/business/rename', { name }),
   /** Any registered user: read their business's inventory. */
+  /** What leaving would mean for me — what I am owed, and whether I may. */
+  leavePreview: () => request('GET', '/business/leave'),
+  /** Leave the shop I work for. My membership goes; what I am owed does not. */
+  leaveBusiness: () => request('POST', '/business/leave', { confirm: true }),
   getInventory: () => request('GET', '/inventory'),
   /** The shop's stock counts as `Name, Amount` text. */
   getStocktake: () => request('GET', '/inventory/stocktake'),

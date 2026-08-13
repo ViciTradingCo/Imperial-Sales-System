@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.1', date: '2026-08-12', notes: [
+    'You can leave the shop you work for. Profile → Leave your shop. It ends your place on the roster there and then — no waiting on anybody to remove you.',
+    'ANYTHING YOU ARE OWED STAYS OWED. The screen tells you the figure before you decide. Your shifts and the sales you rang up stay on the shop’s books, your owner still sees what they owe you, and they can still settle it after you have gone. Leaving is not forfeiting.',
+    'You are signed out afterwards, and you are simply unregistered again — to work anywhere, including back at the same shop, you need that shop’s staff code, the same as when you first registered.',
+    'Managers can leave too. Owners cannot: a shop whose owner walked out has nobody left to run it, so that stays an admin’s job — archiving the company or handing it to somebody else.',
+    'You cannot leave mid-shift. Clock out first, or the shift would sit open on the shop’s log with nobody able to close it.',
+  ] },
   { version: '4.0', date: '2026-08-12', notes: [
     'Inventory is two tables: STOCK — what your shop sells — and INGREDIENTS, what it crafts with. They were one list with a small pill on some rows, so finding your stock meant reading past your ingredients and finding your ingredients meant reading past your stock.',
     'They do not even want the same columns. Stock shows what you charge; an ingredient is never sold, so what matters is what it has cost you — its column reads “Bought at”, averaged over your own deliveries. Each table says how many items are in it, and the harvest column only appears where something in that table actually pays.',

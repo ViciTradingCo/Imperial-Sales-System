@@ -369,6 +369,22 @@ them separately and merges rather than hanging commission off shift rows.
 Settling a person settles both: it is one debt, and marking half would leave the
 screen disagreeing with what the owner just did.
 
+## Leaving a shop ends MEMBERSHIP, never the debt
+
+An employee (or a manager) leaves from Profile → Leave your shop. It removes
+their user row and revokes their sessions — an account belonging to no shop is a
+state nothing else knows what to do with, and the way back already exists: a
+staff code, the same one that let them in. `time_card` and `sales` rows carry the
+BUSINESS, not a live link to the account, so the shop keeps its history and goes
+on owing what it owed; `shopShifts` still lists a departed person by name and
+`markPaid` still settles them.
+
+`leaveRefusal` in `guards.js` is the one rule — used by the route that refuses
+AND the screen that decides whether to offer the button, so a screen can never
+offer what the server will turn down. An OWNER is refused: a shop whose owner
+walked out cannot be put right from the inside, so that is an admin's job.
+Someone clocked in is refused too, or the open shift outlives them.
+
 ## Archiving is not deleting
 
 `archiveCompany` renames the shop and everything it owns to a unique key — which
