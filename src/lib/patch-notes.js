@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.5', date: '2026-08-14', notes: [
+    'Export everything in one file. Shop Settings → Export data now has “Export everything (CSV)”, which gives you a single spreadsheet holding your sales log, your coffer and your inventory, each under its own heading.',
+    'The three are still available on their own — Sales log only, Coffer only, and Inventory only, which is new. A single export is byte for byte what it always was, so anything you already point a spreadsheet at keeps working.',
+    'The inventory export carries what an ingredient has actually cost you, averaged over your own deliveries, alongside what you charge for what you sell.',
+  ] },
   { version: '4.4', date: '2026-08-12', notes: [
     'Admins: an archived company no longer appears in Market Analysis’s Top 5 companies. A shop that has left the network cannot be one of the ones doing well, and a departed shop sitting at the top of the ranking was the wrong answer to the question that table asks.',
     'It keeps its line in Company Performance, marked “(archived)”. Its trade really happened, and dropping it there would have left the totals unexplainable.',

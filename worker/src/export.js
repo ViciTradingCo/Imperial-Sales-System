@@ -10,6 +10,7 @@
 import { getDb, REALM_TABLES } from './db.js';
 import { parseSaleItems } from './sales.js';
 import { readRealmPrefs } from './realm-prefs.js';
+import { listInventory } from './inventory.js';
 
 // Order matters only cosmetically; each table is independent. Includes the
 // registry tables (users, companies, settings, MOTD) now that D1 is the sole
@@ -137,32 +138,89 @@ function csvCell(v) {
 }
 
 /**
- * Owner-facing per-shop CSV export. type='sales' → this shop's sales log;
- * type='coffer' → its coffer ledger. Returns { filename, csv }.
+ * Owner-facing per-shop CSV export.
+ *
+ * THE THREE SHAPES ARE DEFINED ONCE. A "full shop" export is the same three
+ * sections the single exports produce, one after another — not a fourth query
+ * that could quietly disagree with them about what a sale or a coffer entry
+ * looks like.
+ *
+ * Each section knows its own columns and how to load its rows, and renders
+ * anything stored as DATA into something a spreadsheet can read: sale lines
+ * become "Iron Sword x2 @ 25gp" in this realm's denomination rather than the
+ * JSON they are kept as.
+ */
+const SECTIONS = {
+  sales: {
+    title: 'SALES LOG',
+    cols: ['order_no', 'ts', 'customer', 'hold', 'items', 'qty_total', 'total', 'employee', 'discount', 'status'],
+    load: async (db, business, realmId, env) => {
+      const { results } = await db.prepare(
+        `SELECT order_no, ts, customer, hold, items, qty_total, total, employee, discount, status
+           FROM sales WHERE realm_id = ? AND business = ? ORDER BY id`).bind(realmId, business).all();
+      const { currency } = await readRealmPrefs(env, realmId);
+      return (results || []).map((r) => ({
+        ...r,
+        items: parseSaleItems(r.items).lines.map((l) => l.name + ' x' + l.qty + ' @ ' + l.price + currency).join(', ')
+          || r.items,
+      }));
+    },
+  },
+  coffer: {
+    title: 'COFFER',
+    cols: ['ts', 'kind', 'amount', 'note'],
+    load: async (db, business, realmId) => (await db.prepare(
+      'SELECT ts, kind, amount, note FROM coffer_entries WHERE realm_id = ? AND business = ? ORDER BY id')
+      .bind(realmId, business).all()).results || [],
+  },
+  inventory: {
+    title: 'INVENTORY',
+    cols: ['item', 'price', 'stock', 'low_stock', 'ingredient', 'avg_cost', 'harvest_pay'],
+    // Through listInventory rather than a raw SELECT, so the export agrees with
+    // the screen about what an inventory row is — including avg_cost, which is
+    // averaged over the shop's own deliveries and is the figure that matters
+    // for an ingredient.
+    load: async (_db, business, realmId, env) => (await listInventory(env, business, realmId)).map((r) => ({
+      item: r.item,
+      price: r.price,
+      stock: r.stock,
+      low_stock: r.lowStock,
+      ingredient: r.ingredient ? 'yes' : '',
+      avg_cost: r.avgCost == null ? '' : r.avgCost,
+      harvest_pay: r.harvestPay || '',
+    })),
+  },
+};
+
+function sectionCsv(section, rows) {
+  const lines = [section.cols.join(',')];
+  (rows || []).forEach((r) => lines.push(section.cols.map((c) => csvCell(r[c])).join(',')));
+  return lines.join('\n');
+}
+
+/**
+ * `type` is 'sales', 'coffer', 'inventory', or 'full' — everything the shop has.
+ *
+ * A single-section export is EXACTLY what it always was: its header row and its
+ * rows, nothing else, so anyone with a spreadsheet already pointed at one keeps
+ * working. The full export marks each section with a `# TITLE` line and a blank
+ * line between, which is what makes three different shapes legible in one file.
  */
 export async function businessCsv(env, business, type, realmId) {
   const db = await getDb(env);
   const stamp = new Date().toISOString().slice(0, 10);
   const slug = String(business || 'shop').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'shop';
-  let cols, rows;
-  if (type === 'coffer') {
-    cols = ['ts', 'kind', 'amount', 'note'];
-    ({ results: rows } = await db.prepare('SELECT ts, kind, amount, note FROM coffer_entries WHERE realm_id = ? AND business = ? ORDER BY id').bind(realmId, business).all());
-  } else {
-    cols = ['order_no', 'ts', 'customer', 'hold', 'items', 'qty_total', 'total', 'employee', 'discount', 'status'];
-    ({ results: rows } = await db.prepare('SELECT order_no, ts, customer, hold, items, qty_total, total, employee, discount, status FROM sales WHERE realm_id = ? AND business = ? ORDER BY id').bind(realmId, business).all());
-    // Sale lines are stored as data; a spreadsheet wants them readable, so they
-    // are rendered here in this realm's denomination.
-    const { currency } = await readRealmPrefs(env, realmId);
-    rows = (rows || []).map((r) => ({
-      ...r,
-      items: parseSaleItems(r.items).lines.map((l) => l.name + ' x' + l.qty + ' @ ' + l.price + currency).join(', ')
-        || r.items,
-    }));
+
+  const want = SECTIONS[type] ? [type] : (type === 'full' ? ['sales', 'coffer', 'inventory'] : ['sales']);
+  const parts = [];
+  for (const key of want) {
+    const section = SECTIONS[key];
+    const rows = await section.load(db, business, realmId, env);
+    parts.push(want.length > 1 ? '# ' + section.title + '\n' + sectionCsv(section, rows) : sectionCsv(section, rows));
   }
-  const lines = [cols.join(',')];
-  (rows || []).forEach((r) => lines.push(cols.map((c) => csvCell(r[c])).join(',')));
-  return { filename: slug + '-' + (type === 'coffer' ? 'coffer' : 'sales') + '-' + stamp + '.csv', csv: lines.join('\n') };
+
+  const name = want.length > 1 ? 'everything' : want[0];
+  return { filename: slug + '-' + name + '-' + stamp + '.csv', csv: parts.join('\n\n') };
 }
 
 /** Gzips a JS object; returns an ArrayBuffer suitable for a file download. */

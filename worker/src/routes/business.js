@@ -619,7 +619,11 @@ async function setStyle({ request, env, body }) {
  */
 async function ownerExport({ request, env, url, cors }) {
   const caller = await requireOwner(request, env);
-  const type = url.searchParams.get('type') === 'coffer' ? 'coffer' : 'sales';
+  // Named rather than passed through: the query string decides WHICH export,
+  // and anything unrecognised falls back to the sales log rather than becoming
+  // a section name the exporter has to defend itself against.
+  const asked = url.searchParams.get('type');
+  const type = ['coffer', 'inventory', 'full'].includes(asked) ? asked : 'sales';
   const { filename, csv } = await businessCsv(env, caller.business, type, realmIdOf(caller, env));
   return new Response(csv, {
     status: 200,

@@ -203,19 +203,24 @@ function exportCard() {
       const blob = await api.exportBusinessCsvBlob(type);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = type + '-' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.href = url; a.download = (type === 'full' ? 'shop-everything' : type) +
+        '-' + new Date().toISOString().slice(0, 10) + '.csv';
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
       setStatus('Downloaded ✓', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { btn.disabled = false; }
   }
-  const salesBtn = el('button.secondary-btn', { onclick: () => download('sales', salesBtn) }, 'Export sales (CSV)');
-  const cofferBtn = el('button.secondary-btn', { onclick: () => download('coffer', cofferBtn) }, 'Export coffer (CSV)');
+  const fullBtn = el('button.primary', { onclick: () => download('full', fullBtn) }, 'Export everything (CSV)');
+  const salesBtn = el('button.secondary-btn', { onclick: () => download('sales', salesBtn) }, 'Sales log only');
+  const cofferBtn = el('button.secondary-btn', { onclick: () => download('coffer', cofferBtn) }, 'Coffer only');
+  const invBtn = el('button.secondary-btn', { onclick: () => download('inventory', invBtn) }, 'Inventory only');
   return el('div.card', {}, [
     el('h2', {}, 'Export data'),
-    el('p', { class: 'note' }, 'Download your shop’s records as a spreadsheet-friendly CSV for your own bookkeeping.'),
-    el('div', { class: 'row-actions' }, [salesBtn, cofferBtn]),
+    el('p', { class: 'note' }, 'Download your shop’s records as a spreadsheet-friendly CSV for your own ' +
+      'bookkeeping. Everything gives you one file with your sales log, your coffer and your inventory in ' +
+      'it, each under its own heading — or take just the one you need.'),
+    el('div', { class: 'row-actions' }, [fullBtn, salesBtn, cofferBtn, invBtn]),
     status,
   ]);
 }
