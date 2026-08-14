@@ -25,6 +25,7 @@ import { renderSales, renderIntake } from './shop-history.js';
 import { canManage } from '../lib/roles.js';
 import { setOpsActions } from '../lib/sections.js';
 import { createItemPicker } from '../lib/item-picker.js';
+import { openStocktakeModal } from './inventory.js';
 import { toast } from '../lib/toast.js';
 
 /** Renders a tile page, with the admin-assigned artwork once it arrives. */
@@ -216,12 +217,26 @@ function exportCard() {
   const cofferBtn = el('button.secondary-btn', { onclick: () => download('coffer', cofferBtn) }, 'Coffer only');
   const invBtn = el('button.secondary-btn', { onclick: () => download('inventory', invBtn) }, 'Inventory only');
   return el('div.card', {}, [
-    el('h2', {}, 'Export data'),
+    el('h2', {}, 'Export & import data'),
     el('p', { class: 'note' }, 'Download your shop’s records as a spreadsheet-friendly CSV for your own ' +
       'bookkeeping. Everything gives you one file with your sales log, your coffer and your inventory in ' +
       'it, each under its own heading — or take just the one you need.'),
     el('div', { class: 'row-actions' }, [fullBtn, salesBtn, cofferBtn, invBtn]),
     status,
+    el('h4', {}, 'Bringing data back in'),
+    // The ONE thing that can come back in is stock counts, and it opens the
+    // stocktake rather than reimplementing it here: same reader, same check,
+    // same Apply. A sales log and a coffer are records of things that HAPPENED
+    // — a shop cannot paste those into having happened, and a screen offering
+    // to would be offering a lie.
+    el('p', { class: 'note' }, 'Stock counts are the part you can bring back. Edit the inventory sheet you ' +
+      'exported — or count the shelves into a new one — and read it back in here. It shows you exactly ' +
+      'what would change before anything does.'),
+    el('p', { class: 'note' }, 'Your sales log and coffer cannot be imported: they are the record of what ' +
+      'actually happened, and they are written by the register as it happens.'),
+    el('div', { class: 'row-actions' }, [
+      el('button.secondary-btn', { onclick: () => openStocktakeModal(() => {}) }, 'Import stock counts'),
+    ]),
   ]);
 }
 

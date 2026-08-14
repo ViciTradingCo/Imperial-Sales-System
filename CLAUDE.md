@@ -427,6 +427,16 @@ let a line move anything but a count. Anything the paste omits is LEFT ALONE —
 partial list silently zeroing the rest is the worst thing it could do — and an
 unknown name is reported, never invented.
 
+A SPREADSHEET IS A FASTER WAY TO FILL THE BOX IN, never a second way to change
+stock: `src/lib/spreadsheet.js` reads .xlsx/.csv into `Name, Amount` text and
+drops it in the same textarea a person types into, so a file goes through the
+same planner, preview and Apply. The .xlsx reader is hand-written (a ZIP
+directory walk plus `DecompressionStream`) because the smallest capable library
+is bigger than this whole app and this is an offline-first PWA. It reads cells
+BY REFERENCE, since a sheet omits empty cells and reading them in order shifts
+every column left. Legacy binary `.xls` is refused with instructions, not
+half-supported.
+
 `planStockImport` is the one planner for both preview and apply (the preview is
 the apply with the last step left off), so the two cannot promise different
 things.

@@ -25,6 +25,7 @@ import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
+import { readSpreadsheet, rowsToStocktake } from '../lib/spreadsheet.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = canManage(me);
@@ -396,11 +397,44 @@ function openTransferModal(me, onChanged) {
  * with `apply` left off — so what the preview promises is what the apply does,
  * rather than two code paths that can drift apart.
  */
-function openStocktakeModal(onSaved) {
+export function openStocktakeModal(onSaved, prefill) {
   // Both boxes are kept SHORT. They are scrollable and resizable, and every row
   // of height here pushed the buttons further down a modal that was already
   // taller than the window.
   const text = el('textarea', { rows: '7', placeholder: 'Iron Sword, 12\nHealth Potion, 40' });
+  if (prefill) text.value = prefill;
+
+  /**
+   * A SPREADSHEET INSTEAD OF TYPING. It fills the box below — it does not take
+   * a second route into the inventory. Whatever the file says goes through the
+   * same check and the same Apply as anything pasted by hand, which is the only
+   * reason it is safe to accept a file at all.
+   */
+  const fileNote = el('p', { class: 'note' });
+  const file = el('input', { type: 'file', accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  file.addEventListener('change', async () => {
+    const picked = file.files && file.files[0];
+    if (!picked) return;
+    fileNote.className = 'note';
+    fileNote.textContent = 'Reading ' + picked.name + '…';
+    try {
+      const { text: filled, note, count } = rowsToStocktake(await readSpreadsheet(picked));
+      if (!count) { fileNote.className = 'warn'; fileNote.textContent = note || 'Nothing to read in that file.'; return; }
+      text.value = filled;
+      fileNote.textContent = 'Read ' + count + ' line' + (count === 1 ? '' : 's') + ' from ' + picked.name + '. ' +
+        note + ' Check it below, then Check this paste.';
+      apply.hidden = true;
+      mount(report);
+      setStatus('');
+    } catch (e) {
+      fileNote.className = 'error';
+      fileNote.textContent = e.message || String(e);
+    } finally {
+      // Cleared so picking the SAME file again still fires a change event —
+      // which is exactly what somebody does after fixing a row in Excel.
+      file.value = '';
+    }
+  });
   const status = el('p', {});
   const report = el('div', {});
   const check = el('button.secondary-btn', { onclick: () => run(false) }, 'Check this paste');
@@ -495,7 +529,12 @@ function openStocktakeModal(onSaved) {
     el('label', {}, 'What you hold now'),
     current,
     el('div', { class: 'row-actions' }, [copy]),
-    el('label', {}, 'Paste your counts here'),
+    el('label', {}, 'Read it from a spreadsheet'),
+    file,
+    el('p', { class: 'note' }, 'A .csv or .xlsx with an item column and an amount column — headings like ' +
+      '“Item” and “Amount” are found wherever they sit. It fills the box below for you to check.'),
+    fileNote,
+    el('label', {}, 'Or paste your counts here'),
     text,
     el('p', { class: 'note' }, 'This sets COUNTS. It never changes the price of something you already ' +
       'list, and anything you leave out is left exactly as it is — so a count of one shelf is safe to ' +

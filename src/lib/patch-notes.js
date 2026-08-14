@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.6', date: '2026-08-14', notes: [
+    'The Stocktake reads a spreadsheet. Pick a .csv or .xlsx and it fills the box for you — no retyping, no copy and paste.',
+    'It finds your columns rather than demanding a shape: headings like “Item” and “Amount” are picked up wherever they sit, other columns are ignored, and a sheet with no headings is read as name-then-amount. It tells you which columns it used.',
+    'What it reads still goes through the same check and the same Apply as anything typed by hand — you see exactly what would change before it changes.',
+    'You can start the same job from Shop Settings → Export & import data, next to the exports, since “fix my inventory in a spreadsheet and put it back” is one task.',
+    'Note: the older .xls format cannot be read — open it in your spreadsheet program and Save As .xlsx or .csv. Your sales log and coffer cannot be imported at all; they are the record of what actually happened.',
+  ] },
   { version: '4.5', date: '2026-08-14', notes: [
     'Export everything in one file. Shop Settings → Export data now has “Export everything (CSV)”, which gives you a single spreadsheet holding your sales log, your coffer and your inventory, each under its own heading.',
     'The three are still available on their own — Sales log only, Coffer only, and Inventory only, which is new. A single export is byte for byte what it always was, so anything you already point a spreadsheet at keeps working.',
