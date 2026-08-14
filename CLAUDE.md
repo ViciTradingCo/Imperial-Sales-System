@@ -43,8 +43,12 @@ The only Google product still involved is **Sign-In** (identity). Full detail in
   service-account key. Registry modules (`users.js`, `registry.js`, `cert.js`,
   `settings.js`, `business-settings.js`, `motd.js`) are D1-backed.
 - **Router:** `worker/src/index.js` is a thin shell (CORS, size cap, rate limit,
-  `/health`, dispatch); handlers live in `worker/src/routes/*.js` and share
-  `http.js` (dispatch/body/JSON) + `guards.js` (auth).
+  `/health`, dispatch); handlers live in `worker/src/routes/*.js` (`auth`,
+  `admin`, `business`, `court`) and share `http.js` (dispatch/body/JSON) +
+  `guards.js` (auth). A new route module exports its own `routes` array and is
+  spread into `ROUTES` — and must also be added to `routes.test.js` and
+  `api-client.test.js`, or the client/route drift check reports its paths as
+  unserved.
 - **Backups:** admin file export/import (`export.js`) + an optional daily R2
   snapshot (`backup-cron.js`) + D1 Time Travel. No Sheets mirror.
 

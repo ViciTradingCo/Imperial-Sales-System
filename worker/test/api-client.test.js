@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { routes as authRoutes } from '../src/routes/auth.js';
 import { routes as adminRoutes } from '../src/routes/admin.js';
 import { routes as businessRoutes } from '../src/routes/business.js';
+import { routes as courtRoutes } from '../src/routes/court.js';
 
 const SRC = join(import.meta.dirname, '..', '..', 'src');
 
@@ -61,7 +62,7 @@ describe('frontend API client', () => {
   });
 
   it('calls only paths the Worker actually routes', () => {
-    const served = new Set([...authRoutes, ...adminRoutes, ...businessRoutes].map((r) => r.path));
+    const served = new Set([...authRoutes, ...adminRoutes, ...businessRoutes, ...courtRoutes].map((r) => r.path));
     served.add('/health');       // served by the router itself, not a route module
     const missing = [];
     // Paths are written as string or template literals in the client; take the

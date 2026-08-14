@@ -23,8 +23,9 @@ import { purgeExpiredSessions } from './sessions.js';
 import { routes as authRoutes } from './routes/auth.js';
 import { routes as adminRoutes } from './routes/admin.js';
 import { routes as businessRoutes } from './routes/business.js';
+import { routes as courtRoutes } from './routes/court.js';
 
-const ROUTES = [...authRoutes, ...adminRoutes, ...businessRoutes];
+const ROUTES = [...authRoutes, ...adminRoutes, ...businessRoutes, ...courtRoutes];
 
 async function healthResponse(env, cors) {
   // Probe D1: 'ok' = bound + migrated; 'error' = bound but tables missing;

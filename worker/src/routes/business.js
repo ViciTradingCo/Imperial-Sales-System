@@ -2,7 +2,9 @@
  * Business-operations routes — everything a registered user, owner, or employee
  * does: inventory, intake, the register, transfers, the shop ledger (coffers /
  * discounts / style), per-shop settings, the item + hold lookups, certification,
- * MOTD banners, the Court hold report, and the owner CSV export.
+ * MOTD banners, and the owner CSV export. A Court's own governing routes live
+ * next door in court.js; what stays here is what an ordinary shop sees of its
+ * Court — the notice on its board, and its own standing.
  */
 import { requireRegistered, requireManages, requireOwner, managesBusiness, leaveRefusal, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
 import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate, setManagerRole, deleteMember } from '../users.js';
@@ -26,14 +28,11 @@ import { activeGlobalNotices, readWarnDays, activeNoticesForBusiness,
 import { holdReport, businessReport } from '../market.js';
 import { lastWeekWindow, isWeekTurnover } from '../week.js';
 import { openShift, clockIn, clockOut, myShifts, myCommission, shopShifts, markPaid, editShift, deleteShift } from '../timecard.js';
-import { requireCourt, courtCompanies, courtShop } from '../oversight.js';
-import {
-  SPEND_CATEGORIES, STANDINGS, readCourtSettings, writeCourtSettings,
-  courtStandings, setCourtStanding, courtPrices, setCourtPrice,
-  courtDues, courtDuesFor, recordDuesPayment, courtSpending, recordCourtSpend, courtStock,
-  standingOf,
-} from '../court.js';
 import { businessCsv } from '../export.js';
+// What a shop in a Court's region sees of it on its OWN board: the Court's
+// notice, and its own standing when that has become a sanction. The Court's
+// governing routes are in routes/court.js.
+import { readCourtSettings, standingOf } from '../court.js';
 import { readBranding } from '../branding.js';
 import { FEEDBACK_SUBJECTS, submitFeedback, listOwnFeedback } from '../feedback.js';
 
@@ -709,110 +708,6 @@ async function weeklyRegionRoute({ request, env }) {
 }
 
 /**
- * Court oversight: the shops trading in this Court's region.
- *
- * A Court sees more of its neighbours than an ordinary shop does — rosters and
- * ledgers — which is the point of the flag. What bounds it is the REGION: the
- * gate resolves the caller's own region and every read is scoped to it, so a
- * Court cannot reach a shop trading anywhere else.
- */
-async function courtCompaniesRoute({ request, env }) {
-  const caller = await requireRegistered(request, env);
-  const realmId = realmIdOf(caller, env);
-  const hold = await requireCourt(env, caller.business, realmId);
-  return { hold, companies: await courtCompanies(env, hold, realmId) };
-}
-/** One of those shops in full — roster, coffer, discounts, style, performance. */
-async function courtShopRoute({ request, env, url }) {
-  const caller = await requireRegistered(request, env);
-  const realmId = realmIdOf(caller, env);
-  const hold = await requireCourt(env, caller.business, realmId);
-  return await courtShop(env, hold, url.searchParams.get('business'), realmId);
-}
-
-/* ---- Court Tools: a region's government ---- */
-/**
- * Every Court route resolves the caller's OWN region first, and acts only on
- * it. One gate, applied identically, so no individual handler can be the one
- * that forgot.
- */
-async function courtSeat(request, env) {
-  const caller = await requireRegistered(request, env);
-  const realmId = realmIdOf(caller, env);
-  const hold = await requireCourt(env, caller.business, realmId);
-  return { caller, realmId, hold };
-}
-
-/** Everything the Court Tools page opens with, in one call. */
-async function courtOverview({ request, env }) {
-  const { caller, realmId, hold } = await courtSeat(request, env);
-  const [settings, dues, standings] = await Promise.all([
-    readCourtSettings(env, hold, realmId),
-    courtDues(env, hold, realmId),
-    courtStandings(env, hold, realmId),
-  ]);
-  return {
-    hold, seat: caller.business, settings, dues,
-    shops: standings.length,
-    standings, categories: SPEND_CATEGORIES, options: STANDINGS,
-  };
-}
-async function courtSaveSettings({ request, env, body }) {
-  const { caller, realmId, hold } = await courtSeat(request, env);
-  const settings = await writeCourtSettings(env, hold, body, realmId);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.settings',
-    detail: hold + ': levy ' + settings.taxPercent + '%' + (body.notice !== undefined ? ', notice updated' : ''), realmId });
-  return { settings };
-}
-async function courtSetStanding({ request, env, body }) {
-  const { caller, realmId, hold } = await courtSeat(request, env);
-  const standings = await setCourtStanding(env, hold, body, realmId);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.standing',
-    detail: String(body.business || '') + ' → ' + String(body.standing || ''), realmId });
-  return { standings };
-}
-async function courtGetPrices({ request, env }) {
-  const { realmId, hold } = await courtSeat(request, env);
-  return { hold, prices: await courtPrices(env, hold, realmId) };
-}
-async function courtSavePrice({ request, env, body }) {
-  const { caller, realmId, hold } = await courtSeat(request, env);
-  const prices = await setCourtPrice(env, hold, body, realmId);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.price',
-    detail: String(body.item || '') + ': ' + (body.min || '—') + ' to ' + (body.max || '—'), realmId });
-  return { prices };
-}
-async function courtGetDues({ request, env, url }) {
-  const { realmId, hold } = await courtSeat(request, env);
-  const one = String(url.searchParams.get('business') || '').trim();
-  return one
-    ? { hold, business: one, entries: await courtDuesFor(env, hold, one, realmId) }
-    : { hold, ...(await courtDues(env, hold, realmId)) };
-}
-async function courtPayDues({ request, env, body }) {
-  const { caller, realmId, hold } = await courtSeat(request, env);
-  const dues = await recordDuesPayment(env, hold, body, realmId, caller.business);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.dues.paid',
-    detail: String(body.business || '') + ': ' + String(body.amount || ''), realmId });
-  return dues;
-}
-async function courtGetSpending({ request, env }) {
-  const { realmId, hold } = await courtSeat(request, env);
-  return { hold, ...(await courtSpending(env, hold, realmId)) };
-}
-async function courtSpend({ request, env, body }) {
-  const { caller, realmId, hold } = await courtSeat(request, env);
-  const spending = await recordCourtSpend(env, hold, body, realmId, caller.business);
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.spend',
-    detail: String(body.category || '') + ': ' + String(body.amount || ''), realmId });
-  return spending;
-}
-async function courtGetStock({ request, env }) {
-  const { realmId, hold } = await courtSeat(request, env);
-  return { hold, stock: await courtStock(env, hold, realmId) };
-}
-
-/**
  * Public (no auth): branding — needed before sign-in, so this is the DEPLOYMENT's
  * identity. A realm's own overrides are applied once the user signs in and their
  * realm is known (see /auth/me → realmBranding).
@@ -985,18 +880,6 @@ export const routes = [
   { method: 'GET', path: '/tiles', handler: getTiles },
   { method: 'GET', path: '/market/region', handler: holdReportRoute },
   { method: 'GET', path: '/market/week', handler: weeklyRegionRoute },
-  { method: 'GET', path: '/court/companies', handler: courtCompaniesRoute },
-  { method: 'GET', path: '/court/company', handler: courtShopRoute },
-  { method: 'GET', path: '/court', handler: courtOverview },
-  { method: 'POST', path: '/court/settings', handler: courtSaveSettings },
-  { method: 'POST', path: '/court/standing', handler: courtSetStanding },
-  { method: 'GET', path: '/court/prices', handler: courtGetPrices },
-  { method: 'POST', path: '/court/prices', handler: courtSavePrice },
-  { method: 'GET', path: '/court/dues', handler: courtGetDues },
-  { method: 'POST', path: '/court/dues/pay', handler: courtPayDues },
-  { method: 'GET', path: '/court/spending', handler: courtGetSpending },
-  { method: 'POST', path: '/court/spending', handler: courtSpend },
-  { method: 'GET', path: '/court/stock', handler: courtGetStock },
   { method: 'GET', path: '/motd', handler: getMotd },
   { method: 'POST', path: '/business/intake/delete', handler: deleteIntakeRoute },
   { method: 'POST', path: '/business/inventory/convert', handler: convertInventory },

@@ -19,6 +19,7 @@ import {
 import { listUsersByBusiness } from '../src/users.js';
 import { upsertItem, listInventory } from '../src/inventory.js';
 import { checkCertification } from '../src/cert.js';
+import { listBundles, saveBundle } from '../src/bundles.js';
 
 let env;
 const R = DEFAULT_REALM_ID;
@@ -133,6 +134,15 @@ describe('restoring', () => {
     // Simulate a row archived before archived_from existed.
     await env.DB.prepare('UPDATE companies SET archived_from = NULL WHERE id = ?').bind(id).run();
     expect((await restoreCompany(env, id, R)).business).toBe(SHOP);
+  });
+
+  it('brings its specials back too — a bundle belongs to the shop', async () => {
+    const id = await aShop();
+    await saveBundle(env, SHOP, { name: 'Feast', price: 60, parts: [{ item: 'Iron Sword', qty: 2 }] }, R);
+    await archiveCompany(env, id, R);
+    expect(await listBundles(env, SHOP, R), 'gone with the shop').toEqual([]);
+    await restoreCompany(env, id, R);
+    expect((await listBundles(env, SHOP, R)).map((b) => b.name)).toEqual(['Feast']);
   });
 
   it('cannot be reached from another realm', async () => {

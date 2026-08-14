@@ -112,6 +112,64 @@ function mapSale(r) {
 }
 
 /**
+ * What one bundle line costs, takes off the shelf, and records.
+ *
+ * Pulled out of checkout because it is a whole job of its own: a bundle is one
+ * line to the customer and several to the stockroom, and every one of those
+ * differences has a reason worth stating in one place.
+ *
+ * The price is the BUNDLE'S, read from the shop's own row — the caller resolves
+ * it, and nothing here trusts the request for a figure.
+ */
+function bundleLine(b, askedQty, inv, rules) {
+  const qty = Math.floor(Number(askedQty)) || 1;
+  if (qty < 1) throw new Error('Bad quantity for ' + b.name + '.');
+  if (!b.parts.length) throw new Error(b.name + ' has nothing in it.');
+
+  const need = new Map();
+  const offInventory = [];
+  let floor = 0;
+  let ceiling = null;
+
+  for (const part of b.parts) {
+    const held = inv[part.item.toLowerCase()];
+    if (held && held.ingredient) {
+      throw new Error(b.name + ' contains ' + held.item + ', which is marked as an ingredient — ' +
+        'stock you craft with, not stock you sell.');
+    }
+    if (held) need.set(held.item, (need.get(held.item) || 0) + part.qty * qty);
+    else offInventory.push(part.item);
+    // A Court's price controls apply to a bundle in AGGREGATE: it has no
+    // per-item price to check, but selling ten capped items for one price must
+    // not be a way around the cap.
+    if (rules) {
+      const cap = rules.prices.get(part.item.toLowerCase());
+      if (cap && cap.min != null) floor += cap.min * part.qty;
+      if (cap && cap.max != null && ceiling !== null) ceiling += cap.max * part.qty;
+      else if (cap && cap.max == null) ceiling = null;
+    }
+  }
+  if (rules && floor && b.price < floor) {
+    throw new Error(rules.hold + ' Court sets a floor of ' + floor + ' on what is in ' + b.name +
+      ' — the bundle is priced at ' + b.price + '.');
+  }
+  if (rules && ceiling !== null && ceiling && b.price > ceiling) {
+    throw new Error(rules.hold + ' Court caps what is in ' + b.name + ' at ' + ceiling +
+      ' — the bundle is priced at ' + b.price + '.');
+  }
+
+  return {
+    need,
+    offInventory,
+    subtotal: b.price * qty,
+    // The UNITS that actually left the shelf. A bundle of ten sold once moved
+    // ten things, and the shop's "items sold" should say so.
+    qtyTotal: b.units * qty,
+    line: { name: b.name, qty, price: b.price, parts: b.parts },
+  };
+}
+
+/**
  * Rings up a multi-item sale. cart = [{item, qty, price}] where price is the
  * actual sold-for amount per unit. Attributed to the caller's character.
  */
@@ -172,50 +230,19 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   let subtotal = 0;
   let qtyTotal = 0;
   for (const line of cart) {
-    // A BUNDLE LINE. The client names one; everything about it — its price and
-    // what is in it — is read from the shop's own row, never from the request.
+    // A BUNDLE LINE — several items, one price. Worked out in full by
+    // bundleLine below, which is where the reasoning about it lives.
     if (line.bundle) {
       const b = await findBundle(env, business, line.bundle, realmId);
       if (!b) throw new Error('"' + line.bundle + '" is not one of this shop\'s bundles.');
-      const bq = Math.floor(Number(line.qty)) || 1;
-      if (bq < 1) throw new Error('Bad quantity for ' + b.name + '.');
-      if (!b.parts.length) throw new Error(b.name + ' has nothing in it.');
-
-      let floor = 0, ceiling = null;
-      for (const part of b.parts) {
-        const inv0 = inv[part.item.toLowerCase()];
-        if (inv0 && inv0.ingredient) {
-          throw new Error(b.name + ' contains ' + inv0.item + ', which is marked as an ingredient — ' +
-            'stock you craft with, not stock you sell.');
-        }
-        if (inv0) need[inv0.item] = (need[inv0.item] || 0) + part.qty * bq;
-        else offInventory.push(part.item);
-        // A Court's price controls apply to a bundle in AGGREGATE: it has no
-        // per-item price to check, but selling ten capped items for one price
-        // must not be a way around the cap.
-        if (rules) {
-          const cap = rules.prices.get(part.item.toLowerCase());
-          if (cap && cap.min != null) floor += cap.min * part.qty;
-          if (cap && cap.max != null && ceiling !== null) ceiling += cap.max * part.qty;
-          else if (cap && cap.max == null) ceiling = null;
-        }
-      }
-      if (rules && floor && b.price < floor) {
-        throw new Error(rules.hold + ' Court sets a floor of ' + floor + ' on what is in ' + b.name +
-          ' — the bundle is priced at ' + b.price + '.');
-      }
-      if (rules && ceiling !== null && ceiling && b.price > ceiling) {
-        throw new Error(rules.hold + ' Court caps what is in ' + b.name + ' at ' + ceiling +
-          ' — the bundle is priced at ' + b.price + '.');
-      }
-
-      subtotal += b.price * bq;
-      // The UNITS that actually left the shelf. A bundle of ten sold once moved
-      // ten things, and the shop's "items sold" should say so.
-      qtyTotal += b.units * bq;
+      const priced = bundleLine(b, line.qty, inv, rules);
+      priced.need.forEach((qty, item) => { need[item] = (need[item] || 0) + qty; });
+      offInventory.push(...priced.offInventory);
+      subtotal += priced.subtotal;
+      qtyTotal += priced.qtyTotal;
       // Deliberately NOT added to newItems: a bundle is not an item and must
       // never find its way into the realm's master index.
-      lines.push({ name: b.name, qty: bq, price: b.price, parts: b.parts });
+      lines.push(priced.line);
       continue;
     }
 

@@ -10,6 +10,7 @@ import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
 import { createRealm, listRealms, deleteRealm, realmStats, ensureDefaultRealm } from '../src/realm.js';
 import { findUserByEmail, listAllUsers, listUsersByBusiness, findUserByUid, updateMember, deleteMember, transferMember } from '../src/users.js';
 import { registerUser, listCompanies, findBusinessByName, listBusinessNames, findBusinessMeta, updateCompany, transferCompany } from '../src/registry.js';
+import { listBundles, saveBundle } from '../src/bundles.js';
 import { listInventory, upsertItem as upsertInvItem } from '../src/inventory.js';
 import { recordIntake } from '../src/intake.js';
 import { checkout, listSales } from '../src/sales.js';
@@ -257,5 +258,17 @@ describe('moving between realms', () => {
     expect(await listCompanies(env, id)).toHaveLength(1);
     // The owner came along.
     expect((await listAllUsers(env, id))[0].email).toBe('b@x.test');
+  });
+
+  it('moves everything the shop OWNS, not just its people', async () => {
+    // The per-shop tables are walked from one list, so a table added later is
+    // either on it or silently left behind in the old realm. Bundles were the
+    // most recent addition; this is the canary for the next one too.
+    const co = (await listCompanies(env, REALM_B))[0];
+    await saveBundle(env, co.business, { name: 'Feast', price: 60, parts: [{ item: 'Ale', qty: 2 }] }, REALM_B);
+    const { id } = await createRealm(env, { name: 'Empty Realm' });
+    await transferCompany(env, co.id, id, REALM_B);
+    expect(await listBundles(env, co.business, REALM_B), 'left nothing behind').toEqual([]);
+    expect((await listBundles(env, co.business, id)).map((b) => b.name)).toEqual(['Feast']);
   });
 });

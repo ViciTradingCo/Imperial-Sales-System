@@ -8,8 +8,9 @@ import { describe, it, expect } from 'vitest';
 import { routes as authRoutes } from '../src/routes/auth.js';
 import { routes as adminRoutes } from '../src/routes/admin.js';
 import { routes as businessRoutes } from '../src/routes/business.js';
+import { routes as courtRoutes } from '../src/routes/court.js';
 
-const groups = { auth: authRoutes, admin: adminRoutes, business: businessRoutes };
+const groups = { auth: authRoutes, admin: adminRoutes, business: businessRoutes, court: courtRoutes };
 const all = Object.values(groups).flat();
 
 describe('route wiring', () => {
