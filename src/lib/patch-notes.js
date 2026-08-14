@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.3', date: '2026-08-12', notes: [
+    'The Sales Log has moved into the Shop Ledger. Past sales and deliveries are sections there now, beside Performance, Notices and Coffers — one book for what the shop has done and how it is doing, instead of two pages whose names did not say which held what.',
+    'Nothing changed about who can do what. Looking up an order and voiding one you mis-rang are still open to anyone who works the till, so the Ledger opens for everyone; it simply shows fewer sections to somebody who is not running the shop. Deleting a delivery is still owner’s work.',
+    'Old Sales Log links and home-screen shortcuts still work — they take you to the Ledger.',
+  ] },
   { version: '4.2', date: '2026-08-12', notes: [
     'SPECIALS. Shop Settings → Specials & Discounts. Build a bundle — five drinks and five meals, say — give it one price, and your staff ring the whole thing up as a single line at the register.',
     'The bundle price is the bundle’s, not the sum of its parts; that difference is the whole point of one. While you set it up the screen tells you what the same items would come to separately, so you can see the saving — or see that the deal has quietly stopped being one.',

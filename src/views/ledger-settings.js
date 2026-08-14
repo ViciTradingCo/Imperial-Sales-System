@@ -21,6 +21,9 @@ import { money } from '../lib/format.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { renderShopReport } from './shop-report.js';
 import { renderShopNotices } from './shop-notices.js';
+import { renderSales, renderIntake } from './shop-history.js';
+import { canManage } from '../lib/roles.js';
+import { setOpsActions } from '../lib/sections.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { toast } from '../lib/toast.js';
 
@@ -37,20 +40,46 @@ function tilePage(container, { title, note, sections }) {
   api.getTiles().then((r) => draw(r.images || {})).catch(() => { /* glyphs are fine */ });
 }
 
-/** Shop Ledger — the daily three. */
+/**
+ * Shop Ledger — the shop's own book: what has happened, and how it is going.
+ *
+ * Past sales and deliveries used to be a separate page called the Sales Log,
+ * which meant an owner looking over the day's trade had two pages to visit and
+ * nothing in either name to say which held what. They are sections here now.
+ *
+ * WHICH SECTIONS YOU SEE DEPENDS ON YOUR ROLE, rather than the page being shut
+ * to employees. Looking up an order — and voiding one you mis-rang — was always
+ * open to anyone who works the till, and folding it into a manager-only page
+ * would have quietly taken that away. So the door is open and the tiles differ.
+ * Every one of them is enforced in the Worker regardless of what is offered.
+ */
 export function renderLedgerSettings(container, { me }) {
-  tilePage(container, {
-    title: 'Shop Ledger',
-    note: (me.business || 'Your shop') + ' — how the shop is doing, day to day. ' +
-      'Discounts, style, and the rest are under Shop Settings in the menu.',
-    sections: [
+  // The shop-tools bar, which the Sales Log used to put up. Without it the
+  // Ledger was the one shop page you could not get off without the menu.
+  setOpsActions(me);
+  const sections = [
+    // What has already happened. Everyone who works the till.
+    { key: 'log-sales', label: 'Sales', hint: 'Find or void a past order', glyph: '🧾',
+      open: (host) => renderSales(host) },
+    { key: 'log-intake', label: 'Deliveries', hint: 'Intake you have recorded', glyph: '🚚',
+      open: (host) => renderIntake(host, canManage(me)) },
+  ];
+  // How the shop is DOING, and its money. The owner's and the manager's.
+  if (canManage(me)) {
+    sections.push(
       { key: 'led-report', label: 'Performance', hint: 'Revenue & best sellers', glyph: '📈',
         open: (host) => renderShopReport(host) },
       { key: 'led-notices', label: 'Notices', hint: 'Post to your staff', glyph: '📣',
         open: (host) => renderShopNotices(host) },
       { key: 'led-coffer', label: 'Coffers', hint: 'Balance & ledger', glyph: '🪙',
         open: (host) => mount(host, cofferCard()) },
-    ],
+    );
+  }
+  tilePage(container, {
+    title: 'Shop Ledger',
+    note: (me.business || 'Your shop') + ' — what the shop has done, and how it is doing. ' +
+      (canManage(me) ? 'Discounts, style, and the rest are under Shop Settings in the menu.' : ''),
+    sections,
   });
 }
 

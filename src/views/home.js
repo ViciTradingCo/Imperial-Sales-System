@@ -78,16 +78,17 @@ export function renderHome(container, { me }) {
       { key: 'inventory', label: 'Inventory', hint: 'Stock & intake', glyph: '📦', onOpen: go('/inventory') },
       canManage(me) ? { key: 'employees', label: 'Employees', hint: 'Your roster', glyph: '🧑‍🤝‍🧑',
         onOpen: go('/employees') } : null,
-      canManage(me) ? { key: 'ledger', label: 'Shop Ledger', hint: 'Performance, notices, coffers', glyph: '📖',
-        onOpen: go('/ledger') } : null,
+      // Not gated: it holds the past sales and deliveries that every member
+      // could always reach, and shows fewer sections to someone who is not
+      // running the shop.
+      { key: 'ledger', label: 'Shop Ledger', hint: 'Sales, deliveries, coffers', glyph: '📖',
+        onOpen: go('/ledger') },
       // Shop Settings was reachable ONLY from the side menu — which on a phone
       // is behind the hamburger — while its sibling the Shop Ledger had a tile.
       // Half an owner's tools being one click from home and half being hidden is
       // most of why things here were reported as hard to find.
       canManage(me) ? { key: 'shopsettings', label: 'Shop Settings', hint: 'Discounts, style, exports', glyph: '⚙️',
         onOpen: go('/ledger/settings') } : null,
-      { key: 'saleslog', label: 'Sales Log', hint: 'Past sales & deliveries', glyph: '🧾',
-        onOpen: go('/sales-log') },
       canManage(me) ? { key: 'restock', label: 'Restock', hint: 'Low & out of stock', glyph: '🔔',
         onOpen: go('/restock') } : null,
       // Last week's trade in this shop's own region. Owner-level — it is what

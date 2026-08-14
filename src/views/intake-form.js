@@ -49,7 +49,7 @@ const GUIDE = {
   source: [
     'Naming a REGISTERED shop credits it for the supply in its own region’s trade. Anyone else — an ' +
       'NPC smith, a traveller, a mine — is recorded as typed.',
-    'Nothing is written until you press Record. A delivery entered by mistake can be removed in Sales Log.',
+    'Nothing is written until you press Record. A delivery entered by mistake can be removed under Deliveries on the Shop Ledger.',
   ],
 };
 
@@ -445,7 +445,7 @@ function buildIntake(me, onRecorded) {
  * The deliveries below it are the receipt. Selling clears the cart when a sale
  * lands, which tells you it worked; recording a delivery used to close a window
  * and leave you looking at nothing. The full history — and removing a delivery
- * entered by mistake — stays in Sales Log rather than being built twice.
+ * entered by mistake — stays on the Shop Ledger rather than being built twice.
  */
 export function renderBuying(host, { me }) {
   const canBuy = canManage(me);
@@ -468,7 +468,7 @@ export function renderBuying(host, { me }) {
     el('div.card', {}, [
       el('h3', {}, 'Recent deliveries'),
       el('p', { class: 'note' }, 'The last few, so you can see what you just recorded. The full history, and ' +
-        'removing a delivery recorded by mistake, are in Sales Log.'),
+        'removing a delivery recorded by mistake, are on the Shop Ledger.'),
       listHost,
     ]),
   );

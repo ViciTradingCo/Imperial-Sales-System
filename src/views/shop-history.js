@@ -1,52 +1,24 @@
 /**
- * Sales Log — everything that has already happened, in one place.
+ * WHAT HAS ALREADY HAPPENED — past sales, and past deliveries.
  *
- * The two histories used to live wherever the thing that WRITES them lives:
- * order lookup at the bottom of the register, deliveries at the bottom of
- * Inventory. That put a record you consult occasionally underneath a form you
- * use constantly, on both pages, and it split "what happened" across two
- * screens that are otherwise about doing rather than reading.
+ * These two were a page of their own ("Sales Log") sitting beside the Shop
+ * Ledger, which meant an owner looking over the day's trade had two places to
+ * go and no way to tell from the names which held what. They are tiles on the
+ * Ledger now; this module is what they render.
  *
- * They are the same kind of thing — goods and money that already moved, listed
- * newest first, each with the one correction it allows (void a sale, delete a
- * delivery). So they belong together, and away from the tills.
- *
- * The corrections stay here rather than being read-only: the moment you notice a
- * mistyped delivery is the moment you are looking at the list of deliveries.
+ * They keep the permissions they had, which is why the Ledger opens to anyone
+ * registered rather than to managers alone: looking up an order is for whoever
+ * works the till, and VOIDING one is deliberately open to any active member —
+ * the person who mis-rang a sale is usually the person who notices. Deleting a
+ * delivery stays owner-only; it rewrites the coffer. Every one of those is
+ * enforced in the Worker, not here.
  */
 import { money, coins } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { setOpsActions } from '../lib/sections.js';
-import { canManage } from '../lib/roles.js';
-import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
-
-export function renderSalesLog(container, { me }) {
-  setOpsActions(me); // stays on the shop-tools bar with Register / Inventory
-  const canEdit = canManage(me);
-  let tileImages = {};
-
-  draw();
-  // Artwork an admin has assigned, if any; the glyphs stand in until it lands.
-  api.getTiles().then((r) => { tileImages = r.images || {}; draw(); }).catch(() => {});
-
-  function draw() {
-  mount(container, el('div.card', {}, [
-    el('h2', {}, 'Sales Log'),
-    el('p', { class: 'note' }, 'What has already happened — sales rung up, and deliveries taken in. ' +
-      'Newest first.'),
-    tileGrid(sectionTiles([
-      { key: 'log-sales', label: 'Sales', hint: 'Find or void a past order', glyph: '🧾',
-        open: (host) => renderSales(host) },
-      { key: 'log-intake', label: 'Deliveries', hint: 'Intake you have recorded', glyph: '🚚',
-        open: (host) => renderIntake(host, canEdit) },
-    ]), tileImages),
-  ]));
-  }
-}
 
 /* ---- sales: search, and void ---- */
 
@@ -57,7 +29,7 @@ function saleLines(s) {
   return lines.map((l) => l.name + ' x' + l.qty + ' @ ' + money(l.price)).join(', ');
 }
 
-function renderSales(host) {
+export function renderSales(host) {
   const q = el('input', { type: 'text', placeholder: 'Order #, customer, or employee' });
   const results = el('div', {}, skeletonRows(3));
   const search = el('button.secondary-btn', { onclick: run }, 'Search');
@@ -117,7 +89,7 @@ function shortDate(ts) {
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
 }
 
-function renderIntake(host, canEdit) {
+export function renderIntake(host, canEdit) {
   const listHost = el('div', {}, skeletonRows(3));
   mount(host,
     el('p', { class: 'note' }, 'Every delivery you have recorded. Deleting one puts its stock back out ' +

@@ -323,9 +323,9 @@ const TILE_KEYS = [
   // Home — shop (admins have no tiles; their tools are on the action bar)
   ['register', 'Register'], ['inventory', 'Inventory'], ['employees', 'Employees'],
   ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
-  ['saleslog', 'Sales Log'], ['marketinfo', 'Market Info'], ['shopsettings', 'Shop Settings'],
-  // Sales Log's own two sections
-  ['log-sales', 'Sales Log · Sales'], ['log-intake', 'Sales Log · Deliveries'],
+  ['marketinfo', 'Market Info'], ['shopsettings', 'Shop Settings'],
+  // The Shop Ledger's history sections
+  ['log-sales', 'Shop Ledger · Sales'], ['log-intake', 'Shop Ledger · Deliveries'],
   ['emp-code', 'Employees · Staff code'],
   ['tc-mine', 'Time Cards · Mine'], ['tc-log', 'Time Cards · Shift log'],
   // Network Settings sections

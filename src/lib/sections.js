@@ -33,12 +33,11 @@ export function setOpsActions(me) {
     { label: 'Register', path: '/pos', onClick: () => navigate('/pos') },
     { label: 'Inventory', path: '/inventory', onClick: () => navigate('/inventory') },
   ];
-  // What has already happened — past sales and past deliveries. Open to
-  // everyone who works the till, as order lookup was on the register. The two
-  // corrections keep the guards they already had: voiding a sale is any active
-  // member (the person who mis-rang it is usually the one who notices), while
-  // deleting a delivery is owner-only, since it rewrites the coffer.
-  items.push({ label: 'Sales Log', path: '/sales-log', onClick: () => navigate('/sales-log') });
+  // The shop's own book — what has happened (past sales, past deliveries) and,
+  // for whoever runs the shop, how it is going. Open to everyone who works the
+  // till, as order lookup was on the register; the sections inside differ by
+  // role rather than the page being shut.
+  items.push({ label: 'Shop Ledger', path: '/ledger', onClick: () => navigate('/ledger') });
   // Clocking on and off is everyone's; the shop-wide log inside it is the
   // owner's, gated on the page and in the Worker.
   items.push({ label: 'Time Cards', path: '/timecard', onClick: () => navigate('/timecard') });

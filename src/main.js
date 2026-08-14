@@ -37,7 +37,6 @@ import { renderAudit } from './views/audit.js';
 import { renderItemIndex } from './views/item-index.js';
 import { renderLedgerSettings, renderShopSettingsPage } from './views/ledger-settings.js';
 import { renderMarketInfo } from './views/market-info.js';
-import { renderSalesLog } from './views/sales-log.js';
 import { renderTimecard } from './views/timecard.js';
 import { startUpdateWatch } from './lib/update-check.js';
 
@@ -261,12 +260,10 @@ route('/market-info', (container) => {
   renderMarketInfo(container, { me: m });
 });
 
-// Past sales and past deliveries. Anyone who works the till may look one up;
-// undoing one is owner-only, enforced per action rather than at the door.
-route('/sales-log', (container) => {
-  if (!state.me || !state.me.registered) { navigate('/'); return; }
-  renderSalesLog(container, { me: state.me });
-});
+// The Sales Log's two sections moved onto the Shop Ledger. Kept as a redirect
+// rather than deleted: the address is in people's history, on the home screen
+// of anyone who installed the app, and inside a cached offline shell.
+route('/sales-log', () => navigate('/ledger'));
 
 // Clocking on and off. Everyone who works a shift; the shop-wide log inside is
 // owner-only, enforced per section rather than at the door.
@@ -275,11 +272,17 @@ route('/timecard', (container) => {
   renderTimecard(container, { me: state.me });
 });
 
-// The Shop Ledger — performance, notices, coffers. Distinct from Shop Settings
-// at /ledger/settings, which is where the things you CHANGE live.
+// The Shop Ledger — what the shop has done (sales, deliveries) and how it is
+// doing (performance, notices, coffers). Distinct from Shop Settings at
+// /ledger/settings, which is where the things you CHANGE live.
+//
+// Open to any member, NOT managers only: the sales and deliveries it now holds
+// were always open to whoever works the till, and shutting the door on the page
+// would have taken away an employee's ability to void a sale they mis-rang. The
+// page offers different sections by role instead.
 route('/ledger', (container) => {
   const m = state.me;
-  if (!m || !m.registered || !canManage(m)) { navigate('/'); return; }
+  if (!m || !m.registered) { navigate('/'); return; }
   renderLedgerSettings(container, { me: m });
 });
 
