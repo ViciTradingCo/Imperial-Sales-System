@@ -10,6 +10,10 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.4', date: '2026-08-12', notes: [
+    'Admins: an archived company no longer appears in Market Analysis’s Top 5 companies. A shop that has left the network cannot be one of the ones doing well, and a departed shop sitting at the top of the ranking was the wrong answer to the question that table asks.',
+    'It keeps its line in Company Performance, marked “(archived)”. Its trade really happened, and dropping it there would have left the totals unexplainable.',
+  ] },
   { version: '4.3', date: '2026-08-12', notes: [
     'The Sales Log has moved into the Shop Ledger. Past sales and deliveries are sections there now, beside Performance, Notices and Coffers — one book for what the shop has done and how it is doing, instead of two pages whose names did not say which held what.',
     'Nothing changed about who can do what. Looking up an order and voiding one you mis-rang are still open to anyone who works the till, so the Ledger opens for everyone; it simply shows fewer sections to somebody who is not running the shop. Deleting a delivery is still owner’s work.',

@@ -180,11 +180,11 @@ describe('operational data is realm-scoped', () => {
     // and the market only reports indexed items. That is the same rule that
     // keeps off-index names out of A's numbers.
     const market = await marketAnalysis(env, REALM_B);
-    expect(market.businesses).toEqual([{ business: SHOP, orders: 0, items: 0, revenue: 0 }]);
+    expect(market.businesses).toEqual([{ business: SHOP, orders: 0, items: 0, revenue: 0, archived: false }]);
     expect(market.items).toEqual([]);
     // …and A's shop, which did sell, reports only A's sale.
     expect((await marketAnalysis(env, A)).businesses)
-      .toEqual([{ business: SHOP, orders: 1, items: 2, revenue: 20 }]);
+      .toEqual([{ business: SHOP, orders: 1, items: 2, revenue: 20, archived: false }]);
   });
 
   it('keeps the item index, holds, and network settings separate', async () => {

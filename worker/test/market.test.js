@@ -311,6 +311,48 @@ describe('harvests', () => {
   });
 });
 
+/**
+ * AN ARCHIVED SHOP has left the network. Its trade really happened, so it keeps
+ * its line where the figures have to add up — but a ranking of who is doing
+ * well is not somewhere a departed shop belongs, and the Top 5 reads this flag
+ * to drop it.
+ */
+describe('archived companies', () => {
+  const archive = (name) => env.DB.prepare(
+    "INSERT INTO companies (id, business, status, realm_id) VALUES (?, ?, 'ARCHIVED', ?)")
+    .bind('c-' + name, name, R).run();
+  const live = (name) => env.DB.prepare(
+    "INSERT INTO companies (id, business, status, realm_id) VALUES (?, ?, 'VALID', ?)")
+    .bind('c-' + name, name, R).run();
+
+  it('is flagged, so a ranking can leave it out', async () => {
+    await archive('Alpha');
+    await sale([{ name: 'Iron Sword', qty: 2, price: 40 }]);
+    const row = (await marketAnalysis(env, R)).businesses.find((b) => b.business === 'Alpha');
+    expect(row).toMatchObject({ archived: true, revenue: 80 });
+  });
+
+  it('KEEPS its figures — the trade happened and the totals must add up', async () => {
+    await archive('Alpha');
+    await sale([{ name: 'Iron Sword', qty: 2, price: 40 }]);
+    expect((await marketAnalysis(env, R)).businesses.map((b) => b.business)).toContain('Alpha');
+  });
+
+  it('leaves a shop that is still trading unflagged', async () => {
+    await live('Alpha');
+    await sale([{ name: 'Iron Sword', qty: 1, price: 40 }]);
+    const row = (await marketAnalysis(env, R)).businesses.find((b) => b.business === 'Alpha');
+    expect(row.archived).toBe(false);
+  });
+
+  it('does not flag a shop merely because it is missing from the roster', async () => {
+    // Renamed since, say. Unknown is not the same as departed.
+    await sale([{ name: 'Iron Sword', qty: 1, price: 40 }]);
+    const row = (await marketAnalysis(env, R)).businesses.find((b) => b.business === 'Alpha');
+    expect(row.archived).toBe(false);
+  });
+});
+
 describe('one item on demand', () => {
   it('returns the same figures as the list, plus the trend', async () => {
     await saleOn('2026-01-01', [{ name: 'Iron Sword', qty: 4, price: 25 }]);
@@ -383,7 +425,7 @@ describe('company performance', () => {
     await sale([{ name: 'Iron Sword', qty: 2, price: 25 }]);   // Alpha only
     const rows = (await marketAnalysis(env, R)).businesses;
     expect(rows.map((b) => b.business)).toEqual(['Alpha', 'Quiet Forge']);
-    expect(rows[1]).toEqual({ business: 'Quiet Forge', orders: 0, items: 0, revenue: 0 });
+    expect(rows[1]).toEqual({ business: 'Quiet Forge', orders: 0, items: 0, revenue: 0, archived: false });
   });
 
   it('ranks by revenue, then alphabetically among the silent', async () => {
@@ -427,6 +469,6 @@ describe('company performance', () => {
     await sale([{ name: 'Iron Sword', qty: 2, price: 25 }], 'VOIDED');
     await staffSale([{ name: 'Iron Sword', qty: 3, price: 25 }]);
     const rows = (await marketAnalysis(env, R)).businesses;
-    expect(rows).toEqual([{ business: 'Alpha', orders: 0, items: 0, revenue: 0 }]);
+    expect(rows).toEqual([{ business: 'Alpha', orders: 0, items: 0, revenue: 0, archived: false }]);
   });
 });

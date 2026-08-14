@@ -262,18 +262,25 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
  * the roster (archived, or renamed since) keeps its line, because the trade
  * still happened and hiding it would make the totals unexplainable.
  *
+ * An ARCHIVED shop is kept but FLAGGED. Its trade really happened, so it stays
+ * in Company Performance where the figures have to add up — but it has left the
+ * network, and a ranking of "who is doing well" that a departed shop can top is
+ * a ranking of the wrong thing. The Top 5 drops anything flagged here.
+ *
  * Ordered by revenue, then by name — so the earners rank, and the long tail of
  * zeroes is at least alphabetical instead of arbitrary.
  */
-function withRoster(roster, sold) {
+function withRoster(roster, sold, archived) {
+  const gone = new Set((archived || []).map((a) => String(a).trim().toLowerCase()));
   const byName = new Map();
   (roster || []).forEach((c) => {
-    if (c.business) byName.set(c.business, { business: c.business, orders: 0, items: 0, revenue: 0 });
+    if (c.business) byName.set(c.business, { business: c.business, orders: 0, items: 0, revenue: 0, archived: false });
   });
   (sold || []).forEach((r) => {
     const name = String(r.business || '').trim();
     if (!name) return;
-    const row = byName.get(name) || { business: name, orders: 0, items: 0, revenue: 0 };
+    const row = byName.get(name) ||
+      { business: name, orders: 0, items: 0, revenue: 0, archived: gone.has(name.toLowerCase()) };
     row.orders += Number(r.orders) || 0;
     row.items += Number(r.items) || 0;
     row.revenue += Number(r.revenue) || 0;
@@ -337,7 +344,13 @@ export async function marketAnalysis(env, realmId) {
               COALESCE(SUM(total), 0) AS revenue
          FROM sales
         WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0
-        GROUP BY business`).bind(realmId).all()).results) || []);
+        GROUP BY business`).bind(realmId).all()).results) || [],
+    // Archiving renames the shop and its rows to a unique key, so a departed
+    // shop's sales are grouped under that name rather than the one anybody
+    // recognises. This is how a row is known to be one.
+    ((await db.prepare(
+      "SELECT business FROM companies WHERE upper(status) = 'ARCHIVED' AND realm_id = ?")
+      .bind(realmId).all()).results || []).map((r) => r.business));
 
   /**
    * A region's trade is everything that changed hands THERE — sales rung up in
