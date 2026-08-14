@@ -10,6 +10,10 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.7', date: '2026-08-14', notes: [
+    'The Stocktake reads CSV files. Yesterday’s note said .xlsx as well; that has been taken back out in favour of one simple format. Every spreadsheet program writes CSV — choose “Save as” and pick it — and CSV is what the inventory export already gives you, so exporting, editing and reading it back needs nothing else.',
+    'Picking an .xls or .xlsx now tells you to save it as CSV rather than failing oddly.',
+  ] },
   { version: '4.6', date: '2026-08-14', notes: [
     'The Stocktake reads a spreadsheet. Pick a .csv or .xlsx and it fills the box for you — no retyping, no copy and paste.',
     'It finds your columns rather than demanding a shape: headings like “Item” and “Amount” are picked up wherever they sit, other columns are ignored, and a sheet with no headings is read as name-then-amount. It tells you which columns it used.',

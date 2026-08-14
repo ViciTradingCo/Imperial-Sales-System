@@ -25,7 +25,7 @@ import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
-import { readSpreadsheet, rowsToStocktake } from '../lib/spreadsheet.js';
+import { readCsvFile, rowsToStocktake } from '../lib/csv.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = canManage(me);
@@ -411,14 +411,14 @@ export function openStocktakeModal(onSaved, prefill) {
    * reason it is safe to accept a file at all.
    */
   const fileNote = el('p', { class: 'note' });
-  const file = el('input', { type: 'file', accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const file = el('input', { type: 'file', accept: '.csv,text/csv' });
   file.addEventListener('change', async () => {
     const picked = file.files && file.files[0];
     if (!picked) return;
     fileNote.className = 'note';
     fileNote.textContent = 'Reading ' + picked.name + '…';
     try {
-      const { text: filled, note, count } = rowsToStocktake(await readSpreadsheet(picked));
+      const { text: filled, note, count } = rowsToStocktake(await readCsvFile(picked));
       if (!count) { fileNote.className = 'warn'; fileNote.textContent = note || 'Nothing to read in that file.'; return; }
       text.value = filled;
       fileNote.textContent = 'Read ' + count + ' line' + (count === 1 ? '' : 's') + ' from ' + picked.name + '. ' +
@@ -529,10 +529,11 @@ export function openStocktakeModal(onSaved, prefill) {
     el('label', {}, 'What you hold now'),
     current,
     el('div', { class: 'row-actions' }, [copy]),
-    el('label', {}, 'Read it from a spreadsheet'),
+    el('label', {}, 'Read it from a CSV'),
     file,
-    el('p', { class: 'note' }, 'A .csv or .xlsx with an item column and an amount column — headings like ' +
-      '“Item” and “Amount” are found wherever they sit. It fills the box below for you to check.'),
+    el('p', { class: 'note' }, 'A .csv with an item column and an amount column — headings like “Item” ' +
+      'and “Amount” are found wherever they sit. Any spreadsheet program will save one: choose ' +
+      '“Save as” and pick CSV. It fills the box below for you to check.'),
     fileNote,
     el('label', {}, 'Or paste your counts here'),
     text,

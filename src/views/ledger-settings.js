@@ -229,7 +229,7 @@ function exportCard() {
     // same Apply. A sales log and a coffer are records of things that HAPPENED
     // — a shop cannot paste those into having happened, and a screen offering
     // to would be offering a lie.
-    el('p', { class: 'note' }, 'Stock counts are the part you can bring back. Edit the inventory sheet you ' +
+    el('p', { class: 'note' }, 'Stock counts are the part you can bring back. Edit the inventory CSV you ' +
       'exported — or count the shelves into a new one — and read it back in here. It shows you exactly ' +
       'what would change before anything does.'),
     el('p', { class: 'note' }, 'Your sales log and coffer cannot be imported: they are the record of what ' +
