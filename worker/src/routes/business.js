@@ -827,7 +827,31 @@ async function getMotd({ request, env }) {
       }
     } catch (e) { /* inventory optional */ }
   }
-  return { notices, banner: banners[0] ? banners[0].text : null, banners };
+  /**
+   * THE SHIFT YOU ARE IN THE MIDDLE OF, if any — what the floating shift bar is
+   * built from.
+   *
+   * It rides along with the notices rather than being fetched on its own,
+   * because it is wanted in exactly the same place and at exactly the same
+   * moments: on every page, whenever the shell re-checks what it should be
+   * telling you. A poll of its own would be a second clock to keep in step with
+   * this one.
+   *
+   * Keyed on HAVING a shift, never on a role. An owner who forgets to clock out
+   * is owed the reminder as much as anyone; an admin has no shifts and so will
+   * never see it without a line here saying so.
+   *
+   * The start time and the elapsed hours go over, and no MONEY: an open shift is
+   * worth nothing yet, and a figure ticking upward invites clocking out to make
+   * it stop.
+   */
+  let shift = null;
+  try {
+    const open = await openShift(env, caller.uid, realmId);
+    if (open) shift = { clockIn: open.clockIn, hours: open.hours, long: open.long };
+  } catch (e) { /* a courtesy, never the reason a page has no notices */ }
+
+  return { notices, banner: banners[0] ? banners[0].text : null, banners, shift };
 }
 
 export const routes = [

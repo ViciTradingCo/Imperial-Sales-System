@@ -18,7 +18,7 @@ import { api } from '../lib/api.js';
 import { canManage } from '../lib/roles.js';
 import { navigate } from '../lib/router.js';
 import { tileGrid } from '../lib/tiles.js';
-import { setAdminActions, setHomeActions, subscriptionCard, recentErrorsPanel } from '../lib/sections.js';
+import { setAdminActions, subscriptionCard, recentErrorsPanel } from '../lib/sections.js';
 import { skeletonLines } from '../lib/skeleton.js';
 
 export function renderHome(container, { me }) {
@@ -40,10 +40,6 @@ export function renderHome(container, { me }) {
     mount(container, motdHost, adminWelcomeCard(me), errorsCard(me));
     return; // an admin's tools are on the action bar, not on the page
   }
-
-  // The Time Card is home's one context button — see setHomeActions for why it
-  // is here and not on the shop-tools bar with Register and Inventory.
-  setHomeActions(me);
 
   mount(container,
     motdHost,
@@ -80,6 +76,11 @@ export function renderHome(container, { me }) {
     const tiles = [
       { key: 'register', label: 'Register', hint: 'Ring up a sale', glyph: '🪙', onOpen: go('/pos') },
       { key: 'inventory', label: 'Inventory', hint: 'Stock & intake', glyph: '📦', onOpen: go('/inventory') },
+      // Clocking on is the first thing a member does and clocking off the last,
+      // so it sits with the shop tools on the page everybody lands on. Not
+      // gated: the card is the PERSON's, and the shop-wide log inside it is the
+      // part that checks for a manager.
+      { key: 'timecard', label: 'Time Card', hint: 'Clock in & out', glyph: '⏱️', onOpen: go('/timecard') },
       canManage(me) ? { key: 'employees', label: 'Employees', hint: 'Your roster', glyph: '🧑‍🤝‍🧑',
         onOpen: go('/employees') } : null,
       // Not gated: it holds the past sales and deliveries that every member

@@ -54,8 +54,8 @@ function when(ts) {
 
 export function renderTimecard(container, { me }) {
   // The shop-tools bar, so there is somewhere to go after clocking on — but
-  // this page is no longer ON it. Its way in is the Time Card button on Home,
-  // which is the one place it is offered (see setHomeActions).
+  // this page is no longer ON it. Its way in is the Time Card tile under Shop
+  // tools on Home, and the floating shift bar while a shift is open.
   setOpsActions(me);
   const isOwner = canManage(me); // the shop's log; a manager keeps it too
   let tileImages = {};
@@ -142,13 +142,20 @@ function renderMine(host) {
     ]);
   }
 
+  /**
+   * Clocking on or off changes what the floating shift bar should say, and the
+   * shell is what draws it — so the shell is told, rather than this page being
+   * given a second way to reach it. Same event the transfer screens already use.
+   */
+  const shellRecheck = () => window.dispatchEvent(new Event('eec:banners'));
+
   async function doIn() {
-    try { await api.clockIn(); toast('Clocked in.', 'ok'); load(); }
+    try { await api.clockIn(); toast('Clocked in.', 'ok'); load(); shellRecheck(); }
     catch (e) { toast(e.message || String(e), 'error'); }
   }
   async function doOut() {
     const note = window.prompt('Anything to note about this shift? (optional)') || '';
-    try { await api.clockOut(note); toast('Clocked out.', 'ok'); load(); }
+    try { await api.clockOut(note); toast('Clocked out.', 'ok'); load(); shellRecheck(); }
     catch (e) { toast(e.message || String(e), 'error'); }
   }
 

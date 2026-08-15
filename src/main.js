@@ -39,6 +39,7 @@ import { renderLedgerSettings, renderShopSettingsPage } from './views/ledger-set
 import { renderMarketInfo } from './views/market-info.js';
 import { renderTimecard } from './views/timecard.js';
 import { startUpdateWatch } from './lib/update-check.js';
+import { initShiftBar, setShift, repaintShiftBar } from './lib/shift-bar.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
@@ -90,14 +91,23 @@ function paintBanners(apiBanners) {
 }
 
 function refreshGlobalBanner() {
-  if (!(state.me && state.me.registered)) { globalBanner.hidden = true; globalBanner.innerHTML = ''; return; }
+  if (!(state.me && state.me.registered)) {
+    globalBanner.hidden = true; globalBanner.innerHTML = '';
+    setShift(null);
+    return;
+  }
   api.getMotd()
-    .then((r) => paintBanners((r && r.banners) || (r && r.banner ? [{ text: r.banner }] : [])))
+    .then((r) => {
+      paintBanners((r && r.banners) || (r && r.banner ? [{ text: r.banner }] : []));
+      // The shift rides along with the notices — same request, same moments.
+      setShift((r && r.shift) || null);
+    })
     // An unreachable MOTD must not swallow the update notice — that one is
     // known locally and does not depend on the API being up.
     .catch(() => paintBanners([]));
 }
-// Views can ask the shell to re-check banners (e.g. after accepting a transfer).
+// Views can ask the shell to re-check banners (e.g. after accepting a transfer,
+// or after clocking on or off).
 window.addEventListener('eec:banners', () => { api.bustMotd(); refreshGlobalBanner(); });
 
 // The header floats (sticky); the action bar sticks just below it. Measure the
@@ -433,6 +443,10 @@ async function main() {
   loadBranding(); // sitewide name/logo/favicon (public — also brands the landing)
   initRouter(appEl, showRoot);
   onBeforeRender(clearActions); // reset per-view action buttons before each render
+  // The shift bar hides itself on the Time Card, so it has to be repainted
+  // when the route changes — not only when /motd is re-read.
+  initShiftBar();
+  onBeforeRender(repaintShiftBar);
 
   renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
   onAuthChange(({ idToken }) => { if (idToken) onSignedIn(); });

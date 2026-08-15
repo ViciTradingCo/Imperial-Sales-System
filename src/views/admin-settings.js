@@ -322,7 +322,7 @@ function denominationCard() {
 const TILE_KEYS = [
   // Home — shop (admins have no tiles; their tools are on the action bar)
   ['register', 'Register'], ['inventory', 'Inventory'], ['employees', 'Employees'],
-  ['ledger', 'Shop Ledger'], ['restock', 'Restock'],
+  ['ledger', 'Shop Ledger'], ['restock', 'Restock'], ['timecard', 'Time Card'],
   ['marketinfo', 'Market Info'], ['shopsettings', 'Shop Settings'],
   // The Shop Ledger's history sections
   ['log-sales', 'Shop Ledger · Sales'], ['log-intake', 'Shop Ledger · Deliveries'],

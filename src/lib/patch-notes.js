@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.2', date: '2026-08-15', notes: [
+    'A bar now floats at the foot of the screen for as long as you are clocked in, telling you so and how long it has been. It follows you from page to page and stays put as you scroll, because a shift you have forgotten about is not something you go looking for.',
+    'It carries a Time Card button, so clocking out is one press from wherever you are. The press takes you to your card rather than ending the shift where you stand — you still say when, and can still leave a note.',
+    'After sixteen hours it turns amber and reads “Still clocked in”. That is the same threshold your time card has always used to flag a long shift.',
+    'It shows no money. An open shift is worth nothing yet — it is still being worked — and a figure creeping up in the corner of every screen is an odd thing to be paid by.',
+    'The Time Card has settled under Shop tools with the rest of the tiles, rather than the button it briefly was.',
+  ] },
   { version: '5.1', date: '2026-08-15', notes: [
     'The Time Card is a button on the Home page now, at the top with the rest of the buttons.',
     'It used to sit on the shop-tools bar beside Register and Inventory — present on five pages you open once you are already working, and missing from the one page everybody starts on. Clocking on is the first thing you do, so it belongs where you arrive.',

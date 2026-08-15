@@ -45,27 +45,6 @@ export function setOpsActions(me) {
 }
 
 /**
- * HOME's bar — the Time Card, and nothing else.
- *
- * Clocking on is the first thing a member does and clocking off the last, and
- * unlike everything on the shop-tools bar it belongs to the PERSON rather than
- * to the shop's stock or its books. So it sits on the page everybody lands on
- * instead of riding along on five pages they may never open.
- *
- * It was on the shop-tools bar, which is exactly the wrong way round: present
- * beside Register and Inventory while you are already working, absent from the
- * screen you arrive at. One button, in one place — a second copy would be a
- * second thing to keep in step, and clocking in twice is not a thing.
- *
- * Nothing for an admin: they run the deployment, they do not work shifts, and
- * their own bar is the record-keeping one.
- */
-export function setHomeActions(me) {
-  if (!me || !me.registered || me.role === 'admin') return;
-  setActions([{ label: 'Time Card', onClick: () => navigate('/timecard') }]);
-}
-
-/**
  * The signed-in user, remembered so the admin bar is identical on every admin
  * page. This used to be a parameter, which meant six call sites each had to
  * remember to pass it — and the ones that forgot rendered a bar with entries

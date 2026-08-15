@@ -1110,6 +1110,36 @@ img, table { max-width: 100%; }
   z-index: 200; display: flex; flex-direction: column; gap: var(--sp-2);
   align-items: center; pointer-events: none; width: max-content; max-width: 92vw;
 }
+/* Toasts rise above the shift bar rather than landing on top of it — both are
+   centred at the bottom, and "Clocked in" hidden under "Sale complete" is the
+   one moment the bar had a job to do. */
+body.has-shift .toast-host { bottom: 84px; }
+
+/* THE SHIFT BAR — floats at the bottom for as long as a shift is open.
+   Fixed, not part of the banner stack: the stack scrolls away with the page,
+   and the bottom of a phone is where a thumb already is. The strip itself does
+   not take pointer events, so it never eats a click meant for the page
+   underneath it — only the bar within it does. */
+#shiftBar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 44;
+  display: flex; justify-content: center; pointer-events: none;
+  padding: 0 14px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+.shift-float {
+  pointer-events: auto; display: flex; align-items: center; gap: var(--sp-3);
+  background: var(--header-bg); color: var(--header-text);
+  border-radius: 999px; padding: 8px 10px 8px 18px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.34);
+  font-size: calc(14px * var(--type-scale)); max-width: 100%;
+}
+/* A shift the Worker has flagged as having run long. The threshold is its
+   decision; this only wears it. */
+.shift-float.long { background: var(--warn); color: #fff; }
+.shift-float-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shift-float .banner-btn { flex: 0 0 auto; min-height: 34px; }
+/* Room at the foot of the page for the bar to float over, or it sits on top of
+   the last row of whatever you scrolled to the bottom to read. */
+body.has-shift #app { padding-bottom: 84px; }
 .toast {
   background: var(--header-bg); color: var(--header-text);
   padding: 10px 18px; border-radius: 999px; font-size: 0.92rem;

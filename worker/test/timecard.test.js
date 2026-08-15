@@ -15,6 +15,8 @@ import {
   clockIn, clockOut, openShift, myShifts, shopShifts, markPaid, editShift, deleteShift, hoursBetween,
 } from '../src/timecard.js';
 import { cofferBalance } from '../src/coffers.js';
+import { createSession } from '../src/sessions.js';
+import { routes as businessRoutes } from '../src/routes/business.js';
 
 let env;
 const R = DEFAULT_REALM_ID;
@@ -303,5 +305,67 @@ describe('commission', () => {
   it('ignores a sale with no seller on it rather than pooling them', async () => {
     await sold('', '', 100, 10);
     expect((await shopShifts(env, SHOP, R)).people).toEqual([]);
+  });
+});
+
+/**
+ * The shift bar's data. It rides on /motd rather than a poll of its own, so
+ * what has to hold is that the notices route carries the open shift and stops
+ * carrying it the moment the shift ends — a bar that outlives its shift is
+ * worse than no bar, because it sends someone to clock out of nothing.
+ */
+describe('the open shift on /motd', () => {
+  const motdRoute = businessRoutes.find((r) => r.method === 'GET' && r.path === '/motd');
+  const req = (token) => ({ headers: { get: (h) => (h === 'Authorization' ? 'Bearer ' + token : null) } });
+
+  async function motdFor(uid, email) {
+    await env.DB.prepare(
+      'INSERT OR IGNORE INTO users (uid, realm_id, email, business, role, is_owner, status, char_name, created) ' +
+      "VALUES (?, ?, ?, ?, 'employee', 0, 'active', 'Ann', ?)")
+      .bind(uid, R, email, SHOP, new Date().toISOString()).run();
+    const { token } = await createSession(env, { email, name: 'Ann', uid });
+    return motdRoute.handler({ request: req(token), env });
+  }
+
+  it('says nothing when nobody is clocked in', async () => {
+    const d = await motdFor('u-ann', 'ann@x.test');
+    expect(d.shift).toBe(null);
+  });
+
+  it('carries the open shift, its start and how long it has run', async () => {
+    await clockIn(env, { ...ANN, rate: 5 }, R);
+    await startedHoursAgo('u-ann', 3);
+    const d = await motdFor('u-ann', 'ann@x.test');
+    expect(d.shift.clockIn).toBeTruthy();
+    expect(d.shift.hours).toBeCloseTo(3, 1);
+    expect(d.shift.long).toBe(false);
+  });
+
+  // No money on it: an open shift is worth nothing yet, and a figure ticking
+  // upward on a bar that follows you everywhere invites clocking out to stop it.
+  it('carries no pay figure', async () => {
+    await clockIn(env, { ...ANN, rate: 5 }, R);
+    const d = await motdFor('u-ann', 'ann@x.test');
+    expect(d.shift.pay).toBeUndefined();
+  });
+
+  it('flags a shift that has run long, so the bar can wear a warning', async () => {
+    await clockIn(env, { ...ANN, rate: 5 }, R);
+    await startedHoursAgo('u-ann', 20);
+    const d = await motdFor('u-ann', 'ann@x.test');
+    expect(d.shift.long).toBe(true);
+  });
+
+  it('stops carrying it the moment the shift ends', async () => {
+    await clockIn(env, { ...ANN, rate: 5 }, R);
+    await clockOut(env, { uid: 'u-ann', rate: 5 }, R);
+    const d = await motdFor('u-ann', 'ann@x.test');
+    expect(d.shift).toBe(null);
+  });
+
+  it('is the CALLER’s shift, never a colleague’s', async () => {
+    await clockIn(env, { uid: 'u-bo', employee: 'Bo', business: SHOP, rate: 5 }, R);
+    const d = await motdFor('u-ann', 'ann@x.test');
+    expect(d.shift).toBe(null);
   });
 });
