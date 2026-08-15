@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.9', date: '2026-08-15', notes: [
+    'The register starts on your own region. Nearly every sale happens where the shop is, so it is filled in for you — change it for the customer who came from somewhere else, instead of setting it by hand on every local sale.',
+    'If your shop has no region on its record, or it is named something the network does not list, the register still asks — it will not guess one for you.',
+    'Admins set a shop’s region on its company record; realms that do not trade by region are unaffected, as they never see the field.',
+  ] },
   { version: '4.8', date: '2026-08-15', notes: [
     'Recording a delivery on a phone is typeable again. The item search was squeezed into a quarter of the screen — about five letters of the name you were trying to find — because the line was still laid out in the four columns it uses on a desk.',
     'On a narrow screen the line now wraps: the item takes the full width, and the quantity, the cost and the Remove button share the line beneath it. The “×” that removes a line is a proper button rather than a character to aim at.',

@@ -250,6 +250,18 @@ export function renderPos(container, { me, mode }) {
     const regionLabel = prefs.regionLabel || 'Region';
     const holdSel = el('select', {}, el('option', { value: '' }, 'Pick a ' + regionLabel.toLowerCase() + '…'));
     holds.forEach((h) => holdSel.appendChild(el('option', { value: h }, h)));
+    // THE SHOP'S OWN REGION STARTS SELECTED. Nearly every sale a shop rings up
+    // happens where the shop is, so the clerk should be changing this for the
+    // customer who came from elsewhere — not setting it by hand on every local
+    // sale, which is a field you eventually stop reading.
+    //
+    // Matched through `norm` because the company's region was typed by an admin
+    // on the company record while the list is the realm's own spelling of it. A
+    // shop with no region set, or one naming a region the realm no longer has,
+    // keeps the prompt and the checkout still refuses to proceed without a
+    // choice — the default is a convenience, never an assumption.
+    const homeRegion = (me && me.hold) ? holds.find((h) => norm(h) === norm(me.hold)) : '';
+    if (homeRegion) holdSel.value = homeRegion;
     const holdWrap = el('div', {}, [el('label', {}, regionLabel), holdSel]);
     holdWrap.hidden = !regionOn;
     const discName = el('input', { type: 'text', placeholder: 'Name (optional)' });
