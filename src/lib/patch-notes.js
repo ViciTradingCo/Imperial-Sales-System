@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.1', date: '2026-08-15', notes: [
+    'The Time Card is a button on the Home page now, at the top with the rest of the buttons.',
+    'It used to sit on the shop-tools bar beside Register and Inventory — present on five pages you open once you are already working, and missing from the one page everybody starts on. Clocking on is the first thing you do, so it belongs where you arrive.',
+    'It is the only way in now, rather than one of two: everything inside it — your own card, and the shift log for whoever runs the shop — is exactly where it was.',
+  ] },
   { version: '5.0', date: '2026-08-15', notes: [
     'TRAVELING. A company can be marked as having no fixed region — a caravan, a peddler, a shop that follows the fairs. Admins set it on the company record, at the bottom of the region list.',
     'A travelling shop is asked where every sale is happening rather than being given a home to assume, and the register says why the box is empty instead of leaving you wondering.',

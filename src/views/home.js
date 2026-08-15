@@ -18,7 +18,7 @@ import { api } from '../lib/api.js';
 import { canManage } from '../lib/roles.js';
 import { navigate } from '../lib/router.js';
 import { tileGrid } from '../lib/tiles.js';
-import { setAdminActions, subscriptionCard, recentErrorsPanel } from '../lib/sections.js';
+import { setAdminActions, setHomeActions, subscriptionCard, recentErrorsPanel } from '../lib/sections.js';
 import { skeletonLines } from '../lib/skeleton.js';
 
 export function renderHome(container, { me }) {
@@ -40,6 +40,10 @@ export function renderHome(container, { me }) {
     mount(container, motdHost, adminWelcomeCard(me), errorsCard(me));
     return; // an admin's tools are on the action bar, not on the page
   }
+
+  // The Time Card is home's one context button — see setHomeActions for why it
+  // is here and not on the shop-tools bar with Register and Inventory.
+  setHomeActions(me);
 
   mount(container,
     motdHost,

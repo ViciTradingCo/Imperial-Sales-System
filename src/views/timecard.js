@@ -53,6 +53,9 @@ function when(ts) {
 }
 
 export function renderTimecard(container, { me }) {
+  // The shop-tools bar, so there is somewhere to go after clocking on — but
+  // this page is no longer ON it. Its way in is the Time Card button on Home,
+  // which is the one place it is offered (see setHomeActions).
   setOpsActions(me);
   const isOwner = canManage(me); // the shop's log; a manager keeps it too
   let tileImages = {};

@@ -38,13 +38,31 @@ export function setOpsActions(me) {
   // till, as order lookup was on the register; the sections inside differ by
   // role rather than the page being shut.
   items.push({ label: 'Shop Ledger', path: '/ledger', onClick: () => navigate('/ledger') });
-  // Clocking on and off is everyone's; the shop-wide log inside it is the
-  // owner's, gated on the page and in the Worker.
-  items.push({ label: 'Time Cards', path: '/timecard', onClick: () => navigate('/timecard') });
   if (canManage(me)) {
     items.push({ label: 'Employees', path: '/employees', onClick: () => navigate('/employees') });
   }
   setActions(mark(items));
+}
+
+/**
+ * HOME's bar — the Time Card, and nothing else.
+ *
+ * Clocking on is the first thing a member does and clocking off the last, and
+ * unlike everything on the shop-tools bar it belongs to the PERSON rather than
+ * to the shop's stock or its books. So it sits on the page everybody lands on
+ * instead of riding along on five pages they may never open.
+ *
+ * It was on the shop-tools bar, which is exactly the wrong way round: present
+ * beside Register and Inventory while you are already working, absent from the
+ * screen you arrive at. One button, in one place — a second copy would be a
+ * second thing to keep in step, and clocking in twice is not a thing.
+ *
+ * Nothing for an admin: they run the deployment, they do not work shifts, and
+ * their own bar is the record-keeping one.
+ */
+export function setHomeActions(me) {
+  if (!me || !me.registered || me.role === 'admin') return;
+  setActions([{ label: 'Time Card', onClick: () => navigate('/timecard') }]);
 }
 
 /**
