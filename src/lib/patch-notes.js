@@ -10,6 +10,14 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.0', date: '2026-08-15', notes: [
+    'TRAVELING. A company can be marked as having no fixed region — a caravan, a peddler, a shop that follows the fairs. Admins set it on the company record, at the bottom of the region list.',
+    'A travelling shop is asked where every sale is happening rather than being given a home to assume, and the register says why the box is empty instead of leaving you wondering.',
+    'It gets no Market Info either: that page reports on one region’s market over the week just gone, and a shop that was in three of them has no such week. Its sales still count towards whichever region each one was rung up in, so the regions it visits see its trade exactly as before.',
+    'A travelling company cannot be a Court — a Court governs a region, and this is a company that is not in one.',
+    'Admins: the region list on the company record is now YOUR realm’s regions. It was the nine Skyrim holds written into the app, so a realm that had named its own regions was being offered somebody else’s here, and could file a company under a region its own register has never heard of.',
+    '“Traveling” cannot be used as the name of a region, for the obvious reason that the network would no longer be able to tell one from the other.',
+  ] },
   { version: '4.9', date: '2026-08-15', notes: [
     'The register starts on your own region. Nearly every sale happens where the shop is, so it is filled in for you — change it for the customer who came from somewhere else, instead of setting it by hand on every local sale.',
     'If your shop has no region on its record, or it is named something the network does not list, the register still asks — it will not guess one for you.',

@@ -20,7 +20,7 @@
  * works, the address bar says which one you are on, and a half-built cart is
  * not silently thrown away by a click meant to check a delivery.
  */
-import { currency, money, coins } from '../lib/format.js';
+import { currency, money, coins, isTraveling } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { setOpsActions } from '../lib/sections.js';
@@ -260,9 +260,20 @@ export function renderPos(container, { me, mode }) {
     // shop with no region set, or one naming a region the realm no longer has,
     // keeps the prompt and the checkout still refuses to proceed without a
     // choice — the default is a convenience, never an assumption.
-    const homeRegion = (me && me.hold) ? holds.find((h) => norm(h) === norm(me.hold)) : '';
+    //
+    // A TRAVELLING shop is the case this rule does not hold for, and it is
+    // skipped by name rather than by luck: it has no home, so there is nothing
+    // to be right about, and each sale really does happen somewhere different.
+    const travels = isTraveling(me && me.hold);
+    const homeRegion = (!travels && me && me.hold) ? holds.find((h) => norm(h) === norm(me.hold)) : '';
     if (homeRegion) holdSel.value = homeRegion;
-    const holdWrap = el('div', {}, [el('label', {}, regionLabel), holdSel]);
+    const holdWrap = el('div', {}, [
+      el('label', {}, regionLabel),
+      holdSel,
+      // Said once, where the empty box is, so the clerk knows it was left blank
+      // on purpose rather than wondering why theirs does not fill itself in.
+      travels ? el('p', { class: 'note' }, 'Your shop travels — say where this sale is happening.') : null,
+    ].filter(Boolean));
     holdWrap.hidden = !regionOn;
     const discName = el('input', { type: 'text', placeholder: 'Name (optional)' });
     // DIRECTION AND MAGNITUDE, not a signed number to type. The sign is how an

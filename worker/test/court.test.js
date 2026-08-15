@@ -12,6 +12,7 @@ import { ensureDefaultRealm } from '../src/realm.js';
 import { registerUser, updateCompany, listCompanies } from '../src/registry.js';
 import { requireCourt, courtCompanies, courtShop, shopRoster, shopOverview } from '../src/oversight.js';
 import { holdReport } from '../src/market.js';
+import { TRAVELING } from '../src/regions.js';
 import { cacheBust } from '../src/cache.js';
 
 let env;
@@ -54,6 +55,14 @@ describe('who is a Court', () => {
     const co = (await listCompanies(env, R)).find((c) => c.business === COURT);
     await updateCompany(env, { id: co.id, name: COURT, hold: '', court: true }, R);
     await expect(requireCourt(env, COURT, R)).rejects.toThrow(/no region assigned/i);
+  });
+
+  // A travelling Court would govern the word "Traveling" — a place no sale can
+  // be filed under — so its levy, licences and price caps would bind nobody.
+  it('refuses a travelling company, and says which of the two to fix', async () => {
+    const co = (await listCompanies(env, R)).find((c) => c.business === COURT);
+    await updateCompany(env, { id: co.id, name: COURT, hold: TRAVELING, court: true }, R);
+    await expect(requireCourt(env, COURT, R)).rejects.toThrow(/no region to govern/i);
   });
 });
 

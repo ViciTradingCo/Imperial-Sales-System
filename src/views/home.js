@@ -12,7 +12,7 @@
  * Tile artwork is assigned by an admin (Network Settings → Tile Images) as image
  * URLs; tiles fall back to a glyph when no image is set.
  */
-import { regionWord, regionsOn } from '../lib/format.js';
+import { regionWord, regionsOn, isTraveling } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { canManage } from '../lib/roles.js';
@@ -95,7 +95,10 @@ export function renderHome(container, { me }) {
       // the person setting prices needs, not the person ringing them up — and
       // hidden in realms that do not divide trade by region, where the page
       // would have nothing to report on.
-      canManage(me) && regionsOn()
+      // A TRAVELLING shop is hidden for the same reason: it has no one market to
+      // read. It trades wherever it happens to be, so a report on "its" region
+      // would be a report on a place it may not have been all week.
+      canManage(me) && regionsOn() && !isTraveling(me.hold)
         ? { key: 'marketinfo', label: 'Market Info', hint: 'Your ' + regionWord() + '’s market, last week', glyph: '📈',
             onOpen: go('/market-info') }
         : null,

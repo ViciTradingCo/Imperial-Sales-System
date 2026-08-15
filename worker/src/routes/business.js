@@ -14,7 +14,7 @@ import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock, stockText, planStockImport, importStockText } from '../inventory.js';
 import { recordIntakeLines, recordHarvest, listIntake, deleteIntake } from '../intake.js';
-import { readRegions } from '../regions.js';
+import { readRegions, isTraveling, TRAVELING } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
 import { checkCertification } from '../cert.js';
 import { checkout, listSales, voidSale, employeePerformance } from '../sales.js';
@@ -694,6 +694,12 @@ async function weeklyRegionRoute({ request, env }) {
   const caller = await requireManages(request, env);
   const realmId = realmIdOf(caller, env);
   const meta = await findBusinessMeta(env, caller.business, realmId);
+  // A TRAVELLING shop is told apart from one whose region was never set. Both
+  // get no report — there is no one market a shop without a home trades in —
+  // but only one of them is waiting on an admin to fix something.
+  if (isTraveling(meta.hold)) {
+    return { hold: TRAVELING, traveling: true, noRegion: true, week: lastWeekWindow(), overview: {}, businesses: [], items: [] };
+  }
   if (!meta.hold) {
     // Nothing to report on rather than an empty report: the difference between
     // "your region traded nothing" and "you have no region" matters.
@@ -733,20 +739,25 @@ async function getMotd({ request, env }) {
   // The Court's notice to its region — announcements from the government of
   // the place you trade in, alongside the network's own.
   const meta = await findBusinessMeta(env, caller.business, realmId);
-  if (meta && meta.hold) {
-    const court = await readCourtSettings(env, meta.hold, realmId);
-    if (court.notice) notices.push('⚖️ ' + meta.hold + ' Court: ' + court.notice);
+  // A TRAVELLING shop has no home Court. The Court that governs any given sale
+  // is the one for the region that sale happened in, which checkout already
+  // resolves per sale — so there is no standing notice or sanction to show here,
+  // and asking for one would be asking about a region the shop is not in.
+  const homeRegion = meta && !isTraveling(meta.hold) ? meta.hold : '';
+  if (homeRegion) {
+    const court = await readCourtSettings(env, homeRegion, realmId);
+    if (court.notice) notices.push('⚖️ ' + homeRegion + ' Court: ' + court.notice);
   }
 
   const banners = [];
   // A sanction is not a notice to skim past: it stops or threatens trade, so it
   // goes in the banner strip with the certification warnings.
-  if (meta && meta.hold && (caller.role === 'owner' || caller.role === 'employee')) {
-    const standing = await standingOf(env, caller.business, meta.hold, realmId);
+  if (homeRegion && (caller.role === 'owner' || caller.role === 'employee')) {
+    const standing = await standingOf(env, caller.business, homeRegion, realmId);
     if (standing === 'banned') {
-      banners.push({ text: '⚖️ The ' + meta.hold + ' Court has BARRED this shop from trading — sales are blocked.' });
+      banners.push({ text: '⚖️ The ' + homeRegion + ' Court has BARRED this shop from trading — sales are blocked.' });
     } else if (standing === 'restricted') {
-      banners.push({ text: '⚖️ The ' + meta.hold + ' Court has placed this shop under restriction.' });
+      banners.push({ text: '⚖️ The ' + homeRegion + ' Court has placed this shop under restriction.' });
     }
   }
   if (caller.role === 'owner' || caller.role === 'employee') {

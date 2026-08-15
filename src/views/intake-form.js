@@ -17,7 +17,7 @@
  * Producing stock rather than buying it (Farm/Harvest, Craft) stays on
  * Inventory: no coin moves, no supplier exists, and there is no sale to ring.
  */
-import { money, coins, regionLabel, regionWord, regionsOn } from '../lib/format.js';
+import { money, coins, regionLabel, regionWord, regionsOn, isTraveling } from '../lib/format.js';
 import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { canManage } from '../lib/roles.js';
@@ -269,8 +269,10 @@ function buildIntake(me, onRecorded) {
     freeHint: 'Not a registered company — it will be recorded as typed.',
     meta: (c) => (regionsOn() && c.hold ? c.hold : ''),
     onPick: (c) => {
-      // The supplier's own region, unless the user has already chosen one.
-      if (regionsOn() && c.hold && !hold.value) hold.value = c.hold;
+      // The supplier's own region, unless the user has already chosen one — and
+      // never from a TRAVELLING supplier, which has no region to lend. Where the
+      // goods came from is then a real question only the buyer can answer.
+      if (regionsOn() && c.hold && !isTraveling(c.hold) && !hold.value) hold.value = c.hold;
       fillReview();
     },
   });

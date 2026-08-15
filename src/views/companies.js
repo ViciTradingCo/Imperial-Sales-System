@@ -6,7 +6,7 @@
  *   • Ledger — a READ-ONLY look at the shop's books: coffer, discounts, style,
  *     and what it sells. Admins look; owners keep them.
  */
-import { regionLabel, regionWord, money } from '../lib/format.js';
+import { regionLabel, regionWord, money, TRAVELING, isTraveling } from '../lib/format.js';
 import { el, mount, esc, tableEl, statTiles } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
@@ -19,7 +19,6 @@ import { toast } from '../lib/toast.js';
 import { emptyState } from '../lib/empty.js';
 
 const PAGE_SIZE = 25;
-const HOLDS = ['Eastmarch', 'Falkreath', 'Haafingar', 'Hjaalmarch', 'The Pale', 'The Reach', 'The Rift', 'Whiterun', 'Winterhold'];
 
 export function renderCompanies(container, { me } = {}) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
@@ -177,14 +176,34 @@ function ledgerBody(d) {
 function openNameModal(company, onSaved) {
   const name = el('input', { type: 'text', value: company.business || '' });
 
+  /**
+   * The region select — THE REALM'S OWN regions, plus Traveling.
+   *
+   * The list here used to be the nine Skyrim holds, written into this file. A
+   * realm that had named its own regions in Network Settings was therefore
+   * offered somebody else's on this screen, and a company could be filed under
+   * a region its own register has never heard of.
+   *
+   * Repainted rather than appended to, because the list arrives over the
+   * network while the modal is already open: whatever is currently chosen is
+   * carried across each repaint, so a save that lands before the regions do
+   * cannot write "— none —" over a region nobody meant to clear. A region the
+   * realm has since dropped is kept for the same reason — editing a company's
+   * NAME must not quietly move it out of its region.
+   */
   const hold = el('select', {});
-  hold.appendChild(el('option', { value: '' }, '— none —'));
-  const holds = HOLDS.includes(company.hold) || !company.hold ? HOLDS : [company.hold, ...HOLDS];
-  holds.forEach((h) => {
-    const opt = el('option', { value: h }, h);
-    if (h === company.hold) opt.selected = true;
-    hold.appendChild(opt);
-  });
+  function paintRegions(list) {
+    const chosen = hold.value || company.hold || '';
+    hold.replaceChildren(el('option', { value: '' }, '— none —'));
+    const opts = list.slice();
+    if (chosen && !isTraveling(chosen) && !opts.includes(chosen)) opts.push(chosen);
+    opts.forEach((h) => hold.appendChild(el('option', { value: h }, h)));
+    // Last, and spelled out: it is not a place, it is the absence of one.
+    hold.appendChild(el('option', { value: TRAVELING }, TRAVELING + ' — no fixed ' + regionWord()));
+    hold.value = isTraveling(chosen) ? TRAVELING : chosen;
+  }
+  paintRegions(company.hold && !isTraveling(company.hold) ? [company.hold] : []);
+  api.getRegions().then((r) => paintRegions(r.holds || [])).catch(() => { /* keep what it has */ });
 
   const court = el('input', { type: 'checkbox' });
   court.checked = !!company.court;

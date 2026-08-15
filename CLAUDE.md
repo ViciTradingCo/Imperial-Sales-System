@@ -220,6 +220,17 @@ be a data migration for a cosmetic gain, so the storage keeps the old name and
 everything above it says region. Module, route, and function names follow the
 UI: `regions.js`, `/regions`, `readRegions`, `/market/region`.
 
+`Traveling` (`TRAVELING` / `isTraveling`, mirrored in `worker/src/regions.js` and
+`src/lib/format.js`) is a company with no fixed region — a caravan. It is an
+answer for a COMPANY's region and never for a SALE's: a travelling shop still
+rings every sale up in the region it is standing in, so region reports stay
+true. `writeRegions` refuses to let a realm name a region this, or "based
+nowhere" and "based in Traveling" become indistinguishable. What a travelling
+shop does not get is anything keyed on a home: no register default, no weekly
+Market Info, no home Court notice, and it cannot BE a Court. Admin-set only —
+it is not offered at sign-up, because a shop that could declare itself
+region-less could put itself beyond every Court's roster.
+
 ## The item index is one table per type
 
 The Master Item Index is divided into TABLES BY TYPE (Weapons, Potions, …). Those

@@ -16,6 +16,7 @@
  * trader as well as an overseer.
  */
 import { listCompanies, findBusinessMeta } from './registry.js';
+import { isTraveling, TRAVELING } from './regions.js';
 import { listUsersByBusiness } from './users.js';
 import { cofferSummary } from './coffers.js';
 import { listDiscounts } from './discounts.js';
@@ -77,6 +78,14 @@ export async function requireCourt(env, business, realmId) {
     const e = new Error('This is available to Court businesses only.');
     e.forbidden = true;
     throw e;
+  }
+  // A Court IS a region's government, and its every book is keyed by region. A
+  // travelling company has none, so it would govern the word "Traveling" — a
+  // place no sale can ever be filed under, and therefore a Court with a levy
+  // nobody owes and licences nobody needs.
+  if (isTraveling(meta.hold)) {
+    throw new Error('A company marked as ' + TRAVELING + ' has no region to govern. An admin needs to ' +
+      'give it a region, or move the Court flag to a company based in one.');
   }
   if (!meta.hold) {
     throw new Error('Your company is marked as a Court but has no region assigned — an admin needs to set one.');

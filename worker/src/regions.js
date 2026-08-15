@@ -32,6 +32,29 @@ export async function readRegions(env, realmId) {
   }
 }
 
+/**
+ * TRAVELING — a company with no fixed region: a caravan, a peddler, a shop that
+ * follows the fairs.
+ *
+ * It is an answer for a COMPANY's region and never for a SALE's. A travelling
+ * shop still rings every sale up in the region the sale happened in, so the
+ * region on a sales row is always a real place and every region report stays
+ * true. What it does NOT have is a home — which is why the register does not
+ * pre-fill one for it, and why the weekly market report it would otherwise get
+ * has no region to be about.
+ *
+ * Stored as the word, in the same column, rather than as a second flag: it IS
+ * the answer to "which region is this shop in", and a shop cannot be both
+ * travelling and based in Whiterun. A separate flag would allow exactly that
+ * contradiction and leave every reader guessing which half to believe.
+ */
+export const TRAVELING = 'Traveling';
+
+/** Whether a company's stored region means "no fixed region". */
+export function isTraveling(hold) {
+  return String(hold || '').trim().toLowerCase() === TRAVELING.toLowerCase();
+}
+
 /** Admin: replace the hold index with the given list (order preserved, de-duped). */
 export async function writeRegions(env, list, realmId) {
   const db = await getDb(env);
@@ -40,6 +63,13 @@ export async function writeRegions(env, list, realmId) {
   (list || []).forEach((h) => {
     const v = String(h || '').trim();
     const k = v.toLowerCase();
+    // Refused, not quietly dropped: a realm with a region called Traveling
+    // could not tell "based here" from "based nowhere", and an admin who typed
+    // it deserves to be told why it will not take rather than watch it vanish.
+    if (isTraveling(v)) {
+      throw new Error('“' + TRAVELING + '” is reserved — it is how a company with no fixed ' +
+        'region is marked, so it cannot also be one of the regions.');
+    }
     if (v && !seen.has(k)) { seen.add(k); holds.push(v); }
   });
   const stmts = [db.prepare('DELETE FROM hold_index WHERE realm_id = ?').bind(realmId)];

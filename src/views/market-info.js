@@ -58,6 +58,17 @@ export function renderMarketInfo(container, { me }) {
 
   api.getWeeklyMarket()
     .then((d) => {
+      // A travelling shop is not a shop waiting on an admin: it has no home
+      // market on purpose, and saying "no region set" would read as a fault.
+      if (d.traveling) {
+        mount(host, emptyState({
+          glyph: '🐎',
+          title: 'Your shop travels',
+          hint: 'A travelling shop has no home ' + regionWord() + ', so there is no one local market to ' +
+            'report on. Your sales still count towards the ' + regionWord() + ' each one was rung up in.',
+        }));
+        return;
+      }
       if (d.noRegion) {
         mount(host, emptyState({
           glyph: '🗺️',

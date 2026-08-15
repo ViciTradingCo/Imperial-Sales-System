@@ -35,6 +35,23 @@ export function regionWord() { return region.label.toLowerCase(); }
 export function regionsOn() { return region.shown; }
 
 /**
+ * TRAVELING — a company with no fixed region. The word an admin picks on the
+ * company record instead of a region, mirroring `worker/src/regions.js`, which
+ * is where the rule is stated in full and which refuses to let a realm name a
+ * real region this.
+ *
+ * NOT translated with the region label. Region/Hold/Province is what a realm
+ * calls a PLACE; this is the answer "none of them", and it means the same thing
+ * whatever the places are called.
+ */
+export const TRAVELING = 'Traveling';
+
+/** Whether a company's region means "no fixed region". */
+export function isTraveling(hold) {
+  return String(hold || '').trim().toLowerCase() === TRAVELING.toLowerCase();
+}
+
+/**
  * An amount, in this realm's denomination.
  *
  * WHOLE COINS, ROUNDED DOWN. Prices may be typed with a fraction — the register
