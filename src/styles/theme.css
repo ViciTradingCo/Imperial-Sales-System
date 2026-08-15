@@ -410,7 +410,9 @@ body {
 }
 .craft-row .item-picker { flex: 1 1 auto; min-width: 0; }
 .craft-row input[type="number"] { flex: 0 0 84px; width: 84px; margin: 0; }
-.craft-row button { flex: 0 0 auto; margin: 0; }
+/* Direct child only: the picker's own suggestion list is full of buttons, and
+   the row's layout has nothing to say about them. */
+.craft-row > button { flex: 0 0 auto; margin: 0; }
 
 /* Column names above a list of line rows. A placeholder disappears the moment
    something is typed over it, so the heading is what still says which box is
@@ -426,6 +428,27 @@ body {
 @media (max-width: 600px) {
   /* No room for four columns on a phone; the per-field labels carry it. */
   .line-head { display: none; }
+
+  /* …AND THE ROW ITSELF STOPS PRETENDING there are four columns. The headings
+     were dropped here long ago for want of room while the fields were left
+     crammed into the same width — which squeezed the item search to 94px on a
+     390px phone and 64px on a 360px one, about five characters of a name you
+     are trying to type.
+
+     So the line wraps: the ITEM takes the full width, because it is the field
+     you actually type into, and the numbers share the line beneath it. They may
+     grow past their desktop 84px now that they have the room to. */
+  .craft-row { flex-wrap: wrap; }
+  .craft-row .item-picker { flex: 1 1 100%; }
+  /* Basis 0, not 84px: the two numbers SHARE whatever the subtotal and the
+     Remove button leave, instead of each claiming 84px and shoving the other
+     onto a line of its own. */
+  .craft-row input[type="number"] { flex: 1 1 0; width: auto; min-width: 0; }
+  .craft-row .buy-sub { flex: 0 1 auto; align-self: center; }
+  /* And the "×" gets a thumb's worth of width. It was 25px — the width of the
+     glyph — which is a fine mouse target and a miss on a phone, sat right next
+     to a number you are trying to correct. */
+  .craft-row > button { flex: 0 0 44px; min-height: 44px; padding-left: 0; padding-right: 0; }
 }
 
 /* A delivery's running total, and each line's own subtotal — the thing that

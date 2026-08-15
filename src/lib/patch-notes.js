@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '4.8', date: '2026-08-15', notes: [
+    'Recording a delivery on a phone is typeable again. The item search was squeezed into a quarter of the screen — about five letters of the name you were trying to find — because the line was still laid out in the four columns it uses on a desk.',
+    'On a narrow screen the line now wraps: the item takes the full width, and the quantity, the cost and the Remove button share the line beneath it. The “×” that removes a line is a proper button rather than a character to aim at.',
+    'The same lines are used by Craft’s ingredients and by the items in a Special, so those are easier to fill in too. Nothing changes on a desktop or a tablet.',
+  ] },
   { version: '4.7', date: '2026-08-14', notes: [
     'The Stocktake reads CSV files. Yesterday’s note said .xlsx as well; that has been taken back out in favour of one simple format. Every spreadsheet program writes CSV — choose “Save as” and pick it — and CSV is what the inventory export already gives you, so exporting, editing and reading it back needs nothing else.',
     'Picking an .xls or .xlsx now tells you to save it as CSV rather than failing oddly.',
