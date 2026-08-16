@@ -18,6 +18,7 @@
 import { getDb } from './db.js';
 import { HARVEST_VENDOR } from './intake.js';
 import { parseSaleItems } from './sales.js';
+import { transferLines } from './transfers.js';
 import { listItemIndex, matchMasterItem, normalizeItem } from './item-index.js';
 import { readSettings } from './settings.js';
 import { listBusinessCards } from './registry.js';
@@ -228,7 +229,14 @@ function itemStats(saleRows, master, intakeRows, transferRows) {
   // Accepted transfers: bought from another company INSIDE the network. The
   // goods arrived and were paid for at the transfer's price. No region: a
   // transfer records two companies, not a place.
-  (transferRows || []).forEach((r) => bought(r.item, Number(r.qty) || 0, Number(r.price) || 0, ''));
+  //
+  // EXPANDED INTO ITS LINES first. A transfer is a shipment, and its row's
+  // `item` column is only the first thing in the crate while `qty` is the whole
+  // crate's units — so reading the columns would value two swords, five ales
+  // and a rope as eight swords. That is the kind of invented figure the
+  // valuation would then believe.
+  (transferRows || []).forEach((r) =>
+    transferLines(r).forEach((l) => bought(l.item, l.qty, l.price, '')));
 
   return Object.values(map).map((m) => {
     // The raw lines and the accumulator maps are working data, not payload.
@@ -401,7 +409,7 @@ export async function marketAnalysis(env, realmId) {
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?` + NOT_HARVEST).bind(realmId).all()).results) || [];
   const transferRows = ((await db.prepare(
-    `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
+    `SELECT item, qty, price, items FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
   const ranked = itemStats(saleRows, master, intakeRows, transferRows);
   // Only the five on screen carry a trend; the rest of the list would multiply
   // the response size for series nothing draws.
@@ -484,7 +492,7 @@ export async function itemReport(env, name, realmId) {
   const intakeRows = ((await db.prepare(
     `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?` + NOT_HARVEST).bind(realmId).all()).results) || [];
   const transferRows = ((await db.prepare(
-    `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
+    `SELECT item, qty, price, items FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
   const found = itemStats(saleRows, master, intakeRows, transferRows).find((r) => r.item === hit.name);
 
   // An indexed item that has never traded is a valid answer, not an error.
@@ -526,7 +534,7 @@ export async function businessReport(env, business, realmId) {
     `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND business = ?` + NOT_HARVEST).bind(realmId, b).all()).results) || [];
   // What this shop took IN from other companies counts as its buying too.
   const transferRows = ((await db.prepare(
-    `SELECT item, qty, price FROM transfers WHERE realm_id = ? AND status = 'accepted' AND to_business = ?`)
+    `SELECT item, qty, price, items FROM transfers WHERE realm_id = ? AND status = 'accepted' AND to_business = ?`)
     .bind(realmId, b).all()).results) || [];
 
   return {

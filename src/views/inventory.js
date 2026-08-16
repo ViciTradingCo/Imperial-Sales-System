@@ -264,41 +264,33 @@ function openStockModal(it, onSaved) {
 }
 
 /**
- * Transfer goods to another company. Sending debits your stock immediately; the
- * goods only appear in the receiver's inventory once they accept (from the
- * incoming list here). Shows pending incoming (with Accept) and outgoing.
+ * A crate as one line of text — "Ale ×5 + 1 more from Beta" — with its full
+ * contents underneath when there is more than one line.
+ *
+ * The summary comes from the Worker rather than being assembled here, so the
+ * wording on a screen and the wording in the audit log are the same sentence.
  */
-function openTransferModal(me, onChanged) {
-  // Transfers move YOUR stock, so the picker is bound to in-stock inventory
-  // (already canonical names) rather than the whole master index.
-  const picker = createItemPicker({
-    placeholder: 'Search your stock…',
-    meta: (it) => it.stock + ' in stock',
-  });
-  const qty = el('input', { type: 'number', min: '1', step: '1', placeholder: 'Amount' });
-  const toSel = el('select', {}, el('option', { value: '' }, 'Receiving company…'));
-  const status = el('p', {});
-  const send = el('button.primary', { onclick: doSend }, 'Confirm transfer');
-  const pendingHost = el('div', {}, el('p', { class: 'note' }, 'Loading transfers…'));
-  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+function crateHtml(x, who) {
+  const head = '<b>' + esc(x.summary || '') + '</b> <span class="note">' + esc(who) + '</span>';
+  if ((x.lines || []).length < 2) return head;
+  return head + '<br><span class="note">' +
+    x.lines.map((l) => esc(l.item) + ' ×' + l.qty).join(', ') + '</span>';
+}
 
-  // Populate the item picker from current stock, and the company dropdown.
-  api.getInventory().then((inv) => {
-    picker.setItems((inv.inventory || []).filter((it) => it.stock > 0).map((it) => ({ name: it.item, stock: it.stock })));
-  }).catch(() => {});
-  api.getBusinesses().then((res) => {
-    (res.businesses || []).filter((b) => b.toLowerCase() !== String(me.business || '').toLowerCase())
-      .forEach((b) => toSel.appendChild(el('option', { value: b }, b)));
-  }).catch(() => {});
-
-  function renderPending(t) {
+/**
+ * The crates waiting on somebody: yours to accept, and theirs to accept from
+ * you. `act` runs one of the accept / decline / cancel calls and hands back the
+ * fresh lists, so this never fetches on its own behalf.
+ */
+function pendingPanel(act) {
+  const host = el('div', {}, el('p', { class: 'note' }, 'Loading transfers…'));
+  const draw = (t) => {
     const inc = t.incoming || [];
     const out = t.outgoing || [];
-    const nodes = [];
-    nodes.push(el('h3', {}, 'Incoming'));
+    const nodes = [el('h3', {}, 'Incoming')];
     if (!inc.length) nodes.push(el('p', { class: 'note' }, 'No transfers waiting for you.'));
     else inc.forEach((x) => nodes.push(el('div.emp-row', {}, [
-      el('span', { html: '<b>' + esc(x.item) + '</b> ×' + x.qty + ' <span class="note">from ' + esc(x.other) + '</span>' }),
+      el('span', { html: crateHtml(x, 'from ' + x.other) }),
       el('span', { class: 'row-actions' }, [
         el('button.primary.small', { onclick: () => act(() => api.acceptTransfer(x.id)) }, 'Accept'),
         el('button.danger.small', { onclick: () => act(() => api.declineTransfer(x.id)) }, 'Decline'),
@@ -307,45 +299,167 @@ function openTransferModal(me, onChanged) {
     nodes.push(el('h3', {}, 'Outgoing (awaiting acceptance)'));
     if (!out.length) nodes.push(el('p', { class: 'note' }, 'None pending.'));
     else out.forEach((x) => nodes.push(el('div.emp-row', {}, [
-      el('span', { html: '<b>' + esc(x.item) + '</b> ×' + x.qty + ' <span class="note">to ' + esc(x.other) + '</span>' }),
+      el('span', { html: crateHtml(x, 'to ' + x.other) }),
       el('button.danger.small', { onclick: () => act(() => api.cancelTransfer(x.id)) }, 'Cancel'),
     ])));
-    mount(pendingHost, ...nodes);
+    mount(host, ...nodes);
+  };
+  const load = () => api.getTransfers().then(draw)
+    .catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
+  return { el: host, draw, load };
+}
+
+/** What has already been handed over, either way, with what became of it. */
+function historyPanel() {
+  const host = el('div', {}, el('p', { class: 'note' }, 'Loading history…'));
+  const load = () => api.getTransferHistory().then((r) => {
+    const h = r.history || [];
+    if (!h.length) { mount(host, el('p', { class: 'note' }, 'No transfer history yet.')); return; }
+    mount(host, ...h.map((x) => el('div.emp-row', {}, [
+      el('span', { html: (x.dir === 'out' ? '→ ' : '← ') +
+        crateHtml(x, (x.dir === 'out' ? 'to ' + x.to : 'from ' + x.from) + ' · ' + x.status) }),
+    ])));
+  }).catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
+  return { el: host, load };
+}
+
+/**
+ * Transfer goods to another company — a CRATE, not an item.
+ *
+ * A shop sending goods to another usually sends several things at once, and
+ * doing that as five separate transfers meant the receiver accepting five
+ * times and either shop reading five lines of history for one handover. So the
+ * form is a list of lines, exactly like a delivery on the register's Buying
+ * side, and the whole crate is sent, accepted, declined or cancelled as one.
+ *
+ * Sending debits your stock immediately; the goods only appear in the
+ * receiver's inventory once they accept, from the incoming list here.
+ */
+/**
+ * The crate: a list of lines, each an item off your own shelf and how much.
+ *
+ * `onChange` is handed the folded figures whenever anything is typed, so the
+ * screen around this can word its total and refuse an impossible send without
+ * this needing to know about either of them.
+ */
+function crateForm(onChange) {
+  const host = el('div', {});
+  const lines = [];
+  /** What this shop can send: its own listings, with something on the shelf. */
+  let stock = [];
+
+  /**
+   * What the lines ask for, FOLDED BY ITEM the way the Worker folds it — two
+   * lines of the same thing spend the same shelf, which is the mistake a list
+   * of lines makes possible and a single form never could.
+   */
+  function asked() {
+    const by = new Map();
+    lines.forEach((l) => {
+      const picked = l.picker.selected();
+      const n = Math.floor(Number(l.qty.value));
+      if (!picked || !isFinite(n) || n < 1) return;
+      const prev = by.get(picked.name);
+      by.set(picked.name, { item: picked.name, qty: (prev ? prev.qty : 0) + n, stock: picked.stock });
+    });
+    return [...by.values()];
   }
 
-  function loadPending() {
-    api.getTransfers().then(renderPending).catch((e) => mount(pendingHost, el('p', { class: 'error' }, e.message || String(e))));
+  function sync() {
+    // Remove only exists to undo a line, so it is not offered on the only one.
+    lines.forEach((l) => { l.remove.hidden = lines.length < 2; });
+    onChange(asked());
   }
 
-  const historyHost = el('div', {}, el('p', { class: 'note' }, 'Loading history…'));
-  function loadHistory() {
-    api.getTransferHistory().then((r) => {
-      const h = r.history || [];
-      if (!h.length) { mount(historyHost, el('p', { class: 'note' }, 'No transfer history yet.')); return; }
-      mount(historyHost, ...h.map((x) => el('div.emp-row', {}, [
-        el('span', { html: (x.dir === 'out' ? '→ ' : '← ') + '<b>' + esc(x.item) + '</b> ×' + x.qty +
-          ' <span class="note">' + (x.dir === 'out' ? 'to ' + esc(x.to) : 'from ' + esc(x.from)) +
-          ' · ' + esc(x.status) + '</span>' }),
-      ])));
-    }).catch((e) => mount(historyHost, el('p', { class: 'error' }, e.message || String(e))));
+  /**
+   * The picker is bound to THIS shop's in-stock inventory rather than the master
+   * index — you can only send what you actually hold, and those names are
+   * already the ones the Worker will match on.
+   */
+  function add() {
+    const picker = createItemPicker({
+      placeholder: 'Search your stock…',
+      items: stock,
+      meta: (it) => it.stock + ' in stock',
+    });
+    const qty = el('input', { type: 'number', min: '1', step: '1', value: '1', 'aria-label': 'Amount' });
+    const remove = el('button.secondary-btn.small', {
+      type: 'button', title: 'Remove this line', 'aria-label': 'Remove this line',
+      onclick: () => {
+        const i = lines.indexOf(line);
+        if (i < 0) return;
+        lines.splice(i, 1);
+        row.remove();
+        sync();
+      },
+    }, '×');
+    const row = el('div', { class: 'craft-row' }, [picker.el, qty, remove]);
+    row.addEventListener('input', sync);
+    const line = { row, picker, qty, remove };
+    lines.push(line);
+    host.appendChild(row);
+    sync();
   }
+
+  return {
+    el: host,
+    add,
+    asked,
+    setStock: (list) => { stock = list; lines.forEach((l) => l.picker.setItems(stock)); },
+    /** Back to one empty line, so the next crate is not a copy of the last. */
+    reset: () => { lines.splice(0, lines.length).forEach((l) => l.row.remove()); add(); },
+  };
+}
+
+function openTransferModal(me, onChanged) {
+  const toSel = el('select', {}, el('option', { value: '' }, 'Receiving company…'));
+  const status = el('p', {});
+  const send = el('button.primary', { onclick: doSend }, 'Confirm transfer');
+  const pending = pendingPanel((fn) => act(fn));
+  const history = historyPanel();
+  const totalLine = el('p', { class: 'note' }, '');
+  function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
+
+  /**
+   * The running total, and the one thing worth catching before the send: more
+   * of something than the shop actually holds.
+   */
+  const crate = crateForm((want) => {
+    const over = want.filter((w) => w.qty > w.stock);
+    const units = want.reduce((n, w) => n + w.qty, 0);
+    totalLine.className = over.length ? 'note warn' : 'note';
+    totalLine.textContent = over.length
+      ? 'More ' + over[0].item + ' than you hold — ' + over[0].qty + ' of ' + over[0].stock + '.'
+      : (units ? units + ' item' + (units === 1 ? '' : 's') + ' in ' + want.length + ' line' + (want.length === 1 ? '' : 's') + '.' : '');
+    send.disabled = !!over.length;
+  });
+
+  api.getInventory().then((inv) => {
+    crate.setStock((inv.inventory || []).filter((it) => it.stock > 0).map((it) => ({ name: it.item, stock: it.stock })));
+  }).catch(() => {});
+  api.getBusinesses().then((res) => {
+    (res.businesses || []).filter((b) => b.toLowerCase() !== String(me.business || '').toLowerCase())
+      .forEach((b) => toSel.appendChild(el('option', { value: b }, b)));
+  }).catch(() => {});
 
   let sendKey = null; // stable across a retry of the same send; cleared on success
   async function doSend() {
-    const picked = picker.selected();
-    if (!picked) { setStatus('Pick an item from your stock.', 'error'); return; }
+    const items = crate.asked();
+    if (!items.length) { setStatus('Add at least one item from your stock.', 'error'); return; }
     if (!toSel.value) { setStatus('Pick a receiving company.', 'error'); return; }
-    const n = Math.floor(Number(qty.value));
-    if (!n || n < 1) { setStatus('Enter an amount.', 'error'); return; }
     if (!sendKey) sendKey = newIdem();
     send.disabled = true;
     setStatus('Sending…', '');
     try {
-      renderPending(await api.createTransfer({ toBusiness: toSel.value, item: picked.name, qty: n, idempotencyKey: sendKey }));
-      sendKey = null; // next transfer gets a fresh key
+      pending.draw(await api.createTransfer({
+        toBusiness: toSel.value,
+        items: items.map((i) => ({ item: i.item, qty: i.qty })),
+        idempotencyKey: sendKey,
+      }));
+      sendKey = null; // next crate gets a fresh key
       setStatus('Transfer sent — awaiting acceptance.', 'ok');
-      qty.value = '';
-      loadHistory();
+      crate.reset();
+      history.load();
       onChanged(); // stock left our inventory
     } catch (e) {
       setStatus(e.message || String(e), 'error');
@@ -357,8 +471,8 @@ function openTransferModal(me, onChanged) {
   // Accept / decline / cancel all move stock and refresh the same way.
   async function act(fn) {
     try {
-      renderPending(await fn());
-      loadHistory();
+      pending.draw(await fn());
+      history.load();
       onChanged(); // inventory changed (goods arrived, or returned to sender)
       window.dispatchEvent(new Event('eec:banners')); // refresh the pending banner
     } catch (e) {
@@ -366,21 +480,25 @@ function openTransferModal(me, onChanged) {
     }
   }
 
-  loadPending();
-  loadHistory();
+  crate.add();
+  pending.load();
+  history.load();
   openModal([
     el('h3', {}, 'Transfer goods'),
-    el('p', { class: 'note' }, 'Send stock to another company. It leaves your inventory now and appears in theirs once they accept.'),
-    el('label', {}, 'Item'), picker.el,
-    el('label', {}, 'Amount'), qty,
+    el('p', { class: 'note' }, 'Send stock to another company — as many items as you like in one crate. ' +
+      'It leaves your inventory now and appears in theirs once they accept, all of it together.'),
+    el('label', {}, 'Items'),
+    crate.el,
+    el('button.secondary-btn', { onclick: crate.add }, 'Add another item'),
+    totalLine,
     el('label', {}, 'Receiving company'), toSel,
     send,
     status,
     el('hr', {}),
-    pendingHost,
+    pending.el,
     el('hr', {}),
     el('h3', {}, 'Recent transfers'),
-    historyHost,
+    history.el,
   ]);
 }
 

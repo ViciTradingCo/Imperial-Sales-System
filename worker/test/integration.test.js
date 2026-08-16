@@ -63,10 +63,12 @@ describe('transfers conserve stock', () => {
     expect(await stockOf('Alpha', 'Iron Sword')).toBe(10);
   });
 
+  // The refusal NAMES the item, which matters once a shipment can hold six of
+  // them: "not enough stock" leaves you checking every line by hand.
   it('rejects a transfer bigger than stock', async () => {
     await seedItem('Alpha', 'Iron Sword', 30, 2);
     await expect(createTransfer(env, 'Alpha', { toBusiness: 'Beta', item: 'Iron Sword', qty: 5 }, 'default'))
-      .rejects.toThrow(/not enough stock/i);
+      .rejects.toThrow(/not enough iron sword/i);
     expect(await stockOf('Alpha', 'Iron Sword')).toBe(2); // unchanged
   });
 

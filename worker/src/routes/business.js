@@ -18,7 +18,7 @@ import { readRegions, isTraveling, TRAVELING } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
 import { checkCertification } from '../cert.js';
 import { checkout, listSales, voidSale, employeePerformance } from '../sales.js';
-import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory } from '../transfers.js';
+import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory, transferSummary } from '../transfers.js';
 import { cofferSummary, adjustCoffer } from '../coffers.js';
 import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
 import { listBundles, saveBundle, deleteBundle } from '../bundles.js';
@@ -532,7 +532,11 @@ async function listTransfersRoute({ request, env }) {
 async function createTransferRoute({ request, env, body }) {
   const caller = await requireManages(request, env);
   await createTransfer(env, caller.business, body, realmIdOf(caller, env));
-  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.send', detail: (body.item || '') + ' ×' + (body.qty || '') + ' → ' + (body.toBusiness || ''), realmId: realmIdOf(caller, env) });
+  // What was actually sent, as one line, so the audit reads the same for a
+  // crate of six as it did for a single sword.
+  const sent = Array.isArray(body.items) && body.items.length ? body.items : [{ item: body.item, qty: body.qty }];
+  const detail = transferSummary(sent.map((l) => ({ item: String((l && l.item) || ''), qty: Math.floor(Number(l && l.qty) || 0) })));
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.send', detail: detail + ' → ' + (body.toBusiness || ''), realmId: realmIdOf(caller, env) });
   return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }
 async function acceptTransferRoute({ request, env, body }) {

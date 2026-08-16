@@ -68,6 +68,10 @@ const SCHEMA = [
      from_business TEXT NOT NULL, to_business TEXT NOT NULL,
      item TEXT NOT NULL, qty INTEGER NOT NULL DEFAULT 0,
      price REAL NOT NULL DEFAULT 0,
+     -- The shipment's lines, as JSON. item/qty/price alongside it are the first
+     -- line and the total units, kept so a one-item transfer is stored exactly
+     -- as it was before shipments; see transfers.js.
+     items TEXT,
      status TEXT NOT NULL DEFAULT 'pending', ts TEXT NOT NULL, idem TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_transfers_to ON transfers (to_business)`,
   `CREATE INDEX IF NOT EXISTS idx_transfers_from ON transfers (from_business)`,
@@ -352,6 +356,11 @@ const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS idx_intake_idem ON intake (business, idem)',
   'ALTER TABLE transfers ADD COLUMN idem TEXT',
   'CREATE INDEX IF NOT EXISTS idx_transfers_idem ON transfers (from_business, idem)',
+  // A transfer became a SHIPMENT — several items sent, accepted or refused as
+  // one crate — and its lines live here as JSON, the way a sale's do. Rows
+  // written before this have it NULL and keep their single line in the item /
+  // qty / price columns; `transferLines` reads either.
+  'ALTER TABLE transfers ADD COLUMN items TEXT',
   // Multi-realm: every data table gains realm_id. The DEFAULT means existing
   // rows land in the 'default' realm automatically — no backfill needed. On a
   // fresh DB these are no-ops ("duplicate column"), since SCHEMA already has it.

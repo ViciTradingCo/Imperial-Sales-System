@@ -106,6 +106,27 @@ describe('average value', () => {
     expect((await itemRow()).avgValue).toBe(25);
   });
 
+  /**
+   * A transfer is a SHIPMENT, and its row's `item` column is only the first
+   * thing in the crate while `qty` is the whole crate's units. Read as columns,
+   * two swords sent alongside five ales and a rope would be valued as EIGHT
+   * swords at the sword's price — an invented figure, arriving with the weight
+   * of eight units of evidence behind it.
+   */
+  it('values a crate line by line, not by its first item and its total units', async () => {
+    await env.DB.prepare(
+      `INSERT INTO transfers (realm_id, from_business, to_business, item, qty, price, items, status, ts)
+       VALUES (?, 'Rival Traders', 'Alpha', 'Iron Sword', 8, 25, ?, 'accepted', '2026-01-01T00:00:00Z')`)
+      .bind(R, JSON.stringify([
+        { item: 'Iron Sword', qty: 2, price: 25 },
+        { item: 'Ale', qty: 5, price: 5 },
+        { item: 'Rope', qty: 1, price: 2 },
+      ])).run();
+    const sword = (await marketAnalysis(env, R)).items.find((i) => i.item === 'Iron Sword');
+    expect(sword.avgValue).toBe(25);
+    expect(sword.valueSamples).toBe(2); // the two that moved, not the crate's eight
+  });
+
   it('ignores a transfer that was never accepted', async () => {
     await intake(2, 10);
     await transferIn(10, 999, 'pending');

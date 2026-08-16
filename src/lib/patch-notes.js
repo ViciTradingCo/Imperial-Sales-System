@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.4', date: '2026-08-16', notes: [
+    'A transfer can carry as many items as you like. Inventory → Transfer is a list of lines now — add an item, add another, send the lot as one crate.',
+    'It goes as ONE handover: the receiver accepts once and everything lands together, it shows up as a single line in both shops’ history, and declining or cancelling puts every item back on your shelf.',
+    'It tells you what you are sending as you build it, and will not let you send more of something than you hold — including when the same item is on two lines, which is the easy way to promise twice what you have.',
+    'Transfers you sent before this still show, still accept, and still return their goods exactly as they always did.',
+  ] },
   { version: '5.3', date: '2026-08-15', notes: [
     'The row of buttons at the top of every shop screen — Register, Inventory, Shop Ledger, Employees — is gone. All four were already tiles under Shop tools, so it was a second copy of your home page following you around.',
     'Shop tools is the way to them now, and every shop page has a “← Back” at the top corner, the same one the admin screens have always had.',
