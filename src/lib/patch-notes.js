@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.5', date: '2026-08-16', notes: [
+    'Transfers waiting on somebody now read “Pending Transfer”, with how much is in the crate and who it is with — and the list of what is inside is folded away behind Show more.',
+    'A crate of ten used to spell itself out beside its own Accept button, which turned a list of transfers into a wall of item names with the decisions buried in it. Press Show more on the one you mean; Show less puts it away.',
+    'Recent transfers fold the same way, keeping their summary as their name so the log still says at a glance what each one was.',
+  ] },
   { version: '5.4', date: '2026-08-16', notes: [
     'A transfer can carry as many items as you like. Inventory → Transfer is a list of lines now — add an item, add another, send the lot as one crate.',
     'It goes as ONE handover: the receiver accepts once and everything lands together, it shows up as a single line in both shops’ history, and declining or cancelling puts every item back on your shelf.',

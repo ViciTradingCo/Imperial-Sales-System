@@ -923,6 +923,15 @@ label.inline {
    the same column as one without — the row is `space-between`, and without
    this the name drifts to the middle of whatever is left over. */
 .emp-who { flex: 1 1 auto; min-width: 0; }
+/* A crate in a transfer list: a title line, a Show more, and the contents it
+   opens. Top-aligned rather than centred — the left side grows when it is
+   open, and a centred Accept button would drift down the page with it. */
+.crate-row { align-items: flex-start; }
+.crate-head { margin: 0; }
+.crate-lines { margin-top: var(--sp-1); }
+/* The contents are a column of quantities, so they are set in the data face and
+   not the hand: a count is not calligraphy, and these have to line up. */
+.crate-lines p { margin: 0; font-family: var(--font-data); font-size: var(--data-size); }
 button.primary.small { padding: 5px 10px; font-size: 12px; margin: 0; width: auto; }
 button.secondary-btn.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto; }
 button.danger {
