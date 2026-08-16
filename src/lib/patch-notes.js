@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.3', date: '2026-08-15', notes: [
+    'The row of buttons at the top of every shop screen — Register, Inventory, Shop Ledger, Employees — is gone. All four were already tiles under Shop tools, so it was a second copy of your home page following you around.',
+    'Shop tools is the way to them now, and every shop page has a “← Back” at the top corner, the same one the admin screens have always had.',
+    'Nothing has moved for admins: Member List, Company List, Item Index and Audit Log are still a row of buttons, because an admin has no tiles.',
+  ] },
   { version: '5.2', date: '2026-08-15', notes: [
     'A bar now floats at the foot of the screen for as long as you are clocked in, telling you so and how long it has been. It follows you from page to page and stays put as you scroll, because a shift you have forgotten about is not something you go looking for.',
     'It carries a Time Card button, so clocking out is one press from wherever you are. The press takes you to your card rather than ending the shift where you stand — you still say when, and can still leave a note.',

@@ -19,7 +19,7 @@ import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
-import { setOpsActions } from '../lib/sections.js';
+import { backToHome } from '../lib/sections.js';
 import { canManage } from '../lib/roles.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
@@ -29,10 +29,10 @@ import { readCsvFile, rowsToStocktake } from '../lib/csv.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = canManage(me);
-  setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
   const listHost = el('div', {}, skeletonRows(4));
 
   const firstCard = [
+    backToHome(),
     el('h2', {}, 'Inventory'),
     el('p', { class: 'note' }, (me.business || 'Your shop') +
       ' — what you sell and what you craft with, in two tables. "Low" means at or below an ' +

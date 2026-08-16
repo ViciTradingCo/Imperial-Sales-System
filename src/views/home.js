@@ -64,12 +64,16 @@ export function renderHome(container, { me }) {
   /**
    * Home's tiles NAVIGATE; they do not open focal menus.
    *
-   * Every one of these has a page of its own, reachable from the shop-tools bar
-   * as well. Opening the same view in a modal gave it two lives: the bar and the
-   * side menu vanished behind the overlay, the browser's Back button closed
-   * nothing, and the address bar still said Home — so there was no way to link
-   * to what you were looking at, or return to it. A tile is a shortcut to a
-   * page, and now it behaves like one.
+   * Every one of these has a page of its own, and this grid is now the ONLY way
+   * to it: the shop-tools action bar carried the same four destinations at the
+   * top of every shop screen, which made a second copy of this page follow you
+   * around. Each of those pages carries a Back link instead.
+   *
+   * Opening the same view in a modal was the other thing tried here, and it
+   * gave each one two lives: the side menu vanished behind the overlay, the
+   * browser's Back button closed nothing, and the address bar still said Home —
+   * so there was no way to link to what you were looking at, or return to it. A
+   * tile is a shortcut to a page, and it behaves like one.
    */
   function drawTiles() {
     const go = (path) => () => navigate(path);

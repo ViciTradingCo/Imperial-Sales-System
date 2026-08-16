@@ -23,7 +23,7 @@ import { renderShopReport } from './shop-report.js';
 import { renderShopNotices } from './shop-notices.js';
 import { renderSales, renderIntake } from './shop-history.js';
 import { canManage } from '../lib/roles.js';
-import { setOpsActions } from '../lib/sections.js';
+import { backToHome } from '../lib/sections.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { openStocktakeModal } from './inventory.js';
 import { toast } from '../lib/toast.js';
@@ -32,6 +32,7 @@ import { toast } from '../lib/toast.js';
 function tilePage(container, { title, note, sections }) {
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
+    backToHome(),
     el('h2', {}, title),
     el('p', { class: 'note' }, note),
     gridHost,
@@ -55,9 +56,6 @@ function tilePage(container, { title, note, sections }) {
  * Every one of them is enforced in the Worker regardless of what is offered.
  */
 export function renderLedgerSettings(container, { me }) {
-  // The shop-tools bar, which the Sales Log used to put up. Without it the
-  // Ledger was the one shop page you could not get off without the menu.
-  setOpsActions(me);
   const sections = [
     // What has already happened. Everyone who works the till.
     { key: 'log-sales', label: 'Sales', hint: 'Find or void a past order', glyph: '🧾',

@@ -13,7 +13,7 @@
 import { money } from '../lib/format.js';
 import { el, mount, esc, statTiles } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { setOpsActions } from '../lib/sections.js';
+import { backToHome } from '../lib/sections.js';
 import { canManage } from '../lib/roles.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { skeletonRows } from '../lib/skeleton.js';
@@ -53,10 +53,6 @@ function when(ts) {
 }
 
 export function renderTimecard(container, { me }) {
-  // The shop-tools bar, so there is somewhere to go after clocking on — but
-  // this page is no longer ON it. Its way in is the Time Card tile under Shop
-  // tools on Home, and the floating shift bar while a shift is open.
-  setOpsActions(me);
   const isOwner = canManage(me); // the shop's log; a manager keeps it too
   let tileImages = {};
 
@@ -69,6 +65,7 @@ export function renderTimecard(container, { me }) {
 
   function draw() {
     mount(container, el('div.card', {}, [
+      backToHome(),
       el('h2', {}, 'Time Cards'),
       el('p', { class: 'note' }, isOwner
         ? 'Clock yourself on and off, and see what your staff have worked and are owed.'

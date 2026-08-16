@@ -730,25 +730,13 @@ function daysUntil(untilStr) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   return Math.round((d.getTime() - today.getTime()) / 86400000);
 }
-async function getMotd({ request, env }) {
-  const caller = await requireRegistered(request, env);
-  const realmId = realmIdOf(caller, env);
-  const notices = [];
-  notices.push(...(await activeGlobalNotices(env, realmId)));
-  notices.push(...(await activeNoticesForBusiness(env, caller.business, realmId)));
-  // The Court's notice to its region — announcements from the government of
-  // the place you trade in, alongside the network's own.
-  const meta = await findBusinessMeta(env, caller.business, realmId);
-  // A TRAVELLING shop has no home Court. The Court that governs any given sale
-  // is the one for the region that sale happened in, which checkout already
-  // resolves per sale — so there is no standing notice or sanction to show here,
-  // and asking for one would be asking about a region the shop is not in.
-  const homeRegion = meta && !isTraveling(meta.hold) ? meta.hold : '';
-  if (homeRegion) {
-    const court = await readCourtSettings(env, homeRegion, realmId);
-    if (court.notice) notices.push('⚖️ ' + homeRegion + ' Court: ' + court.notice);
-  }
-
+/**
+ * The banner strip: conditions that are stopping or about to stop trade, or a
+ * queue somebody has to clear. Split out of getMotd, which had grown to hold
+ * the notices, every banner and the open shift in one run — three unrelated
+ * questions with nothing but a shared caller between them.
+ */
+async function callerBanners(env, caller, realmId, homeRegion) {
   const banners = [];
   // A sanction is not a notice to skim past: it stops or threatens trade, so it
   // goes in the banner strip with the certification warnings.
@@ -827,6 +815,29 @@ async function getMotd({ request, env }) {
       }
     } catch (e) { /* inventory optional */ }
   }
+  return banners;
+}
+
+async function getMotd({ request, env }) {
+  const caller = await requireRegistered(request, env);
+  const realmId = realmIdOf(caller, env);
+  const notices = [];
+  notices.push(...(await activeGlobalNotices(env, realmId)));
+  notices.push(...(await activeNoticesForBusiness(env, caller.business, realmId)));
+  // The Court's notice to its region — announcements from the government of
+  // the place you trade in, alongside the network's own.
+  const meta = await findBusinessMeta(env, caller.business, realmId);
+  // A TRAVELLING shop has no home Court. The Court that governs any given sale
+  // is the one for the region that sale happened in, which checkout already
+  // resolves per sale — so there is no standing notice or sanction to show here,
+  // and asking for one would be asking about a region the shop is not in.
+  const homeRegion = meta && !isTraveling(meta.hold) ? meta.hold : '';
+  if (homeRegion) {
+    const court = await readCourtSettings(env, homeRegion, realmId);
+    if (court.notice) notices.push('⚖️ ' + homeRegion + ' Court: ' + court.notice);
+  }
+  const banners = await callerBanners(env, caller, realmId, homeRegion);
+
   /**
    * THE SHIFT YOU ARE IN THE MIDDLE OF, if any — what the floating shift bar is
    * built from.

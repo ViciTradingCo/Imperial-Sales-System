@@ -4,8 +4,9 @@
  * SELLING builds a cart (item, qty, sold-for price), picks a customer, region
  * and optional discount, then completes the sale — decrementing stock and
  * logging it server-side, attributed to the signed-in character. An expired
- * certification blocks it. Order lookup + void live in a focus modal opened
- * from the action bar.
+ * certification blocks it. Looking a past order up and voiding it is the Shop
+ * Ledger's Sales section, not this page — this is the till, and that is the
+ * book.
  *
  * BUYING is the same counter pointed the other way — a delivery arriving, coin
  * leaving the coffer — and lives in `intake-form.js`.
@@ -23,7 +24,7 @@
 import { currency, money, coins, isTraveling } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { setOpsActions } from '../lib/sections.js';
+import { backToHome } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { newIdem } from '../lib/id.js';
 import { enqueueSale, flushSales, queuedCount, isNetworkError } from '../lib/offline-queue.js';
@@ -59,12 +60,12 @@ function modeSwitch(mode) {
 }
 
 export function renderPos(container, { me, mode }) {
-  setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
 
   const banner = el('div', {});
   const offlineBar = el('div', {});
   const body = el('div', {}, el('p', { class: 'note' }, 'Loading register…'));
   const header = el('div.card', {}, [
+    backToHome(),
     el('h2', {}, 'Register — ' + (me.business || 'Your shop')),
     modeSwitch(mode),
     banner,

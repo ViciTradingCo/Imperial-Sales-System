@@ -14,7 +14,7 @@
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
-import { setOpsActions } from '../lib/sections.js';
+import { backToHome } from '../lib/sections.js';
 import { money } from '../lib/format.js';
 
 /** Fills `host` with the report. Shared by the page and the modal. */
@@ -49,9 +49,9 @@ function fillReport(host) {
 
 /** The Restock page, reached from Home. */
 export function renderLowStock(container, { me }) {
-  setOpsActions(me); // keeps the shop-tools bar, like every other shop page
   const host = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
   mount(container, el('div.card', {}, [
+    backToHome(),
     el('h2', {}, 'Restock'),
     el('p', { class: 'note' }, 'What has run out, and what is close to it. "Low" means at or below an ' +
       'item’s own Low Stock number, which you set when editing the item.'),

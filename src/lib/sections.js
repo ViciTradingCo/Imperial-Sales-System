@@ -1,11 +1,21 @@
 /**
  * Shared "section" action bars + the subscription panel.
  *
- * A section is a group of sibling pages that share one action bar (e.g. the
- * business tools: Register / Inventory / Employees, or the admin tools: Member
- * List / Company List / …). Each page in a section sets the same bar, so the
- * buttons PERSIST as you move between sibling sub-pages, and the current page's
- * button is marked active.
+ * A section is a group of sibling pages that share one action bar — the
+ * record-keeping screens (Member List / Company List / Item Index / Audit Log)
+ * and Market Analysis's own sub-pages. Each page in a section sets the same
+ * bar, so the buttons PERSIST as you move between siblings, and the current
+ * page's button is marked active.
+ *
+ * A SHOP's pages have no bar. They had one — Register / Inventory / Shop Ledger
+ * / Employees — and every entry on it was already a tile under Shop tools on
+ * Home, which made the top of every shop screen a second copy of the landing
+ * page. Home's tiles are the way to them now, and each of those pages carries a
+ * Back link the way the admin screens always have.
+ *
+ * The two bars that remain are the ones with NO tile behind them: an admin has
+ * no tile grid at all, and Market's sub-pages are sections of one screen rather
+ * than destinations of their own.
  */
 import { regionLabel, regionsOn } from './format.js';
 import { el, mount, esc } from './dom.js';
@@ -13,7 +23,6 @@ import { navigate, currentPath } from './router.js';
 import { setActions } from './actions.js';
 import { toast } from './toast.js';
 import { api } from './api.js';
-import { canManage } from './roles.js';
 
 /**
  * Marks the button whose `path` matches the current route as active.
@@ -27,21 +36,16 @@ function mark(items) {
   return items.map((it) => ({ ...it, class: on(it.path) ? 'active' : undefined }));
 }
 
-/** The business-tools action set (Register / Inventory / Employees). */
-export function setOpsActions(me) {
-  const items = [
-    { label: 'Register', path: '/pos', onClick: () => navigate('/pos') },
-    { label: 'Inventory', path: '/inventory', onClick: () => navigate('/inventory') },
-  ];
-  // The shop's own book — what has happened (past sales, past deliveries) and,
-  // for whoever runs the shop, how it is going. Open to everyone who works the
-  // till, as order lookup was on the register; the sections inside differ by
-  // role rather than the page being shut.
-  items.push({ label: 'Shop Ledger', path: '/ledger', onClick: () => navigate('/ledger') });
-  if (canManage(me)) {
-    items.push({ label: 'Employees', path: '/employees', onClick: () => navigate('/employees') });
-  }
-  setActions(mark(items));
+/**
+ * The way off a shop page, now that those pages have no action bar.
+ *
+ * The same "← Back" the admin screens have always carried, written once
+ * because seven pages need exactly it — a second wording of the same button
+ * would be the drift this module exists to prevent. It goes to Home, since Home
+ * is where the tile that opened the page lives.
+ */
+export function backToHome() {
+  return el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back');
 }
 
 /**

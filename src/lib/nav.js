@@ -11,13 +11,14 @@ import { canManage } from './roles.js';
 /** The nav destinations available to a given user, in order. */
 function navItems(me) {
   const items = [{ path: '/', label: me.role === 'admin' ? 'Admin Panel' : 'Home' }];
-  // Register / Inventory / Employees live on an action bar on Home for
-  // owners/employees. Admins manage the network, not a shop, so they don't get
-  // the Business Operations entry.
-  // The admin destinations split by how they're used. These three are places
-  // you GO — each owns its own screen and its own sub-navigation — so they sit
-  // in the side menu. The record-keeping screens (members, companies, items,
-  // audit) share one action bar instead; see setAdminActions.
+  // A shop's destinations are not here: Register, Inventory, Time Card, the
+  // Ledger and the rest are tiles under Shop tools on Home, and listing them
+  // again would be a third copy of the same list.
+  //
+  // The admin destinations split by how they are used. These are places you GO
+  // — each owns its own screen and its own sub-navigation — so they sit in the
+  // side menu. The record-keeping screens (members, companies, items, audit)
+  // share one action bar instead; see setAdminActions.
   if (me.role === 'admin') {
     items.push({ path: '/admin/market', label: 'Market Analysis' });
     items.push({ path: '/admin/motd', label: 'MOTD' });

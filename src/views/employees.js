@@ -8,7 +8,7 @@ import { navigate } from '../lib/router.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { api } from '../lib/api.js';
 import { openModal } from '../lib/modal.js';
-import { setOpsActions } from '../lib/sections.js';
+import { backToHome } from '../lib/sections.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 import { skeletonRows, skeletonLines } from '../lib/skeleton.js';
@@ -17,7 +17,6 @@ import { money } from '../lib/format.js';
 import { isOwner, roleLabel } from '../lib/roles.js';
 
 export function renderEmployees(container, { me }) {
-  setOpsActions(me); // business-tools bar persists across Register/Inventory/Employees
   // A manager keeps the roster — activating, annotating, reading it. What is
   // the OWNER'S alone is what someone is PAID and who else becomes a manager,
   // so those two buttons are the only thing on this page that asks.
@@ -26,6 +25,7 @@ export function renderEmployees(container, { me }) {
   const perfHost = el('div', {}, skeletonLines(3));
   const gridHost = el('div', {});
   mount(container, el('div.card', {}, [
+    backToHome(),
     el('h2', {}, 'Employees'),
     el('p', { class: 'note' }, 'Your roster at ' + (me.business || 'your business') + '. Pick a section to open it.'),
     gridHost,

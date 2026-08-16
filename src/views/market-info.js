@@ -19,7 +19,7 @@
 import { regionWord, regionsOn } from '../lib/format.js';
 import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { setOpsActions } from '../lib/sections.js';
+import { backToHome } from '../lib/sections.js';
 import { emptyState } from '../lib/empty.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { openFocalMenu } from '../lib/tiles.js';
@@ -47,9 +47,9 @@ function weekLabel(week) {
 }
 
 export function renderMarketInfo(container, { me }) {
-  setOpsActions(me); // stays on the shop-tools bar with Register / Inventory
   const host = el('div', {}, el('p', { class: 'note' }, 'Reading last week’s trade…'));
   mount(container, el('div.card', {}, [
+    backToHome(),
     el('h2', {}, 'Market Info'),
     el('p', { class: 'note' }, 'What things are worth in your ' + regionWord() + ', over the week just gone. ' +
       'It updates once a week, when the new week begins.'),
