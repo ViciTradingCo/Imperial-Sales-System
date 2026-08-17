@@ -570,3 +570,142 @@ describe('the harvest rate on an item', () => {
       .rejects.toThrow(/≥ 0/);
   });
 });
+
+/**
+ * A HAUL OF SEVERAL THINGS. You come back from a morning's work with wheat AND
+ * apples AND a hare; recording that as three trips means three lines in the
+ * delivery log for one walk back from the field, and three chances for the
+ * connection to drop between them.
+ *
+ * The rules that have to hold are the ones a list makes newly breakable:
+ * nothing lands if any line is bad, the log knows it was ONE trip, and a haul
+ * that mixes a paid crop with an unpaid one pays for the half it should.
+ */
+describe('a harvest of several items at once', () => {
+  const setRate = (item, rate) => upsertItem(env, SHOP, { item, price: 10, harvestPay: rate }, R);
+  const HAUL = [
+    { item: 'Wheat', numItems: 20 },
+    { item: 'Apple', numItems: 6 },
+    { item: 'Hare', numItems: 2 },
+  ];
+
+  it('adds every line in one go', async () => {
+    await recordHarvest(env, SHOP, { items: HAUL }, R);
+    const inv = await listInventory(env, SHOP, R);
+    expect(inv.map((i) => [i.item, i.stock]).sort()).toEqual([['Apple', 6], ['Hare', 2], ['Wheat', 20]]);
+  });
+
+  it('records it as ONE trip in the delivery log', async () => {
+    await recordHarvest(env, SHOP, { items: HAUL, idempotencyKey: 'h9' }, R);
+    const log = await listIntake(env, SHOP, R);
+    expect(log).toHaveLength(3);
+    // Every line of one haul shares a delivery, which is what groups them.
+    expect(new Set(log.map((l) => l.delivery)).size).toBe(1);
+    expect(log.every((l) => l.vendor === HARVEST_VENDOR)).toBe(true);
+  });
+
+  it('lands nothing at all when one line is bad', async () => {
+    await expect(recordHarvest(env, SHOP, {
+      items: [...HAUL, { item: 'Rabbit', numItems: 0 }],
+    }, R)).rejects.toThrow(/item 4/i);
+    expect(await listInventory(env, SHOP, R)).toEqual([]);
+    expect(await listIntake(env, SHOP, R)).toEqual([]);
+  });
+
+  it('names the line with no item on it', async () => {
+    await expect(recordHarvest(env, SHOP, {
+      items: [{ item: 'Wheat', numItems: 1 }, { item: '  ', numItems: 3 }],
+    }, R)).rejects.toThrow(/which item did you bring in\? \(item 2\)/i);
+  });
+
+  it('folds two lines of the same crop onto one listing, however cased', async () => {
+    await recordHarvest(env, SHOP, { items: [{ item: 'Wheat', numItems: 5 }, { item: 'wheat', numItems: 7 }] }, R);
+    const inv = await listInventory(env, SHOP, R);
+    expect(inv).toHaveLength(1);
+    expect(inv[0]).toMatchObject({ item: 'Wheat', stock: 12 });
+  });
+
+  it('takes the Ingredient flag per line, not per haul', async () => {
+    await recordHarvest(env, SHOP, {
+      items: [{ item: 'Wheat', numItems: 5, ingredient: true }, { item: 'Apple', numItems: 5 }],
+    }, R);
+    const inv = await listInventory(env, SHOP, R);
+    expect(inv.find((i) => i.item === 'Wheat').ingredient).toBe(true);
+    expect(inv.find((i) => i.item === 'Apple').ingredient).toBe(false);
+  });
+
+  it('is idempotent for the whole haul', async () => {
+    await recordHarvest(env, SHOP, { items: HAUL, idempotencyKey: 'h1' }, R);
+    const again = await recordHarvest(env, SHOP, { items: HAUL, idempotencyKey: 'h1' }, R);
+    expect(again.duplicate).toBe(true);
+    expect((await listInventory(env, SHOP, R)).find((i) => i.item === 'Wheat').stock).toBe(20);
+    expect(await listIntake(env, SHOP, R)).toHaveLength(3);
+  });
+
+  // A haul of one recorded its key unsuffixed until this became multi-line. A
+  // retry that spans the deploy must still not double the crop.
+  it('still recognises a retry of a haul recorded before this', async () => {
+    await recordHarvest(env, SHOP, { item: 'Wheat', numItems: 5, idempotencyKey: 'old' }, R);
+    await env.DB.prepare("UPDATE intake SET idem = 'old' WHERE idem = 'old#0'").run();
+    const again = await recordHarvest(env, SHOP, { items: [{ item: 'Wheat', numItems: 5 }], idempotencyKey: 'old' }, R);
+    expect(again.duplicate).toBe(true);
+    expect((await listInventory(env, SHOP, R))[0].stock).toBe(5);
+  });
+
+  describe('when the shop pays for some of it', () => {
+    it('pays each line its own rate, and nothing for the ones with none', async () => {
+      await setRate('Nirnroot', 3);
+      await setRate('Wheat', 1);
+      const res = await recordHarvest(env, SHOP, {
+        claimPay: true,
+        items: [{ item: 'Nirnroot', numItems: 10 }, { item: 'Wheat', numItems: 4 }, { item: 'Hare', numItems: 2 }],
+      }, R);
+      expect(res.paid).toBe(34); // 30 + 4 + nothing for the hare
+      expect(res.lines).toEqual([
+        { item: 'Nirnroot', qty: 10, rate: 3, paid: 30 },
+        { item: 'Wheat', qty: 4, rate: 1, paid: 4 },
+        { item: 'Hare', qty: 2, rate: 0, paid: 0 },
+      ]);
+      expect(await cofferBalance(env, SHOP, R)).toBe(-34);
+    });
+
+    // One entry per paid line, for the reason a delivery does the same: each
+    // line is its own intake row, and deleting one refunds exactly what it took.
+    it('writes one coffer entry per PAID line and none for the rest', async () => {
+      await setRate('Nirnroot', 3);
+      const res = await recordHarvest(env, SHOP, {
+        claimPay: true, employee: 'Ann',
+        items: [{ item: 'Nirnroot', numItems: 2 }, { item: 'Hare', numItems: 9 }],
+      }, R);
+      const { results } = await env.DB.prepare('SELECT kind, amount, note FROM coffer_entries').all();
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({ kind: 'harvest-pay', amount: -6 });
+      expect(results[0].note).toContain('Nirnroot');
+      expect(res.paid).toBe(6);
+    });
+
+    // A claim against nothing is still refused — but only when NOTHING pays.
+    it('refuses a claim when no line in the haul has a rate', async () => {
+      await expect(recordHarvest(env, SHOP, {
+        claimPay: true, items: [{ item: 'Wheat', numItems: 5 }, { item: 'Hare', numItems: 1 }],
+      }, R)).rejects.toThrow(/harvest rate/i);
+      expect(await listInventory(env, SHOP, R)).toEqual([]);
+    });
+
+    it('never lets the request name a rate', async () => {
+      await setRate('Nirnroot', 3);
+      const res = await recordHarvest(env, SHOP, {
+        claimPay: true,
+        items: [{ item: 'Nirnroot', numItems: 10, rate: 999, harvestPay: 999, paid: 999 }],
+      }, R);
+      expect(res.paid).toBe(30);
+    });
+
+    it('pays nothing at all when the claim is not made', async () => {
+      await setRate('Nirnroot', 3);
+      const res = await recordHarvest(env, SHOP, { items: [{ item: 'Nirnroot', numItems: 10 }] }, R);
+      expect(res.paid).toBe(0);
+      expect(await cofferBalance(env, SHOP, R)).toBe(0);
+    });
+  });
+});

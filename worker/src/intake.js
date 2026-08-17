@@ -164,6 +164,49 @@ export async function recordIntake(env, business, entry, realmId) {
 }
 
 /**
+ * Turns a haul's lines into what will actually be written, or throws.
+ *
+ * EVERY LINE IS CHECKED BEFORE ANY IS WRITTEN — a bad line 3 must not leave
+ * lines 1 and 2 in the inventory — and the message says which line, so it can
+ * be found on a long list.
+ *
+ * Two lines naming the same crop land on ONE listing whatever their casing:
+ * the inventory's uniqueness is on the raw name, so "wheat" and "Wheat" would
+ * otherwise become two rows with the morning's work split between them. The
+ * lookup is cached per name because the listing and its rate are answers about
+ * the same row, asked once.
+ */
+async function planHaul(db, business, realmId, asked, claimPay) {
+  const known = new Map();
+  const lookup = async (name) => {
+    const key = name.toLowerCase();
+    if (known.has(key)) return known.get(key);
+    const row = await db.prepare(
+      'SELECT item, harvest_pay FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
+      .bind(realmId, business, key).first();
+    const found = { invName: row ? row.item : name, pay: Number((row && row.harvest_pay) || 0) };
+    known.set(key, found);
+    return found;
+  };
+
+  const plan = [];
+  for (let i = 0; i < asked.length; i++) {
+    const l = asked[i] || {};
+    const where = asked.length > 1 ? ' (item ' + (i + 1) + ')' : '';
+    const name = String(l.item || '').trim();
+    if (!name) throw new Error('Which item did you bring in?' + where);
+    const qty = Math.floor(Number(l.numItems));
+    if (!isFinite(qty) || qty < 1) throw new Error('How many? Enter a whole number of 1 or more.' + where);
+    const { invName, pay } = await lookup(name);
+    const ingGiven = l.ingredient !== undefined && l.ingredient !== null && l.ingredient !== '';
+    // THE RATE IS READ FROM THE ITEM, never taken from the request.
+    const rate = claimPay ? pay : 0;
+    plan.push({ name, invName, qty, rate, owed: coin(qty * rate), ing: l.ingredient ? 1 : 0, ingGiven });
+  }
+  return plan;
+}
+
+/**
  * FARM / HARVEST — stock that was produced, not bought.
  *
  * A farm brings in a crop; a mine brings up ore; a hunter comes back with
@@ -189,70 +232,90 @@ export async function recordIntake(env, business, entry, realmId) {
  * claiming the payment is the last person who should be able to say what it is
  * worth.
  */
-export async function recordHarvest(env, business, { item, numItems, ingredient, claimPay, employee, idempotencyKey }, realmId) {
+export async function recordHarvest(env, business, { items, item, numItems, ingredient, claimPay, employee, idempotencyKey }, realmId) {
   const db = await getDb(env);
   const idem = String(idempotencyKey || '').trim();
   if (idem) {
-    const prior = await db.prepare('SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem = ? LIMIT 1')
-      .bind(realmId, business, idem).first();
+    // The bare key as well as `#0`: a haul of one stored it unsuffixed until
+    // this became multi-line, and a retry spanning the deploy must still not
+    // double the crop.
+    const prior = await db.prepare(
+      'SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem IN (?, ?) LIMIT 1')
+      .bind(realmId, business, idem + '#0', idem).first();
     // Same SHAPE as a first-time record, not a bare list: a caller that has to
     // tell a retry apart from a real one has already lost the argument.
-    if (prior) return { intake: await listIntake(env, business, realmId), paid: 0, rate: 0, duplicate: true };
+    if (prior) return { intake: await listIntake(env, business, realmId), paid: 0, rate: 0, lines: [], duplicate: true };
   }
-  const name = String(item || '').trim();
-  if (!name) throw new Error('Which item did you bring in?');
-  const qty = Math.floor(Number(numItems));
-  if (!isFinite(qty) || qty < 1) throw new Error('How many? Enter a whole number of 1 or more.');
 
-  const ingGiven = ingredient !== undefined && ingredient !== null && ingredient !== '';
-  const ing = ingredient ? 1 : 0;
-  // Same case-insensitive match as a delivery: a harvest must land on the
-  // listing the owner is already looking at.
-  const existing = await db.prepare(
-    'SELECT item, harvest_pay FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
-    .bind(realmId, business, name.toLowerCase()).first();
-  const invName = existing ? existing.item : name;
+  /**
+   * A HAUL, one or many. You come back from a morning's work with wheat AND
+   * apples AND a hare, and recording that as three separate trips means three
+   * lines in the delivery log for one walk back from the field — and three
+   * chances for the connection to drop between them.
+   *
+   * The single-item shape is still accepted: it is what a page left open across
+   * this deploy sends, and it is how every caller wrote it until now.
+   */
+  const asked = Array.isArray(items) && items.length ? items : [{ item, numItems, ingredient }];
+  const plan = await planHaul(db, business, realmId, asked, claimPay);
 
-  // The rate the OWNER set on this item, and what this haul therefore earns.
-  // Rounded once on the total, like every other amount in the ledger.
-  const rate = claimPay ? Number((existing && existing.harvest_pay) || 0) : 0;
-  if (claimPay && !(rate > 0)) {
-    throw new Error('There is no harvest rate set for "' + name + '". An owner sets one on the item in Inventory.');
+  /**
+   * A claim against nothing is still refused — but only when NOTHING in the
+   * haul pays. A morning that brought in one crop the shop buys and one it does
+   * not is an ordinary morning, and refusing the whole haul over the unpaid
+   * half would make the tick box a trap.
+   */
+  if (claimPay && !plan.some((p) => p.rate > 0)) {
+    throw new Error(plan.length === 1
+      ? 'There is no harvest rate set for "' + plan[0].name + '". An owner sets one on the item in Inventory.'
+      : 'None of these has a harvest rate set. An owner sets one on the item in Inventory.');
   }
-  const owed = coin(qty * rate);
+
   const who = String(employee || '').trim();
   const ts = new Date().toISOString();
-
-  const stmts = [
+  const stmts = [];
+  plan.forEach((p, i) => {
     // Logged as intake with HARVEST as the vendor, so it appears in the
     // delivery history and can be deleted like any other mistake. The PRICE is
     // the harvest rate when one was claimed and 0 otherwise — an unpaid
     // harvest cost nothing, and market.js excludes a zero from valuation so a
     // free thing never looks like a thing worth nothing.
-    db.prepare(
+    //
+    // Every line of one haul shares the key and differs by `#n`, which is what
+    // makes the delivery log group them as the single trip they were.
+    stmts.push(db.prepare(
       `INSERT INTO intake (realm_id, business, ts, item, vendor, source_hold, num_items, price_per, idem, from_business)
        VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, '')`
-    ).bind(realmId, business, ts, name, HARVEST_VENDOR, qty, rate, idem || null),
-    db.prepare(
+    ).bind(realmId, business, ts, p.name, HARVEST_VENDOR, p.qty, p.rate, idem ? idem + '#' + i : null));
+    stmts.push(db.prepare(
       `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient)
        VALUES (?, ?, ?, 0, ?, 0, ?)
        ON CONFLICT (realm_id, business, item) DO UPDATE SET
          stock = stock + excluded.stock,
          ingredient = CASE WHEN ? THEN excluded.ingredient ELSE inventory.ingredient END`
-    ).bind(realmId, business, invName, qty, ing, ingGiven ? 1 : 0),
-  ];
-  // Paid for, so the coffer pays for it — a business expense, recorded the
-  // moment the goods are handed over, exactly as a delivery from an outside
-  // supplier is. Nothing is written when nobody was paid.
-  if (owed > 0) {
-    stmts.push(db.prepare(
-      `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'harvest-pay', ?, ?)`
-    ).bind(realmId, business, ts, -owed, 'Harvest: ' + name + ' ×' + qty + (who ? ' by ' + who : '')));
-  }
+    ).bind(realmId, business, p.invName, p.qty, p.ing, p.ingGiven ? 1 : 0));
+    // Paid for, so the coffer pays for it — a business expense, recorded the
+    // moment the goods are handed over, exactly as a delivery from an outside
+    // supplier is. ONE ENTRY PER LINE, rounded per line, for the reason a
+    // delivery does the same: each line is its own intake row, and deleting one
+    // must refund exactly what that line took.
+    if (p.owed > 0) {
+      stmts.push(db.prepare(
+        `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'harvest-pay', ?, ?)`
+      ).bind(realmId, business, ts, -p.owed, 'Harvest: ' + p.name + ' ×' + p.qty + (who ? ' by ' + who : '')));
+    }
+  });
 
   await db.batch(stmts);
 
-  return { intake: await listIntake(env, business, realmId), paid: owed, rate };
+  return {
+    intake: await listIntake(env, business, realmId),
+    paid: plan.reduce((n, p) => n + p.owed, 0),
+    // The rate of the ONE line, when there is one. A haul of several has no
+    // single rate, and inventing one would be a figure nobody could check.
+    rate: plan.length === 1 ? plan[0].rate : 0,
+    lines: plan.map((p) => ({ item: p.name, qty: p.qty, rate: p.rate, paid: p.owed })),
+  };
 }
 
 /** How a harvested delivery is labelled in the log. */

@@ -167,10 +167,12 @@ async function harvestRoute({ request, env, body }) {
     // saying who was paid.
     employee: actorName(caller),
   }, realmId);
+  // What actually came in, however many lines it took to say it.
+  const detail = res.lines.map((l) => l.item + ' ×' + l.qty).join(', ');
   await logAudit(env, { actor: actorName(caller), business: caller.business,
     action: 'inventory.harvest',
-    detail: body.item + ' ×' + body.numItems + (res.paid ? ' · paid ' + res.paid : ''), realmId });
-  return { intake: res.intake, paid: res.paid, rate: res.rate,
+    detail: detail + (res.paid ? ' · paid ' + res.paid : ''), realmId });
+  return { intake: res.intake, paid: res.paid, rate: res.rate, lines: res.lines,
     inventory: await listInventory(env, caller.business, realmId) };
 }
 

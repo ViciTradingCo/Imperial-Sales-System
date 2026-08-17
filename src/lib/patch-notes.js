@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.6', date: '2026-08-16', notes: [
+    'Harvest takes as many things as you brought in. Add a line for each — wheat, apples, a hare — and record the lot as one haul.',
+    'It goes in as ONE trip: a single entry in your delivery log rather than three, and if anything is wrong with one line none of it is recorded.',
+    'Ingredient is ticked per line now, so a morning that brought in something to craft with and something to sell files each correctly.',
+    'The payment adds up across the haul and says which lines earned it. A line the shop has set no rate for simply pays nothing, instead of the claim being refused for the whole basket.',
+  ] },
   { version: '5.5', date: '2026-08-16', notes: [
     'Transfers waiting on somebody now read “Pending Transfer”, with how much is in the crate and who it is with — and the list of what is inside is folded away behind Show more.',
     'A crate of ten used to spell itself out beside its own Accept button, which turned a list of transfers into a wall of item names with the decisions buried in it. Press Show more on the one you mean; Show less puts it away.',

@@ -31,10 +31,89 @@ import { createItemPicker } from '../lib/item-picker.js';
 import { toast } from '../lib/toast.js';
 
 /**
+ * The haul: a list of lines, each a thing you brought in and how many.
+ *
+ * `onChange` fires whenever anything is typed or ticked, so the screen around
+ * this can say what the haul is worth without this needing to know about pay.
+ *
+ * The Ingredient tick is PER LINE, not per haul. A morning that brought in
+ * wheat to bake with and apples to sell is an ordinary morning, and one tick
+ * over the lot would mislabel half of it.
+ */
+function haulForm({ meta, onChange }) {
+  const host = el('div', {});
+  const lines = [];
+  let master = [];
+
+  function add() {
+    const picker = createItemPicker({
+      allowFree: true,
+      placeholder: 'What did you bring in?',
+      freeHint: 'Not in the index — it will be added for an admin to check.',
+      items: master,
+      meta,
+      onPick: () => sync(),
+    });
+    const qty = el('input', { type: 'number', step: '1', min: '1', value: '1', 'aria-label': 'How many you brought in' });
+    const ingredient = el('input', { type: 'checkbox' });
+    const flag = el('label', { class: 'line-flag', title: 'Stock to craft with, not to sell' },
+      [ingredient, el('span', {}, 'Ingredient')]);
+    const remove = el('button.secondary-btn.small', {
+      type: 'button', title: 'Remove this line', 'aria-label': 'Remove this line',
+      onclick: () => {
+        const i = lines.indexOf(line);
+        if (i < 0) return;
+        lines.splice(i, 1);
+        row.remove();
+        sync();
+      },
+    }, '×');
+    const row = el('div', { class: 'craft-row' }, [picker.el, qty, flag, remove]);
+    // Clicking a suggestion fires onPick; typing a name out does not, and this
+    // side takes free text. The input event bubbles, so one listener on the row
+    // covers both without the picker needing a second callback.
+    row.addEventListener('input', sync);
+    const line = {
+      row, picker, qty, ingredient, remove,
+      read: () => ({
+        item: picker.selected() ? picker.selected().name : picker.value(),
+        qty: Math.floor(Number(qty.value)) || 0,
+        ingredient: ingredient.checked,
+      }),
+    };
+    lines.push(line);
+    host.appendChild(row);
+    sync();
+    return picker;
+  }
+
+  function sync() {
+    // The last remaining line keeps no Remove — a haul of nothing is not a
+    // state worth being able to reach.
+    lines.forEach((l) => { l.remove.hidden = lines.length < 2; });
+    onChange(lines.map((l) => l.read()));
+  }
+
+  return {
+    el: host,
+    add,
+    read: () => lines.map((l) => l.read()),
+    setItems: (list) => { master = list; lines.forEach((l) => l.picker.setItems(master)); },
+    reset: () => { lines.splice(0, lines.length).forEach((l) => l.row.remove()); add(); },
+  };
+}
+
+/**
  * FARM / HARVEST — stock you produced rather than bought.
  *
  * Intake asks eight questions because a purchase has eight answers: who sold
- * it, where, what it cost, what you will charge. A harvest has two.
+ * it, where, what it cost, what you will charge. A harvest line has two.
+ *
+ * A HAUL, one line or many. You come back from a morning's work with wheat AND
+ * apples AND a hare, and recording that as three separate trips meant three
+ * lines in the delivery log for one walk back from the field. Same rule as a
+ * delivery and a transfer: every line is checked before anything is written and
+ * the lot goes in one write, so a haul lands whole or not at all.
  */
 export function renderHarvest(host) {
   let idem = newIdem(); // a retry must not double the crop
@@ -45,25 +124,23 @@ export function renderHarvest(host) {
   const rates = new Map();
   const rateFor = (name) => rates.get(String(name || '').trim().toLowerCase()) || 0;
 
-  const picker = createItemPicker({
-    allowFree: true,
-    placeholder: 'What did you bring in?',
-    freeHint: 'Not in the index — it will be added for an admin to check.',
+  const haul = haulForm({
     // The rate comes FIRST in the meta line, because on the Harvest side "this
     // one is paid for" is the thing worth scanning the list for.
     meta: (it) => {
       const rate = rateFor(it.name);
       const cat = it.category && it.category !== 'Unsorted' ? it.category : '';
-      const paid = rate ? 'pays ' + money(rate) + ' each' : '';
-      return [paid, cat].filter(Boolean).join(' · ');
+      return [rate ? 'pays ' + money(rate) + ' each' : '', cat].filter(Boolean).join(' · ');
     },
-    onPick: () => paintPay(),
+    onChange: () => paintPay(),
   });
-  api.getItems().then((r) => picker.setItems(r.items || [])).catch(() => {});
-  // Clicking a suggestion fires onPick; typing a name out does not, and this
-  // side takes free text. The input event bubbles, so one listener on the
-  // wrapper covers both without the picker needing a second callback.
-  picker.el.addEventListener('input', () => paintPay());
+
+  const claim = el('input', { type: 'checkbox', checked: true });
+  const claimRow = el('label', { class: 'check-row' }, [claim, el('span', {}, 'Claim the harvest payment')]);
+  const owedLine = el('div', { class: 'buy-total' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Add to stock');
+  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
 
   function loadRates() {
     return api.getInventory().then((r) => {
@@ -73,71 +150,67 @@ export function renderHarvest(host) {
       });
     }).catch(() => {});
   }
+  api.getItems().then((r) => haul.setItems(r.items || [])).catch(() => {});
   loadRates().then(paintPay);
-
-  const qty = el('input', { type: 'number', step: '1', min: '1', value: '1', 'aria-label': 'How many you brought in' });
-  const ingredient = el('input', { type: 'checkbox' });
-  const claim = el('input', { type: 'checkbox', checked: true });
-  const claimRow = el('label', { class: 'check-row' }, [claim, el('span', {}, 'Claim the harvest payment')]);
-  const owedLine = el('div', { class: 'buy-total' });
-  const status = el('p', {});
-  const save = el('button.primary', { onclick: doSave }, 'Add to stock');
-  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
-
-  const pickedName = () => {
-    const picked = picker.selected();
-    return picked ? picked.name : picker.value();
-  };
 
   /**
    * The whole point of the feature: say what you are owed BEFORE you commit,
    * so the figure is not a surprise in the coffer afterwards.
    *
-   * When the item carries no rate the row is hidden entirely rather than shown
-   * as zero — an unpaid harvest is the ordinary case, and "you are owed 0" is
-   * an answer to a question nobody asked.
+   * When nothing in the haul carries a rate the row is hidden entirely rather
+   * than shown as zero — an unpaid harvest is the ordinary case, and "you are
+   * owed 0" is an answer to a question nobody asked.
    */
   function paintPay() {
-    const rate = rateFor(pickedName());
-    claimRow.hidden = !rate;
-    owedLine.hidden = !rate || !claim.checked;
+    const read = haul.read().map((l) => ({ ...l, rate: rateFor(l.item) }));
+    const anyRate = read.some((l) => l.rate > 0);
+    claimRow.hidden = !anyRate;
+    owedLine.hidden = !anyRate || !claim.checked;
     if (owedLine.hidden) { owedLine.textContent = ''; return; }
-    const n = Math.floor(Number(qty.value)) || 0;
-    owedLine.textContent = n > 0
-      ? 'You are owed ' + money(n * rate) + ' for ' + n + ' × ' + pickedName()
-      : 'This pays ' + money(rate) + ' each.';
+    const paid = read.filter((l) => l.rate > 0 && l.qty > 0);
+    const owed = paid.reduce((n, l) => n + l.qty * l.rate, 0);
+    owedLine.textContent = owed
+      ? 'You are owed ' + money(owed) + ' for ' + paid.map((l) => l.qty + ' × ' + l.item).join(', ')
+      : 'This pays ' + money(read.map((l) => l.rate).find((r) => r > 0)) + ' each.';
   }
-  qty.addEventListener('input', paintPay);
   claim.addEventListener('change', paintPay);
 
   async function doSave() {
-    const item = pickedName();
-    if (!item) { setStatus('What did you bring in?', 'error'); return; }
-    if (!(Number(qty.value) > 0)) { setStatus('How many? Enter at least 1.', 'error'); return; }
+    const read = haul.read();
+    const items = [];
+    for (let i = 0; i < read.length; i++) {
+      const where = read.length > 1 ? ' (item ' + (i + 1) + ')' : '';
+      if (!read[i].item) { setStatus('What did you bring in?' + where, 'error'); return; }
+      if (!(read[i].qty > 0)) { setStatus('How many? Enter at least 1.' + where, 'error'); return; }
+      items.push({
+        item: read[i].item,
+        numItems: read[i].qty,
+        // Only sent when ticked, so a harvest never silently un-flags an
+        // ingredient the owner already marked — the same rule intake follows.
+        ingredient: read[i].ingredient ? true : undefined,
+      });
+    }
     save.disabled = true;
     setStatus('Adding…', '');
     try {
       const res = await api.harvest({
-        item, numItems: qty.value,
-        // Only sent when ticked, so a harvest never silently un-flags an
-        // ingredient the owner already marked — the same rule intake follows.
-        ingredient: ingredient.checked ? true : undefined,
+        items,
         // Asked for only when there is something to ask for. The Worker re-reads
-        // the rate from the item and refuses a claim on one that has none, so
+        // every rate from the items and pays nothing on a line that has none, so
         // this flag can never invent a wage.
-        claimPay: rateFor(item) > 0 && claim.checked ? true : undefined,
+        claimPay: items.some((l) => rateFor(l.item) > 0) && claim.checked ? true : undefined,
         idempotencyKey: idem,
       });
       markGuideSeen('harvest');
-      toast(item + ' ×' + qty.value + ' added to stock.' +
-        (res && res.paid ? ' You are owed ' + money(res.paid) + '.' : ''), 'ok');
-      // A fresh key with the form: it stays on screen now, so a second crop
+      const what = items.length === 1
+        ? items[0].item + ' ×' + items[0].numItems
+        : items.length + ' items';
+      toast(what + ' added to stock.' + (res && res.paid ? ' You are owed ' + money(res.paid) + '.' : ''), 'ok');
+      // A fresh key with the form: it stays on screen now, so a second haul
       // typed into it would otherwise look like a retry of the first and be
       // silently discarded.
       idem = newIdem();
-      picker.clear();
-      qty.value = '1';
-      ingredient.checked = false;
+      haul.reset();
       claim.checked = true;
       setStatus('');
       // An owner may have changed a rate while this page was open, and the
@@ -152,6 +225,8 @@ export function renderHarvest(host) {
     }
   }
 
+  haul.add();
+
   mount(host, el('div.card', {}, [
     el('h3', {}, 'Farm / Harvest'),
     el('p', { class: 'note' }, 'Stock you produced rather than bought — a crop, a hunt, a dig.'),
@@ -160,16 +235,20 @@ export function renderHarvest(host) {
         'nobody sold it to you.',
       'That is the difference from Buying: intake asks who sold it to you and what it cost, because there ' +
         'was a supplier. Here there was not.',
+      'Bring in as many things as you like at once — add a line for each. They go in together as one haul, ' +
+        'and if anything is wrong with one line none of it is recorded.',
       'Some items your shop PAYS for. If the owner has set a harvest value on what you bring in, the ' +
         'search says so, the total says what you are owed, and recording it takes that out of the shop ' +
         'coffer as a business expense there and then. The rate is the owner’s, set on the item in ' +
         'Inventory — you cannot name your own price, and you do not have to haggle for it either.',
-      'Tick Ingredient for something you will craft with rather than sell. Leave it alone to keep ' +
-        'whatever the item is already marked as — a harvest never un-marks one.',
+      'Tick Ingredient on a line for something you will craft with rather than sell. Leave it alone to ' +
+        'keep whatever the item is already marked as — a harvest never un-marks one.',
     ], guideUnseen('harvest')),
-    el('label', {}, 'Item'), picker.el,
-    el('label', {}, 'How many'), qty,
-    el('label', { class: 'check-row' }, [ingredient, el('span', {}, 'Ingredient — stock to craft with, not to sell')]),
+    el('label', {}, 'What you brought in'),
+    haul.el,
+    el('div', { class: 'row-actions' }, [
+      el('button.secondary-btn.small', { type: 'button', onclick: () => haul.add().focus() }, '+ Add item'),
+    ]),
     claimRow,
     owedLine,
     el('div', { class: 'row-actions' }, [save]),

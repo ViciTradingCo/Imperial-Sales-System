@@ -413,6 +413,12 @@ body {
 /* Direct child only: the picker's own suggestion list is full of buttons, and
    the row's layout has nothing to say about them. */
 .craft-row > button { flex: 0 0 auto; margin: 0; }
+/* A tick box that belongs to ONE line — the Harvest side's Ingredient flag.
+   Sized to its words rather than stretching, and not wrapped mid-phrase. */
+.craft-row .line-flag {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+  margin: 0; font-weight: 400; white-space: nowrap; align-self: center;
+}
 
 /* Column names above a list of line rows. A placeholder disappears the moment
    something is typed over it, so the heading is what still says which box is
