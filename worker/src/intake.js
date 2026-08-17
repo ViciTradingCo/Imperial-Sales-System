@@ -8,7 +8,7 @@
  * An entry can be DELETED to undo a mistyped delivery; see deleteIntake.
  */
 import { getDb } from './db.js';
-import { listInventory } from './inventory.js';
+import { listInventory, listingsByName } from './inventory.js';
 import { coin } from './money.js';
 import { lineSummary } from './lines.js';
 
@@ -35,16 +35,15 @@ async function planDelivery(db, business, realmId, lines) {
    * different cases must land on one row, and neither is in the inventory table
    * yet for the other to find.
    */
+  const shelf = await listingsByName(db, realmId, business, lines.map((l) => l && l.item));
   const claimed = new Map();
-  const resolveName = async (name) => {
+  const resolveName = (name) => {
     const key = name.toLowerCase();
-    if (claimed.has(key)) return claimed.get(key);
-    const existing = await db.prepare(
-      'SELECT item FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
-      .bind(realmId, business, key).first();
-    const invName = existing ? existing.item : name;
-    claimed.set(key, invName);
-    return invName;
+    if (!claimed.has(key)) {
+      const existing = shelf.get(key);
+      claimed.set(key, existing ? existing.item : name);
+    }
+    return claimed.get(key);
   };
 
   // VALIDATE EVERYTHING FIRST. A bad line 4 must not leave lines 1-3 recorded,
@@ -80,7 +79,7 @@ async function planDelivery(db, business, realmId, lines) {
      * re-classification, exactly as it is not a repricing.
      */
     const ingGiven = l.ingredient !== undefined && l.ingredient !== null && l.ingredient !== '';
-    plan.push({ name, qty, per, sale, ing: l.ingredient ? 1 : 0, ingGiven, invName: await resolveName(name) });
+    plan.push({ name, qty, per, sale, ing: l.ingredient ? 1 : 0, ingGiven, invName: resolveName(name) });
   }
 
   return plan;
@@ -205,16 +204,23 @@ export async function recordIntake(env, business, entry, realmId) {
  * the same row, asked once.
  */
 async function planHaul(db, business, realmId, asked, claimPay) {
-  const known = new Map();
-  const lookup = async (name) => {
+  const shelf = await listingsByName(db, realmId, business, asked.map((l) => l && l.item));
+  /**
+   * The listing a name lands on, and what it pays.
+   *
+   * `claimed` is why this is not a bare map read: two lines of the same crop in
+   * different cases must land on ONE listing, and for something the shop has
+   * never stocked neither line is on the shelf for the other to find. The first
+   * spelling in the haul wins, and the second joins it.
+   */
+  const claimed = new Map();
+  const lookup = (name) => {
     const key = name.toLowerCase();
-    if (known.has(key)) return known.get(key);
-    const row = await db.prepare(
-      'SELECT item, harvest_pay FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
-      .bind(realmId, business, key).first();
-    const found = { invName: row ? row.item : name, pay: Number((row && row.harvest_pay) || 0) };
-    known.set(key, found);
-    return found;
+    if (!claimed.has(key)) {
+      const row = shelf.get(key);
+      claimed.set(key, { invName: row ? row.item : name, pay: Number((row && row.harvest_pay) || 0) });
+    }
+    return claimed.get(key);
   };
 
   const plan = [];
@@ -225,7 +231,7 @@ async function planHaul(db, business, realmId, asked, claimPay) {
     if (!name) throw new Error('Which item did you bring in?' + where);
     const qty = Math.floor(Number(l.numItems));
     if (!isFinite(qty) || qty < 1) throw new Error('How many? Enter a whole number of 1 or more.' + where);
-    const { invName, pay } = await lookup(name);
+    const { invName, pay } = lookup(name);
     const ingGiven = l.ingredient !== undefined && l.ingredient !== null && l.ingredient !== '';
     // THE RATE IS READ FROM THE ITEM, never taken from the request.
     const rate = claimPay ? pay : 0;

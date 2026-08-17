@@ -33,6 +33,29 @@ export async function lowStockReport(env, business, realmId) {
   return { out, low };
 }
 
+/**
+ * The shop's listings for a set of names, keyed by the LOWERED name.
+ *
+ * One query for the whole set rather than one per name. A delivery, a haul and
+ * a crate each need the same three answers about every line they carry — what
+ * the shop already calls it, what it charges, how many it holds — and asking
+ * them item by item is a round trip per line for no reason. Ten items in a
+ * crate was ten sequential reads before this.
+ *
+ * Matched on the lowered name because the inventory's uniqueness is on the raw
+ * one: "iron sword" and "Iron Sword" are two rows to SQLite, and a line typed
+ * in either case has to find the listing it means.
+ */
+export async function listingsByName(db, realmId, business, names) {
+  const keys = [...new Set((names || []).map((n) => String(n || '').trim().toLowerCase()).filter(Boolean))];
+  if (!keys.length) return new Map();
+  const { results } = await db.prepare(
+    'SELECT item, price, stock, harvest_pay FROM inventory WHERE realm_id = ? AND business = ? ' +
+    'AND lower(item) IN (' + keys.map(() => '?').join(', ') + ')')
+    .bind(realmId, business, ...keys).all();
+  return new Map((results || []).map((r) => [String(r.item).toLowerCase(), r]));
+}
+
 /** Every item for a business, ordered by name. */
 export async function listInventory(env, business, realmId) {
   const db = await getDb(env);

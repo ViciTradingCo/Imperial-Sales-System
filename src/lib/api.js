@@ -10,6 +10,21 @@ import { getIdToken, handleUnauthorized } from './auth.js';
 let baseUrl = '';
 export function configureApi(url) { baseUrl = String(url || '').replace(/\/$/, ''); }
 
+/**
+ * The POSTs that change a reference list, so the cache clears itself rather
+ * than relying on twenty call sites to remember.
+ *
+ * The admin item routes are matched by PREFIX: a new one added later changes
+ * the index too, and the failure mode of forgetting is a picker quietly missing
+ * an item somebody just created. The other three are the paths that can file a
+ * PENDING item — the register meeting a name nobody has entered, a harvest of
+ * something new, a stocktake counting something nobody wrote down.
+ */
+const REF_WRITES = ['/admin/items', '/admin/regions', '/sale', '/inventory/harvest', '/inventory/stocktake'];
+
+/** Forget the cached reference lists (a write, or a realm switch). */
+function clearRefCache() { _items = null; _regions = null; }
+
 async function request(method, path, body) {
   const token = getIdToken();
   const headers = {};
@@ -27,6 +42,10 @@ async function request(method, path, body) {
   } catch (e) {
     throw new Error('Could not reach the API at ' + baseUrl + ' — check apiBaseUrl in app-config.json and that the Worker is deployed.');
   }
+
+  // A write that lands changes what the reference lists say; a write that fails
+  // changed nothing, so the cache is only cleared once the response is in hand.
+  if (method === 'POST' && res.ok && REF_WRITES.some((p) => path.startsWith(p))) clearRefCache();
 
   const text = await res.text();
   let data = null;
@@ -49,6 +68,23 @@ let _motd = null;
 // Tile artwork changes only when an admin edits it, but six screens ask for it
 // on every render. One promise per session; bustTiles() after a save.
 let _tiles = null;
+/**
+ * The master item index and the realm's regions — the two REFERENCE lists.
+ *
+ * Both are read by half the app and written by almost none of it, and the index
+ * is the largest payload the API serves: every item in the realm. Six views ask
+ * for it, and the register asks four times over just by walking Selling →
+ * Buying → Harvest → Craft, since each side is its own route and re-mounts.
+ *
+ * So they are fetched once per session and shared. `bustRef()` clears them, and
+ * `request` calls it after anything that can change either — see REF_WRITES.
+ *
+ * SHARED MEANS SHARED: every caller gets the same array, so nothing may sort or
+ * splice it in place. Copy first (`[...r.items]`), as the Item Index does — an
+ * in-place sort here would quietly reorder the register's picker too.
+ */
+let _items = null;
+let _regions = null;
 
 export const api = {
   health: () => request('GET', '/health'),
@@ -298,7 +334,13 @@ export const api = {
   convertInventory: (inputs, output, idempotencyKey) =>
     request('POST', '/business/inventory/convert', { inputs, output, idempotencyKey }),
   /** Any registered user: the item index ({items, types} — name, base value, type). */
-  getItems: () => request('GET', '/items'),
+  getItems: () => {
+    if (!_items) {
+      _items = request('GET', '/items');
+      _items.catch(() => { _items = null; }); // don't cache a failure
+    }
+    return _items;
+  },
   /** Admin: add/edit a master item (rename via oldName; `category` files it). */
   saveMasterItem: (item) => request('POST', '/admin/items', item),
   /** Admin: empty this realm's index, or one type table (requires confirm: 'PURGE'). */
@@ -382,7 +424,15 @@ export const api = {
   /** Admin: save the tile artwork map ({ key: httpsUrl }); blank clears a tile. */
   setTileImages: async (images) => { const r = await request('POST', '/admin/tiles', { images }); _tiles = null; return r; },
   /** The region list for the caller's realm. (Sign-up gets its own from checkCode.) */
-  getRegions: () => request('GET', '/regions'),
+  getRegions: () => {
+    if (!_regions) {
+      _regions = request('GET', '/regions');
+      _regions.catch(() => { _regions = null; });
+    }
+    return _regions;
+  },
+  /** Forget both cached reference lists — used on a realm switch. */
+  bustRef: clearRefCache,
   /** Recent intake transactions for the caller's business. */
   getIntake: () => request('GET', '/intake'),
   /** Owner/admin: record a stock intake (purchase). */

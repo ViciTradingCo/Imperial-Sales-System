@@ -25,6 +25,7 @@
  */
 import { getDb } from './db.js';
 import { lineSummary } from './lines.js';
+import { listingsByName } from './inventory.js';
 
 /**
  * A stored transfer's lines.
@@ -97,14 +98,13 @@ export async function createTransfer(env, fromBusiness, { toBusiness, items, ite
     wanted.set(key, { name: prev ? prev.name : name, qty: (prev ? prev.qty : 0) + n });
   }
 
-  // Read the sender's shelf for exactly the items asked for. Matched on the
-  // lowered name, since the inventory's uniqueness is on the raw one and a
-  // shipment typed in another case must still find the row it means.
+  // The sender's shelf for exactly the items asked for, in ONE read. Checked in
+  // the order the lines were typed, so "item 3" in a refusal means the third
+  // line rather than the third thing the database happened to return.
+  const shelf = await listingsByName(db, realmId, fromBusiness, [...wanted.keys()]);
   const lines = [];
   for (const [key, w] of wanted) {
-    const row = await db.prepare(
-      'SELECT item, price, stock FROM inventory WHERE realm_id = ? AND business = ? AND lower(item) = ?')
-      .bind(realmId, fromBusiness, key).first();
+    const row = shelf.get(key);
     if (!row) throw new Error('Item not found in your inventory: ' + w.name);
     if (row.stock < w.qty) {
       throw new Error('Not enough ' + row.item + ' (have ' + row.stock + ', transferring ' + w.qty + ').');

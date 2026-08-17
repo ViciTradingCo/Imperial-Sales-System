@@ -618,6 +618,10 @@ describe('a harvest of several items at once', () => {
     }, R)).rejects.toThrow(/which item did you bring in\? \(item 2\)/i);
   });
 
+  // The shelf is read in one query now, so nothing is in the table yet for a
+  // second line of a NEW crop to find. The first spelling in the haul has to
+  // win, or "Wheat" and "wheat" become two listings with the morning split
+  // between them.
   it('folds two lines of the same crop onto one listing, however cased', async () => {
     await recordHarvest(env, SHOP, { items: [{ item: 'Wheat', numItems: 5 }, { item: 'wheat', numItems: 7 }] }, R);
     const inv = await listInventory(env, SHOP, R);

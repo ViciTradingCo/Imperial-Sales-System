@@ -37,7 +37,6 @@ const T = {
   // Nav + shell
   'Home': { es: 'Inicio', fr: 'Accueil', de: 'Start', it: 'Home' },
   'Admin Panel': { es: 'Panel de administración', fr: 'Panneau d’administration', de: 'Admin-Bereich', it: 'Pannello admin' },
-  'Business Operations': { es: 'Operaciones', fr: 'Opérations', de: 'Betrieb', it: 'Operazioni' },
   'Ledger Settings': { es: 'Ajustes del negocio', fr: 'Réglages du registre', de: 'Ladeneinstellungen', it: 'Impostazioni registro' },
   'Network Settings': { es: 'Ajustes de red', fr: 'Réglages du réseau', de: 'Netzwerk­einstellungen', it: 'Impostazioni rete' },
   'Profile': { es: 'Perfil', fr: 'Profil', de: 'Profil', it: 'Profilo' },

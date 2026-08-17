@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.8', date: '2026-08-18', notes: [
+    'The app is quicker to move around. The item index and your region list are fetched once and kept, instead of being downloaded again by every screen that needs them — walking the register’s four sides used to pull the whole index down four times over.',
+    'They refresh themselves the moment anything changes one: a sale that meets a new item, a harvest, a stocktake, or an admin editing the index.',
+    'Recording a delivery, a haul or a transfer asks the database once for the items on it rather than once per line, so a big crate is no slower to send than a small one.',
+  ] },
   { version: '5.7', date: '2026-08-17', notes: [
     'Your coffer records a delivery as ONE line, not one per item. A trip that brought six things was six debits sitting next to each other; it is now a single entry naming the trip, which is what actually happened — you paid once.',
     'The same for a paid harvest: one wage entry for the haul.',

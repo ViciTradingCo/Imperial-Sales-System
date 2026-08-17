@@ -369,6 +369,7 @@ route('/admin/realms', (container) => {
  */
 async function refreshRealm() {
   api.bustTiles(); // artwork is per realm
+  api.bustRef();   // so are the item index and the region list
   api.bustMotd();
   state.me = await api.me();
   if (state.me && state.me.branding) applyBranding(state.me.branding);
