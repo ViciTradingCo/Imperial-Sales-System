@@ -19,8 +19,9 @@ import { makeD1 } from './d1shim.js';
 import { ensureSchema, DEFAULT_REALM_ID, REALM_TABLES } from '../src/db.js';
 import {
   createTransfer, listTransfers, acceptTransfer, declineTransfer, cancelTransfer,
-  listTransferHistory, transferLines, transferSummary,
+  listTransferHistory, transferLines,
 } from '../src/transfers.js';
+import { lineSummary } from '../src/lines.js';
 
 let env;
 const R = DEFAULT_REALM_ID;
@@ -221,10 +222,10 @@ describe('a transfer from before shipments', () => {
   });
 });
 
-describe('how a crate reads in one line', () => {
+describe('how a bulk act reads in one line', () => {
   it('names the item when there is one, and counts the rest when there are more', () => {
-    expect(transferSummary([{ item: 'Ale', qty: 3 }])).toBe('Ale ×3');
-    expect(transferSummary([{ item: 'Ale', qty: 3 }, { item: 'Rope', qty: 1 }])).toBe('Ale ×3 + 1 more');
-    expect(transferSummary([])).toBe('');
+    expect(lineSummary([{ item: 'Ale', qty: 3 }])).toBe('Ale ×3');
+    expect(lineSummary([{ item: 'Ale', qty: 3 }, { item: 'Rope', qty: 1 }])).toBe('Ale ×3 + 1 more');
+    expect(lineSummary([])).toBe('');
   });
 });

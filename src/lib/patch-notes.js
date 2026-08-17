@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.7', date: '2026-08-17', notes: [
+    'Your coffer records a delivery as ONE line, not one per item. A trip that brought six things was six debits sitting next to each other; it is now a single entry naming the trip, which is what actually happened — you paid once.',
+    'The same for a paid harvest: one wage entry for the haul.',
+    'The figures are better for it. The total is worked out once instead of each line being rounded on its own, so a delivery of three things at 10½ each takes 31 rather than 30 — you are no longer quietly losing a coin a line.',
+    'Removing one item from a delivery gives back exactly what that item is costing you, and removing all of them leaves your coffer precisely where it started. Deliveries recorded before today are refunded by the rule they were written under, so nothing drifts either way.',
+    'Harvest shows what each line earns beside the line itself, with the total on its own underneath — it used to recite the whole list back at you in the total.',
+  ] },
   { version: '5.6', date: '2026-08-16', notes: [
     'Harvest takes as many things as you brought in. Add a line for each — wheat, apples, a hare — and record the lot as one haul.',
     'It goes in as ONE trip: a single entry in your delivery log rather than three, and if anything is wrong with one line none of it is recorded.',

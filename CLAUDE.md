@@ -354,6 +354,31 @@ so a day's takings arrive as 1239.9999999999998 and a bare floor would report
 1239 — but settling at 2dp would round a genuine 12.999 UP to 13, which is the
 one thing this must never do.
 
+## A bulk act is ONE line in the log
+
+A delivery, a haul, a crate is a single act — coin left the coffer once, one
+trip happened — so it gets ONE entry wherever a log holds one line per act: the
+coffer, the audit detail, a pending row. Never one per item. A coffer showing
+six lines for one trip to the smith is a coffer you have to reassemble in your
+head before you can check it against anything.
+
+It is also the only way to obey the rule above: the total is settled once, so
+three lines at 10.5 take 31 rather than three tens. `lineSummary` in
+`worker/src/lines.js` is how such an act is worded, shared so the coffer, the
+audit log and the transfer lists cannot describe the same act differently.
+
+WHICH MOVES THE WEIGHT ONTO UNDOING IT. With the debit settled once, a line's
+refund is not its own price floored — it is the difference that line makes to
+what the trip still costs, measured against the rows STILL on the books rather
+than against the original debit (measured against the debit, the last line
+removed would hand back the whole trip). Difference by difference, the refunds
+sum to exactly what went out.
+
+`coffer_entries.ref` carries the act's idempotency stem, and is what says a trip
+was settled once. A row without one predates this and took a debit per line, so
+its lines are refunded by the old rule — which is what stops an old delivery
+minting a coin on its way out.
+
 ## Multi-realm
 
 The system can host several independent servers ("realms") from one deployment,

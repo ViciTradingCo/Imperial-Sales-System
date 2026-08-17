@@ -68,13 +68,17 @@ function haulForm({ meta, onChange }) {
         sync();
       },
     }, '×');
-    const row = el('div', { class: 'craft-row' }, [picker.el, qty, flag, remove]);
+    // What THIS line earns, beside the line that earned it. The haul's total
+    // is one figure below; a line with no rate shows nothing rather than a
+    // zero, since most of what a shop takes in is not paid for.
+    const pay = el('span', { class: 'buy-sub', title: 'What this line pays' }, '');
+    const row = el('div', { class: 'craft-row' }, [picker.el, qty, flag, pay, remove]);
     // Clicking a suggestion fires onPick; typing a name out does not, and this
     // side takes free text. The input event bubbles, so one listener on the row
     // covers both without the picker needing a second callback.
     row.addEventListener('input', sync);
     const line = {
-      row, picker, qty, ingredient, remove,
+      row, picker, qty, ingredient, remove, pay,
       read: () => ({
         item: picker.selected() ? picker.selected().name : picker.value(),
         qty: Math.floor(Number(qty.value)) || 0,
@@ -94,10 +98,16 @@ function haulForm({ meta, onChange }) {
     onChange(lines.map((l) => l.read()));
   }
 
+  /** Fills each line's pay cell — `text(read)` returns what that line earns. */
+  function showPay(text) {
+    lines.forEach((l) => { l.pay.textContent = text(l.read()); });
+  }
+
   return {
     el: host,
     add,
     read: () => lines.map((l) => l.read()),
+    showPay,
     setItems: (list) => { master = list; lines.forEach((l) => l.picker.setItems(master)); },
     reset: () => { lines.splice(0, lines.length).forEach((l) => l.row.remove()); add(); },
   };
@@ -164,13 +174,20 @@ export function renderHarvest(host) {
   function paintPay() {
     const read = haul.read().map((l) => ({ ...l, rate: rateFor(l.item) }));
     const anyRate = read.some((l) => l.rate > 0);
+    const claiming = anyRate && claim.checked;
+    // Each line carries its own figure, so the total below is just the total —
+    // it was reciting the whole list back, which on a haul of six was the same
+    // words twice on one screen.
+    haul.showPay((l) => {
+      const rate = rateFor(l.item);
+      return claiming && rate > 0 && l.qty > 0 ? money(l.qty * rate) : '';
+    });
     claimRow.hidden = !anyRate;
-    owedLine.hidden = !anyRate || !claim.checked;
+    owedLine.hidden = !claiming;
     if (owedLine.hidden) { owedLine.textContent = ''; return; }
-    const paid = read.filter((l) => l.rate > 0 && l.qty > 0);
-    const owed = paid.reduce((n, l) => n + l.qty * l.rate, 0);
+    const owed = read.filter((l) => l.rate > 0 && l.qty > 0).reduce((n, l) => n + l.qty * l.rate, 0);
     owedLine.textContent = owed
-      ? 'You are owed ' + money(owed) + ' for ' + paid.map((l) => l.qty + ' × ' + l.item).join(', ')
+      ? 'You are owed ' + money(owed)
       : 'This pays ' + money(read.map((l) => l.rate).find((r) => r > 0)) + ' each.';
   }
   claim.addEventListener('change', paintPay);

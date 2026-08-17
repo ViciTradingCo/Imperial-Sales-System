@@ -14,11 +14,12 @@ import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock, stockText, planStockImport, importStockText } from '../inventory.js';
 import { recordIntakeLines, recordHarvest, listIntake, deleteIntake } from '../intake.js';
+import { lineSummary } from '../lines.js';
 import { readRegions, isTraveling, TRAVELING } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
 import { checkCertification } from '../cert.js';
 import { checkout, listSales, voidSale, employeePerformance } from '../sales.js';
-import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory, transferSummary } from '../transfers.js';
+import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory } from '../transfers.js';
 import { cofferSummary, adjustCoffer } from '../coffers.js';
 import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
 import { listBundles, saveBundle, deleteBundle } from '../bundles.js';
@@ -167,8 +168,8 @@ async function harvestRoute({ request, env, body }) {
     // saying who was paid.
     employee: actorName(caller),
   }, realmId);
-  // What actually came in, however many lines it took to say it.
-  const detail = res.lines.map((l) => l.item + ' ×' + l.qty).join(', ');
+  // What actually came in, worded the way every other bulk act is.
+  const detail = lineSummary(res.lines);
   await logAudit(env, { actor: actorName(caller), business: caller.business,
     action: 'inventory.harvest',
     detail: detail + (res.paid ? ' · paid ' + res.paid : ''), realmId });
@@ -537,7 +538,7 @@ async function createTransferRoute({ request, env, body }) {
   // What was actually sent, as one line, so the audit reads the same for a
   // crate of six as it did for a single sword.
   const sent = Array.isArray(body.items) && body.items.length ? body.items : [{ item: body.item, qty: body.qty }];
-  const detail = transferSummary(sent.map((l) => ({ item: String((l && l.item) || ''), qty: Math.floor(Number(l && l.qty) || 0) })));
+  const detail = lineSummary(sent.map((l) => ({ item: String((l && l.item) || ''), qty: Math.floor(Number(l && l.qty) || 0) })));
   await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'transfer.send', detail: detail + ' → ' + (body.toBusiness || ''), realmId: realmIdOf(caller, env) });
   return await listTransfers(env, caller.business, realmIdOf(caller, env));
 }

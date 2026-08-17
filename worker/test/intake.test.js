@@ -661,17 +661,19 @@ describe('a harvest of several items at once', () => {
         items: [{ item: 'Nirnroot', numItems: 10 }, { item: 'Wheat', numItems: 4 }, { item: 'Hare', numItems: 2 }],
       }, R);
       expect(res.paid).toBe(34); // 30 + 4 + nothing for the hare
+      // Each line says what and at what rate; the MONEY is the one settled
+      // figure above, so there is no second set of numbers to disagree with it.
       expect(res.lines).toEqual([
-        { item: 'Nirnroot', qty: 10, rate: 3, paid: 30 },
-        { item: 'Wheat', qty: 4, rate: 1, paid: 4 },
-        { item: 'Hare', qty: 2, rate: 0, paid: 0 },
+        { item: 'Nirnroot', qty: 10, rate: 3 },
+        { item: 'Wheat', qty: 4, rate: 1 },
+        { item: 'Hare', qty: 2, rate: 0 },
       ]);
       expect(await cofferBalance(env, SHOP, R)).toBe(-34);
     });
 
     // One entry per paid line, for the reason a delivery does the same: each
     // line is its own intake row, and deleting one refunds exactly what it took.
-    it('writes one coffer entry per PAID line and none for the rest', async () => {
+    it('writes ONE coffer entry for the haul, whatever it took to bring in', async () => {
       await setRate('Nirnroot', 3);
       const res = await recordHarvest(env, SHOP, {
         claimPay: true, employee: 'Ann',
@@ -705,6 +707,131 @@ describe('a harvest of several items at once', () => {
       await setRate('Nirnroot', 3);
       const res = await recordHarvest(env, SHOP, { items: [{ item: 'Nirnroot', numItems: 10 }] }, R);
       expect(res.paid).toBe(0);
+      expect(await cofferBalance(env, SHOP, R)).toBe(0);
+    });
+  });
+});
+
+/**
+ * ONE LEDGER LINE PER BULK ACT, and the arithmetic that has to hold around it.
+ *
+ * A delivery is a single act — coin left the coffer once — so the coffer gets
+ * one entry for the trip rather than one per item. That is also the only way to
+ * obey the money rule: rounding every line compounds the loss, and three lines
+ * at 10.5 must take 31 rather than three tens.
+ *
+ * Which moves the weight onto DELETION. If the debit is settled once, a line's
+ * refund is not its own price rounded down — it is the difference that line
+ * makes to the trip. The test that matters is the round trip: record it, remove
+ * every line, and the coffer must be exactly where it started.
+ */
+describe('what a bulk act writes to the coffer', () => {
+  const lines = (items, key) => recordIntakeLines(env, SHOP, {
+    items, vendor: 'Smith', hold: 'Whiterun', idempotencyKey: key,
+  }, R);
+  const cofferRows = async () => ((await env.DB.prepare(
+    'SELECT kind, amount, note, ref FROM coffer_entries ORDER BY id').all()).results) || [];
+
+  it('takes ONE debit for a delivery, not one per item', async () => {
+    await lines([
+      { item: 'Iron Sword', numItems: 2, pricePer: 5 },
+      { item: 'Ale', numItems: 4, pricePer: 2 },
+      { item: 'Rope', numItems: 1, pricePer: 3 },
+    ], 'd1');
+    const rows = await cofferRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: 'intake', amount: -21, ref: 'd1' });
+    expect(rows[0].note).toBe('Iron Sword ×2 + 2 more');
+    expect(await cofferBalance(env, SHOP, R)).toBe(-21);
+  });
+
+  it('settles the total once, so pennies do not compound down the list', async () => {
+    // Three lines at 10.5. Rounded per line that is 30; the trip cost 31.
+    await lines([
+      { item: 'A', numItems: 1, pricePer: 10.5 },
+      { item: 'B', numItems: 1, pricePer: 10.5 },
+      { item: 'C', numItems: 1, pricePer: 10.5 },
+    ], 'd2');
+    expect(await cofferBalance(env, SHOP, R)).toBe(-31);
+  });
+
+  it('names the delivery the same way everything else names a bulk thing', async () => {
+    await lines([{ item: 'Ale', numItems: 4, pricePer: 2 }], 'd3');
+    expect((await cofferRows())[0].note).toBe('Ale ×4');
+  });
+
+  it('writes nothing at all for a delivery that cost nothing', async () => {
+    await lines([{ item: 'Gift', numItems: 3, pricePer: 0 }], 'd4');
+    expect(await cofferRows()).toEqual([]);
+    expect(await cofferBalance(env, SHOP, R)).toBe(0);
+  });
+
+  describe('and what removing a line gives back', () => {
+    it('returns the coffer to exactly where it started, line by line', async () => {
+      await lines([
+        { item: 'A', numItems: 1, pricePer: 10.5 },
+        { item: 'B', numItems: 1, pricePer: 10.5 },
+        { item: 'C', numItems: 1, pricePer: 10.5 },
+      ], 'd5');
+      expect(await cofferBalance(env, SHOP, R)).toBe(-31);
+      // Removed one at a time, in the order they appear.
+      for (const entry of await listIntake(env, SHOP, R)) {
+        await deleteIntake(env, SHOP, entry.id, R);
+      }
+      // Not -1, not +2. The refunds add back up to the debit.
+      expect(await cofferBalance(env, SHOP, R)).toBe(0);
+    });
+
+    it('gives back what the line is worth to the trip, not its rounded own price', async () => {
+      await lines([
+        { item: 'A', numItems: 1, pricePer: 10.5 },
+        { item: 'B', numItems: 1, pricePer: 10.5 },
+      ], 'd6');
+      expect(await cofferBalance(env, SHOP, R)).toBe(-21);
+      const [first] = await listIntake(env, SHOP, R);
+      const res = await deleteIntake(env, SHOP, first.id, R);
+      // 21 out, 10 left owing on the line that stays → 11 back, not 10.
+      expect(res.refunded).toBe(11);
+      expect(await cofferBalance(env, SHOP, R)).toBe(-10);
+    });
+
+    it('reconciles a paid haul the same way', async () => {
+      await upsertItem(env, SHOP, { item: 'Nirnroot', price: 10, harvestPay: 2.5 }, R);
+      await upsertItem(env, SHOP, { item: 'Wheat', price: 4, harvestPay: 2.5 }, R);
+      await recordHarvest(env, SHOP, {
+        claimPay: true, idempotencyKey: 'h5',
+        items: [{ item: 'Nirnroot', numItems: 1 }, { item: 'Wheat', numItems: 1 }],
+      }, R);
+      expect(await cofferBalance(env, SHOP, R)).toBe(-5); // one entry, settled once
+      expect((await cofferRows()).filter((r) => r.kind === 'harvest-pay')).toHaveLength(1);
+      for (const entry of await listIntake(env, SHOP, R)) {
+        await deleteIntake(env, SHOP, entry.id, R);
+      }
+      expect(await cofferBalance(env, SHOP, R)).toBe(0);
+    });
+
+    /**
+     * A delivery recorded BEFORE this took one debit per line. Its coffer lines
+     * carry no `ref`, so a deletion falls back to the old rule and refunds
+     * exactly what that line took — which is what stops an old delivery minting
+     * a coin on its way out.
+     */
+    it('refunds a delivery from before by the rule it was written under', async () => {
+      await lines([
+        { item: 'A', numItems: 1, pricePer: 10.5 },
+        { item: 'B', numItems: 1, pricePer: 10.5 },
+      ], 'old');
+      // Rewrite history into the old shape: two debits of 10, no ref.
+      await env.DB.prepare('DELETE FROM coffer_entries').run();
+      for (const item of ['A', 'B']) {
+        await env.DB.prepare(
+          `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note)
+           VALUES (?, ?, ?, 'intake', -10, ?)`).bind(R, SHOP, new Date().toISOString(), item).run();
+      }
+      expect(await cofferBalance(env, SHOP, R)).toBe(-20);
+      for (const entry of await listIntake(env, SHOP, R)) {
+        await deleteIntake(env, SHOP, entry.id, R);
+      }
       expect(await cofferBalance(env, SHOP, R)).toBe(0);
     });
   });

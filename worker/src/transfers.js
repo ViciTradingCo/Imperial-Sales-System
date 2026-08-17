@@ -24,6 +24,7 @@
  * gets you "not found" rather than someone else's goods.
  */
 import { getDb } from './db.js';
+import { lineSummary } from './lines.js';
 
 /**
  * A stored transfer's lines.
@@ -51,13 +52,6 @@ export function transferLines(row) {
 
 /** The units in a shipment — what moved, not how many kinds of thing. */
 const unitsIn = (lines) => lines.reduce((n, l) => n + l.qty, 0);
-
-/** How a shipment reads in one line: "Iron Sword ×3" or "Iron Sword ×3 + 2 more". */
-export function transferSummary(lines) {
-  if (!lines.length) return '';
-  const first = lines[0].item + ' ×' + lines[0].qty;
-  return lines.length === 1 ? first : first + ' + ' + (lines.length - 1) + ' more';
-}
 
 /**
  * Owner/admin: send a pending shipment; debits the sender's stock now.
@@ -133,7 +127,7 @@ export async function createTransfer(env, fromBusiness, { toBusiness, items, ite
 /** One pending shipment, as a screen needs it: who, what, and how much of it. */
 const pendingRow = (r) => {
   const lines = transferLines(r);
-  return { id: r.id, other: r.other, lines, units: unitsIn(lines), summary: transferSummary(lines), ts: r.ts };
+  return { id: r.id, other: r.other, lines, units: unitsIn(lines), summary: lineSummary(lines), ts: r.ts };
 };
 
 /** Pending transfers touching a business: incoming (to accept) and outgoing (awaiting). */
@@ -218,7 +212,7 @@ export async function listTransferHistory(env, business, realmId, limit = 30) {
     const lines = transferLines(r);
     return {
       id: r.id, from: r.from_business, to: r.to_business,
-      lines, units: unitsIn(lines), summary: transferSummary(lines),
+      lines, units: unitsIn(lines), summary: lineSummary(lines),
       status: r.status, ts: r.ts,
       dir: String(r.from_business).trim().toLowerCase() === String(business).trim().toLowerCase() ? 'out' : 'in',
     };

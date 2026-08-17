@@ -81,7 +81,10 @@ const SCHEMA = [
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      realm_id TEXT NOT NULL DEFAULT '${R}',
      business TEXT NOT NULL, ts TEXT NOT NULL,
-     kind TEXT NOT NULL, amount REAL NOT NULL DEFAULT 0, note TEXT)`,
+     kind TEXT NOT NULL, amount REAL NOT NULL DEFAULT 0, note TEXT,
+     -- The bulk act this line belongs to (a delivery's or haul's idem stem),
+     -- so a later deletion can refund against what actually went out.
+     ref TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_coffer_business ON coffer_entries (business)`,
   // Reusable named discounts per shop.
   `CREATE TABLE IF NOT EXISTS discounts (
@@ -361,6 +364,12 @@ const MIGRATIONS = [
   // written before this have it NULL and keep their single line in the item /
   // qty / price columns; `transferLines` reads either.
   'ALTER TABLE transfers ADD COLUMN items TEXT',
+  // WHICH BULK ACT a coffer line belongs to — a delivery's or a haul's
+  // idempotency stem. One entry is written per act rather than per line, and
+  // this is what lets a later deletion refund against the figure that actually
+  // went out instead of guessing at it. Null on a manual adjustment, on a sale,
+  // and on every row written before this existed.
+  'ALTER TABLE coffer_entries ADD COLUMN ref TEXT',
   // Multi-realm: every data table gains realm_id. The DEFAULT means existing
   // rows land in the 'default' realm automatically — no backfill needed. On a
   // fresh DB these are no-ops ("duplicate column"), since SCHEMA already has it.

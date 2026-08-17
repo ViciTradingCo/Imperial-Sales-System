@@ -10,56 +10,18 @@
 import { getDb } from './db.js';
 import { listInventory } from './inventory.js';
 import { coin } from './money.js';
+import { lineSummary } from './lines.js';
 
 /**
- * Records a delivery — ONE OR MANY items — as a single atomic write.
+ * Turns a delivery's lines into what will actually be written, or throws.
  *
- * A trip to a supplier brings back a crate, not an item. Recording it as five
- * separate calls is what the ingredient basket did, and it had the flaw every
- * client-side loop has: a dropped connection between line three and line four
- * leaves a delivery that half happened, with no record saying so. Here every
- * line is validated BEFORE anything is written and all of them go in one
- * `db.batch`, so a delivery either lands whole or not at all.
+ * VALIDATE EVERYTHING FIRST. A bad line 4 must not leave lines 1-3 recorded,
+ * and the message says which line so it can be found on a long list.
  *
- * The SUPPLIER is per delivery, not per line — one trip, one vendor, one
- * region. Everything that differs item by item (cost, sale price, whether it is
- * an ingredient) is on the line.
+ * The sibling of `planHaul`, and deliberately the same shape: a delivery and a
+ * haul differ in what they ask for, not in how a list of lines is checked.
  */
-export async function recordIntakeLines(env, business, { items, vendor, hold, fromBusiness, idempotencyKey }, realmId) {
-  const db = await getDb(env);
-  const lines = (Array.isArray(items) ? items : []).filter(Boolean);
-  if (!lines.length) throw new Error('Add at least one item to the delivery.');
-
-  // One key for the whole delivery; each row stores `key#n`. Because the lines
-  // are written atomically, the presence of line 0 proves the rest landed too —
-  // so one lookup is enough to make a retry harmless.
-  const idem = String(idempotencyKey || '').trim();
-  if (idem) {
-    // The bare key too: single-item deliveries stored it unsuffixed until this
-    // became multi-line, and a retry that spans the deploy must still not
-    // double the stock.
-    const prior = await db.prepare(
-      'SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem IN (?, ?) LIMIT 1')
-      .bind(realmId, business, idem + '#0', idem).first();
-    if (prior) return listIntake(env, business, realmId); // already recorded — no double stock
-  }
-
-  // Bought from a REGISTERED company, when it was. Resolved against the realm's
-  // own companies so it is a real join rather than a second free-text field —
-  // and a shop cannot record buying from itself, which would credit its own
-  // region for supply that never moved.
-  let from = String(fromBusiness || '').trim();
-  if (from) {
-    const known = await db.prepare(
-      'SELECT business FROM companies WHERE realm_id = ? AND lower(business) = ?')
-      .bind(realmId, from.toLowerCase()).first();
-    if (!known) throw new Error('No registered company called "' + from + '" in this realm.');
-    if (known.business.toLowerCase() === String(business || '').trim().toLowerCase()) {
-      throw new Error('A shop cannot record buying from itself.');
-    }
-    from = known.business;
-  }
-
+async function planDelivery(db, business, realmId, lines) {
   /**
    * The name this shop ALREADY lists an item under, if it does.
    *
@@ -121,6 +83,60 @@ export async function recordIntakeLines(env, business, { items, vendor, hold, fr
     plan.push({ name, qty, per, sale, ing: l.ingredient ? 1 : 0, ingGiven, invName: await resolveName(name) });
   }
 
+  return plan;
+}
+
+/**
+ * Records a delivery — ONE OR MANY items — as a single atomic write.
+ *
+ * A trip to a supplier brings back a crate, not an item. Recording it as five
+ * separate calls is what the ingredient basket did, and it had the flaw every
+ * client-side loop has: a dropped connection between line three and line four
+ * leaves a delivery that half happened, with no record saying so. Here every
+ * line is validated BEFORE anything is written and all of them go in one
+ * `db.batch`, so a delivery either lands whole or not at all.
+ *
+ * The SUPPLIER is per delivery, not per line — one trip, one vendor, one
+ * region. Everything that differs item by item (cost, sale price, whether it is
+ * an ingredient) is on the line.
+ */
+export async function recordIntakeLines(env, business, { items, vendor, hold, fromBusiness, idempotencyKey }, realmId) {
+  const db = await getDb(env);
+  const lines = (Array.isArray(items) ? items : []).filter(Boolean);
+  if (!lines.length) throw new Error('Add at least one item to the delivery.');
+
+  // One key for the whole delivery; each row stores `key#n`. Because the lines
+  // are written atomically, the presence of line 0 proves the rest landed too —
+  // so one lookup is enough to make a retry harmless.
+  const idem = String(idempotencyKey || '').trim();
+  if (idem) {
+    // The bare key too: single-item deliveries stored it unsuffixed until this
+    // became multi-line, and a retry that spans the deploy must still not
+    // double the stock.
+    const prior = await db.prepare(
+      'SELECT id FROM intake WHERE realm_id = ? AND business = ? AND idem IN (?, ?) LIMIT 1')
+      .bind(realmId, business, idem + '#0', idem).first();
+    if (prior) return listIntake(env, business, realmId); // already recorded — no double stock
+  }
+
+  // Bought from a REGISTERED company, when it was. Resolved against the realm's
+  // own companies so it is a real join rather than a second free-text field —
+  // and a shop cannot record buying from itself, which would credit its own
+  // region for supply that never moved.
+  let from = String(fromBusiness || '').trim();
+  if (from) {
+    const known = await db.prepare(
+      'SELECT business FROM companies WHERE realm_id = ? AND lower(business) = ?')
+      .bind(realmId, from.toLowerCase()).first();
+    if (!known) throw new Error('No registered company called "' + from + '" in this realm.');
+    if (known.business.toLowerCase() === String(business || '').trim().toLowerCase()) {
+      throw new Error('A shop cannot record buying from itself.');
+    }
+    from = known.business;
+  }
+
+  const plan = await planDelivery(db, business, realmId, lines);
+
   const ts = new Date().toISOString();
   const stmts = [];
   plan.forEach((p, i) => {
@@ -140,14 +156,26 @@ export async function recordIntakeLines(env, business, { items, vendor, hold, fr
          ingredient = CASE WHEN ? THEN excluded.ingredient ELSE inventory.ingredient END`
     ).bind(realmId, business, p.invName, p.sale === null ? p.per : p.sale, p.qty, p.ing,
       p.sale === null ? 0 : 1, p.ingGiven ? 1 : 0));
-    // Debit the shop's coffers for what was paid. ONE ENTRY PER LINE, rounded
-    // per line: each line is its own intake row, and deleting one refunds
-    // exactly what that line took. A single combined debit could not be undone
-    // a line at a time without the two disagreeing by a coin.
-    stmts.push(db.prepare(
-      `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'intake', ?, ?)`
-    ).bind(realmId, business, ts, -coin(p.qty * p.per), p.name));
   });
+
+  /**
+   * ONE DEBIT FOR THE TRIP, not one per line.
+   *
+   * A delivery is a single act — coin left the coffer once — and a coffer
+   * showing six lines for one trip to the smith is a coffer you have to
+   * reassemble in your head before you can check it against anything.
+   *
+   * It is also the only way to obey the money rule. Rounding every line
+   * compounds the loss: three lines at 10.5 must take 31, not three tens. The
+   * total is settled once, here, and `ref` ties it to the trip so removing a
+   * line later refunds against the figure that actually went out.
+   */
+  const spent = coin(plan.reduce((n, p) => n + p.qty * p.per, 0));
+  if (spent > 0) {
+    stmts.push(db.prepare(
+      `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note, ref) VALUES (?, ?, ?, 'intake', ?, ?, ?)`
+    ).bind(realmId, business, ts, -spent, lineSummary(plan.map((p) => ({ item: p.name, qty: p.qty }))), idem || null));
+  }
 
   await db.batch(stmts);
   return listIntake(env, business, realmId);
@@ -201,7 +229,7 @@ async function planHaul(db, business, realmId, asked, claimPay) {
     const ingGiven = l.ingredient !== undefined && l.ingredient !== null && l.ingredient !== '';
     // THE RATE IS READ FROM THE ITEM, never taken from the request.
     const rate = claimPay ? pay : 0;
-    plan.push({ name, invName, qty, rate, owed: coin(qty * rate), ing: l.ingredient ? 1 : 0, ingGiven });
+    plan.push({ name, invName, qty, rate, ing: l.ingredient ? 1 : 0, ingGiven });
   }
   return plan;
 }
@@ -294,27 +322,32 @@ export async function recordHarvest(env, business, { items, item, numItems, ingr
          stock = stock + excluded.stock,
          ingredient = CASE WHEN ? THEN excluded.ingredient ELSE inventory.ingredient END`
     ).bind(realmId, business, p.invName, p.qty, p.ing, p.ingGiven ? 1 : 0));
-    // Paid for, so the coffer pays for it — a business expense, recorded the
-    // moment the goods are handed over, exactly as a delivery from an outside
-    // supplier is. ONE ENTRY PER LINE, rounded per line, for the reason a
-    // delivery does the same: each line is its own intake row, and deleting one
-    // must refund exactly what that line took.
-    if (p.owed > 0) {
-      stmts.push(db.prepare(
-        `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note) VALUES (?, ?, ?, 'harvest-pay', ?, ?)`
-      ).bind(realmId, business, ts, -p.owed, 'Harvest: ' + p.name + ' ×' + p.qty + (who ? ' by ' + who : '')));
-    }
   });
+
+  // ONE WAGE ENTRY FOR THE HAUL, settled once, for the same two reasons a
+  // delivery takes one debit: the shop paid a person once, and rounding each
+  // line separately would shortchange them by a coin a line.
+  const owed = coin(plan.reduce((n, p) => n + p.qty * p.rate, 0));
+  if (owed > 0) {
+    const paidFor = plan.filter((p) => p.rate > 0).map((p) => ({ item: p.name, qty: p.qty }));
+    stmts.push(db.prepare(
+      `INSERT INTO coffer_entries (realm_id, business, ts, kind, amount, note, ref) VALUES (?, ?, ?, 'harvest-pay', ?, ?, ?)`
+    ).bind(realmId, business, ts, -owed, 'Harvest: ' + lineSummary(paidFor) + (who ? ' by ' + who : ''), idem || null));
+  }
 
   await db.batch(stmts);
 
   return {
     intake: await listIntake(env, business, realmId),
-    paid: plan.reduce((n, p) => n + p.owed, 0),
+    paid: owed,
     // The rate of the ONE line, when there is one. A haul of several has no
     // single rate, and inventing one would be a figure nobody could check.
     rate: plan.length === 1 ? plan[0].rate : 0,
-    lines: plan.map((p) => ({ item: p.name, qty: p.qty, rate: p.rate, paid: p.owed })),
+    // Each line says WHAT and AT WHAT RATE; the money is the one settled figure
+    // above. A per-line coin as well would be a second set of numbers that
+    // cannot be made to add up to the first — which is the whole reason the
+    // total is rounded once.
+    lines: plan.map((p) => ({ item: p.name, qty: p.qty, rate: p.rate })),
   };
 }
 
@@ -370,9 +403,49 @@ export async function deleteIntake(env, business, id, realmId) {
   if (!row) throw new Error('That intake entry no longer exists.');
 
   const qty = Number(row.num_items) || 0;
-  // Mirror the debit exactly — it was rounded down when it went out, so the
-  // refund has to round down too or removing an intake would mint a coin.
-  const paid = coin(qty * (Number(row.price_per) || 0));
+
+  /**
+   * WHAT TO GIVE BACK, worked out against what actually went out.
+   *
+   * A delivery takes ONE debit, settled once on the whole trip — so the refund
+   * for one of its lines is not that line's own price rounded down, it is the
+   * difference the line makes to the trip's total. Removing all six lines of a
+   * delivery then refunds exactly what the delivery took, to the coin, instead
+   * of drifting by one per line.
+   *
+   * A row with no trip behind it — a delivery recorded before this, or one
+   * saved without a key — falls back to its own figure, which is precisely what
+   * it debited at the time. The `ref` on the coffer line is what tells the two
+   * apart, so an old delivery is refunded by the old rule and cannot mint a
+   * coin on the way out.
+   */
+  const stem = row.idem ? String(row.idem).split('#')[0] : '';
+  let paid = coin(qty * (Number(row.price_per) || 0));
+  if (stem) {
+    // Was this trip settled ONCE? The `ref` on its coffer line is what says so.
+    // Without one it predates the single debit and each of its lines took its
+    // own rounded figure, so that is what each must give back.
+    const settled = await db.prepare(
+      `SELECT id FROM coffer_entries WHERE realm_id = ? AND business = ? AND ref = ?
+        AND kind IN ('intake', 'harvest-pay') LIMIT 1`).bind(realmId, business, stem).first();
+    if (settled) {
+      // Siblings matched on the stem, never on a timestamp: `stem` and `stem#n`
+      // are the same trip, and nothing else is.
+      const { results } = await db.prepare(
+        `SELECT id, num_items, price_per FROM intake
+          WHERE realm_id = ? AND business = ? AND (idem = ? OR substr(idem, 1, ?) = ?)`)
+        .bind(realmId, business, stem, stem.length + 1, stem + '#').all();
+      const worth = (rows) => coin(rows.reduce((n, r) => n + (Number(r.num_items) || 0) * (Number(r.price_per) || 0), 0));
+      const now = results || [];
+      // WHAT THE TRIP COSTS NOW, LESS WHAT IT WILL COST WITHOUT THIS LINE —
+      // measured against what is still on the books, never against the original
+      // debit. Against the debit, the second line removed would give back what
+      // the first already had, and by the last one the coffer would be up on
+      // the deal. Difference by difference, the refunds sum to the debit.
+      paid = worth(now) - worth(now.filter((r) => r.id !== row.id));
+      if (paid < 0) paid = 0;
+    }
+  }
   const inv = await db.prepare('SELECT stock FROM inventory WHERE realm_id = ? AND business = ? AND item = ?')
     .bind(realmId, business, row.item).first();
   const have = inv ? Number(inv.stock) || 0 : 0;
