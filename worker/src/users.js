@@ -79,7 +79,13 @@ export async function findUserByEmail(env, email) {
   if (!target) return null;
 
   const db = await getDb(env);
-  const row = await db.prepare('SELECT * FROM users WHERE lower(email) = ?').bind(target).first();
+  // THE MEMBERSHIP THEY ARE ACTING AS. One person may work at several shops, so
+  // an email can have several rows; `current` marks the chosen one and the
+  // oldest is the fallback for anyone who has never switched (which is
+  // everybody, until they do).
+  const row = await db.prepare(
+    'SELECT * FROM users WHERE lower(email) = ? ORDER BY current DESC, created ASC, uid ASC LIMIT 1')
+    .bind(target).first();
   let user = rowToUser(row);
 
   if (!user && isConfiguredAdmin(env, target)) {
@@ -98,6 +104,44 @@ export async function findUserByEmail(env, email) {
 
 /** No-op retained for call sites; identity is no longer cached (see findUserByEmail). */
 export function bustUserCache() { /* identity reads are live now */ }
+
+/**
+ * EVERY SHOP THIS PERSON BELONGS TO, oldest first.
+ *
+ * A membership is a users row: its own uid, its own role at that shop, its own
+ * standing. They are not ranks of one account — an owner of one shop can be a
+ * pending employee at another, and neither says anything about the other.
+ */
+export async function listMemberships(env, email) {
+  const target = String(email || '').trim().toLowerCase();
+  if (!target) return [];
+  const db = await getDb(env);
+  const { results } = await db.prepare(
+    'SELECT * FROM users WHERE lower(email) = ? ORDER BY created ASC, uid ASC').bind(target).all();
+  return (results || []).map((r) => ({ ...rowToUser(r), current: Number(r.current) === 1 }));
+}
+
+/**
+ * Switches which membership an email is acting as.
+ *
+ * The uid is checked against the EMAIL, never taken on trust: a uid is the only
+ * thing the client sends, and one belonging to somebody else would otherwise be
+ * a way to put on their shop like a coat. Both writes go in one batch, so there
+ * is no instant at which a person has two current memberships or none.
+ */
+export async function switchMembership(env, email, uid) {
+  const target = String(email || '').trim().toLowerCase();
+  const want = String(uid || '').trim();
+  const db = await getDb(env);
+  const row = await db.prepare('SELECT uid FROM users WHERE uid = ? AND lower(email) = ?')
+    .bind(want, target).first();
+  if (!row) throw new Error('That is not one of your businesses.');
+  await db.batch([
+    db.prepare('UPDATE users SET current = 0 WHERE lower(email) = ?').bind(target),
+    db.prepare('UPDATE users SET current = 1 WHERE uid = ?').bind(want),
+  ]);
+  return findUserByEmail(env, target);
+}
 
 /**
  * Locate a user by uid WITHIN a realm (admin cross-business operations). The
@@ -260,10 +304,17 @@ export async function deleteMember(env, uid, realmId) {
   const existing = await db.prepare('SELECT uid, email FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).first();
   if (!existing) throw new Error('Member not found.');
   await db.prepare('DELETE FROM users WHERE uid = ? AND realm_id = ?').bind(target, realm).run();
-  // Their signed-in sessions go with them. A session only ever proves identity —
-  // with no user row there is nothing left to authorize — but an account that
-  // has been deleted should not leave live credentials lying in a table.
-  await revokeSessionsFor(env, existing.email);
+  /**
+   * ONE MEMBERSHIP ENDED, not necessarily an account.
+   *
+   * Somebody who works at two shops and leaves one is still signed in and still
+   * works at the other, so their sessions stand and they land on what is left.
+   * Only when nothing remains do the credentials go: a session proves identity,
+   * and with no row at all there is nothing left for it to authorize.
+   */
+  const left = await listMemberships(env, existing.email);
+  if (!left.length) await revokeSessionsFor(env, existing.email);
+  else if (!left.some((m) => m.current)) await switchMembership(env, existing.email, left[0].uid);
   bustUserCache();
 }
 

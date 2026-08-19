@@ -12,7 +12,7 @@ import { getDb, renameBusinessData, moveBusinessData, countBusinessTransfers, DE
 import { generateCode } from './realm.js';
 import { readRealmPrefs } from './realm-prefs.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
-import { appendUser, findUserByEmail, bustUserCache } from './users.js';
+import { appendUser, findUserByEmail, bustUserCache, listMemberships, switchMembership } from './users.js';
 
 /**
  * The date a new shop's trial runs until, as YYYY-MM-DD — or '' when the realm
@@ -197,6 +197,22 @@ export async function transferCompany(env, id, toRealm, fromRealm) {
 export async function registerUser(env, { email, name, character, businessName, asOwner, hold, realmId }) {
   const existing = await findUserByEmail(env, email);
   if (existing) return { ...existing, alreadyRegistered: true };
+  return addBusiness(env, { email, character, businessName, asOwner, hold, realmId });
+}
+
+/**
+ * Adds a SHOP TO A PERSON — the first one at sign-up, or another later.
+ *
+ * A membership is its own users row: its own uid, its own role at that shop,
+ * its own standing. That is what lets somebody own one shop and be a pending
+ * employee at another without either fact saying anything about the other, and
+ * it is why this is the same code either way — founding your second shop is
+ * founding a shop.
+ *
+ * The new membership becomes the CURRENT one, because a person who has just
+ * joined or founded somewhere is there.
+ */
+export async function addBusiness(env, { email, character, businessName, asOwner, hold, realmId }) {
   const realm = String(realmId || DEFAULT_REALM_ID);
 
   const char = String(character || '').trim();
@@ -206,6 +222,13 @@ export async function registerUser(env, { email, name, character, businessName, 
 
   const found = await findBusinessByName(env, biz, realm);
   const db = await getDb(env);
+
+  // Already there. Two rows for one person at one shop would double them on
+  // its roster and leave every read picking whichever came back first.
+  const mine = await listMemberships(env, email);
+  const already = mine.find((m) => m.business.trim().toLowerCase() === (found ? found.businessName : biz).trim().toLowerCase()
+    && m.realmId === realm);
+  if (already) throw new Error('You already work at "' + already.business + '".');
 
   if (asOwner) {
     if (found) {
@@ -218,14 +241,16 @@ export async function registerUser(env, { email, name, character, businessName, 
     await db.prepare('INSERT INTO companies (id, business, point_of_contact, until, perpetual, status, hold, court, priority, realm_id, join_code) VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0, ?, ?)')
       .bind(businessId, biz, char, await trialUntil(env, realm), '', String(hold || '').trim(), realm, generateCode('SHOP')).run();
     bustRegistryCache();
-    return appendUser(env, { uid: genUid('usr'), email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active', realmId: realm });
+    const owner = await appendUser(env, { uid: genUid('usr'), email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active', realmId: realm });
+    return switchMembership(env, email, owner.uid);
   }
 
   // Employee path
   if (!found) {
     throw new Error('No business named "' + biz + '" is registered yet. Ask its owner to register it first, or register as its owner if it\'s yours.');
   }
-  return appendUser(env, { uid: genUid('usr'), email, character: char, business: found.businessName, role: 'employee', isOwner: false, status: 'pending', realmId: realm });
+  const joined = await appendUser(env, { uid: genUid('usr'), email, character: char, business: found.businessName, role: 'employee', isOwner: false, status: 'pending', realmId: realm });
+  return switchMembership(env, email, joined.uid);
 }
 
 /**

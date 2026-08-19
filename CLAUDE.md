@@ -391,6 +391,30 @@ did before the feature. The way in is Network Settings → Realms.
 on those. Realm selection happens in exactly ONE place (the Admin Panel) and
 filters the session from then on.
 
+## One person, several shops
+
+A MEMBERSHIP is a `users` row — its own uid, its own role at that shop, its own
+standing. An email may have several, and exactly one carries `current`, which is
+the one `findUserByEmail` resolves to. That is what let this be added to an app
+where forty routes read `caller.business` without touching any of them: the
+caller is still one person at one shop.
+
+The roles do not leak. Owning one shop grants nothing at another — you can own a
+forge and be a pending employee at a tavern, and neither fact says anything
+about the other.
+
+Switching (`switchMembership`) is checked against the EMAIL, never the uid
+alone: the uid is the only thing a client sends, and one belonging to someone
+else would be a way to put on their shop like a coat. The session is untouched —
+it proves WHO you are, and who you are has not changed. The frontend RELOADS
+after a switch (`reloadAsNewBusiness`) rather than re-rendering: the page you
+are on may not exist for the shop you moved to.
+
+ADDING one uses the same join code a newcomer types (`addBusiness`) — a founder
+code makes a shop, a staff code joins one. Anything else would be a second set
+of rules about who may create a company. Leaving one membership leaves the
+others and the session alone; sessions are revoked only when the last one goes.
+
 ## Roles
 
 - **Manager** — an employee the OWNER appointed to run the shop. Everything the

@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '5.9', date: '2026-08-18', notes: [
+    'YOU CAN WORK AT MORE THAN ONE SHOP. Profile → Your businesses takes a Business Code and adds it to your account — a staff code joins you to somebody’s shop, a founder code lets you name another of your own.',
+    'Once you have two, Switch Business appears in the side menu. Pick one and the whole app follows it: your register, your inventory, your ledger, your time card.',
+    'Each is separate. You might own one shop and be a new hire at the next, and being the owner of one gives you nothing at the other — you are activated there the same way anybody is.',
+    'Leaving one shop leaves the rest alone. You stay signed in and land on one of the others; only leaving your last shop signs you out.',
+    'Nothing changes if you work at one shop. There is no menu entry to switch, and everything is where it was.',
+  ] },
   { version: '5.8', date: '2026-08-18', notes: [
     'The app is quicker to move around. The item index and your region list are fetched once and kept, instead of being downloaded again by every screen that needs them — walking the register’s four sides used to pull the whole index down four times over.',
     'They refresh themselves the moment anything changes one: a sale that meets a new item, a harvest, a stocktake, or an admin editing the index.',

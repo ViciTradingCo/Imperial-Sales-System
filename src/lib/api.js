@@ -95,6 +95,14 @@ export const api = {
   /** Sign-up: register against a Business Code. The code decides realm + role. */
   register: (code, character, businessName, hold) =>
     request('POST', '/auth/register', { code, character, businessName, hold }),
+  /**
+   * Switches which of your shops you are working as. Returns the fresh profile,
+   * so the caller re-renders from what the server now says rather than guessing.
+   */
+  switchBusiness: (uid) => request('POST', '/auth/business', { uid }),
+  /** Adds another shop to an already-registered person, by the same join code. */
+  addBusiness: (code, businessName, hold) =>
+    request('POST', '/auth/business/add', { code, businessName, hold }),
   /** Updates the signed-in user's own profile (character name). */
   updateProfile: (character) => request('POST', '/me/profile', { character }),
   /** Owner/admin: the roster for the caller's business. */

@@ -17,6 +17,7 @@ import { LANGS, getLang, setLang } from '../lib/i18n.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { signOut } from '../lib/auth.js';
 import { money } from '../lib/format.js';
+import { businessesPanel, reloadAsNewBusiness } from '../lib/businesses.js';
 
 export function renderProfile(container, { me, onProfileUpdated }) {
   const gridHost = el('div', {});
@@ -33,6 +34,14 @@ export function renderProfile(container, { me, onProfileUpdated }) {
     { key: 'prof-appearance', label: 'Appearance', hint: 'Theme, accent, language', glyph: '🎨',
       open: (host) => mount(host, appearanceCard()) },
   ];
+  /**
+   * Your shops. Not gated: everyone has at least one, and this is where a
+   * person with one adds their second — the nav's switcher only appears once
+   * there is something to switch between.
+   */
+  sections.push({ key: 'prof-businesses', label: 'Your businesses', hint: 'Switch or add one', glyph: '🏪',
+    open: (host) => mount(host, businessesPanel(me, reloadAsNewBusiness)) });
+
   // Leaving is YOUR OWN decision about your own account, so it belongs on your
   // own page — but only where there is something to leave. An owner has no
   // shop to walk away from (it would leave the shop with nobody running it) and

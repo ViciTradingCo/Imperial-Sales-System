@@ -38,6 +38,16 @@ function navItems(me) {
   // owner OR admin, like every other shop page — the route already admits both,
   // so gating the MENU on owner alone hid it from an admin who runs a shop.
   if (canManage(me)) items.push({ path: '/ledger/settings', label: 'Shop Settings' });
+  /**
+   * SWITCH BUSINESS — only for somebody who has more than one.
+   *
+   * Switching is a change of identity rather than a filter (see
+   * lib/businesses.js), so it belongs in the menu beside the other places you
+   * GO, not inside a screen. Someone with a single shop has nothing to switch
+   * to and gets no entry; adding their second is on Profile, where the rest of
+   * what they can do to their own membership already lives.
+   */
+  if (((me.businesses || []).length) > 1) items.push({ path: '/switch', label: 'Switch Business' });
   // The people who use the app every day are the ones with something to say
   // about it; an admin has the review screen instead.
   if (me.role !== 'admin') items.push({ path: '/feedback', label: 'Feedback' });

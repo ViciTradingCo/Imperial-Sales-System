@@ -170,7 +170,11 @@ const SCHEMA = [
      status TEXT NOT NULL DEFAULT 'active', char_name TEXT, notes TEXT,
      created TEXT, last_seen TEXT, active_realm TEXT NOT NULL DEFAULT '',
      pay_rate REAL NOT NULL DEFAULT 0,
-     commission_rate REAL NOT NULL DEFAULT 0)`,
+     commission_rate REAL NOT NULL DEFAULT 0,
+     -- ONE ROW PER MEMBERSHIP. A person who works at two shops has two rows
+     -- sharing an email, and this marks the one they are acting as. See
+     -- users.js — everything downstream still reads a single caller.
+     current INTEGER NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`,
   `CREATE INDEX IF NOT EXISTS idx_users_business ON users (business)`,
   // Registered businesses + their Vici Trading Co. certification (subscription).
@@ -370,6 +374,13 @@ const MIGRATIONS = [
   // went out instead of guessing at it. Null on a manual adjustment, on a sale,
   // and on every row written before this existed.
   'ALTER TABLE coffer_entries ADD COLUMN ref TEXT',
+  // MULTIPLE BUSINESSES PER PERSON. `users` becomes one row per MEMBERSHIP, so
+  // the unique index that allowed only one row per email per realm has to go —
+  // it is a plain index rather than a table constraint, so it drops in place
+  // and no rebuild is needed. `current` marks the membership being acted as.
+  'ALTER TABLE users ADD COLUMN current INTEGER NOT NULL DEFAULT 0',
+  'DROP INDEX IF EXISTS idx_users_realm_email',
+  'CREATE INDEX IF NOT EXISTS idx_users_email_current ON users (email, current)',
   // Multi-realm: every data table gains realm_id. The DEFAULT means existing
   // rows land in the 'default' realm automatically — no backfill needed. On a
   // fresh DB these are no-ops ("duplicate column"), since SCHEMA already has it.
@@ -377,7 +388,6 @@ const MIGRATIONS = [
   ...REALM_TABLES.map((t) => `CREATE INDEX IF NOT EXISTS idx_${t}_realm ON ${t} (realm_id)`),
   // The realm a super admin is currently viewing (empty = their own).
   "ALTER TABLE users ADD COLUMN active_realm TEXT NOT NULL DEFAULT ''",
-  'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_realm_email ON users (realm_id, email)',
   // The idempotency lookups filter on realm as well as business, so the indexes
   // should too — otherwise they scan every realm's rows for that shop name.
   'CREATE INDEX IF NOT EXISTS idx_sales_idem_realm ON sales (realm_id, business, idem)',

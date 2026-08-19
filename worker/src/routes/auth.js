@@ -13,9 +13,9 @@
  * endpoint that lists realms or businesses to an unregistered caller.
  */
 import { requireUser, requireRegistered, publicUser, bearerToken, findBusinessMeta, markPriority, realmIdOf, homeRealmOf, isSystemAdmin } from '../guards.js';
-import { findUserByEmail, setUserCharacter, touchLastSeen } from '../users.js';
+import { findUserByEmail, setUserCharacter, touchLastSeen, listMemberships, switchMembership } from '../users.js';
 import { createSession, revokeSession, isSessionToken } from '../sessions.js';
-import { registerUser } from '../registry.js';
+import { registerUser, addBusiness } from '../registry.js';
 import { listRealms, getRealm, resolveJoinCode } from '../realm.js';
 import { readRegions } from '../regions.js';
 import { readBranding } from '../branding.js';
@@ -53,7 +53,57 @@ async function handleMe({ request, env }) {
     // with the profile so every screen can render amounts correctly without
     // each one fetching settings of its own.
     prefs: await readRealmPrefs(env, activeRealm),
+    /**
+     * EVERY SHOP THIS PERSON BELONGS TO. The nav's switcher is built from it,
+     * and it is sent with the profile rather than fetched on its own because
+     * "which shops are mine" is part of who you are, not a screen's data.
+     */
+    businesses: (await listMemberships(env, user.email)).map((m) => ({
+      uid: m.uid, business: m.business, role: m.role, status: m.status,
+      current: m.uid === user.uid,
+    })),
   });
+}
+
+/**
+ * Switches which of your shops you are working as.
+ *
+ * Everything downstream reads the caller's business from their user row, so
+ * this is the whole of it: flip which row is current and the next request is
+ * that shop's. The session is untouched — it proves WHO you are, and who you
+ * are has not changed.
+ */
+async function handleSwitchBusiness({ request, env, body }) {
+  const payload = await requireUser(request, env);
+  const user = await switchMembership(env, payload.email, body.uid);
+  if (!user) throw new Error('That is not one of your businesses.');
+  return handleMe({ request, env });
+}
+
+/**
+ * Adds another shop to an already-registered person — by the SAME code that
+ * admits a newcomer.
+ *
+ * A founder code makes a shop and hands them it; a staff code puts them in one
+ * as a pending employee. Doing it any other way would mean a second set of
+ * rules about who may create a company, and the point of the codes is that
+ * there is only one.
+ */
+async function handleAddBusiness({ request, env, body }) {
+  const caller = await requireRegistered(request, env);
+  const found = await resolveJoinCode(env, body.code);
+  if (!found) throw new Error("That code isn't recognised. Check it with whoever gave it to you.");
+  const asOwner = found.kind === 'realm';
+  await addBusiness(env, {
+    email: caller.email,
+    // Their own character name carries across; they are the same person.
+    character: caller.character,
+    businessName: asOwner ? body.businessName : found.business,
+    asOwner,
+    hold: asOwner ? body.hold : '',
+    realmId: found.realmId,
+  });
+  return handleMe({ request, env });
 }
 
 /**
@@ -168,5 +218,7 @@ export const routes = [
   { method: 'POST', path: '/auth/me', handler: handleMe },
   { method: 'POST', path: '/auth/code', handler: handleCheckCode },
   { method: 'POST', path: '/auth/register', handler: handleRegister },
+  { method: 'POST', path: '/auth/business', handler: handleSwitchBusiness },
+  { method: 'POST', path: '/auth/business/add', handler: handleAddBusiness },
   { method: 'POST', path: '/me/profile', handler: handleUpdateProfile },
 ];

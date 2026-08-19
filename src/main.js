@@ -40,6 +40,7 @@ import { renderMarketInfo } from './views/market-info.js';
 import { renderTimecard } from './views/timecard.js';
 import { startUpdateWatch } from './lib/update-check.js';
 import { initShiftBar, setShift, repaintShiftBar } from './lib/shift-bar.js';
+import { businessesPanel, reloadAsNewBusiness } from './lib/businesses.js';
 
 const appEl = document.getElementById('app');
 const badgeEl = document.getElementById('userBadge');
@@ -248,6 +249,21 @@ route('/profile', (container) => {
     me: state.me,
     onProfileUpdated: (me) => { state.me = me; renderBadge(); },
   });
+});
+
+/**
+ * The nav's Switch Business entry. A page of its own rather than a modal, so
+ * the address is linkable and Back behaves — and because switching reloads the
+ * app, which a modal would do from underneath itself.
+ */
+route('/switch', (container) => {
+  const m = state.me;
+  if (!m || !m.registered) { navigate('/'); return; }
+  mount(container, el('div.card', {}, [
+    el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
+    el('h2', {}, 'Your businesses'),
+    businessesPanel(m, reloadAsNewBusiness),
+  ]));
 });
 
 route('/employees', (container) => {
