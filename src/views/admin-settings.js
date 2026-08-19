@@ -25,8 +25,10 @@ export function renderAdminSettings(container, { me } = {}) {
   const sections = [
     { key: 'set-branding', label: 'Branding', hint: 'Name, logo, icons', glyph: '🎨',
       open: (host) => mount(host, brandingCard()) },
-    { key: 'set-about', label: 'About page', hint: 'What visitors read', glyph: '📖',
-      open: (host) => mount(host, aboutCard()) },
+    // Goes to the page itself: it is editable in place there, and the page is
+    // the only honest preview of the page. Three boxes in a modal here said
+    // nothing about what they would look like.
+    { key: 'set-about', label: 'About page', hint: 'Edit it in place', glyph: '📖', goto: '/about' },
     { key: 'set-holds', label: 'Regions', hint: 'The region list', glyph: '🗺️',
       open: (host) => mount(host, regionsCard()) },
     { key: 'set-money', label: 'Denomination', hint: 'What the money is called', glyph: '🪙',
@@ -48,49 +50,6 @@ export function renderAdminSettings(container, { me } = {}) {
   }
   draw({});
   api.getTiles().then((r) => draw(r.images || {})).catch(() => {});
-}
-
-/** The About page's wording — what visitors read before signing in. */
-function aboutCard() {
-  const title = el('input', { type: 'text', placeholder: 'Leave blank to use the header title' });
-  const body = el('textarea', { rows: '8', placeholder:
-    'Describe your network…\n\nBlank lines start a new paragraph.\nLines starting with "- " become bullet points.' });
-  const credits = el('textarea', { rows: '4', placeholder: 'Created and managed by …' });
-  const status = el('p', {});
-  const save = el('button.primary', { onclick: doSave }, 'Save About page');
-
-  api.getBrandingAdmin().then((r) => {
-    const b = r.branding || {};
-    title.value = b.aboutTitle || '';
-    body.value = b.aboutBody || '';
-    credits.value = b.aboutCredits || '';
-  }).catch(() => {});
-
-  async function doSave() {
-    save.disabled = true; status.className = ''; status.textContent = 'Saving…';
-    try {
-      await api.setBranding({
-        aboutTitle: title.value.trim(),
-        aboutBody: body.value.trim(),
-        aboutCredits: credits.value.trim(),
-      });
-      status.textContent = '';
-      toast('About page saved', 'ok');
-    } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
-    finally { save.disabled = false; }
-  }
-
-  return el('div.card', {}, [
-    el('h3', {}, 'About page'),
-    el('p', { class: 'note' }, 'The wording on the About / welcome page — the first thing visitors see before they ' +
-      'sign in. Leave a field blank to keep the built-in text.'),
-    el('label', {}, 'Heading'), title,
-    el('label', {}, 'Body'), body,
-    el('p', { class: 'note' }, 'Blank lines separate paragraphs; a block of lines each starting with “- ” becomes a bullet list.'),
-    el('label', {}, 'Credits'), credits,
-    el('div', { class: 'row-actions' }, [save]),
-    status,
-  ]);
 }
 
 /** Sitewide branding — app name, logo, favicon, footer, accent. */

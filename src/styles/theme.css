@@ -711,9 +711,32 @@ body.has-nav .sidenav { display: flex; }
 .patch-notes-page li { margin: 3px 0; }
 
 /* ---- landing / about ---- */
-.card.hero h2 { font-size: 22px; }
+.card.hero h2 { font-size: calc(22px * var(--type-scale)); }
 .feature-list { margin: 0; padding-left: 20px; }
 .feature-list li { margin: 6px 0; }
+
+/* The admin's bar on the About page: a note on the left, Save/Cancel on the
+   right, and on a narrow screen the buttons drop under the note rather than
+   squeezing it to one word a line. */
+.about-edit {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-2); flex-wrap: wrap;
+}
+.about-edit .note { margin: 0; flex: 1 1 240px; }
+.about-edit .row-actions { align-items: center; }
+.about-field { margin-bottom: var(--sp-2); }
+.about-field label { display: block; }
+
+/* The tip jar. The button is a supporter-hosted image of a fixed shape, so it
+   is sized rather than stretched; when it fails to load the link becomes text
+   and takes the ordinary button styling instead. */
+.kofi-wrap { margin: var(--sp-2) 0; }
+.kofi { display: inline-block; line-height: 0; }
+.kofi-img { height: calc(36px * var(--type-scale)); width: auto; max-width: 100%; border: 0; }
+.kofi-plain {
+  line-height: normal; padding: 6px 14px; border: 1px solid var(--accent);
+  border-radius: var(--radius); text-decoration: none;
+}
 
 /* ---- A CARD IS A LEAF OF THE BOOK ----
    Ruled lines, and a red margin rule down the left with the writing starting

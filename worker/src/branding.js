@@ -35,11 +35,19 @@ const BRANDING_DEFAULTS = {
   aboutTitle: '',
   aboutBody: '',
   aboutCredits: '',
+  // The tip jar under Credits. The wording defaults to blank like the rest of
+  // the About page (the frontend supplies the stock copy), but the two LINKS
+  // have real defaults — a button with no destination is not a fallback, it is
+  // a broken control, so a blank supportUrl HIDES the section instead.
+  supportTitle: '',
+  supportBody: '',
+  supportUrl: 'https://ko-fi.com/smiledaemon',
+  supportImageUrl: 'https://ko-fi.com/img/githubbutton_sm.svg',
 };
 
-const TEXT_FIELDS = ['appName', 'shortName', 'tagline', 'footerText', 'aboutTitle'];
-const LONG_FIELDS = ['aboutBody', 'aboutCredits'];
-const URL_FIELDS = ['logoUrl', 'faviconUrl'];
+const TEXT_FIELDS = ['appName', 'shortName', 'tagline', 'footerText', 'aboutTitle', 'supportTitle'];
+const LONG_FIELDS = ['aboutBody', 'aboutCredits', 'supportBody'];
+const URL_FIELDS = ['logoUrl', 'faviconUrl', 'supportUrl', 'supportImageUrl'];
 
 async function readBlob(env, key) {
   try {

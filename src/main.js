@@ -201,7 +201,7 @@ function showRoot(container) {
 route('/', showRoot);
 
 route('/about', (container) => {
-  if (state.me && state.me.registered) renderLanding(container, {});
+  if (state.me && state.me.registered) renderLanding(container, { me: state.me });
   else renderSignedOutLanding(container);
 });
 

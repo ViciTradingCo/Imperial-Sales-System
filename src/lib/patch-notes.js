@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.0', date: '2026-08-19', notes: [
+    'The About page has a tip jar under its credits. The Ledger is one person’s work, given away free; if it has saved you an evening of bookkeeping there is now a button there that says thank you.',
+    'Nothing about the app changes whether you use it or not — no shop is treated differently, and nothing is held back behind it.',
+    'Admins can write the About page ON the About page. Open it and there is an “Edit this page” button: the heading, the welcome, the credits and the tip jar become boxes you type into, with Save and Cancel at both ends.',
+    'It replaces the form that was buried in Network Settings, where you wrote the page blind and had to go and look at it afterwards. The Network Settings tile now takes you to the page itself.',
+    'A realm admin edits their own realm’s wording, as before. A box left blank shows what it will fall back to, so blank reads as “inherited” rather than “missing”.',
+  ] },
   { version: '5.9', date: '2026-08-18', notes: [
     'YOU CAN WORK AT MORE THAN ONE SHOP. Profile → Your businesses takes a Business Code and adds it to your account — a staff code joins you to somebody’s shop, a founder code lets you name another of your own.',
     'Once you have two, Switch Business appears in the side menu. Pick one and the whole app follows it: your register, your inventory, your ledger, your time card.',
