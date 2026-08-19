@@ -35,6 +35,30 @@ export function regionWord() { return region.label.toLowerCase(); }
 export function regionsOn() { return region.shown; }
 
 /**
+ * ITEM KINDS — food, drink, a weapon — as this realm names them.
+ *
+ * Set at sign-in with the rest of the presentation settings, for the same
+ * reason: a tag is STORED lowercase so it compares by one rule, and the realm's
+ * own spelling is applied where it is shown. A realm renaming a kind re-renders
+ * its stock; it never invalidates a listing's tags.
+ */
+let tags = [];
+export function setItemTags(list) {
+  tags = (Array.isArray(list) ? list : []).map((t) => String(t || '').trim()).filter(Boolean);
+}
+/** The realm's vocabulary, in its own spelling — what a tag picker offers. */
+export function itemTags() { return tags.slice(); }
+/**
+ * How one stored tag is written on screen. A tag no longer in the vocabulary
+ * still shows: removing a kind leaves it on the listings that carry it, and a
+ * blank where a word used to be would be worse than the word.
+ */
+export function tagLabel(tag) {
+  const raw = String(tag || '').trim();
+  return tags.find((t) => t.toLowerCase() === raw.toLowerCase()) || raw;
+}
+
+/**
  * TRAVELING — a company with no fixed region. The word an admin picks on the
  * company record instead of a region, mirroring `worker/src/regions.js`, which
  * is where the rule is stated in full and which refuses to let a realm name a

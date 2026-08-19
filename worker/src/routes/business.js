@@ -12,7 +12,7 @@ import { renameBusiness, listBusinessCards } from '../registry.js';
 import { getFlag } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
-import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock, stockText, planStockImport, importStockText } from '../inventory.js';
+import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock, setItemTag, stockText, planStockImport, importStockText } from '../inventory.js';
 import { recordIntakeLines, recordHarvest, listIntake, deleteIntake } from '../intake.js';
 import { lineSummary } from '../lines.js';
 import { readRegions, isTraveling, TRAVELING } from '../regions.js';
@@ -473,6 +473,18 @@ async function deleteItemRoute({ request, env, body }) {
   return { inventory: await deleteItem(env, caller.business, body.item, realmIdOf(caller, env)) };
 }
 /**
+ * ONE KIND, across the whole shop — "these are the food".
+ *
+ * A whole-list answer rather than an addition: what is named carries the tag
+ * and what is not, does not. Every other tag on every row is untouched, so
+ * answering about drink cannot disturb what is food.
+ */
+async function tagItemsRoute({ request, env, body }) {
+  const caller = await requireManages(request, env);
+  return { inventory: await setItemTag(env, caller.business, body || {}, realmIdOf(caller, env)) };
+}
+
+/**
  * A hand correction to an item's stock. Owner/admin only, and always audited:
  * this is the one path that changes stock without something having happened to
  * cause it, so the trail is the only thing that separates a stocktake from a
@@ -898,6 +910,7 @@ export const routes = [
   { method: 'POST', path: '/inventory', handler: saveItem },
   { method: 'POST', path: '/inventory/delete', handler: deleteItemRoute },
   { method: 'POST', path: '/inventory/stock', handler: adjustStock },
+  { method: 'POST', path: '/inventory/tag', handler: tagItemsRoute },
   { method: 'POST', path: '/inventory/harvest', handler: harvestRoute },
   { method: 'GET', path: '/timecard', handler: myTimecard },
   { method: 'POST', path: '/timecard/in', handler: clockInRoute },

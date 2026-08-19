@@ -248,8 +248,12 @@ export const api = {
   leaveBusiness: () => request('POST', '/business/leave', { confirm: true }),
   /** The shop's bundles — several items sold together for one price. */
   getBundles: () => request('GET', '/business/bundles'),
-  /** Owner/manager: create or replace a bundle. */
-  saveBundle: (name, price, parts) => request('POST', '/business/bundles/save', { name, price, parts }),
+  /**
+   * Owner/manager: create or replace a special. It either NAMES its items
+   * (`parts`) or asks for KINDS of item (`needs`) — never both, and the Worker
+   * refuses a special that tries.
+   */
+  saveBundle: (name, price, parts, needs) => request('POST', '/business/bundles/save', { name, price, parts, needs }),
   deleteBundle: (id) => request('POST', '/business/bundles/delete', { id }),
   getInventory: () => request('GET', '/inventory'),
   /** The shop's stock counts as `Name, Amount` text. */
@@ -278,6 +282,11 @@ export const api = {
   setPayRate: (uid, rate, commissionRate) => request('POST', '/business/employees/rate', { uid, rate, commissionRate }),
   /** Owner: appoint an employee as a manager, or stand one down. */
   setManager: (uid, manager) => request('POST', '/business/employees/manager', { uid, manager }),
+  /**
+   * Owner/manager: set ONE kind across the shop — "these are the food".
+   * A whole-list answer: what is not named has the tag taken off.
+   */
+  setItemTag: (tag, items) => request('POST', '/inventory/tag', { tag, items }),
   /** Owner/admin: correct an item's stock by hand (a stocktake, breakage, spoilage). */
   setStock: (item, stock, note) => request('POST', '/inventory/stock', { item, stock, note }),
   /** Owner/admin: per-employee sales performance. */

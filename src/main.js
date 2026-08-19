@@ -17,7 +17,7 @@ import { renderCourtTools } from './views/court.js';
 import { renderFeedback } from './views/feedback.js';
 import { renderFeedbackAdmin } from './views/feedback-admin.js';
 import { initActions, clearActions } from './lib/actions.js';
-import { setCurrency, setRegion } from './lib/format.js';
+import { setCurrency, setRegion, setItemTags } from './lib/format.js';
 import { setSessionUser } from './lib/sections.js';
 import { renderLanding } from './views/landing.js';
 import { renderHome } from './views/home.js';
@@ -389,7 +389,7 @@ async function refreshRealm() {
   api.bustMotd();
   state.me = await api.me();
   if (state.me && state.me.branding) applyBranding(state.me.branding);
-  if (state.me && state.me.prefs) { setCurrency(state.me.prefs.currency); setRegion(state.me.prefs); }
+  if (state.me && state.me.prefs) { setCurrency(state.me.prefs.currency); setRegion(state.me.prefs); setItemTags(state.me.prefs.itemTags); }
   setSessionUser(state.me);
   renderBadge();
   showNav(true);
@@ -432,7 +432,7 @@ async function onSignedIn() {
   // deployment's identity (there is no realm to know about yet); now that we
   // know who they are, a realm hosting its own server can look like itself.
   if (state.me && state.me.branding) applyBranding(state.me.branding);
-  if (state.me && state.me.prefs) { setCurrency(state.me.prefs.currency); setRegion(state.me.prefs); }
+  if (state.me && state.me.prefs) { setCurrency(state.me.prefs.currency); setRegion(state.me.prefs); setItemTags(state.me.prefs.itemTags); }
   setSessionUser(state.me);
   renderBadge();
   showNav(!!(state.me && state.me.registered));

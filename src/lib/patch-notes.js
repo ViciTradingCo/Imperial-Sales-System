@@ -10,6 +10,15 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.1', date: '2026-08-19', notes: [
+    'YOUR STOCK CAN SAY WHAT IT IS. Food, drink, a weapon, a potion — tag a listing with Edit, or answer for the whole shelf at once under Inventory → Kinds ("which of these are food?").',
+    'The kinds come from your realm, so every shop uses the same words. An admin sets the list in Network Settings → Item kinds; it starts with Skyrim’s own — food, drink, potion, weapon, armor, and the rest.',
+    'SPECIALS CAN NOW ASK FOR KINDS. "Five food and five drink for 40" — you set what it asks for, and the customer chooses which at the till from anything you have tagged.',
+    'At the register, a special like that is marked “your choice”. Adding it asks what goes in it, counts as you go, and will not let a clerk go over or under what the deal says.',
+    'It still rings up as ONE line at the special’s price, everything chosen still comes out of stock, and voiding it puts back exactly what was taken.',
+    'One at a time: the next customer picks their own, so add it again for another.',
+    'Specials that name their items work exactly as before, and so does everything you have already set up.',
+  ] },
   { version: '6.0', date: '2026-08-19', notes: [
     'The About page has a tip jar under its credits. The Ledger is one person’s work, given away free; if it has saved you an evening of bookkeeping there is now a button there that says thank you.',
     'Nothing about the app changes whether you use it or not — no shop is treated differently, and nothing is held back behind it.',

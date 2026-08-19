@@ -322,6 +322,47 @@ A Court's price controls apply to a bundle in AGGREGATE (the sum of its parts'
 floors and caps), since it has no per-item price to check and selling ten capped
 items for one price must not be a way around the cap.
 
+## A special may ask for KINDS instead of items
+
+The same `bundles` row, with `needs` (JSON `{tag, qty}`) instead of `parts` —
+"five food and five drink for 40". One or the other, never both: two ways of
+saying what is in one deal is two things to keep agreeing.
+
+Then the TILL chooses and the WORKER prices, which is the usual division. A cart
+line becomes `{bundle, qty: 1, parts: [{item, qty, tag}]}`; `tagSpecialLine`
+checks every chosen item against the shop's own listing — it is stocked, it is
+not an ingredient, and it carries the tag it is claimed against — and that the
+count per tag is EXACT, since "five food" for a flat price stops meaning
+anything if six will do. Each choice names the part of the deal it fills, so an
+item tagged both food and drink cannot pay for both halves with one unit.
+
+ONE AT A TIME. A stored line's `parts` are per unit of the special and
+everything that restocks multiplies by the line's quantity, but two fillings need
+not divide evenly (seven sweet rolls and three stews fills "five food" twice
+with no per-special half). Two specials are two lines, each with what its own
+customer chose.
+
+## Item kinds are on the LISTING, named by the REALM
+
+`inventory.tags` is comma-joined lowercase — per listing, exactly like
+`ingredient`, because what a thing is FOR is the shop's answer and one tavern's
+drink is a hedge wizard's reagent. Stored lowercase so it compares by one rule;
+the realm's own spelling is applied where it is DISPLAYED (`tagLabel`), the same
+as money and regions.
+
+The VOCABULARY is per realm (`realm-prefs.itemTags`, defaulting to Skyrim's
+categories) rather than free text per shop, which drifts within a week: a special
+asks for five DRINK and a listing tagged "drinks" is one the deal cannot see, and
+the failure is silent. Removing a kind from the vocabulary leaves it on any
+listing carrying it — stripping stock of what it IS because a list was edited
+would be the worse surprise.
+
+`setItemTag` is the bulk answer to a question about a LIST ("which of these are
+food?"), so what it does not name loses that tag and every OTHER tag on every row
+is untouched. `upsertItem` follows the `harvest_pay` rule instead: an omitted
+`tags` leaves them alone, so a screen that knows nothing about kinds cannot strip
+a listing of them.
+
 ## A discount and an upcharge are ONE signed percent
 
 `discounts.percent` is positive to take money off, negative to put it on, and

@@ -8,6 +8,35 @@ import { listItemIndex, matchMasterItem, normalizeItem, notePendingItem } from '
 
 const ts = () => new Date().toISOString();
 
+/**
+ * WHAT KIND OF THING a listing is — food, drink, a weapon.
+ *
+ * Stored comma-joined and LOWERCASE on the row, so a tag compares by one rule
+ * everywhere and nothing has to remember whether the shop typed "Drink" or
+ * "drink". The realm's own spelling is applied when it is DISPLAYED, the same
+ * way money and regions are — the vocabulary lives in realm prefs and a realm
+ * renaming a kind must never make a listing's tag unreadable.
+ *
+ * Per LISTING and not per item, exactly as `ingredient` is: what a thing is FOR
+ * is the shop's answer, and one tavern's drink is a hedge wizard's reagent.
+ */
+export function parseTags(field) {
+  return String(field || '')
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** Normalizes a set of tags for storage: lowercase, trimmed, deduplicated. */
+export function encodeTags(list) {
+  const out = [];
+  for (const raw of (Array.isArray(list) ? list : parseTags(list))) {
+    const t = String(raw || '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 24);
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out.join(',');
+}
+
 function statusFor(stock, low) {
   if (stock <= 0) return 'Out of Stock';
   if (low > 0 && stock <= low) return 'Low';
@@ -60,7 +89,7 @@ export async function listingsByName(db, realmId, business, names) {
 export async function listInventory(env, business, realmId) {
   const db = await getDb(env);
   const { results } = await db
-    .prepare('SELECT item, price, stock, low_stock, ingredient, harvest_pay FROM inventory WHERE realm_id = ? AND business = ? ORDER BY item COLLATE NOCASE')
+    .prepare('SELECT item, price, stock, low_stock, ingredient, harvest_pay, tags FROM inventory WHERE realm_id = ? AND business = ? ORDER BY item COLLATE NOCASE')
     .bind(realmId, business)
     .all();
   /**
@@ -94,6 +123,10 @@ export async function listInventory(env, business, realmId) {
     // "not paid for", and the Harvest side of the register offers payment only
     // where this is set.
     harvestPay: Number(r.harvest_pay) || 0,
+    // What KIND of thing this is, lowercase. A special can ask for five of a
+    // kind rather than naming five items, which is why these are worth storing
+    // at all.
+    tags: parseTags(r.tags),
     // Null rather than 0 when nothing has ever been bought — "no data" and
     // "free" are different answers and the UI shows only one of them.
     avgCost: avgByName.has(String(r.item).toLowerCase())
@@ -108,7 +141,7 @@ export async function listInventory(env, business, realmId) {
  * NOT set here — it's driven by intake (in) and sales (out). A brand-new item
  * starts at 0 stock; record an intake to stock it.
  */
-export async function upsertItem(env, business, { item, price, lowStock, ingredient, harvestPay }, realmId) {
+export async function upsertItem(env, business, { item, price, lowStock, ingredient, harvestPay, tags }, realmId) {
   const db = await getDb(env);
   const name = String(item || '').trim();
   if (!name) throw new Error('Item name is required.');
@@ -126,15 +159,20 @@ export async function upsertItem(env, business, { item, price, lowStock, ingredi
     pay = Number(harvestPay);
     if (!isFinite(pay) || pay < 0) throw new Error('Harvest pay must be a number ≥ 0.');
   }
+  // Tags follow the same rule: OMITTED leaves them as they are, so a screen
+  // that knows nothing about kinds cannot strip a listing of what it is.
+  const tagsGiven = tags !== undefined && tags !== null;
+  const tagText = tagsGiven ? encodeTags(tags) : '';
   await db
     .prepare(
-      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient, harvest_pay)
-       VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+      `INSERT INTO inventory (realm_id, business, item, price, stock, low_stock, ingredient, harvest_pay, tags)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
        ON CONFLICT (realm_id, business, item)
        DO UPDATE SET price = excluded.price, low_stock = excluded.low_stock, ingredient = excluded.ingredient,
-         harvest_pay = CASE WHEN ? THEN excluded.harvest_pay ELSE inventory.harvest_pay END`
+         harvest_pay = CASE WHEN ? THEN excluded.harvest_pay ELSE inventory.harvest_pay END,
+         tags = CASE WHEN ? THEN excluded.tags ELSE inventory.tags END`
     )
-    .bind(realmId, business, name, p, low, ing, pay, payGiven ? 1 : 0)
+    .bind(realmId, business, name, p, low, ing, pay, tagText, payGiven ? 1 : 0, tagsGiven ? 1 : 0)
     .run();
   return listInventory(env, business, realmId);
 }
@@ -172,6 +210,45 @@ export async function setStock(env, business, { item, stock, note }, realmId) {
     .bind(n, realmId, business, row.item).run();
 
   return { was: row.stock, now: n, item: row.item, note: String(note || '').trim().slice(0, 200) };
+}
+
+/**
+ * Sets ONE tag across the whole shop: here is everything that is food.
+ *
+ * Tagging is a question about a LIST — "which of these are drink?" — and asking
+ * it item by item means opening forty modals to answer it once. So this takes
+ * the tag and the items that carry it, and the items NOT named have it taken
+ * off: what comes back is the answer to the question, not an addition to it.
+ * Every other tag on every row is left exactly as it was, so answering about
+ * drink cannot disturb what is food.
+ *
+ * One batch, so a shop is never half-tagged.
+ */
+export async function setItemTag(env, business, { tag, items }, realmId) {
+  const db = await getDb(env);
+  const key = encodeTags([tag]);
+  if (!key) throw new Error('Which kind of item?');
+  if (key.includes(',')) throw new Error('One kind at a time.');
+
+  const wanted = new Set((Array.isArray(items) ? items : [])
+    .map((i) => String(i || '').trim().toLowerCase())
+    .filter(Boolean));
+
+  const { results } = await db.prepare('SELECT item, tags FROM inventory WHERE realm_id = ? AND business = ?')
+    .bind(realmId, business).all();
+
+  const writes = [];
+  for (const row of (results || [])) {
+    const has = parseTags(row.tags);
+    const should = wanted.has(String(row.item).toLowerCase());
+    const now = has.includes(key);
+    if (should === now) continue; // nothing to say about this row
+    const next = should ? [...has, key] : has.filter((t) => t !== key);
+    writes.push(db.prepare('UPDATE inventory SET tags = ? WHERE realm_id = ? AND business = ? AND item = ?')
+      .bind(encodeTags(next), realmId, business, row.item));
+  }
+  if (writes.length) await db.batch(writes);
+  return listInventory(env, business, realmId);
 }
 
 /** Removes an item from a business's inventory. */

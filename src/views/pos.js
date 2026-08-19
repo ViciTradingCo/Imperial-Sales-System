@@ -21,8 +21,9 @@
  * works, the address bar says which one you are on, and a half-built cart is
  * not silently thrown away by a click meant to check a delivery.
  */
-import { currency, money, coins, isTraveling } from '../lib/format.js';
+import { currency, money, coins, isTraveling, tagLabel } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
+import { openModal } from '../lib/modal.js';
 import { api } from '../lib/api.js';
 import { backToHome } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
@@ -218,27 +219,49 @@ export function renderPos(container, { me, mode }) {
      */
     const bundleSel = el('select', {}, el('option', { value: '' }, 'Pick a special…'));
     bundles.forEach((b) => bundleSel.appendChild(el('option', { value: String(b.id) },
-      b.name + ' — ' + money(b.price) + ' for ' + b.units + ' item' + (b.units === 1 ? '' : 's'))));
+      b.name + ' — ' + money(b.price) + ' for ' + b.units + ' item' + (b.units === 1 ? '' : 's') +
+      (b.needs && b.needs.length ? ' (your choice)' : ''))));
     const bundleQty = el('input', { type: 'number', min: '1', step: '1', value: '1', 'aria-label': 'How many of this special' });
+    const qtyWrap = el('div', {}, [el('label', {}, 'How many'), bundleQty]);
+    // A special filled AT THE TILL goes in one at a time — each one is a
+    // different customer's choice, and there is no per-special half of seven
+    // sweet rolls. The Worker refuses a second one on the same line, so the
+    // quantity box would be offering something that cannot be done.
+    const paintBundlePick = () => {
+      const b = bundles.find((x) => String(x.id) === bundleSel.value);
+      qtyWrap.hidden = !!(b && b.needs && b.needs.length);
+    };
+    bundleSel.addEventListener('change', paintBundlePick);
     const addBundle = el('button.secondary-btn', { onclick: () => {
       const b = bundles.find((x) => String(x.id) === bundleSel.value);
       if (!b) { setStatus('Pick a special first.', 'error'); return; }
+      setStatus('', '');
+      if (b.needs && b.needs.length) {
+        openFillSpecial(b, inventory, (parts) => {
+          if (!idemKey) idemKey = newIdem();
+          cart.push({ bundle: b.name, qty: 1, price: b.price, parts, byKind: true });
+          bundleSel.value = ''; paintBundlePick();
+          renderCart();
+        });
+        return;
+      }
       const n = Math.floor(Number(bundleQty.value)) || 1;
       if (n < 1) { setStatus('How many?', 'error'); return; }
       if (!idemKey) idemKey = newIdem();
       cart.push({ bundle: b.name, qty: n, price: b.price, parts: b.parts });
-      bundleSel.value = ''; bundleQty.value = '1';
-      setStatus('', '');
+      bundleSel.value = ''; bundleQty.value = '1'; paintBundlePick();
       renderCart();
     } }, 'Add special');
     const bundleCard = el('div.card', {}, [
       el('h3', {}, 'Specials'),
       el('p', { class: 'note' }, 'A set of items for one price. It rings up as a single line and takes ' +
-        'everything in it out of stock.'),
+        'everything in it out of stock. A special marked “your choice” asks for kinds — five food, five ' +
+        'drink — and lets the customer pick which.'),
       el('label', {}, 'Special'), bundleSel,
-      el('label', {}, 'How many'), bundleQty,
+      qtyWrap,
       el('div', { class: 'row-actions' }, [addBundle]),
     ]);
+    paintBundlePick();
 
     const cartHost = el('div', {}, emptyState({ glyph: '🧺', title: 'Cart is empty', hint: 'Search the item index above and add items to build the order.' }));
 
@@ -347,7 +370,11 @@ export function renderPos(container, { me, mode }) {
           // the clerk what is about to leave the shelf.
           ? '<b>' + esc(line.bundle) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
             ' = ' + money(line.qty * line.price) +
-            '<br><span class="note">' + esc(line.parts.map((p) => p.item + ' ×' + p.qty * line.qty).join(', ')) + '</span>'
+            '<br><span class="note">' + esc(line.parts.map((p) =>
+              // A by-kind special was filled for THIS line, so its parts are
+              // already the whole of it; a fixed one lists what is in a single
+              // special and multiplies.
+              p.item + ' ×' + (line.byKind ? p.qty : p.qty * line.qty)).join(', ')) + '</span>'
           : '<b>' + esc(line.item) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
             ' = ' + money(line.qty * line.price) }),
         el('button.secondary-btn.small', { onclick: () => { cart.splice(i, 1); renderCart(); } }, 'Remove'),
@@ -417,7 +444,15 @@ export function renderPos(container, { me, mode }) {
         // A bundle line is sent as its NAME and how many. Its price and its
         // contents are the shop's, read server-side — the till does not get to
         // name either, and the copy held here is only for showing the cart.
-        cart: cart.map((l) => (l.bundle ? { bundle: l.bundle, qty: l.qty } : { item: l.item, qty: l.qty, price: l.price })),
+        cart: cart.map((l) => {
+          if (!l.bundle) return { item: l.item, qty: l.qty, price: l.price };
+          // A special that asks for KINDS carries the customer's choice, and
+          // each choice says which part of the deal it fills — the Worker
+          // checks both against the shop's own tags before it prices anything.
+          return l.byKind
+            ? { bundle: l.bundle, qty: 1, parts: l.parts }
+            : { bundle: l.bundle, qty: l.qty };
+        }),
         customer: customer.value.trim(), hold: holdSel.value,
         discountName: discName.value.trim(), discountPercent: adjustment(),
         staffPurchase: staffBox.checked,
@@ -498,3 +533,92 @@ export function renderPos(container, { me, mode }) {
   }
 }
 
+/**
+ * FILLING A SPECIAL THAT ASKS FOR KINDS — "five food and five drink".
+ *
+ * The deal states what it wants; the customer states what they want; this is
+ * where the second meets the first. One panel per requirement, listing what the
+ * shop has tagged that kind and holds, with a count against each and a tally
+ * that will not let the clerk go over or under.
+ *
+ * Each choice is handed back with the KIND IT FILLS, because an item may be
+ * tagged both food and drink and one unit cannot pay for both halves of the
+ * deal. The Worker re-checks all of it — the tags, the counts, the price — so
+ * nothing here is trusted, only made easy.
+ */
+function openFillSpecial(b, inventory, onFilled) {
+  const status = el('p', {});
+  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
+  const sellable = (inventory || []).filter((it) => !it.ingredient);
+  const panels = [];
+
+  const body = b.needs.map((need) => {
+    const options = sellable.filter((it) => (it.tags || []).includes(need.tag));
+    const tally = el('p', { class: 'note' });
+    const boxes = [];
+    const paint = () => {
+      const got = boxes.reduce((n, x) => n + (Math.floor(Number(x.input.value)) || 0), 0);
+      tally.textContent = got + ' of ' + need.qty + ' chosen';
+      tally.className = got === need.qty ? 'note ok' : 'note';
+    };
+    const rows = options.map((it) => {
+      const input = el('input', {
+        type: 'number', min: '0', step: '1', value: '0',
+        'aria-label': 'How many ' + it.item,
+      });
+      input.addEventListener('input', paint);
+      boxes.push({ input, item: it });
+      return el('div', { class: 'need-row' }, [
+        el('span', { class: 'emp-who', html: '<b>' + esc(it.item) + '</b> <span class="note">' +
+          esc(it.stock + ' in stock') + '</span>' }),
+        input,
+      ]);
+    });
+    paint();
+    panels.push({ need, boxes });
+    return el('div', { class: 'fill-need' }, [
+      el('h4', {}, need.qty + ' × ' + tagLabel(need.tag)),
+      options.length
+        ? el('div', {}, rows)
+        : el('p', { class: 'note error' }, 'Nothing in stock is tagged ' + tagLabel(need.tag) +
+          ' — tag it under Inventory → Kinds.'),
+      tally,
+    ]);
+  });
+
+  let modal;
+  function confirm() {
+    const parts = [];
+    for (const panel of panels) {
+      let got = 0;
+      for (const box of panel.boxes) {
+        const n = Math.floor(Number(box.input.value)) || 0;
+        if (n < 0) { setStatus('A count cannot be negative.', 'error'); return; }
+        if (!n) continue;
+        // Stock is checked properly server-side; this is so the clerk is told
+        // before the customer is, rather than after the whole order is rung up.
+        if (n > box.item.stock) {
+          setStatus('Only ' + box.item.stock + ' ' + box.item.item + ' in stock.', 'error');
+          return;
+        }
+        got += n;
+        parts.push({ item: box.item.item, qty: n, tag: panel.need.tag });
+      }
+      if (got !== panel.need.qty) {
+        setStatus(b.name + ' takes ' + panel.need.qty + ' ' + tagLabel(panel.need.tag) + ' — ' + got + ' chosen.', 'error');
+        return;
+      }
+    }
+    onFilled(parts);
+    modal.close();
+  }
+
+  modal = openModal([
+    el('h3', {}, b.name + ' — ' + money(b.price)),
+    el('p', { class: 'note' }, 'Choose what goes in it. One special at a time: the next customer picks ' +
+      'their own, so add it again for another.'),
+    ...body,
+    el('div', { class: 'row-actions' }, [el('button.primary', { onclick: confirm }, 'Add to order')]),
+    status,
+  ]);
+}

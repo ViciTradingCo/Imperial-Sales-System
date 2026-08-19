@@ -14,7 +14,7 @@
  * rather than in or out of the world, which is an administrative act on the
  * list rather than a thing that happens at a counter.
  */
-import { money } from '../lib/format.js';
+import { money, itemTags, tagLabel } from '../lib/format.js';
 import { el, mount, esc, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
@@ -28,6 +28,10 @@ import { readCsvFile, rowsToStocktake } from '../lib/csv.js';
 
 export function renderInventory(container, { me }) {
   const canEdit = canManage(me);
+  // The list as last loaded. The Kinds screen asks about the whole shop at
+  // once, so it opens on what is already on screen rather than fetching a
+  // second copy of it.
+  let current = [];
   const listHost = el('div', {}, skeletonRows(4));
 
   const firstCard = [
@@ -43,6 +47,9 @@ export function renderInventory(container, { me }) {
     firstCard.push(el('div', { class: 'row-actions' }, [
       el('button.secondary-btn', { onclick: () => openTransferModal(me, refreshInventory) }, 'Transfer'),
       el('button.secondary-btn', { onclick: () => openStocktakeModal(refreshInventory) }, 'Stocktake'),
+      // Tagging is a question about a LIST — "which of these are food?" — so it
+      // gets a screen that asks it that way rather than forty visits to Edit.
+      el('button.secondary-btn', { onclick: () => openTagsModal(current, refreshInventory) }, 'Kinds'),
     ]));
   }
   firstCard.push(listHost);
@@ -75,80 +82,195 @@ export function renderInventory(container, { me }) {
           : 'Nothing stocked yet.' }));
       return;
     }
-    const stock = items.filter((it) => !it.ingredient);
-    const ingredients = items.filter((it) => it.ingredient);
+    const rowActions = canEdit ? {
+      edit: (it) => openItemModal(it, refreshInventory),
+      stock: (it) => openStockModal(it, refreshInventory),
+      remove: async (it) => {
+        if (!confirm('Remove "' + it.item + '" from your inventory?\n\n' +
+          'This deletes the listing and its sale price. An item with no stock left is kept on ' +
+          'purpose — it stays priced and ready for the next delivery — so there is no need to ' +
+          'remove it just because it hit zero.')) return;
+        try { const res = await api.deleteItem(it.item); current = res.inventory || []; renderList(current); }
+        catch (e) { alert(e.message || e); }
+      },
+    } : null;
     mount(listHost,
-      table('Stock', 'What your shop sells.', stock, false,
-        'Nothing to sell yet — everything you hold is marked as an ingredient.'),
-      table('Ingredients', 'What your shop crafts with. These are not for sale, so what matters is ' +
-        'what they cost you, not what you would charge.', ingredients, true,
-        'Nothing marked as an ingredient. Tick Ingredient on an item with Edit to move it here.'),
+      itemTable('Stock', 'What your shop sells.', items.filter((it) => !it.ingredient), false,
+        'Nothing to sell yet — everything you hold is marked as an ingredient.', rowActions),
+      itemTable('Ingredients', 'What your shop crafts with. These are not for sale, so what matters is ' +
+        'what they cost you, not what you would charge.', items.filter((it) => it.ingredient), true,
+        'Nothing marked as an ingredient. Tick Ingredient on an item with Edit to move it here.', rowActions),
     );
   }
 
-  /**
-   * One of the two tables.
-   *
-   * `cost` swaps the money column: an asking price for stock, what it has
-   * actually been bought at for ingredients. The harvest column appears only
-   * where some row in THIS table has a rate, so a shop that does not buy from
-   * its own people is not reading a column of blanks.
-   */
-  function table(title, note, rows, cost, emptyNote) {
-    const anyHarvest = rows.some((it) => it.harvestPay);
-    const head = ['Item', cost ? 'Bought at' : 'Price', 'In stock', 'Status'];
-    if (anyHarvest) head.push('Harvest pays');
-    if (canEdit) head.push('');
-
-    const body = rows.map((it) => {
-      const cells = [
-        el('span', { html: '<b>' + esc(it.item) + '</b>' }),
-        // "Never bought" and "free" are different answers, and only one of them
-        // is true — so an ingredient nobody has purchased says so rather than
-        // showing 0.
-        cost ? (it.avgCost ? money(it.avgCost) : '—') : money(it.price),
-        String(it.stock),
-        el('span', { html: statusTag(it.status) }),
-      ];
-      if (anyHarvest) cells.push(it.harvestPay ? money(it.harvestPay) : '—');
-      if (canEdit) {
-        cells.push(el('span', { class: 'row-actions' }, [
-          el('button.primary.small', { onclick: () => openItemModal(it, refreshInventory) }, 'Edit'),
-          el('button.secondary-btn.small', { onclick: () => openStockModal(it, refreshInventory) }, 'Stock'),
-          el('button.secondary-btn.small', {
-            onclick: async () => {
-              if (!confirm('Remove "' + it.item + '" from your inventory?\n\n' +
-                'This deletes the listing and its sale price. An item with no stock left is kept on ' +
-                'purpose — it stays priced and ready for the next delivery — so there is no need to ' +
-                'remove it just because it hit zero.')) return;
-              try { const res = await api.deleteItem(it.item); renderList(res.inventory || []); }
-              catch (e) { alert(e.message || e); }
-            },
-          }, 'Remove'),
-        ]));
-      }
-      return cells;
-    });
-
-    return el('div', { class: 'inv-table' }, [
-      el('h3', {}, title + ' (' + rows.length + ')'),
-      el('p', { class: 'note' }, note),
-      rows.length
-        ? el('div', { class: 'table-scroll' }, tableEl(head, body))
-        : el('p', { class: 'note' }, emptyNote),
-    ]);
-  }
-
   async function refreshInventory() {
-    try { renderList((await api.getInventory()).inventory || []); }
-    catch (e) { mount(listHost, el('p', { class: 'error' }, e.message || String(e))); }
+    try {
+      current = (await api.getInventory()).inventory || [];
+      renderList(current);
+    } catch (e) { mount(listHost, el('p', { class: 'error' }, e.message || String(e))); }
   }
   refreshInventory();
+}
+
+/**
+ * One of the two tables.
+ *
+ * `cost` swaps the money column: an asking price for stock, what it has
+ * actually been bought at for ingredients. The harvest column appears only
+ * where some row in THIS table has a rate, so a shop that does not buy from its
+ * own people is not reading a column of blanks. `actions` is null for anyone
+ * who may only look, which is also what drops the buttons column.
+ */
+function itemTable(title, note, rows, cost, emptyNote, actions) {
+  const anyHarvest = rows.some((it) => it.harvestPay);
+  const head = ['Item', cost ? 'Bought at' : 'Price', 'In stock', 'Status'];
+  if (anyHarvest) head.push('Harvest pays');
+  if (actions) head.push('');
+
+  const body = rows.map((it) => {
+    const cells = [
+      // The kinds ride WITH the name: what a thing is is part of naming it,
+      // and a column of its own would be mostly empty on most shops' rows.
+      el('span', { html: '<b>' + esc(it.item) + '</b>' + tagPills(it.tags) }),
+      // "Never bought" and "free" are different answers, and only one of them
+      // is true — so an ingredient nobody has purchased says so rather than
+      // showing 0.
+      cost ? (it.avgCost ? money(it.avgCost) : '—') : money(it.price),
+      String(it.stock),
+      el('span', { html: statusTag(it.status) }),
+    ];
+    if (anyHarvest) cells.push(it.harvestPay ? money(it.harvestPay) : '—');
+    if (actions) {
+      cells.push(el('span', { class: 'row-actions' }, [
+        el('button.primary.small', { onclick: () => actions.edit(it) }, 'Edit'),
+        el('button.secondary-btn.small', { onclick: () => actions.stock(it) }, 'Stock'),
+        el('button.secondary-btn.small', { onclick: () => actions.remove(it) }, 'Remove'),
+      ]));
+    }
+    return cells;
+  });
+
+  return el('div', { class: 'inv-table' }, [
+    el('h3', {}, title + ' (' + rows.length + ')'),
+    el('p', { class: 'note' }, note),
+    rows.length
+      ? el('div', { class: 'table-scroll' }, tableEl(head, body))
+      : el('p', { class: 'note' }, emptyNote),
+  ]);
 }
 
 function statusTag(s) {
   const cls = s === 'Out of Stock' ? 'bad' : s === 'Low' ? 'warn' : 'ok';
   return '<span class="' + cls + '">' + esc(s) + '</span>';
+}
+
+/** A listing's kinds, written in the realm's own spelling. */
+function tagPills(tags) {
+  return (tags || []).map((t) => ' <span class="pill tag">' + esc(tagLabel(t)) + '</span>').join('');
+}
+
+/**
+ * The kind-picker on one listing: every kind this realm names, ticked or not.
+ *
+ * A fixed vocabulary rather than a box to type in. A special asks for five
+ * DRINK, and "drinks" typed on one listing is a listing the deal cannot see —
+ * the failure would be silent and would look like the special being broken.
+ */
+function tagChooser(selected) {
+  const chosen = new Set((selected || []).map((t) => String(t).toLowerCase()));
+  const boxes = [];
+  const vocabulary = itemTags();
+  // Anything the listing already carries that the realm has since dropped stays
+  // offered, or saving from this screen would quietly strip it.
+  const orphans = [...chosen].filter((t) => !vocabulary.some((v) => v.toLowerCase() === t));
+  const wrap = el('div', { class: 'tag-picker' }, [...vocabulary, ...orphans].map((name) => {
+    const box = el('input', { type: 'checkbox' });
+    box.checked = chosen.has(String(name).toLowerCase());
+    boxes.push({ box, name });
+    return el('label', { class: 'tag-check' }, [box, el('span', {}, tagLabel(name))]);
+  }));
+  return {
+    node: vocabulary.length || orphans.length
+      ? wrap
+      : el('p', { class: 'note' }, 'This realm has not named any kinds of item yet — an admin sets them in Network Settings.'),
+    value: () => boxes.filter((b) => b.box.checked).map((b) => String(b.name).toLowerCase()),
+  };
+}
+
+/**
+ * KINDS, across the whole shop: pick one, tick everything that is it.
+ *
+ * The other way round from the Edit modal, and deliberately — tagging is a
+ * question about a list ("which of these are food?"), and answering it one
+ * listing at a time means opening forty modals to say one thing. What is ticked
+ * carries the kind and what is not, does not; nothing else on any row moves.
+ */
+function openTagsModal(items, onSaved) {
+  const vocabulary = itemTags();
+  const status = el('p', {});
+  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
+
+  if (!vocabulary.length) {
+    openModal([
+      el('h3', {}, 'Kinds of item'),
+      el('p', { class: 'note' }, 'This realm has not named any kinds of item yet. An admin sets them in ' +
+        'Realm Management → Network Settings, and every shop in the realm can then tag its stock.'),
+    ]);
+    return;
+  }
+
+  const pick = el('select', {}, vocabulary.map((t) => el('option', { value: t.toLowerCase() }, t)));
+  const listHost = el('div', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save');
+  let boxes = [];
+
+  // Ingredients are stock the shop crafts with and never sells, so they are not
+  // offered: a special made of them could not be rung up anyway.
+  const sellable = (items || []).filter((it) => !it.ingredient);
+
+  function paint() {
+    const tag = pick.value;
+    boxes = [];
+    if (!sellable.length) {
+      mount(listHost, el('p', { class: 'note' }, 'Nothing to tag yet — stock the shop first.'));
+      return;
+    }
+    mount(listHost, el('div', { class: 'tag-picker' }, sellable.map((it) => {
+      const box = el('input', { type: 'checkbox' });
+      box.checked = (it.tags || []).includes(tag);
+      boxes.push({ box, item: it.item });
+      return el('label', { class: 'tag-check' }, [box, el('span', {}, it.item)]);
+    })));
+  }
+  pick.addEventListener('change', () => { setStatus(''); paint(); });
+  paint();
+
+  let modal;
+  async function doSave() {
+    save.disabled = true;
+    setStatus('Saving…');
+    try {
+      await api.setItemTag(pick.value, boxes.filter((b) => b.box.checked).map((b) => b.item));
+      onSaved();
+      modal.close();
+      toast('Kinds saved.', 'ok');
+    } catch (e) {
+      save.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  modal = openModal([
+    el('h3', {}, 'Kinds of item'),
+    el('p', { class: 'note' }, 'What each thing IS — food, drink, a weapon. Specials can then ask for five ' +
+      'food and five drink rather than naming the items, and the customer chooses at the till.'),
+    el('label', {}, 'Kind'), pick,
+    el('p', { class: 'note' }, 'Tick everything that is this kind. Unticking takes the kind off — nothing ' +
+      'else about the item changes, and its other kinds stay as they are.'),
+    listHost,
+    el('div', { class: 'row-actions' }, [save]),
+    status,
+  ]);
 }
 
 /** Focus modal to edit an existing item's sale price + low-stock threshold. */
@@ -175,6 +297,9 @@ function openItemModal(it, onSaved) {
   ]);
   priceWrap.hidden = ingredient.checked;
   ingredient.addEventListener('change', () => { priceWrap.hidden = ingredient.checked; });
+  // WHAT KIND OF THING this is. On the listing rather than the shared index,
+  // like Ingredient above it: one tavern's drink is a hedge wizard's reagent.
+  const kinds = tagChooser(it.tags);
   const status = el('p', {});
   const save = el('button.primary', { onclick: doSave }, 'Save');
 
@@ -190,6 +315,7 @@ function openItemModal(it, onSaved) {
         ingredient: ingredient.checked,
         // Blank clears it; the Worker reads an empty string as "no rate".
         harvestPay: harvestPay.value === '' ? 0 : harvestPay.value,
+        tags: kinds.value(),
       });
       onSaved();
       modal.close();
@@ -210,6 +336,9 @@ function openItemModal(it, onSaved) {
     el('p', { class: 'note' }, 'What you will pay one of your own people for each one they bring in. ' +
       'They claim it on the register’s Harvest side, and it comes out of your coffer as a business ' +
       'expense when they do. Leave it blank if you do not buy this from your staff.'),
+    el('label', {}, 'What kind of thing is it?'), kinds.node,
+    el('p', { class: 'note' }, 'Used by specials that ask for a kind — “five food and five drink” — rather ' +
+      'than naming the items. Tagging a whole shelf at once is quicker under Kinds on the Inventory page.'),
     save,
     status,
   ]);

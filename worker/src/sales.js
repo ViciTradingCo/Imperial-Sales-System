@@ -15,6 +15,7 @@ import { logAudit } from './audit.js';
 import { courtRules, standingOf, accrueLevy } from './court.js';
 import { coin } from './money.js';
 import { findBundle } from './bundles.js';
+import { parseTags } from './inventory.js';
 import { adjustmentLabel, MAX_UPCHARGE } from './discounts.js';
 
 /**
@@ -170,6 +171,114 @@ function bundleLine(b, askedQty, inv, rules) {
 }
 
 /**
+ * A special that asks for KINDS — "five food and five drink" — once the till
+ * has said which items fill it.
+ *
+ * The shape of the trust is the same as everywhere else: the client chooses
+ * WHAT (the customer picked the mead, not the shop) and the Worker checks the
+ * choice and states the PRICE. Each chosen line says which requirement it
+ * fills, so an item tagged both food and drink cannot quietly pay for both
+ * halves of the deal — and the count has to be EXACT, since "five food" sold
+ * for a flat price stops meaning anything if six will do.
+ *
+ * What it returns is an ordinary bundle line: one line to the customer, its
+ * chosen parts riding along so the stockroom and any later void know what
+ * actually left the shelf.
+ */
+function tagSpecialLine(b, askedQty, chosen, inv, rules) {
+  /**
+   * ONE AT A TIME, and this is where that rule is enforced rather than merely
+   * observed by the register.
+   *
+   * A stored line's parts are PER UNIT of the special — everything that puts
+   * stock back multiplies them by the line's quantity — and two of these need
+   * not divide evenly: seven sweet rolls and three stews is a perfectly good
+   * way to fill "five food" twice, and there is no per-special half of it.
+   * Two specials are two lines, each with what its own customer chose.
+   */
+  const qty = Math.floor(Number(askedQty)) || 1;
+  if (qty !== 1) {
+    throw new Error(b.name + ' is filled at the till, so it is rung up one at a time — add it again for another.');
+  }
+
+  const picked = (Array.isArray(chosen) ? chosen : [])
+    .map((p) => ({
+      item: String((p && p.item) || '').trim(),
+      qty: Math.floor(Number(p && p.qty)) || 0,
+      tag: String((p && p.tag) || '').trim().toLowerCase(),
+    }))
+    .filter((p) => p.item && p.qty > 0);
+  if (!picked.length) throw new Error('Choose what goes in ' + b.name + '.');
+
+  const need = new Map();
+  const parts = [];
+  const filled = new Map(); // tag → units chosen against it
+  let floor = 0;
+  let ceiling = 0;
+  let capped = true; // every part has a ceiling, so the aggregate one means something
+
+  for (const p of picked) {
+    const held = inv[p.item.toLowerCase()];
+    // Unlike a fixed bundle, a kind can only be filled from stock the shop
+    // LISTS: the tag lives on the listing, so an item it does not stock has no
+    // kind here and nothing to check against.
+    if (!held) throw new Error(p.item + ' is not in your inventory, so it cannot fill ' + b.name + '.');
+    if (held.ingredient) {
+      throw new Error(b.name + ' cannot be filled with ' + held.item + ' — it is marked as an ingredient, ' +
+        'stock you craft with rather than sell.');
+    }
+    if (!p.tag) throw new Error('Each choice in ' + b.name + ' must say which part of the deal it fills.');
+    if (!held.tags.includes(p.tag)) {
+      throw new Error(held.item + ' is not tagged "' + p.tag + '", so it cannot fill that part of ' + b.name + '.');
+    }
+    need.set(held.item, (need.get(held.item) || 0) + p.qty);
+    parts.push({ item: held.item, qty: p.qty });
+    filled.set(p.tag, (filled.get(p.tag) || 0) + p.qty);
+
+    // The Court's floor and ceiling, in aggregate — the same rule a fixed
+    // bundle follows, since neither has a per-item price to check.
+    if (rules) {
+      const cap = rules.prices.get(held.item.toLowerCase());
+      if (cap && cap.min != null) floor += cap.min * p.qty;
+      if (cap && cap.max != null) ceiling += cap.max * p.qty;
+      else capped = false;
+    }
+  }
+
+  for (const want of b.needs) {
+    const got = filled.get(want.tag) || 0;
+    if (got !== want.qty) {
+      throw new Error(b.name + ' takes ' + want.qty + ' ' + want.tag + ' — ' + got + ' chosen.');
+    }
+  }
+  // A tag chosen that the deal never asked for is a mistake at the till, not a
+  // free extra: it would leave the shelf without being charged for.
+  for (const tag of filled.keys()) {
+    if (!b.needs.some((n) => n.tag === tag)) {
+      throw new Error(b.name + ' does not ask for anything tagged "' + tag + '".');
+    }
+  }
+
+  const price = b.price;
+  if (rules && floor && price < floor) {
+    throw new Error(rules.hold + ' Court sets a floor of ' + floor + ' on what was chosen for ' + b.name +
+      ' — the special is priced at ' + price + '.');
+  }
+  if (rules && capped && ceiling && price > ceiling) {
+    throw new Error(rules.hold + ' Court caps what was chosen for ' + b.name + ' at ' + ceiling +
+      ' — the special is priced at ' + price + '.');
+  }
+
+  return {
+    need,
+    offInventory: [],
+    subtotal: price,
+    qtyTotal: parts.reduce((n, p) => n + p.qty, 0),
+    line: { name: b.name, qty: 1, price: b.price, parts },
+  };
+}
+
+/**
  * Rings up a multi-item sale. cart = [{item, qty, price}] where price is the
  * actual sold-for amount per unit. Attributed to the caller's character.
  */
@@ -216,11 +325,17 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
   }
 
   const master = await listItemIndex(env, realmId);
-  const { results } = await db.prepare('SELECT item, price, stock, ingredient FROM inventory WHERE realm_id = ? AND business = ?')
+  const { results } = await db.prepare('SELECT item, price, stock, ingredient, tags FROM inventory WHERE realm_id = ? AND business = ?')
     .bind(realmId, business).all();
   const inv = {};
   (results || []).forEach((r) => {
-    inv[r.item.toLowerCase()] = { item: r.item, price: r.price, stock: r.stock, ingredient: !!r.ingredient };
+    inv[r.item.toLowerCase()] = {
+      item: r.item, price: r.price, stock: r.stock, ingredient: !!r.ingredient,
+      // What KIND of thing it is, for a special that asks for kinds rather than
+      // naming items. Read here so the check happens against the shop's own
+      // listing and never against anything the till claims.
+      tags: parseTags(r.tags),
+    };
   });
 
   const need = {};            // in-inventory items → stock decrements
@@ -235,7 +350,11 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     if (line.bundle) {
       const b = await findBundle(env, business, line.bundle, realmId);
       if (!b) throw new Error('"' + line.bundle + '" is not one of this shop\'s bundles.');
-      const priced = bundleLine(b, line.qty, inv, rules);
+      // Two kinds of special: one that names its items, and one that asks for
+      // kinds and is filled at the till. The row says which it is.
+      const priced = b.needs.length
+        ? tagSpecialLine(b, line.qty, line.parts, inv, rules)
+        : bundleLine(b, line.qty, inv, rules);
       priced.need.forEach((qty, item) => { need[item] = (need[item] || 0) + qty; });
       offInventory.push(...priced.offInventory);
       subtotal += priced.subtotal;

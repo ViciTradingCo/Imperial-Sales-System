@@ -17,7 +17,7 @@ import { el, mount, esc } from '../lib/dom.js';
 import { navigate } from '../lib/router.js';
 import { api } from '../lib/api.js';
 import { renderSettingsForm } from './settings-form.js';
-import { money } from '../lib/format.js';
+import { money, itemTags, tagLabel } from '../lib/format.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { renderShopReport } from './shop-report.js';
 import { renderShopNotices } from './shop-notices.js';
@@ -93,7 +93,7 @@ export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
       // I charge for this, other than the list price?" — and an owner setting up
       // a Friday deal should not have to know in advance whether the app files
       // it under a percentage or a basket.
-      { key: 'led-discounts', label: 'Specials & Discounts', hint: 'Bundles, discounts, upcharges', glyph: '🏷️',
+      { key: 'led-discounts', label: 'Specials & Discounts', hint: 'Specials, discounts, upcharges', glyph: '🏷️',
         open: (host) => mount(host, bundlesCard(), discountsCard()) },
       { key: 'led-export', label: 'Export', hint: 'Sales & coffer CSV', glyph: '📤',
         open: (host) => mount(host, exportCard()) },
@@ -332,6 +332,12 @@ function shortDate(ts) {
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
 }
 
+/** What a special holds, in one line: its items, or the kinds it asks for. */
+function bundleContents(b) {
+  if (b.needs && b.needs.length) return b.needs.map((n) => n.qty + ' × ' + tagLabel(n.tag)).join(' + ');
+  return b.parts.map((p) => p.item + ' ×' + p.qty).join(', ');
+}
+
 /* ---- Specials: several items, one price ---- */
 /**
  * A BUNDLE — "five ales and five stews, sixty gold".
@@ -351,11 +357,58 @@ function bundlesCard() {
   const price = el('input', { type: 'number', min: '0', step: '1', placeholder: 'Price for the lot' });
   const rowsHost = el('div', {});
   const status = el('p', {});
-  const save = el('button.primary', { onclick: doSave }, 'Save bundle');
+  const save = el('button.primary', { onclick: doSave }, 'Save special');
   const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
 
   let stock = [];          // what this shop actually sells
   const rows = [];         // [{ node, picker, qty }]
+
+  /**
+   * THE TWO KINDS OF SPECIAL, and the one choice that separates them.
+   *
+   * A special either NAMES its items — five ales and five stews — or asks for
+   * KINDS of item: five food and five drink, whichever the customer picks.
+   * Named is a fixed deal the shop assembles; by kind is a deal the customer
+   * assembles at the till out of anything tagged for it.
+   *
+   * One or the other, never both. A special that did half of each would have to
+   * be reconciled at the register, and there is no honest reading of "five
+   * drink, one of which is this ale" that is not simply one of the two.
+   */
+  const mode = el('select', {}, [
+    el('option', { value: 'items' }, 'Names its items'),
+    el('option', { value: 'kinds' }, 'Asks for kinds of item'),
+  ]);
+  const needRows = [];     // [{ node, tag, qty }]
+  const needsHost = el('div', {});
+  const itemsWrap = el('div', {});
+  const kindsWrap = el('div', {});
+
+  function addNeed(tag, qty) {
+    const kinds = itemTags();
+    const pick = el('select', {}, kinds.map((t) => el('option', { value: t.toLowerCase() }, t)));
+    if (tag) pick.value = String(tag).toLowerCase();
+    const q = el('input', { type: 'number', min: '1', step: '1', value: String(qty || 1), 'aria-label': 'How many' });
+    const remove = el('button.secondary-btn.small', { type: 'button', onclick: () => {
+      const i = needRows.findIndex((r) => r.tag === pick);
+      if (i >= 0) { needRows.splice(i, 1); drawNeeds(); }
+    } }, 'Remove');
+    const node = el('div', { class: 'need-row' }, [pick, q, remove]);
+    needRows.push({ node, tag: pick, qty: q });
+    drawNeeds();
+    return pick;
+  }
+  function drawNeeds() { mount(needsHost, ...needRows.map((r) => r.node)); }
+
+  function paintMode() {
+    const byKind = mode.value === 'kinds';
+    itemsWrap.hidden = byKind;
+    kindsWrap.hidden = !byKind;
+    if (byKind && !needRows.length) addNeed();
+    if (byKind) sumLine.textContent = '';
+    else paintSum();
+  }
+  mode.addEventListener('change', paintMode);
 
   function addRow(item, qty) {
     const picker = createItemPicker({
@@ -400,11 +453,11 @@ function bundlesCard() {
   rowsHost.addEventListener('input', paintSum);
 
   function render(bs) {
-    if (!bs.length) { mount(list, el('p', { class: 'note' }, 'No bundles yet.')); return; }
+    if (!bs.length) { mount(list, el('p', { class: 'note' }, 'No specials yet.')); return; }
     mount(list, ...bs.map((b) => el('div.emp-row', {}, [
       el('span', { class: 'emp-who', html: '<b>' + esc(b.name) + '</b> · ' + esc(money(b.price)) +
         ' for ' + b.units + ' item' + (b.units === 1 ? '' : 's') +
-        '<br><span class="note">' + esc(b.parts.map((p) => p.item + ' ×' + p.qty).join(', ')) + '</span>' }),
+        '<br><span class="note">' + esc(bundleContents(b)) + '</span>' }),
       el('span', { class: 'row-actions' }, [
         el('button.secondary-btn.small', { onclick: () => edit(b) }, 'Edit'),
         el('button.danger.small', { onclick: () => remove(b) }, 'Delete'),
@@ -416,9 +469,13 @@ function bundlesCard() {
     name.value = b.name;
     price.value = String(b.price);
     rows.splice(0, rows.length);
+    needRows.splice(0, needRows.length);
+    mode.value = (b.needs && b.needs.length) ? 'kinds' : 'items';
     b.parts.forEach((p) => addRow(p.item, p.qty));
+    (b.needs || []).forEach((n) => addNeed(n.tag, n.qty));
     if (!rows.length) addRow();
-    paintSum();
+    drawNeeds();
+    paintMode();
     setStatus('Editing “' + b.name + '”. Saving replaces it.', '');
   }
 
@@ -434,51 +491,77 @@ function bundlesCard() {
       rows.forEach((r) => r.picker.setItems(stock));
       render(bs.bundles || []);
       if (!rows.length) addRow();
+      paintMode();
     });
   }
 
   async function doSave() {
+    const byKind = mode.value === 'kinds';
     const parts = [];
-    for (const r of rows) {
-      const item = r.picker.value();
-      if (!item) continue;
-      parts.push({ item, qty: Math.floor(Number(r.qty.value)) || 0 });
+    const needs = [];
+    if (byKind) {
+      for (const r of needRows) {
+        if (!r.tag.value) continue;
+        needs.push({ tag: r.tag.value, qty: Math.floor(Number(r.qty.value)) || 0 });
+      }
+    } else {
+      for (const r of rows) {
+        const item = r.picker.value();
+        if (!item) continue;
+        parts.push({ item, qty: Math.floor(Number(r.qty.value)) || 0 });
+      }
     }
-    if (!name.value.trim()) { setStatus('Give the bundle a name.', 'error'); return; }
-    if (!parts.length) { setStatus('Put at least one item in it.', 'error'); return; }
+    if (!name.value.trim()) { setStatus('Give the special a name.', 'error'); return; }
+    if (byKind && !needs.length) { setStatus('Say what kinds it asks for.', 'error'); return; }
+    if (!byKind && !parts.length) { setStatus('Put at least one item in it.', 'error'); return; }
     save.disabled = true; setStatus('Saving…', '');
     try {
-      const res = await api.saveBundle(name.value.trim(), price.value, parts);
+      const res = await api.saveBundle(name.value.trim(), price.value, parts, needs);
       render(res.bundles || []);
       name.value = ''; price.value = '';
-      rows.splice(0, rows.length); addRow(); paintSum();
+      rows.splice(0, rows.length); addRow();
+      needRows.splice(0, needRows.length); drawNeeds();
+      paintMode();
       setStatus('Saved ✓', 'ok');
-      toast('Bundle saved.', 'ok');
+      toast('Special saved.', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { save.disabled = false; }
   }
 
   async function remove(b) {
-    if (!window.confirm('Delete the “' + b.name + '” bundle?\n\nSales already rung up with it are untouched.')) return;
+    if (!window.confirm('Delete the “' + b.name + '” special?\n\nSales already rung up with it are untouched.')) return;
     try { render((await api.deleteBundle(b.id)).bundles || []); }
     catch (e) { setStatus(e.message || String(e), 'error'); }
   }
 
-  load();
-  return el('div.card', {}, [
-    el('h2', {}, 'Specials'),
-    el('p', { class: 'note' }, 'Several items sold together for one price — five drinks and five meals for a ' +
-      'set figure, say. Your staff ring the whole thing up as one line at the register, and every item in ' +
-      'it still comes out of your stock.'),
-    list,
-    el('h4', {}, 'Add or edit a bundle'),
-    el('label', {}, 'Name'), name,
+  mount(itemsWrap,
     el('label', {}, 'What is in it'),
     rowsHost,
     el('div', { class: 'row-actions' }, [
       el('button.secondary-btn.small', { type: 'button', onclick: () => addRow().focus() }, '+ Add item'),
+    ]));
+  mount(kindsWrap,
+    el('label', {}, 'What it asks for'),
+    needsHost,
+    el('div', { class: 'row-actions' }, [
+      el('button.secondary-btn.small', { type: 'button', onclick: () => addNeed() }, '+ Add kind'),
     ]),
-    el('label', {}, 'Price for the whole bundle'), price,
+    el('p', { class: 'note' }, 'The customer picks which — anything your inventory tags with that kind. ' +
+      'Tag your stock under Inventory → Kinds; a kind nobody has tagged cannot fill anything.'));
+
+  load();
+  return el('div.card', {}, [
+    el('h2', {}, 'Specials'),
+    el('p', { class: 'note' }, 'Several items sold together for one price. A special either NAMES what is in ' +
+      'it, or asks for KINDS — “five food and five drink” — and lets the customer choose at the till. Either ' +
+      'way your staff ring it up as one line, and everything in it still comes out of your stock.'),
+    list,
+    el('h4', {}, 'Add or edit a special'),
+    el('label', {}, 'Name'), name,
+    el('label', {}, 'How it is filled'), mode,
+    itemsWrap,
+    kindsWrap,
+    el('label', {}, 'Price for the whole special'), price,
     sumLine,
     el('div', { class: 'row-actions' }, [save]),
     status,

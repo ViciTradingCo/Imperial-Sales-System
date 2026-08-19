@@ -32,6 +32,7 @@ const SCHEMA = [
      low_stock INTEGER NOT NULL DEFAULT 0,
      ingredient INTEGER NOT NULL DEFAULT 0,
      harvest_pay REAL NOT NULL DEFAULT 0,
+     tags TEXT NOT NULL DEFAULT '',
      UNIQUE (realm_id, business, item))`,
   `CREATE INDEX IF NOT EXISTS idx_inventory_business ON inventory (business)`,
   `CREATE TABLE IF NOT EXISTS sales (
@@ -103,6 +104,7 @@ const SCHEMA = [
      realm_id TEXT NOT NULL DEFAULT '${R}',
      business TEXT NOT NULL, name TEXT NOT NULL,
      price REAL NOT NULL DEFAULT 0, parts TEXT NOT NULL DEFAULT '[]',
+     needs TEXT NOT NULL DEFAULT '[]',
      UNIQUE (realm_id, business, name))`,
   `CREATE INDEX IF NOT EXISTS idx_bundles_business ON bundles (business)`,
   // Per-shop style (tagline + accent colour), one row per business per realm.
@@ -425,6 +427,16 @@ const MIGRATIONS = [
   "ALTER TABLE intake ADD COLUMN from_business TEXT NOT NULL DEFAULT ''",
   'CREATE INDEX IF NOT EXISTS idx_intake_from ON intake (realm_id, from_business)',
   'CREATE INDEX IF NOT EXISTS idx_sales_counted ON sales (realm_id, status, staff_purchase)',
+  // WHAT KIND OF THING a listing is — food, drink, a weapon. Per LISTING and
+  // comma-joined lowercase, for the same reason `ingredient` is: the shop
+  // decides what its stock is FOR, and one shop's drink is another's reagent.
+  // Empty is untagged, which is what every existing row starts as.
+  "ALTER TABLE inventory ADD COLUMN tags TEXT NOT NULL DEFAULT ''",
+  // A SPECIAL BY TAG — "five food and five drink for 40" — states what it wants
+  // rather than naming the items, so the customer chooses at the till. A row
+  // has parts OR needs, never both; every special written before this has
+  // parts, and an empty needs is what says so.
+  "ALTER TABLE bundles ADD COLUMN needs TEXT NOT NULL DEFAULT '[]'",
 ];
 
 /**

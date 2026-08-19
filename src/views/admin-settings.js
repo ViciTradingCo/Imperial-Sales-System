@@ -35,6 +35,8 @@ export function renderAdminSettings(container, { me } = {}) {
       open: (host) => mount(host, denominationCard()) },
     { key: 'set-trial', label: 'New shops', hint: 'Opening trial length', glyph: '🎁',
       open: (host) => mount(host, trialCard()) },
+    { key: 'set-kinds', label: 'Item kinds', hint: 'Food, drink, weapons…', glyph: '🏷️',
+      open: (host) => mount(host, itemKindsCard()) },
     { key: 'set-tiles', label: 'Tile images', hint: 'Home tile artwork', glyph: '🖼️',
       open: (host) => mount(host, tileImagesCard()) },
     { key: 'set-status', label: 'System status', hint: 'Counts + errors', glyph: '💚',
@@ -241,6 +243,51 @@ function trialCard() {
   ]);
 }
 
+/**
+ * THE KINDS OF THING THIS REALM TRADES IN — food, drink, a weapon.
+ *
+ * The vocabulary is the realm's and the tagging is each shop's: an owner marks
+ * their own listings, and a special can then ask for five food rather than
+ * naming five items. A shared list rather than free text per shop, because
+ * "drink" and "drinks" typed at two counters are two kinds that look like one,
+ * and the deal that asks for the first would quietly ignore the second.
+ *
+ * One per line — a textarea rather than a row of fields, because this is a list
+ * somebody pastes and reorders far more often than they edit one entry of.
+ */
+function itemKindsCard() {
+  const box = el('textarea', { rows: '10', placeholder: 'Food\nDrink\nWeapon' });
+  const status = el('p', {});
+  const save = el('button.primary', { onclick: doSave }, 'Save kinds');
+
+  api.getRealmPrefs()
+    .then((p) => { box.value = (p.itemTags || []).join('\n'); })
+    .catch(() => {});
+
+  async function doSave() {
+    save.disabled = true; status.className = ''; status.textContent = 'Saving…';
+    try {
+      await api.setRealmPrefs({ itemTags: box.value.split('\n').map((t) => t.trim()).filter(Boolean) });
+      status.textContent = '';
+      toast('Item kinds saved — reload to see them everywhere', 'ok');
+    } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
+    finally { save.disabled = false; }
+  }
+
+  return el('div.card', {}, [
+    el('h3', {}, 'Item kinds'),
+    el('p', { class: 'note' }, 'What kinds of thing this realm trades in. Shops tag their own stock with these ' +
+      '(Inventory → Kinds), and a special can then ask for “five food and five drink” and let the customer ' +
+      'choose which. One per line.'),
+    el('label', {}, 'Kinds'),
+    box,
+    el('p', { class: 'note' }, 'Taking a kind off this list does NOT strip it from stock already tagged with ' +
+      'it — a shop keeps what it wrote down, and the kind simply stops being offered.'),
+    el('div', { class: 'row-actions' }, [save]),
+    status,
+  ]);
+}
+
 /** The denomination every amount in this realm is shown in. */
 function denominationCard() {
   const input = el('input', { type: 'text', placeholder: 'gp' });
@@ -292,6 +339,7 @@ const TILE_KEYS = [
   ['set-about', 'Settings · About page'],
   ['set-holds', 'Settings · Regions'], ['set-money', 'Settings · Denomination'],
   ['set-trial', 'Settings · New shops'],
+  ['set-kinds', 'Settings · Item kinds'],
   ['set-tiles', 'Settings · Tile images'],
   ['set-status', 'Settings · System status'],
   ['set-data', 'Settings · Data'],

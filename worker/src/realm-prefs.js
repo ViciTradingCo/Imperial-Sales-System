@@ -33,7 +33,46 @@ export const PREFS_DEFAULTS = {
    * call: 0 means no trial at all (an admin must certify by hand).
    */
   trialDays: 7,
+  /**
+   * WHAT KINDS OF THING this realm trades in — food, drink, a weapon.
+   *
+   * The vocabulary is the REALM'S, and a shop tags its own listings from it.
+   * Free text per shop was the alternative and drifts within a week ("drink",
+   * "drinks", "Drink"), which matters here more than it looks: a special asks
+   * for five DRINK, and a tag that is nearly right buys nothing.
+   *
+   * The default is Skyrim's own categories, so a realm that never opens this
+   * screen can still tag its stock on the day it signs up.
+   */
+  itemTags: [
+    'Food', 'Drink', 'Potion', 'Poison', 'Weapon', 'Armor', 'Clothing',
+    'Jewelry', 'Book', 'Scroll', 'Soul Gem', 'Ore', 'Ingot', 'Pelt', 'Gem', 'Misc',
+  ],
 };
+
+/** How many kinds a realm may name, and how long a name may be. */
+const MAX_TAGS = 40;
+const MAX_TAG_LEN = 24;
+
+/**
+ * Cleans a realm's tag vocabulary: trimmed, deduplicated case-insensitively,
+ * and free of commas — the listing stores its tags comma-joined, so a comma in
+ * a name would silently become two tags.
+ */
+function cleanTagList(input) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of (Array.isArray(input) ? input : [])) {
+    const name = String(raw || '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_TAG_LEN);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  if (out.length > MAX_TAGS) throw new Error('A realm can name at most ' + MAX_TAGS + ' kinds of item.');
+  return out;
+}
 
 function key(realmId) {
   return 'realm_prefs:' + String(realmId || DEFAULT_REALM_ID);
@@ -61,6 +100,10 @@ export async function writeRealmPrefs(env, input, realmId) {
     next.regionLabel = r || PREFS_DEFAULTS.regionLabel;
   }
   if (input.showRegion !== undefined) next.showRegion = !!input.showRegion;
+  // Removing a kind leaves it on any listing already carrying it — the tag is
+  // stored on the row, and quietly stripping stock of what it IS because a
+  // vocabulary was edited would be a far worse surprise than an orphan tag.
+  if (input.itemTags !== undefined) next.itemTags = cleanTagList(input.itemTags);
   if (input.trialDays !== undefined) {
     const d = Math.floor(Number(input.trialDays));
     if (!isFinite(d) || d < 0 || d > 365) throw new Error('New-shop trial must be between 0 and 365 days.');

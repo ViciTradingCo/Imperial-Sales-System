@@ -951,6 +951,35 @@ label.inline {
 .item-picker-empty { padding: 10px 12px; margin: 0; }
 .pill.danger { background: #a4302a; color: #fff; }
 .pill.warn { background: #b5741c; color: #fff; }
+/* What KIND of thing a listing is. Quieter than a status pill: it is a note in
+   the margin beside the name, not a warning about the row. */
+.pill.tag {
+  background: none; color: var(--note);
+  border: 1px solid var(--edge); font-weight: 400; text-transform: none;
+}
+
+/* A grid of tick-boxes — the kinds on one listing, or every listing of one
+   kind. It wraps into columns so twenty of them are read across rather than
+   scrolled through. */
+.tag-picker {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px var(--sp-3); margin: var(--sp-2) 0;
+  max-height: 40vh; overflow-y: auto;
+}
+.tag-check {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 32px; cursor: pointer; font-weight: 400;
+}
+.tag-check input { margin: 0; }
+/* What a special ASKS FOR, as a line in its builder. */
+.need-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: 4px; }
+.need-row select { flex: 1 1 140px; }
+.need-row .emp-who { flex: 1 1 140px; }
+.need-row input { flex: 0 0 90px; }
+/* One requirement of a special being filled at the till — "5 × Food", and what
+   the shop has that is food. */
+.fill-need { margin-bottom: var(--sp-3); }
+.fill-need h4 { margin-bottom: 4px; }
 
 /* Employee management */
 .emp-row {
