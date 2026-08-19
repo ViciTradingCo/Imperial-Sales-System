@@ -62,6 +62,17 @@ function richText(text) {
   return out;
 }
 
+/**
+ * The hairline between two halves of one card.
+ *
+ * `--edge`, not `--rule`: the ruled lines of a page are allowed to be invisible
+ * (the scroll surface makes them so), and a divider that carries meaning has to
+ * be drawn whatever the surface.
+ */
+function sectionRule() {
+  return el('hr', { class: 'card-rule' });
+}
+
 /** The credits fallback — a literal, so the one bit of markup here is ours. */
 function stockCredits() {
   return [
@@ -108,9 +119,20 @@ function aboutView({ signInMount, canEdit, onEdit }) {
     ]));
   }
 
+  // What the Ledger IS and what it DOES are one statement, so they are one
+  // card. Split across two, the page opened with four short cards and made the
+  // reader scroll past all of them to reach anything they had not read before.
   nodes.push(el('div.card.hero', {}, [
     el('h2', {}, b.aboutTitle || b.tagline || 'The Vici Automated Ledger'),
     ...richText(b.aboutBody || STOCK.aboutBody),
+    sectionRule(),
+    el('h3', {}, 'What you can do'),
+    el('ul', { class: 'feature-list' }, [
+      el('li', {}, 'Employees ring up sales at their shop’s register.'),
+      el('li', {}, 'Owners manage their shop: inventory, staff, and pricing.'),
+      el('li', {}, 'Admins keep the network and its settings in order.'),
+      el('li', {}, 'Your view only ever shows the business you belong to.'),
+    ]),
   ]));
 
   if (signInMount) {
@@ -122,31 +144,21 @@ function aboutView({ signInMount, canEdit, onEdit }) {
     ]));
   }
 
-  nodes.push(el('div.card', {}, [
-    el('h3', {}, 'What you can do'),
-    el('ul', { class: 'feature-list' }, [
-      el('li', {}, 'Employees ring up sales at their shop’s register.'),
-      el('li', {}, 'Owners manage their shop: inventory, staff, and pricing.'),
-      el('li', {}, 'Admins keep the network and its settings in order.'),
-      el('li', {}, 'Your view only ever shows the business you belong to.'),
-    ]),
-  ]));
-
+  // Credits and the tip jar are the same subject twice — who made this, and
+  // how to thank them — so they close the page as ONE card with a rule between
+  // them rather than as two that say it over again. The tip jar half appears
+  // only when it has somewhere to point.
   nodes.push(el('div.card.credits', {}, [
     el('h3', {}, 'Credits'),
     ...(b.aboutCredits ? richText(b.aboutCredits) : stockCredits()),
-  ]));
-
-  // The tip jar sits under the credits — it is the same subject, said with a
-  // button — and only appears when it has somewhere to point.
-  if (b.supportUrl) {
-    nodes.push(el('div.card.support', {}, [
+    ...(b.supportUrl ? [
+      sectionRule(),
       el('h3', {}, b.supportTitle || STOCK.supportTitle),
       ...richText(b.supportBody || STOCK.supportBody),
       el('div', { class: 'kofi-wrap' }, [supportButton(b)]),
       el('p', { class: 'note' }, 'Tips are a thank-you, never a requirement. The ledger works the same either way.'),
-    ]));
-  }
+    ] : []),
+  ]));
 
   return nodes;
 }
@@ -214,19 +226,22 @@ function aboutEditor({ draft, scope, inherited, onSave, onCancel }) {
       ? 'You are editing this realm’s About page. A box left blank uses the deployment’s wording.'
       : 'You are editing the About page every visitor sees. A box left blank uses the built-in wording.'),
 
+    // The same two cards the page is read in, so editing changes what the
+    // wording says and not what shape the page is.
     el('div.card.hero', {}, [
+      el('h3', {}, 'The page'),
       box('aboutTitle', 'Heading', el('input', { type: 'text' }), fallbackHint('aboutTitle', branding().tagline)),
       box('aboutBody', 'Body', el('textarea', { rows: '8' }), fallbackHint('aboutBody', STOCK.aboutBody)),
-      el('p', { class: 'note' }, 'Blank lines separate paragraphs; a block of lines each starting with “- ” becomes a bullet list.'),
+      el('p', { class: 'note' }, 'Blank lines separate paragraphs; a block of lines each starting with “- ” becomes a bullet list. ' +
+        'The “What you can do” list below it is part of the app and is not edited here.'),
     ]),
 
     el('div.card.credits', {}, [
       el('h3', {}, 'Credits'),
       box('aboutCredits', 'What it says', el('textarea', { rows: '4' }),
         fallbackHint('aboutCredits', 'Created and managed by SmileDaemon.')),
-    ]),
 
-    el('div.card.support', {}, [
+      sectionRule(),
       el('h3', {}, 'Tip jar'),
       box('supportTitle', 'Heading', el('input', { type: 'text' }), fallbackHint('supportTitle', STOCK.supportTitle)),
       box('supportBody', 'What it says', el('textarea', { rows: '8' }), fallbackHint('supportBody', STOCK.supportBody)),

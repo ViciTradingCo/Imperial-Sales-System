@@ -16,6 +16,7 @@ const PATCH_NOTES = [
     'Admins can write the About page ON the About page. Open it and there is an “Edit this page” button: the heading, the welcome, the credits and the tip jar become boxes you type into, with Save and Cancel at both ends.',
     'It replaces the form that was buried in Network Settings, where you wrote the page blind and had to go and look at it afterwards. The Network Settings tile now takes you to the page itself.',
     'A realm admin edits their own realm’s wording, as before. A box left blank shows what it will fall back to, so blank reads as “inherited” rather than “missing”.',
+    'The page itself is shorter to read. What the Ledger is and what it does are one card now, and the credits and the tip jar close it as another, each divided by a ruled line rather than sitting in four separate cards you had to scroll past.',
   ] },
   { version: '5.9', date: '2026-08-18', notes: [
     'YOU CAN WORK AT MORE THAN ONE SHOP. Profile → Your businesses takes a Business Code and adds it to your account — a staff code joins you to somebody’s shop, a founder code lets you name another of your own.',

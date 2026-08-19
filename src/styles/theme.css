@@ -727,6 +727,16 @@ body.has-nav .sidenav { display: flex; }
 .about-field { margin-bottom: var(--sp-2); }
 .about-field label { display: block; }
 
+/* The divider between two halves of ONE card — credits and the tip jar, the
+   welcome and what the app does. `--edge` rather than `--rule`: a surface may
+   make its ruled lines invisible (the scroll does), and a line that carries
+   meaning has to be drawn on every surface. */
+.card-rule {
+  border: 0;
+  border-top: 1px solid var(--edge);
+  margin: var(--sp-3) 0;
+}
+
 /* The tip jar. The button is a supporter-hosted image of a fixed shape, so it
    is sized rather than stretched; when it fails to load the link becomes text
    and takes the ordinary button styling instead. */
