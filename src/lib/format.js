@@ -35,6 +35,18 @@ export function regionWord() { return region.label.toLowerCase(); }
 export function regionsOn() { return region.shown; }
 
 /**
+ * Whether this realm requires certification (the subscription).
+ *
+ * Set at sign-in with the other presentation settings, and read wherever a
+ * screen would otherwise ask about expiry dates. The Worker enforces the rule
+ * itself — this only decides what is worth SHOWING, so a realm that does not
+ * charge for anything is not made to look at a subscription it does not have.
+ */
+let certOn = true;
+export function setCertification(prefs) { certOn = !prefs || prefs.certification !== false; }
+export function certificationOn() { return certOn; }
+
+/**
  * ITEM KINDS — food, drink, a weapon — as this realm names them.
  *
  * Set at sign-in with the rest of the presentation settings, for the same

@@ -6,7 +6,7 @@
  *   • Ledger — a READ-ONLY look at the shop's books: coffer, discounts, style,
  *     and what it sells. Admins look; owners keep them.
  */
-import { regionLabel, regionWord, money, TRAVELING, isTraveling } from '../lib/format.js';
+import { regionLabel, regionWord, money, TRAVELING, isTraveling, certificationOn } from '../lib/format.js';
 import { el, mount, esc, tableEl, statTiles } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
@@ -29,8 +29,11 @@ export function renderCompanies(container, { me } = {}) {
   mount(container, el('div.card', {}, [
     el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
     el('h2', {}, 'Company List'),
-    el('p', { class: 'note' }, 'Every registered business. Edit renames a company, Subscription sets its ' +
-      'certification, and Ledger opens a read-only view of its books.'),
+    el('p', { class: 'note' }, certificationOn()
+      ? 'Every registered business. Edit renames a company, Subscription sets its ' +
+        'certification, and Ledger opens a read-only view of its books.'
+      : 'Every registered business. Edit renames a company and Ledger opens a read-only view of its books. ' +
+        'This realm does not require certification, so there are no subscriptions to set.'),
     el('div', { class: 'row-actions' }, [
       el('button.secondary-btn', { onclick: () => openArchiveModal(load) }, 'Archived companies'),
     ]),
@@ -58,22 +61,34 @@ export function renderCompanies(container, { me } = {}) {
 
   function renderList(companies) {
     mount(listHost, ...companies.map((c) => {
-      const sub = c.perpetual ? 'Perpetual' : (c.until ? 'until ' + c.until : 'no subscription');
-      const statusCls = String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';
+      // A realm that does not require certification has nothing to say here:
+      // the dates are still stored, but they decide nothing, and reading
+      // "no subscription" beside a shop that trades freely is a puzzle.
+      const sub = !certificationOn()
+        ? 'certification not required in this realm'
+        : (c.perpetual ? 'Perpetual' : (c.until ? 'until ' + c.until : 'no subscription'));
+      // With certification off, the stored VALID/EXPIRED decides nothing — so
+      // the pill says what is actually true of the shop instead of quoting a
+      // date that stopped mattering.
+      const certOn = certificationOn();
+      const statusText = certOn ? (c.status || '—') : 'Trading';
+      const statusCls = !certOn || String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';
       const court = c.court ? ' <span class="role-pill">Court</span>' : '';
       const realmPill = (me && me.realmCount > 1 && c.realmId)
         ? ' <span class="realm-pill">' + esc(c.realmName || c.realmId) + '</span>' : '';
       const holdLine = c.hold ? '<br><span class="note">' + esc(regionLabel()) + ': ' + esc(c.hold) + '</span>' : '';
       return el('div', { class: 'member-row' }, [
         el('p', { html:
-          '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(c.status || '—') + '</span>' + court + realmPill + '<br>' +
+          '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(statusText) + '</span>' + court + realmPill + '<br>' +
           '<span class="note">' + esc(sub) + (c.pointOfContact ? ' · ' + esc(c.pointOfContact) : '') + '</span>' + holdLine }),
         el('span', { class: 'row-actions' }, [
           el('button.primary.small', { onclick: () => openNameModal(c, load) }, 'Edit'),
-          el('button.secondary-btn.small', { onclick: () => openSubscriptionModal(c, load) }, 'Subscription'),
+          certOn
+            ? el('button.secondary-btn.small', { onclick: () => openSubscriptionModal(c, load) }, 'Subscription')
+            : null,
           el('button.secondary-btn.small', { onclick: () => openLedgerModal(c) }, 'Ledger'),
           el('button.danger.small', { onclick: () => remove(c) }, 'Archive'),
-        ]),
+        ].filter(Boolean)),
       ]);
     }));
   }

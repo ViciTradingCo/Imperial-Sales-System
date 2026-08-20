@@ -17,7 +17,7 @@
  * no tile grid at all, and Market's sub-pages are sections of one screen rather
  * than destinations of their own.
  */
-import { regionLabel, regionsOn } from './format.js';
+import { regionLabel, regionsOn, certificationOn } from './format.js';
 import { el, mount, esc } from './dom.js';
 import { navigate, currentPath } from './router.js';
 import { setActions } from './actions.js';
@@ -146,6 +146,9 @@ export function recentErrorsPanel(errors, me, onCleared) {
  */
 export function subscriptionCard(me) {
   const host = el('div.card', {}, el('p', { class: 'note' }, 'Checking subscription…'));
+  // A realm that does not require certification has no subscription to report,
+  // and a card saying VALID over a date nobody maintains is worse than no card.
+  if (!certificationOn()) { host.hidden = true; host.innerHTML = ''; return host; }
   api.getCert()
     .then((c) => {
       const status = String(c.status || '').toUpperCase();

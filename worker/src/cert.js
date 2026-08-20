@@ -3,9 +3,17 @@
  * registry: Perpetual grants VALID forever; otherwise VALID while today ≤ the
  * subscription `until` date, EXPIRED beyond it (a blank/unreadable date — or a
  * business not in the registry — is EXPIRED).
+ *
+ * A REALM MAY NOT REQUIRE IT AT ALL (`realm-prefs.certification`). Then this
+ * passes every shop that exists and is not archived, and says so with `off`, so
+ * the screens that manage subscriptions can stop asking rather than showing a
+ * VALID badge over a date nobody maintains. The stored dates are untouched:
+ * turning it back on restores each shop's real standing instead of having
+ * quietly certified the lot.
  */
 import { getDb } from './db.js';
 import { cacheGet, cacheSet } from './cache.js';
+import { readRealmPrefs } from './realm-prefs.js';
 
 function startOfToday() {
   const d = new Date();
@@ -41,6 +49,12 @@ export async function checkCertification(env, business, realmId) {
   if (String(row.status || '').trim().toUpperCase() === 'ARCHIVED') {
     return put({ status: 'EXPIRED', until: '', archived: true });
   }
+  // The realm does not require certification: a shop that EXISTS and has not
+  // been archived may trade. Read after the row for exactly that reason — this
+  // is a rule about expiry dates, not a way for a company nobody registered to
+  // start selling.
+  const prefs = await readRealmPrefs(env, realmId);
+  if (prefs.certification === false) return put({ status: 'VALID', off: true });
   if (Number(row.perpetual) === 1) return put({ status: 'VALID', perpetual: true });
   const d = new Date(String(row.until || ''));
   if (isNaN(d.getTime())) return put({ status: 'EXPIRED', until: '' });

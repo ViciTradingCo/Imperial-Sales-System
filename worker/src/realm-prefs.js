@@ -26,6 +26,21 @@ export const PREFS_DEFAULTS = {
   /** What a "region" is called in this realm's fiction (Hold, Province, Sector…). */
   regionLabel: 'Region',
   /**
+   * WHETHER THIS REALM REQUIRES CERTIFICATION AT ALL.
+   *
+   * A subscription that expires and stops a shop trading is a rule some servers
+   * want and others do not — running one where nobody is charged for anything
+   * means every shop eventually lapses for no reason, and an admin spends their
+   * evenings renewing dates.
+   *
+   * Off means the check simply passes: nothing expires, nothing is warned
+   * about, and the screens that manage subscriptions stop asking. It is not a
+   * blanket "everyone is certified" flag written across the companies — the
+   * dates stay exactly as they are, so turning it back on restores every shop's
+   * standing rather than having quietly erased it.
+   */
+  certification: true,
+  /**
    * Days of certification a newly founded shop opens with.
    *
    * A founder code should mean you can trade immediately, so a new shop starts
@@ -100,6 +115,7 @@ export async function writeRealmPrefs(env, input, realmId) {
     next.regionLabel = r || PREFS_DEFAULTS.regionLabel;
   }
   if (input.showRegion !== undefined) next.showRegion = !!input.showRegion;
+  if (input.certification !== undefined) next.certification = !!input.certification;
   // Removing a kind leaves it on any listing already carrying it — the tag is
   // stored on the row, and quietly stripping stock of what it IS because a
   // vocabulary was edited would be a far worse surprise than an orphan tag.

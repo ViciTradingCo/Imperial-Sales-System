@@ -542,6 +542,20 @@ been taken rather than inventing a suffix; an admin decides what it is called.
 An archived shop does not trade: `checkCertification` returns EXPIRED for it
 BEFORE it looks at `perpetual`, or a perpetual archived shop goes on selling.
 
+## Certification is a realm's choice, not a law
+
+`realm-prefs.certification` (Network Settings → Certification). Off means
+`checkCertification` passes any shop that EXISTS and is not archived — the two
+checks that come first, because this is a rule about expiry dates and not a way
+for a company nobody registered to start selling. It returns `off: true`, and
+the screens that manage subscriptions read `certificationOn()` and stop asking
+rather than showing a VALID badge over a date nobody maintains.
+
+NOTHING IS REWRITTEN. The `until` dates stay exactly as they are, so turning it
+back on restores every shop's real standing instead of having quietly certified
+the lot. A realm that charges for nothing had every shop lapse on a timer and an
+admin renewing dates for no reason; that is the whole problem this solves.
+
 ## Bulk edits carry ONE kind of value
 
 The shelved inventory import (`archive/inventory-import/`) carried price, stock

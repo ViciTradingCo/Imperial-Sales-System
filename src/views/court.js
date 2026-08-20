@@ -17,7 +17,7 @@
  * coffer and take it.
  */
 import { el, mount, esc, tableEl, statTiles } from '../lib/dom.js';
-import { money, regionWord } from '../lib/format.js';
+import { money, regionWord, certificationOn } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { tileGrid, sectionTiles, openFocalMenu } from '../lib/tiles.js';
 import { navigate } from '../lib/router.js';
@@ -55,11 +55,17 @@ function renderCourtCompanies(container) {
       return;
     }
     mount(listHost, ...rows.map((c) => {
-      const statusCls = String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';
-      const sub = c.perpetual ? 'Perpetual' : (c.until ? 'certified until ' + c.until : 'no subscription');
+      // Where the realm does not require certification, a shop's stored
+      // VALID/EXPIRED decides nothing — so the Court is not shown a verdict on
+      // a date that no longer governs anything.
+      const certOn = certificationOn();
+      const statusCls = !certOn || String(c.status).toUpperCase() === 'VALID' ? 'ok' : 'bad';
+      const sub = !certOn
+        ? 'certification not required in this realm'
+        : (c.perpetual ? 'Perpetual' : (c.until ? 'certified until ' + c.until : 'no subscription'));
       return el('div', { class: 'member-row' }, [
         el('p', { html:
-          '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(c.status || '—') + '</span>' +
+          '<b>' + esc(c.business || '—') + '</b> · <span class="' + statusCls + '">' + esc(certOn ? (c.status || '—') : 'Trading') + '</span>' +
           (c.court ? ' <span class="role-pill">Court</span>' : '') + '<br>' +
           '<span class="note">' + esc(sub) + (c.pointOfContact ? ' · ' + esc(c.pointOfContact) : '') + '</span>' }),
         el('span', { class: 'row-actions' }, [

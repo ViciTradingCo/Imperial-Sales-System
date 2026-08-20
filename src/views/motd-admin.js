@@ -19,6 +19,7 @@ import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
+import { certificationOn } from '../lib/format.js';
 
 export function renderMotdAdmin(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
@@ -33,8 +34,10 @@ export function renderMotdAdmin(container) {
     el('div.card', {}, [
       el('button', { class: 'link-back', onclick: () => navigate('/') }, '← Back'),
       el('h2', {}, 'MOTD'),
-      el('p', { class: 'note' }, 'Post a notice for everyone, schedule per-business messages, and tune the ' +
-        'subscription-expiry warning. Pick a section to open it.'),
+      el('p', { class: 'note' }, certificationOn()
+        ? 'Post a notice for everyone, schedule per-business messages, and tune the ' +
+          'subscription-expiry warning. Pick a section to open it.'
+        : 'Post a notice for everyone, or schedule per-business messages. Pick a section to open it.'),
       gridHost,
     ]));
 
@@ -55,9 +58,13 @@ export function renderMotdAdmin(container) {
         el('button.primary', { onclick: () => openEntryModal(null) }, 'Add message'),
         listHost,
       ])) },
-    { key: 'motd-warn', label: 'Expiry warning', hint: 'Certification lead time', glyph: '⏳',
-      open: (host) => mount(host, warnCard(cfg || {})) },
-  ];
+    // Only where certification is required. A lead time for a warning that can
+    // never fire is a setting that does nothing, and a tile promising one.
+    certificationOn()
+      ? { key: 'motd-warn', label: 'Expiry warning', hint: 'Certification lead time', glyph: '⏳',
+        open: (host) => mount(host, warnCard(cfg || {})) }
+      : null,
+  ].filter(Boolean);
 
   function drawTiles(images) {
     mount(gridHost, tileGrid(sectionTiles(sections, navigate), images));

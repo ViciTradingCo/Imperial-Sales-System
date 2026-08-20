@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.3', date: '2026-08-20', notes: [
+    'CERTIFICATION IS NOW OPTIONAL, per realm. Network Settings → Certification has a switch: turn it off and no shop needs a subscription to trade.',
+    'With it off nothing expires, no expiry warnings are shown, the Company List stops offering subscriptions, and a lapsed shop can ring up sales again.',
+    'Nothing is erased by turning it off. Every subscription date stays on file, so switching it back on restores each shop exactly as it stood — it does not silently certify everybody.',
+    'An archived shop still cannot trade, and neither can a business that is not registered. Those were never expiry questions.',
+    'The old “New shops” setting lives in the same place now — it is the same question, and the trial length means nothing when certification is off, so it hides itself.',
+  ] },
   { version: '6.2', date: '2026-08-20', notes: [
     'A SPECIAL CAN BE A PERCENTAGE OFF ITS OWN ITEMS. Set one up as “10% off” instead of a flat figure, and a full suit of armour sells for a tenth less — with the rest of the order rung up at full price beside it.',
     'That is the difference from a discount: a discount comes off the whole sale, this comes off only what is in the special.',

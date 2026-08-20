@@ -33,7 +33,7 @@ export function renderAdminSettings(container, { me } = {}) {
       open: (host) => mount(host, regionsCard()) },
     { key: 'set-money', label: 'Denomination', hint: 'What the money is called', glyph: '🪙',
       open: (host) => mount(host, denominationCard()) },
-    { key: 'set-trial', label: 'New shops', hint: 'Opening trial length', glyph: '🎁',
+    { key: 'set-trial', label: 'Certification', hint: 'Require it, trial length', glyph: '📜',
       open: (host) => mount(host, trialCard()) },
     { key: 'set-kinds', label: 'Item kinds', hint: 'Food, drink, weapons…', glyph: '🏷️',
       open: (host) => mount(host, itemKindsCard()) },
@@ -197,17 +197,32 @@ function regionsCard() {
 }
 
 /**
- * How long a newly founded shop is certified for.
+ * CERTIFICATION: whether this realm requires one at all, and how long a newly
+ * founded shop gets.
  *
- * A founder code should mean the holder can trade at once, so a new shop opens
- * certified rather than expired. How much grace that is — or none at all — is a
- * realm's own policy.
+ * One card, because they are one question — "how does this realm handle
+ * subscriptions?" — and the second half is meaningless when the answer to the
+ * first is "it does not". A server where nobody is charged for anything had
+ * every shop lapse on a timer and an admin renewing dates for no reason; the
+ * toggle turns the whole apparatus off, and turns it back on with every shop's
+ * real standing intact, because nothing about the dates is rewritten either way.
  */
 function trialCard() {
+  const required = el('input', { type: 'checkbox' });
   const days = el('input', { type: 'number', min: '0', max: '365', step: '1' });
   const status = el('p', {});
-  const save = el('button.primary', { onclick: doSave }, 'Save trial length');
+  const save = el('button.primary', { onclick: doSave }, 'Save');
   const sample = el('p', { class: 'note' }, '');
+  const trialWrap = el('div', {});
+  const offNote = el('p', { class: 'note' },
+    'Nothing expires in this realm. Shops trade whether or not they have a subscription date, no expiry ' +
+    'warnings are shown, and the Company List stops offering subscriptions. The dates already on file are ' +
+    'kept, so turning this back on restores each shop exactly as it was.');
+  function paintRequired() {
+    trialWrap.hidden = !required.checked;
+    offNote.hidden = required.checked;
+  }
+  required.addEventListener('change', paintRequired);
   function paint() {
     const n = Math.floor(Number(days.value));
     sample.textContent = !isFinite(n) || n <= 0
@@ -217,27 +232,37 @@ function trialCard() {
   }
   days.addEventListener('input', paint);
 
-  api.getRealmPrefs().then((p) => { days.value = String(p.trialDays != null ? p.trialDays : 7); paint(); }).catch(paint);
+  api.getRealmPrefs().then((p) => {
+    required.checked = p.certification !== false;
+    days.value = String(p.trialDays != null ? p.trialDays : 7);
+    paint();
+    paintRequired();
+  }).catch(() => { required.checked = true; paint(); paintRequired(); });
 
   async function doSave() {
     save.disabled = true; status.className = ''; status.textContent = 'Saving…';
     try {
-      await api.setRealmPrefs({ trialDays: days.value });
+      await api.setRealmPrefs({ certification: required.checked, trialDays: days.value });
       status.textContent = '';
-      toast('Trial length saved', 'ok');
+      toast(required.checked ? 'Certification settings saved' : 'Certification is off for this realm', 'ok');
     } catch (e) { status.className = 'error'; status.textContent = e.message || String(e); }
     finally { save.disabled = false; }
   }
 
-  return el('div.card', {}, [
-    el('h3', {}, 'New shops'),
-    el('p', { class: 'note' }, 'Days of certification a shop gets when it is founded with this realm’s founder ' +
-      'code. Set 0 to certify every new shop by hand instead. Existing shops are unaffected.'),
+  mount(trialWrap,
     el('label', {}, 'Opening trial (days)'),
     days,
     sample,
     el('p', { class: 'note' }, 'The expiry banner warns owners before this runs out — set that lead time in ' +
-      'MOTD → Expiry warning.'),
+      'MOTD → Expiry warning.'));
+
+  return el('div.card', {}, [
+    el('h3', {}, 'Certification'),
+    el('p', { class: 'note' }, 'Whether shops in this realm need a current subscription to trade. Turn it off ' +
+      'and nothing expires — useful for a server that does not charge for anything.'),
+    el('label', { class: 'check-row' }, [required, el('span', {}, 'Require certification to sell')]),
+    offNote,
+    trialWrap,
     el('div', { class: 'row-actions' }, [save]),
     status,
   ]);
@@ -338,7 +363,7 @@ const TILE_KEYS = [
   ['set-branding', 'Settings · Branding'],
   ['set-about', 'Settings · About page'],
   ['set-holds', 'Settings · Regions'], ['set-money', 'Settings · Denomination'],
-  ['set-trial', 'Settings · New shops'],
+  ['set-trial', 'Settings · Certification'],
   ['set-kinds', 'Settings · Item kinds'],
   ['set-tiles', 'Settings · Tile images'],
   ['set-status', 'Settings · System status'],
