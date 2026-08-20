@@ -338,6 +338,17 @@ function bundleContents(b) {
   return b.parts.map((p) => p.item + ' ×' + p.qty).join(', ');
 }
 
+/**
+ * What a special COSTS, in one line.
+ *
+ * A percentage one has no fixed figure to show: it is worked out at the till
+ * from what the shop charges that day, which is the point of pricing a set that
+ * way — reprice the armour and the deal follows.
+ */
+function bundlePrice(b) {
+  return b.percentOff ? b.percentOff + '% off its items' : money(b.price);
+}
+
 /* ---- Specials: several items, one price ---- */
 /**
  * A BUNDLE — "five ales and five stews, sixty gold".
@@ -379,6 +390,33 @@ function bundlesCard() {
     el('option', { value: 'items' }, 'Names its items'),
     el('option', { value: 'kinds' }, 'Asks for kinds of item'),
   ]);
+
+  /**
+   * THE TWO WAYS TO PRICE ONE.
+   *
+   * A flat figure for the lot, or a PERCENTAGE off what the shop already
+   * charges for the things in it — a full suit of armour at 10% off, with the
+   * rest of the order untouched. That is what separates it from the discount
+   * below: this one reaches only its own items.
+   *
+   * A percentage has no fixed figure, and is not meant to: reprice a piece and
+   * the deal follows it, which is the reason to set one up this way.
+   */
+  const priceMode = el('select', {}, [
+    el('option', { value: 'flat' }, 'A price for the whole special'),
+    el('option', { value: 'percent' }, 'A percentage off its items'),
+  ]);
+  const percent = el('input', { type: 'number', min: '0', max: '100', step: '1', placeholder: '% off, e.g. 10' });
+  const flatWrap = el('div', {});
+  const pctWrap = el('div', {});
+  function paintPriceMode() {
+    const byPct = priceMode.value === 'percent';
+    flatWrap.hidden = byPct;
+    pctWrap.hidden = !byPct;
+    paintSum();
+  }
+  priceMode.addEventListener('change', paintPriceMode);
+  percent.addEventListener('input', paintSum);
   const needRows = [];     // [{ node, tag, qty }]
   const needsHost = el('div', {});
   const itemsWrap = el('div', {});
@@ -440,6 +478,14 @@ function bundlesCard() {
       const n = Math.floor(Number(r.qty.value)) || 0;
       if (p !== undefined && n > 0) { sep += p * n; known++; }
     });
+    if (priceMode.value === 'percent') {
+      const off = Number(percent.value);
+      sumLine.textContent = !known || !isFinite(off) || !off
+        ? ''
+        : 'These come to ' + money(sep) + ', so the special sells them for ' +
+          money(sep * (100 - off) / 100) + ' — a saving of ' + money(sep * off / 100) + '.';
+      return;
+    }
     const asked = Number(price.value);
     if (!known || !isFinite(asked) || !asked) { sumLine.textContent = ''; return; }
     const diff = sep - asked;
@@ -455,8 +501,8 @@ function bundlesCard() {
   function render(bs) {
     if (!bs.length) { mount(list, el('p', { class: 'note' }, 'No specials yet.')); return; }
     mount(list, ...bs.map((b) => el('div.emp-row', {}, [
-      el('span', { class: 'emp-who', html: '<b>' + esc(b.name) + '</b> · ' + esc(money(b.price)) +
-        ' for ' + b.units + ' item' + (b.units === 1 ? '' : 's') +
+      el('span', { class: 'emp-who', html: '<b>' + esc(b.name) + '</b> · ' + esc(bundlePrice(b)) +
+        (b.percentOff ? ' · ' : ' for ') + b.units + ' item' + (b.units === 1 ? '' : 's') +
         '<br><span class="note">' + esc(bundleContents(b)) + '</span>' }),
       el('span', { class: 'row-actions' }, [
         el('button.secondary-btn.small', { onclick: () => edit(b) }, 'Edit'),
@@ -467,7 +513,9 @@ function bundlesCard() {
 
   function edit(b) {
     name.value = b.name;
-    price.value = String(b.price);
+    price.value = b.percentOff ? '' : String(b.price);
+    percent.value = b.percentOff ? String(b.percentOff) : '';
+    priceMode.value = b.percentOff ? 'percent' : 'flat';
     rows.splice(0, rows.length);
     needRows.splice(0, needRows.length);
     mode.value = (b.needs && b.needs.length) ? 'kinds' : 'items';
@@ -476,6 +524,7 @@ function bundlesCard() {
     if (!rows.length) addRow();
     drawNeeds();
     paintMode();
+    paintPriceMode();
     setStatus('Editing “' + b.name + '”. Saving replaces it.', '');
   }
 
@@ -492,11 +541,14 @@ function bundlesCard() {
       render(bs.bundles || []);
       if (!rows.length) addRow();
       paintMode();
+      paintPriceMode();
     });
   }
 
   async function doSave() {
     const byKind = mode.value === 'kinds';
+    const byPct = priceMode.value === 'percent';
+    const off = byPct ? Math.floor(Number(percent.value)) || 0 : 0;
     const parts = [];
     const needs = [];
     if (byKind) {
@@ -514,14 +566,16 @@ function bundlesCard() {
     if (!name.value.trim()) { setStatus('Give the special a name.', 'error'); return; }
     if (byKind && !needs.length) { setStatus('Say what kinds it asks for.', 'error'); return; }
     if (!byKind && !parts.length) { setStatus('Put at least one item in it.', 'error'); return; }
+    if (byPct && (off < 1 || off > 100)) { setStatus('Say what percentage comes off, 1 to 100.', 'error'); return; }
     save.disabled = true; setStatus('Saving…', '');
     try {
-      const res = await api.saveBundle(name.value.trim(), price.value, parts, needs);
+      const res = await api.saveBundle(name.value.trim(), price.value, parts, needs, off);
       render(res.bundles || []);
-      name.value = ''; price.value = '';
+      name.value = ''; price.value = ''; percent.value = '';
       rows.splice(0, rows.length); addRow();
       needRows.splice(0, needRows.length); drawNeeds();
       paintMode();
+      paintPriceMode();
       setStatus('Saved ✓', 'ok');
       toast('Special saved.', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
@@ -549,6 +603,12 @@ function bundlesCard() {
     el('p', { class: 'note' }, 'The customer picks which — anything your inventory tags with that kind. ' +
       'Tag your stock under Inventory → Kinds; a kind nobody has tagged cannot fill anything.'));
 
+  mount(flatWrap, el('label', {}, 'Price for the whole special'), price);
+  mount(pctWrap,
+    el('label', {}, 'Percentage off'), percent,
+    el('p', { class: 'note' }, 'Taken off what you charge for the things in this special, and nothing else in ' +
+      'the order. Reprice one of them and the deal follows — there is no fixed figure to keep up to date.'));
+
   load();
   return el('div.card', {}, [
     el('h2', {}, 'Specials'),
@@ -561,7 +621,9 @@ function bundlesCard() {
     el('label', {}, 'How it is filled'), mode,
     itemsWrap,
     kindsWrap,
-    el('label', {}, 'Price for the whole special'), price,
+    el('label', {}, 'How it is priced'), priceMode,
+    flatWrap,
+    pctWrap,
     sumLine,
     el('div', { class: 'row-actions' }, [save]),
     status,

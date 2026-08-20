@@ -54,6 +54,17 @@ function rowToBundle(r) {
     id: r.id,
     name: String(r.name || '').trim(),
     price: Number(r.price) || 0,
+    /**
+     * PRICED AS A PERCENTAGE OFF ITS OWN ITEMS, when this is set — a suit of
+     * armour at 10% off the armour. It is not the order-level discount: it
+     * touches only what is in this special, and the rest of the sale is rung
+     * up at full price beside it.
+     *
+     * 0 means the flat `price` above is what it costs, which is every special
+     * written before this existed. One or the other, never both — a deal
+     * cannot be 60 gold AND 10% off without one of the two being a lie.
+     */
+    percentOff: Number(r.discount_pct) || 0,
     parts,
     /**
      * WHAT IT ASKS FOR, when it does not name items: [{tag, qty}] — five food
@@ -77,7 +88,7 @@ function rowToBundle(r) {
 export async function listBundles(env, business, realmId) {
   const db = await getDb(env);
   const { results } = await db.prepare(
-    'SELECT id, name, price, parts, needs FROM bundles WHERE business = ? AND realm_id = ? ORDER BY name')
+    'SELECT id, name, price, parts, needs, discount_pct FROM bundles WHERE business = ? AND realm_id = ? ORDER BY name')
     .bind(business, realmId).all();
   return (results || []).map(rowToBundle);
 }
@@ -88,7 +99,7 @@ export async function findBundle(env, business, name, realmId) {
   if (!target) return null;
   const db = await getDb(env);
   const r = await db.prepare(
-    'SELECT id, name, price, parts, needs FROM bundles WHERE business = ? AND realm_id = ? AND lower(name) = ?')
+    'SELECT id, name, price, parts, needs, discount_pct FROM bundles WHERE business = ? AND realm_id = ? AND lower(name) = ?')
     .bind(business, realmId, target).first();
   return r ? rowToBundle(r) : null;
 }
@@ -100,11 +111,24 @@ export async function findBundle(env, business, name, realmId) {
  * TUNES — the price of the Friday deal changes, an item joins it — and making
  * that delete-then-recreate would mean the register briefly offering neither.
  */
-export async function saveBundle(env, business, { name, price, parts, needs }, realmId) {
+export async function saveBundle(env, business, { name, price, parts, needs, percentOff }, realmId) {
   const nm = String(name || '').trim();
   if (!nm) throw new Error('Give the bundle a name.');
-  const p = Number(price);
-  if (!isFinite(p) || p < 0) throw new Error('A bundle price must be a number, 0 or more.');
+
+  /**
+   * TWO WAYS TO PRICE ONE, and it is one or the other.
+   *
+   * A flat figure for the lot, or a percentage off what the shop already
+   * charges for the things in it. A percentage is not an upcharge in disguise:
+   * a set worth MORE than its parts is what the flat price is for, so this is
+   * held to 0–100 rather than made signed the way the order-level adjustment is.
+   */
+  const off = Number(percentOff) || 0;
+  if (!isFinite(off) || off < 0 || off > 100) {
+    throw new Error('A special’s discount must be between 0 and 100 percent.');
+  }
+  const p = off ? 0 : Number(price);
+  if (!off && (!isFinite(p) || p < 0)) throw new Error('A bundle price must be a number, 0 or more.');
 
   /**
    * BY TAG: "five food and five drink". It names no items, so the till chooses
@@ -149,10 +173,11 @@ export async function saveBundle(env, business, { name, price, parts, needs }, r
 
   const db = await getDb(env);
   await db.prepare(
-    `INSERT INTO bundles (realm_id, business, name, price, parts, needs) VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO bundles (realm_id, business, name, price, parts, needs, discount_pct) VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (realm_id, business, name)
-     DO UPDATE SET price = excluded.price, parts = excluded.parts, needs = excluded.needs`)
-    .bind(realmId, business, nm, p, JSON.stringify(clean), JSON.stringify(wants)).run();
+     DO UPDATE SET price = excluded.price, parts = excluded.parts, needs = excluded.needs,
+       discount_pct = excluded.discount_pct`)
+    .bind(realmId, business, nm, p, JSON.stringify(clean), JSON.stringify(wants), off).run();
   return listBundles(env, business, realmId);
 }
 

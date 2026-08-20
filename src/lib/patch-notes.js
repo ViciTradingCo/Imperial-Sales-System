@@ -10,6 +10,14 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.2', date: '2026-08-20', notes: [
+    'A SPECIAL CAN BE A PERCENTAGE OFF ITS OWN ITEMS. Set one up as “10% off” instead of a flat figure, and a full suit of armour sells for a tenth less — with the rest of the order rung up at full price beside it.',
+    'That is the difference from a discount: a discount comes off the whole sale, this comes off only what is in the special.',
+    'There is no fixed price to keep up to date. Reprice a piece and the deal follows it, because the saving is worked out from what you are charging that day.',
+    'It works on both sorts of special — one that names its items, and one that asks for kinds and is filled at the till.',
+    'A special priced this way needs every item in your inventory: there has to be a price to take a tenth off. You will be told which item is missing rather than quietly given it away.',
+    'The kinds on an item are a dropdown and a row of chips now, instead of a grid of every kind at once — the picker is the size of the answer rather than the size of the list.',
+  ] },
   { version: '6.1', date: '2026-08-19', notes: [
     'YOUR STOCK CAN SAY WHAT IT IS. Food, drink, a weapon, a potion — tag a listing with Edit, or answer for the whole shelf at once under Inventory → Kinds ("which of these are food?").',
     'The kinds come from your realm, so every shop uses the same words. An admin sets the list in Network Settings → Item kinds; it starts with Skyrim’s own — food, drink, potion, weapon, armor, and the rest.',

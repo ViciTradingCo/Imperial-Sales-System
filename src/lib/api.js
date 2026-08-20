@@ -251,9 +251,12 @@ export const api = {
   /**
    * Owner/manager: create or replace a special. It either NAMES its items
    * (`parts`) or asks for KINDS of item (`needs`) — never both, and the Worker
-   * refuses a special that tries.
+   * refuses a special that tries. `percentOff` prices it as a percentage off
+   * its own items instead of a flat `price`; the Worker works that out at the
+   * till from the shop's own prices.
    */
-  saveBundle: (name, price, parts, needs) => request('POST', '/business/bundles/save', { name, price, parts, needs }),
+  saveBundle: (name, price, parts, needs, percentOff) =>
+    request('POST', '/business/bundles/save', { name, price, parts, needs, percentOff }),
   deleteBundle: (id) => request('POST', '/business/bundles/delete', { id }),
   getInventory: () => request('GET', '/inventory'),
   /** The shop's stock counts as `Name, Amount` text. */

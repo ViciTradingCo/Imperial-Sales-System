@@ -342,6 +342,25 @@ not divide evenly (seven sweet rolls and three stews fills "five food" twice
 with no per-special half). Two specials are two lines, each with what its own
 customer chose.
 
+## A special is priced flat, or as a percentage OF ITS OWN ITEMS
+
+`bundles.discount_pct` — when set, `price` is 0 and the special costs the shop's
+own prices for what is in it, less that percentage. Not the order-level
+discount: it reaches only the special's items and the rest of the sale is rung
+up beside it at full price.
+
+Nothing is stored but the percentage. `specialPrice(b, listed)` works the figure
+out at checkout from the current listings, so repricing a piece moves the deal
+with it — which is the reason to set one up this way. The client computes the
+same sum for the cart, but only to say what the customer is about to pay; the
+Worker's answer is the one that is charged.
+
+It is held to 0–100 rather than made signed like `discounts.percent`: a set
+worth MORE than its parts is what the flat price already expresses, so a
+negative here would be a second way to say one thing. A percentage special
+refuses a part the shop does not list — there is no figure to take a tenth of,
+and reading a missing listing as 0 would quietly give the item away.
+
 ## Item kinds are on the LISTING, named by the REALM
 
 `inventory.tags` is comma-joined lowercase — per listing, exactly like

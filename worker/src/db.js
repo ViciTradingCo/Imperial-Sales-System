@@ -105,6 +105,7 @@ const SCHEMA = [
      business TEXT NOT NULL, name TEXT NOT NULL,
      price REAL NOT NULL DEFAULT 0, parts TEXT NOT NULL DEFAULT '[]',
      needs TEXT NOT NULL DEFAULT '[]',
+     discount_pct REAL NOT NULL DEFAULT 0,
      UNIQUE (realm_id, business, name))`,
   `CREATE INDEX IF NOT EXISTS idx_bundles_business ON bundles (business)`,
   // Per-shop style (tagline + accent colour), one row per business per realm.
@@ -437,6 +438,11 @@ const MIGRATIONS = [
   // has parts OR needs, never both; every special written before this has
   // parts, and an empty needs is what says so.
   "ALTER TABLE bundles ADD COLUMN needs TEXT NOT NULL DEFAULT '[]'",
+  // A SPECIAL PRICED AS A PERCENTAGE OFF ITS OWN ITEMS — a suit of armour at
+  // 10% off the armour, and nothing else in the order touched. 0 means the
+  // special charges its flat `price` instead, which is every special written
+  // before this one.
+  'ALTER TABLE bundles ADD COLUMN discount_pct REAL NOT NULL DEFAULT 0',
 ];
 
 /**

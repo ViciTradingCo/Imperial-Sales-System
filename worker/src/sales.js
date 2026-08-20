@@ -131,6 +131,7 @@ function bundleLine(b, askedQty, inv, rules) {
   const offInventory = [];
   let floor = 0;
   let ceiling = null;
+  let listed = 0; // what the parts come to at the shop's own prices
 
   for (const part of b.parts) {
     const held = inv[part.item.toLowerCase()];
@@ -138,8 +139,20 @@ function bundleLine(b, askedQty, inv, rules) {
       throw new Error(b.name + ' contains ' + held.item + ', which is marked as an ingredient — ' +
         'stock you craft with, not stock you sell.');
     }
-    if (held) need.set(held.item, (need.get(held.item) || 0) + part.qty * qty);
-    else offInventory.push(part.item);
+    if (held) {
+      need.set(held.item, (need.get(held.item) || 0) + part.qty * qty);
+      listed += held.price * part.qty;
+    } else {
+      offInventory.push(part.item);
+      // A flat-priced special can hold something the shop does not list — the
+      // price is the special's either way. A PERCENTAGE cannot: there is no
+      // figure to take a tenth off, and treating a missing listing as 0 would
+      // quietly give the thing away.
+      if (b.percentOff) {
+        throw new Error(b.name + ' takes its price from what its items cost, and ' + part.item +
+          ' is not in your inventory. Add it, or give the special a flat price.');
+      }
+    }
     // A Court's price controls apply to a bundle in AGGREGATE: it has no
     // per-item price to check, but selling ten capped items for one price must
     // not be a way around the cap.
@@ -150,24 +163,41 @@ function bundleLine(b, askedQty, inv, rules) {
       else if (cap && cap.max == null) ceiling = null;
     }
   }
-  if (rules && floor && b.price < floor) {
+  // What ONE of them costs: the flat figure, or the shop's own prices for what
+  // is in it with the special's percentage taken off. Worked out here rather
+  // than stored, because it moves the moment an item is repriced — which is the
+  // whole point of pricing a set this way.
+  const unit = specialPrice(b, listed);
+  if (rules && floor && unit < floor) {
     throw new Error(rules.hold + ' Court sets a floor of ' + floor + ' on what is in ' + b.name +
-      ' — the bundle is priced at ' + b.price + '.');
+      ' — the bundle is priced at ' + unit + '.');
   }
-  if (rules && ceiling !== null && ceiling && b.price > ceiling) {
+  if (rules && ceiling !== null && ceiling && unit > ceiling) {
     throw new Error(rules.hold + ' Court caps what is in ' + b.name + ' at ' + ceiling +
-      ' — the bundle is priced at ' + b.price + '.');
+      ' — the bundle is priced at ' + unit + '.');
   }
 
   return {
     need,
     offInventory,
-    subtotal: b.price * qty,
+    subtotal: unit * qty,
     // The UNITS that actually left the shelf. A bundle of ten sold once moved
     // ten things, and the shop's "items sold" should say so.
     qtyTotal: b.units * qty,
-    line: { name: b.name, qty, price: b.price, parts: b.parts },
+    line: { name: b.name, qty, price: unit, parts: b.parts },
   };
+}
+
+/**
+ * What one of a special costs: its flat price, or the percentage off.
+ *
+ * `listed` is what its items come to at the shop's own prices. Not rounded
+ * here — the intermediate arithmetic stays exact and only the settled total is
+ * made a whole coin, so a 10% discount on three lines does not lose a coin per
+ * line on its way to the till.
+ */
+function specialPrice(b, listed) {
+  return b.percentOff ? listed * (100 - b.percentOff) / 100 : b.price;
 }
 
 /**
@@ -215,6 +245,7 @@ function tagSpecialLine(b, askedQty, chosen, inv, rules) {
   const filled = new Map(); // tag → units chosen against it
   let floor = 0;
   let ceiling = 0;
+  let listed = 0; // what the choice comes to at the shop's own prices
   let capped = true; // every part has a ceiling, so the aggregate one means something
 
   for (const p of picked) {
@@ -233,6 +264,7 @@ function tagSpecialLine(b, askedQty, chosen, inv, rules) {
     }
     need.set(held.item, (need.get(held.item) || 0) + p.qty);
     parts.push({ item: held.item, qty: p.qty });
+    listed += held.price * p.qty;
     filled.set(p.tag, (filled.get(p.tag) || 0) + p.qty);
 
     // The Court's floor and ceiling, in aggregate — the same rule a fixed
@@ -259,7 +291,7 @@ function tagSpecialLine(b, askedQty, chosen, inv, rules) {
     }
   }
 
-  const price = b.price;
+  const price = specialPrice(b, listed);
   if (rules && floor && price < floor) {
     throw new Error(rules.hold + ' Court sets a floor of ' + floor + ' on what was chosen for ' + b.name +
       ' — the special is priced at ' + price + '.');
@@ -274,7 +306,7 @@ function tagSpecialLine(b, askedQty, chosen, inv, rules) {
     offInventory: [],
     subtotal: price,
     qtyTotal: parts.reduce((n, p) => n + p.qty, 0),
-    line: { name: b.name, qty: 1, price: b.price, parts },
+    line: { name: b.name, qty: 1, price, parts },
   };
 }
 

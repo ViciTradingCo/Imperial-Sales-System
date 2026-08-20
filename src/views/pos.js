@@ -217,9 +217,26 @@ export function renderPos(container, { me, mode }) {
      * Hidden entirely when the shop has none, rather than sitting there empty:
      * a picker with nothing in it is a question nobody can answer.
      */
+    /**
+     * What one of a special costs, for the CART to show.
+     *
+     * A flat one knows its own figure; a percentage one is worked out from what
+     * this shop charges for what is in it. The Worker does the same sum and its
+     * answer is the one that counts — this is the till telling the customer
+     * what they are about to pay, not the till naming a price.
+     */
+    const listedTotal = (parts) => (parts || []).reduce((sum, p) => {
+      const it = invByNorm.get(norm(p.item));
+      return sum + (it ? it.price * p.qty : 0);
+    }, 0);
+    const specialPrice = (b, parts) => (b.percentOff
+      ? listedTotal(parts || b.parts) * (100 - b.percentOff) / 100
+      : b.price);
+
     const bundleSel = el('select', {}, el('option', { value: '' }, 'Pick a special…'));
     bundles.forEach((b) => bundleSel.appendChild(el('option', { value: String(b.id) },
-      b.name + ' — ' + money(b.price) + ' for ' + b.units + ' item' + (b.units === 1 ? '' : 's') +
+      b.name + ' — ' + (b.percentOff ? b.percentOff + '% off' : money(b.price)) +
+      ' for ' + b.units + ' item' + (b.units === 1 ? '' : 's') +
       (b.needs && b.needs.length ? ' (your choice)' : ''))));
     const bundleQty = el('input', { type: 'number', min: '1', step: '1', value: '1', 'aria-label': 'How many of this special' });
     const qtyWrap = el('div', {}, [el('label', {}, 'How many'), bundleQty]);
@@ -239,7 +256,7 @@ export function renderPos(container, { me, mode }) {
       if (b.needs && b.needs.length) {
         openFillSpecial(b, inventory, (parts) => {
           if (!idemKey) idemKey = newIdem();
-          cart.push({ bundle: b.name, qty: 1, price: b.price, parts, byKind: true });
+          cart.push({ bundle: b.name, qty: 1, price: specialPrice(b, parts), parts, byKind: true });
           bundleSel.value = ''; paintBundlePick();
           renderCart();
         });
@@ -248,7 +265,7 @@ export function renderPos(container, { me, mode }) {
       const n = Math.floor(Number(bundleQty.value)) || 1;
       if (n < 1) { setStatus('How many?', 'error'); return; }
       if (!idemKey) idemKey = newIdem();
-      cart.push({ bundle: b.name, qty: n, price: b.price, parts: b.parts });
+      cart.push({ bundle: b.name, qty: n, price: specialPrice(b), parts: b.parts });
       bundleSel.value = ''; bundleQty.value = '1'; paintBundlePick();
       renderCart();
     } }, 'Add special');
@@ -614,9 +631,10 @@ function openFillSpecial(b, inventory, onFilled) {
   }
 
   modal = openModal([
-    el('h3', {}, b.name + ' — ' + money(b.price)),
+    el('h3', {}, b.name + ' — ' + (b.percentOff ? b.percentOff + '% off' : money(b.price))),
     el('p', { class: 'note' }, 'Choose what goes in it. One special at a time: the next customer picks ' +
-      'their own, so add it again for another.'),
+      'their own, so add it again for another.' +
+      (b.percentOff ? ' What it costs follows what you chose, less ' + b.percentOff + '%.' : '')),
     ...body,
     el('div', { class: 'row-actions' }, [el('button.primary', { onclick: confirm }, 'Add to order')]),
     status,

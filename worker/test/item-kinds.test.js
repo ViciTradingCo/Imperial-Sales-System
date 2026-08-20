@@ -276,3 +276,90 @@ describe('filling one at the till', () => {
     await expect(ring([{ bundle: 'Tavern Night', qty: 1 }])).rejects.toThrow(/Choose what goes in/i);
   });
 });
+
+/**
+ * A SPECIAL PRICED AS A PERCENTAGE OFF ITS OWN ITEMS.
+ *
+ * A suit of armour at 10% off the armour — and nothing else in the order
+ * touched, which is the whole difference between this and the order-level
+ * discount. There is no stored figure: the price is worked out at the till from
+ * what the shop charges that day, so repricing a piece moves the deal with it.
+ */
+describe('a special priced by percentage', () => {
+  beforeEach(async () => {
+    await saveBundle(env, SHOP, {
+      name: 'Full Kit', price: 0, percentOff: 10,
+      parts: [{ item: 'Iron Sword', qty: 1 }, { item: 'Stew', qty: 2 }],
+    }, R);
+  });
+
+  it('stores the percentage and no price', async () => {
+    const b = (await listBundles(env, SHOP, R)).find((x) => x.name === 'Full Kit');
+    expect(b).toMatchObject({ percentOff: 10, price: 0 });
+  });
+
+  it('is one or the other — a flat price is cleared when a percentage is set', async () => {
+    await saveBundle(env, SHOP, { name: 'Full Kit', price: 99, percentOff: 25, parts: [{ item: 'Stew', qty: 1 }] }, R);
+    const b = (await listBundles(env, SHOP, R)).find((x) => x.name === 'Full Kit');
+    expect(b).toMatchObject({ percentOff: 25, price: 0 });
+  });
+
+  it('refuses a percentage that is not one', async () => {
+    await expect(saveBundle(env, SHOP, {
+      name: 'Nonsense', percentOff: 140, parts: [{ item: 'Stew', qty: 1 }],
+    }, R)).rejects.toThrow(/between 0 and 100/i);
+  });
+
+  it('charges the shop’s own prices, less the percentage', async () => {
+    // Iron Sword 30 + 2 × Stew 10 = 50, less 10% = 45.
+    const res = await ring([{ bundle: 'Full Kit', qty: 1 }]);
+    expect(res.total).toBe(45);
+  });
+
+  it('FOLLOWS a reprice, because there is no stored figure to go stale', async () => {
+    await upsertItem(env, SHOP, { item: 'Iron Sword', price: 40, lowStock: 0 }, R);
+    const res = await ring([{ bundle: 'Full Kit', qty: 1 }]);
+    expect(res.total).toBe(54); // (40 + 20) less 10%
+  });
+
+  it('leaves the rest of the order at full price', async () => {
+    const res = await ring([
+      { bundle: 'Full Kit', qty: 1 },
+      { item: 'Ale', qty: 2, price: 5 },
+    ]);
+    expect(res.total).toBe(55); // 45 for the kit, 10 for the ales, untouched
+  });
+
+  it('takes its items off the shelf like any other special', async () => {
+    await ring([{ bundle: 'Full Kit', qty: 2 }]);
+    expect(await stockOf('Iron Sword')).toBe(3);
+    expect(await stockOf('Stew')).toBe(96);
+  });
+
+  it('rounds ONCE, at the total — not per line', async () => {
+    await upsertItem(env, SHOP, { item: 'Stew', price: 10.5, lowStock: 0, tags: ['food'] }, R);
+    // Sword 30 + 2 × 10.5 = 51, less 10% = 45.9 → 45 taken, not 45 from a
+    // pre-floored 45.
+    const res = await ring([{ bundle: 'Full Kit', qty: 1 }]);
+    expect(res.total).toBe(45);
+  });
+
+  it('refuses an item it cannot price — there is nothing to take a tenth off', async () => {
+    await saveBundle(env, SHOP, {
+      name: 'Ghost Kit', percentOff: 10, parts: [{ item: 'Dragonbone Axe', qty: 1 }],
+    }, R);
+    await expect(ring([{ bundle: 'Ghost Kit', qty: 1 }]))
+      .rejects.toThrow(/not in your inventory/i);
+  });
+
+  /** The two features meet: a by-kind special can be priced this way too. */
+  it('works on a special that asks for kinds, over what the customer chose', async () => {
+    await saveBundle(env, SHOP, {
+      name: 'Round of Drinks', percentOff: 50, needs: [{ tag: 'drink', qty: 2 }],
+    }, R);
+    const res = await ring([{ bundle: 'Round of Drinks', qty: 1, parts: [
+      { item: 'Mead', qty: 2, tag: 'drink' }, // 7 each = 14, less half = 7
+    ] }]);
+    expect(res.total).toBe(7);
+  });
+});
