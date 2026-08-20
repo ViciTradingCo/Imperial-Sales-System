@@ -958,9 +958,20 @@ label.inline {
   border: 1px solid var(--edge); font-weight: 400; text-transform: none;
 }
 
-/* A grid of tick-boxes — the kinds on one listing, or every listing of one
-   kind. It wraps into columns so twenty of them are read across rather than
-   scrolled through. */
+/* The kinds ON one listing: a chip each, with an ✕ to take it off. Sized to the
+   answer rather than to the vocabulary — the dropdown above them offers what is
+   left. */
+.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: var(--sp-2) 0; align-items: center; }
+.tag-chip { display: inline-flex; align-items: center; gap: 6px; padding-right: 4px; }
+.tag-chip-x {
+  background: none; border: 0; padding: 0 4px; margin: 0; cursor: pointer;
+  font: inherit; font-size: 11px; line-height: 1; color: var(--note);
+}
+.tag-chip-x:hover { color: var(--bad); }
+
+/* A grid of tick-boxes — every listing of one kind, on the bulk screen. It
+   wraps into columns so twenty of them are read across rather than scrolled
+   through. */
 .tag-picker {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 4px var(--sp-3); margin: var(--sp-2) 0;

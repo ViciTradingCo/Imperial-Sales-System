@@ -170,30 +170,62 @@ function tagPills(tags) {
 }
 
 /**
- * The kind-picker on one listing: every kind this realm names, ticked or not.
+ * The kind-picker on one listing: a dropdown that ADDS, and a chip per kind on
+ * it, each with an ✕.
  *
- * A fixed vocabulary rather than a box to type in. A special asks for five
- * DRINK, and "drinks" typed on one listing is a listing the deal cannot see —
- * the failure would be silent and would look like the special being broken.
+ * It was a grid of tick-boxes — every kind the realm names, laid out at once —
+ * which put a wall of twenty boxes in the middle of a form where the answer is
+ * usually one word. A dropdown is the size of the answer instead of the size of
+ * the vocabulary, and what the listing IS stays readable as a row of chips
+ * rather than having to be found among the things it is not.
+ *
+ * A fixed vocabulary rather than a box to type in, either way. A special asks
+ * for five DRINK, and "drinks" typed on one listing is a listing the deal
+ * cannot see — the failure would be silent and would look like the special
+ * being broken.
  */
 function tagChooser(selected) {
-  const chosen = new Set((selected || []).map((t) => String(t).toLowerCase()));
-  const boxes = [];
+  const chosen = (selected || []).map((t) => String(t).toLowerCase());
   const vocabulary = itemTags();
   // Anything the listing already carries that the realm has since dropped stays
-  // offered, or saving from this screen would quietly strip it.
-  const orphans = [...chosen].filter((t) => !vocabulary.some((v) => v.toLowerCase() === t));
-  const wrap = el('div', { class: 'tag-picker' }, [...vocabulary, ...orphans].map((name) => {
-    const box = el('input', { type: 'checkbox' });
-    box.checked = chosen.has(String(name).toLowerCase());
-    boxes.push({ box, name });
-    return el('label', { class: 'tag-check' }, [box, el('span', {}, tagLabel(name))]);
-  }));
+  // on it, or saving from this screen would quietly strip it.
+  const known = () => [...vocabulary.map((v) => v.toLowerCase()), ...chosen];
+
+  const pick = el('select', {});
+  const chips = el('div', { class: 'tag-chips' });
+  const wrap = el('div', {}, [pick, chips]);
+
+  function paint() {
+    // The dropdown offers what this listing is NOT yet, so picking one is
+    // always an addition and the list shortens as it is used up.
+    const left = vocabulary.filter((v) => !chosen.includes(v.toLowerCase()));
+    mount(pick, el('option', { value: '' }, left.length ? 'Add a kind…' : 'Every kind is already on it'),
+      ...left.map((v) => el('option', { value: v.toLowerCase() }, v)));
+    pick.disabled = !left.length;
+    pick.value = '';
+
+    mount(chips, ...(chosen.length
+      ? chosen.map((t) => el('span', { class: 'pill tag tag-chip' }, [
+        el('span', {}, tagLabel(t)),
+        el('button', {
+          type: 'button', class: 'tag-chip-x', 'aria-label': 'Remove ' + tagLabel(t),
+          onclick: () => { chosen.splice(chosen.indexOf(t), 1); paint(); },
+        }, '✕'),
+      ]))
+      : [el('span', { class: 'note' }, 'No kind set.')]));
+  }
+  pick.addEventListener('change', () => {
+    if (!pick.value) return;
+    if (!chosen.includes(pick.value)) chosen.push(pick.value);
+    paint();
+  });
+  paint();
+
   return {
-    node: vocabulary.length || orphans.length
+    node: known().length
       ? wrap
       : el('p', { class: 'note' }, 'This realm has not named any kinds of item yet — an admin sets them in Network Settings.'),
-    value: () => boxes.filter((b) => b.box.checked).map((b) => String(b.name).toLowerCase()),
+    value: () => chosen.slice(),
   };
 }
 
