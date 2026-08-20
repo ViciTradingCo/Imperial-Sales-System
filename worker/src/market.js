@@ -35,7 +35,7 @@ import { lastWeekWindow } from './week.js';
  * drag every item a shop farms toward its own labour cost and call that the
  * item's worth. So the exclusion is now stated rather than assumed.
  */
-const NOT_HARVEST = ` AND COALESCE(vendor, '') != '${HARVEST_VENDOR}'`;
+export const NOT_HARVEST = ` AND COALESCE(vendor, '') != '${HARVEST_VENDOR}'`;
 
 // Re-exported so callers reading a market report get the week from the same
 // place they get the report. The definition lives in week.js — one week, shared
@@ -161,7 +161,7 @@ function bestRegionOf(regionMap) {
  * `revenue` stays on the row: it is the ranking key here, and the shop and
  * region reports display it.
  */
-function itemStats(saleRows, master, intakeRows, transferRows) {
+export function itemStats(saleRows, master, intakeRows, transferRows) {
   const exact = new Map();
   master.forEach((it) => exact.set(normalizeItem(it.name), it));
   const map = {};
@@ -333,7 +333,7 @@ function mergeRegionTrade(...groups) {
 }
 
 /** The list shape: everything except the per-item series. */
-function withoutTrend(rows) {
+export function withoutTrend(rows) {
   return rows.map(({ trend, ...rest }) => rest);
 }
 
@@ -512,38 +512,6 @@ export async function itemReport(env, name, realmId) {
  * market view. Scoped strictly to the caller's business: headline totals, a
  * daily revenue trend, and their best-selling items.
  */
-export async function businessReport(env, business, realmId) {
-  const db = await getDb(env);
-  const b = String(business || '').trim();
-  const empty = { business: b, overview: { revenue: 0, orders: 0, itemsSold: 0 }, trends: [], items: [] };
-  if (!b) return empty;
-
-  const overview = await db.prepare(
-    `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
-            COALESCE(SUM(qty_total), 0) AS itemsSold
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?`).bind(realmId, b).first();
-
-  const trends = (((await db.prepare(
-    `SELECT substr(ts, 1, 10) AS day, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?
-      GROUP BY day ORDER BY day DESC LIMIT 30`).bind(realmId, b).all()).results) || []).reverse();
-
-  const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND business = ?`).bind(realmId, b).all()).results) || [];
-  const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND business = ?` + NOT_HARVEST).bind(realmId, b).all()).results) || [];
-  // What this shop took IN from other companies counts as its buying too.
-  const transferRows = ((await db.prepare(
-    `SELECT item, qty, price, items FROM transfers WHERE realm_id = ? AND status = 'accepted' AND to_business = ?`)
-    .bind(realmId, b).all()).results) || [];
-
-  return {
-    business: b,
-    overview: overview || empty.overview,
-    trends,
-    items: withoutTrend(itemStats(saleRows, await listItemIndex(env, realmId), intakeRows, transferRows)).slice(0, 20),
-  };
-}
 
 /**
  * A single hold's report — the slice a Court oversees. Scoped to sales made in

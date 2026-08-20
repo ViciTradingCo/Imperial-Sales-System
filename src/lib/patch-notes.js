@@ -10,6 +10,16 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.4', date: '2026-08-20', notes: [
+    'Shop Ledger → Performance is easier to read. The small labels under every figure were handwritten, uppercased and fixed at twelve pixels; they are printed now, sentence case, and they grow with your text size like the rest of the app.',
+    'THE LAST 30 DAYS, against the 30 before. Revenue and orders each say whether they are up or down on the previous month, so the page answers “is my shop growing” without you working it out.',
+    'Money in, money out, and what you kept — taken straight from your coffer over the same 30 days, so this page and your ledger can never disagree.',
+    'HOW IT TRADES: your average order, items per order, how many customers you know by name and how many came back, your best day of the week, what you have given away in discounts, sales voided, and employee purchases.',
+    'ON THE SHELF: what your stock is worth at your own prices, how many units you hold, and how many listings need restocking.',
+    'NOT MOVING — the list a best-seller chart cannot show you: stock you are holding that has not sold in sixty days, worth most first. That is the money sitting on your shelves.',
+    'WHAT SELLS, BY KIND — units of food, drink, weapons and the rest, once you have tagged your stock. A special counts as the things it actually took off the shelf.',
+    'The revenue chart says what its tallest bar is worth. It used to hide that in a hover tooltip, which on a phone is nowhere at all.',
+  ] },
   { version: '6.3', date: '2026-08-20', notes: [
     'CERTIFICATION IS NOW OPTIONAL, per realm. Network Settings → Certification has a switch: turn it off and no shop needs a subscription to trade.',
     'With it off nothing expires, no expiry warnings are shown, the Company List stops offering subscriptions, and a lapsed shop can ring up sales again.',

@@ -21,7 +21,7 @@ import { listUsersByBusiness } from './users.js';
 import { cofferSummary } from './coffers.js';
 import { listDiscounts } from './discounts.js';
 import { getShopStyle } from './shop-style.js';
-import { businessReport } from './market.js';
+import { businessReport } from './shop-report.js';
 
 /**
  * One shop's books: its treasury, its offers, its look, and how it is trading.

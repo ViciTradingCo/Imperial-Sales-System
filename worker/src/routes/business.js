@@ -26,7 +26,8 @@ import { listBundles, saveBundle, deleteBundle } from '../bundles.js';
 import { getShopStyle, setShopStyle } from '../shop-style.js';
 import { activeGlobalNotices, readWarnDays, activeNoticesForBusiness,
   listMotdsForBusiness, addMotdForBusiness, updateMotdForBusiness, deleteMotdForBusiness } from '../motd.js';
-import { holdReport, businessReport } from '../market.js';
+import { holdReport } from '../market.js';
+import { businessReport } from '../shop-report.js';
 import { lastWeekWindow, isWeekTurnover } from '../week.js';
 import { openShift, clockIn, clockOut, myShifts, myCommission, shopShifts, markPaid, editShift, deleteShift } from '../timecard.js';
 import { businessCsv } from '../export.js';
