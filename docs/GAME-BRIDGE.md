@@ -22,6 +22,12 @@ stop being something they have to type in twice.
 truth for *what is in a box*. The ledger stays the source of truth for what
 things cost, what was sold, who is owed what, and what the shop is worth.
 
+This is now **structural rather than a promise** (§12.1): the credential itself
+is read-only, so a bug in this app cannot write to the game world even if
+somebody later wires one badly. That is worth more than any rule written down
+here, and it means the rules below are about protecting the LEDGER — the game
+can look after itself.
+
 Writing back — "ring up a sale and the ale disappears from the chest" — is the
 obvious next request and is deliberately out of scope. It is a different and far
 larger trust problem: a bug in a read shows the wrong number on a screen, a bug
@@ -80,9 +86,11 @@ One deployment can host several realms, and each realm is a *different game
 server*. The bridge is therefore per realm, like regions, denomination and
 certification.
 
-- **Base URL, enabled flag, schedule, caps:** `sys_flags` under a realm-keyed
-  name — `game_bridge:<realm>` — read/written by a `game-settings.js` in the
-  shape of `realm-prefs.js`. Not `realm-prefs` itself: those are sent to every
+- **Base URL, enabled flag, the count's hour, the assumed rate limit, the caps,
+  and `goldItemId`:** `sys_flags` under a realm-keyed name —
+  `game_bridge:<realm>` — read/written by a `game-settings.js` in the shape of
+  `realm-prefs.js`. A realm pointed at the **test server** is exactly this
+  setting with a different URL, which is what makes staging free (§12d). Not `realm-prefs` itself: those are sent to every
   signed-in client inside `/auth/me`, and a base URL is operator configuration,
   not presentation.
 - **The credential:** a Worker **secret**, never a `[vars]` entry (`wrangler.toml`
@@ -252,10 +260,22 @@ a chest inside someone else's house.
    else; the Worker resolves the parcel from the caller's business rather than
    from anything the client sends.
 
-If the game reports parcel ownership and it can be matched to a character the
-app already knows, step 1 could later become self-service with a verification
-step. That is a refinement, not the foundation — and it is one of the questions
-in §12, because the answer decides whether it is possible at all.
+**SETTLED (§12.5): the game does not say who owns a parcel.** There is no field
+to match against, so step 1 is not a stopgap on the way to self-service — it is
+the only place ownership is established at all. Three things follow:
+
+- **The admin's binding IS the record of ownership.** Nothing else in either
+  system asserts that this building belongs to this shop, so the binding is
+  written with an audit line naming who bound what and when, and re-binding a
+  parcel to a different company is audited the same way. It is the sort of claim
+  somebody will need to check the provenance of a year later.
+- **An unbound parcel is invisible to owners.** The world list is an admin
+  screen. An owner never browses the world and picks; they are handed one
+  building and see only its chests.
+- **Verification is a human step, out of band.** The System Admin confirms in
+  the game (or with the server's own operators) that the parcel is the shop's
+  before binding it. The app cannot help with this and should not pretend to —
+  what it can do is make the claim explicit, dated and attributable.
 
 ---
 
@@ -422,14 +442,37 @@ it.
   Per container, `last_hash` short-circuits the whole thing: identical contents,
   no work, no log line, no coffer entry.
 
-### Manual before automatic
+### 7d. A COUNT, not a camera — the reading is deliberately behind
 
-The first version has one button: **Preview**, then **Sync**. A cron that
-rewrites shop inventories unattended, on a feature never tested against a live
-API, is how a ledger gets corrupted quietly and at three in the morning. The
-`scheduled()` entry already exists (`backup-cron.js`) and an opt-in periodic
-sync is a small addition *later*, once the manual path has been boring for a
-while.
+**SETTLED (§12.8): the world is not read live.** The bridge does not follow a
+chest as it changes; it takes a **count at a moment**, on a schedule, and the
+ledger is the books *as of that count*. Three reasons, and they all point the
+same way:
+
+- **Lore.** A ledger that updates as a player's hand moves in a chest is a
+  magical readout, not an account book. A shop that was counted last night, and
+  says so, is the fiction this whole app is written in.
+- **Truth.** A container read while somebody is mid-loot is a number that was
+  never true for a whole second. A quiet-hour count is a number that was.
+- **Cost.** A count per shop per day is a handful of calls. Following a world
+  live is a poll loop that would spend the rate limit on discovering that
+  nothing has changed.
+
+What this demands of the interface is one thing, done everywhere: **say when.**
+Every figure that came from a count carries its as-of time — *"Counted at 03:00
+today"* — on the inventory, on the coffer, and on the Performance page. A number
+without its timestamp will be read as live, and then disbelieved the first time
+it disagrees with what somebody is looking at in the game.
+
+The cadence is a per-realm setting (a quiet hour, daily by default). A manual
+**Sync now** stays, for setting a shop up and for the moment after somebody
+moves stock deliberately — but it is the exception, not the mode.
+
+**Phasing is unchanged by this.** Manual first while it is proven; the schedule
+switched on once a manual run has been boring for a fortnight. A cron that
+rewrites inventories unattended on a feature nobody has watched work is how a
+ledger gets corrupted quietly and at three in the morning — which is, awkwardly,
+exactly when it would run.
 
 ---
 
@@ -580,32 +623,89 @@ per run.
 
 ---
 
-## 12. What must be asked of the API provider
+## 12. What was asked of the API provider, and what came back
 
-Answers here change the design; several of them decide whether parts of it are
-possible at all.
+Answered by the server's operator. Where an answer settled something, the
+section it settled says so and this is the record of why.
 
-1. **Auth**: scheme, where the credential goes, rotation, and whether a
-   *read-only* credential exists.
-2. **Rate limits**: requests per minute, burst, and what a limit response looks
-   like. This sets the cache TTLs and whether a scheduled sync is viable at all.
-3. **ID stability**: are parcel, container and item ids stable across a server
-   restart, a mod update, a load-order change? *If container ids are not stable,
-   the whole binding model needs a different anchor* — this is the single most
-   important question on the list.
-4. **Gold**: an item stack, or a field on the container/owner?
-5. **Ownership**: does a parcel report who owns it, in a form matchable to a
-   player account? (Decides whether §6 can ever be self-service.)
-6. **Instance data**: do stacks expose enchantment / tempering / custom names,
-   or only the base form? (Decides §8's known limitation.)
-7. **Pagination** and worst-case sizes: how many parcels, containers per parcel,
-   stacks per container.
-8. **Consistency**: is a read atomic, or can a container be read mid-write while
-   a player is looting it?
-9. **Push**: are there webhooks or an event stream, or is polling the only way?
-10. **A test server**: is there a staging world to build against? Without one,
-    the mock adapter is the only safe place to develop, which is why it is in
-    §4.
+| # | Question | Answer | What it settles |
+|---|---|---|---|
+| 1 | Auth, and does a **read-only** credential exist? | Read-only, and available — access is the only blocker | §1 is now structural, not just intent: a bug in this app *cannot* write to the game, because the credential cannot |
+| 2 | Rate limits | Standard | Pace and cache as if modest (§12a); measure the real numbers on the test server |
+| 3 | Are parcel / container / item ids **stable**? | **Yes** | The binding model stands as designed. This was the one that could have forced a rewrite |
+| 4 | Is gold an item stack or a field? | **An item stack** | §7b as written: the coffer is a pile of coin found like any other stack, and `goldItemId` is a realm setting |
+| 5 | Does a parcel report its owner? | **No** — ownership needs a System Admin to verify | §6: admin-mediated binding is permanent, and the binding is itself the ownership record |
+| 6 | Do stacks expose instance data (enchanted, tempered, named)? | Unclear | §8's limitation stands, and §12b makes it a first-contact discovery |
+| 7 | Pagination and worst-case sizes | Unclear | §12b: the adapter hides paging; the caps refuse what is too big either way |
+| 8 | Is a read atomic? | **Do not read live** — a delayed count, for lore accuracy | §7d: the bridge takes a count on a schedule and every figure says as-of when |
+| 9 | Webhooks, or polling? | *(explained below — polling, and it is the right answer here)* | §12c |
+| 10 | Is there a **test server**? | **Yes** | §12d, and it reorders the work: the risky half can be learned somewhere harmless |
+
+### 12a. "Standard" rate limits, until they are measured
+
+Assume modest and behave well: one shop at a time, its containers read in
+sequence rather than in a burst, listings cached for the length of a sync, and a
+scheduled sweep that walks a few shops per run rather than the whole realm at
+once. A realm setting holds the assumed limit so it can be raised to whatever the
+server actually allows once that is known.
+
+A shop of five containers is six calls a day. A realm of forty such shops is
+under two hundred — trivially within anything, *provided* they are spread out
+rather than fired together, which is why the sweep paces.
+
+### 12b. Two unknowns, and why neither blocks anything
+
+Both are contained by the shape already chosen:
+
+- **Instance data (6).** Everything above the adapter works in `{itemId, count}`;
+  merging by id happens in `bridge.js`. If it turns out a stack does expose
+  enchantment or tempering, the *adapter* decides whether to hand up a qualified
+  id — and nothing above it changes. If it does not, the limitation in §8 stands
+  and is documented rather than discovered.
+- **Pagination and sizes (7).** `listParcels()` returns a list; whether that took
+  one request or nine is the adapter's business. The caps in `bridge.js` apply to
+  the **assembled total**, so a paged world that is too large still refuses as a
+  whole.
+
+Both become **first-contact tasks on the test server**: read one parcel, one
+container, one item definition, and write down what actually comes back.
+
+### 12c. Polling versus push — and why polling wins here
+
+*The question was "explain the differences", so:*
+
+**Polling** is the app asking, on its own clock: *what is in this chest?* It is
+simple, it needs nothing from the game beyond the read that already exists, it
+fails safely (a missed run means stale data, not lost data), and it cannot be
+spoofed — the app chose who to ask. Its costs are that it learns about a change
+only at the next run, and that most runs discover nothing has changed.
+
+**Push** (a webhook or event stream) is the game telling the app *the barrel
+changed* the moment it does. It is immediate and spends nothing on quiet
+periods. Its costs are real: the app must expose an endpoint the game can reach,
+authenticate what arrives (an unauthenticated webhook is a stranger writing to
+your ledger), survive duplicates and out-of-order events, and cope with a missed
+event leaving the ledger silently wrong forever — so a periodic reconciling poll
+is needed *anyway*, as a backstop. Push is strictly more machinery, and it buys
+latency.
+
+**For this app, latency is not wanted.** Answer 8 asks for a delayed count on
+purpose. Push would deliver exactly the thing the design is trying not to have,
+and would add an inbound attack surface to get it. So: **polling, on a schedule,
+and no webhook endpoint** — and if push ever appears, the right use of it is not
+to sync faster but to mark a shop as "worth counting at the next run".
+
+### 12d. The test server is where the risk goes
+
+The multi-realm design pays for itself here: a **realm pointed at the test
+server** is a complete, isolated staging environment with no new machinery. Its
+shops, items, bindings and coffers are its own — realm isolation already
+guarantees that — so the whole feature can be wrong there without touching the
+live realm's books.
+
+The order of work below assumes this: the HTTP adapter, the first real reads and
+the first apply all happen in a test realm, and the live realm is pointed at the
+real server only once a full cycle has run there without surprises.
 
 ---
 
@@ -617,12 +717,19 @@ possible at all.
    the bulk of the thinking and none of it needs the network — **next, and still
    buildable with no access.**
 3. Schema + `link.js`: bind a parcel, give a container a role.
-4. `http-bridge.js` against the real API; `/game/status` and nothing else.
+4. `http-bridge.js` against the **test server**, in a **test realm**;
+   `/game/status` and nothing else. First contact answers §12b's two unknowns —
+   instance data and real-world sizes — somewhere harmless.
 5. Preview screen — read-only, changes nothing, and is where the first real data
-   gets looked at by human eyes.
-6. Apply: stock corrections, then listings, then the coffer difference.
+   gets looked at by human eyes. Still in the test realm.
+6. Apply, in the test realm: stock corrections, then listings, then the coffer
+   difference. Run a full cycle. Break it on purpose: unplug the server
+   mid-sync, delete a chest, loot one while it reads.
 7. Item import, limited to what bound containers actually contain.
-8. Only then: an opt-in schedule.
+8. Point the LIVE realm at the real server, manual syncs only.
+9. Only then: the schedule (§7d), once a manual run has been boring for a
+   fortnight.
 
-Steps 1 and 2 are the ones worth doing while permission is pending. They are
-also the ones that determine whether the rest is correct. Step 1 is done.
+Steps 1 and 2 need no access at all. Step 1 is done; step 2 is next and is the
+bulk of the thinking. Steps 4–7 need only the TEST server, which exists — so the
+only thing genuinely gated on the live credential is step 8.
