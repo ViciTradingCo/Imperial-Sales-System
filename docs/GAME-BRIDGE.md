@@ -1,9 +1,12 @@
 # The Game Bridge — architecture, not yet built
 
-**STATUS: DESIGN ONLY. Nothing in this document is implemented.** No table, no
-route, no module and no screen described here exists in the repo. It is written
-now so that the day API access is granted the work is assembly rather than
-design, and so nobody has to re-derive the awkward parts under time pressure.
+**STATUS: DESIGN, plus step 1 of §13.** The only things that exist in the repo
+are `worker/src/game/bridge.js` (the contract and the rules for what the ledger
+will believe) and `worker/src/game/mock-bridge.js` (a fixture world), with their
+tests. **Nothing is wired**: no table, no route, no screen, no schema migration,
+and nothing imports either file outside its own test. The rest is written down
+so that the day API access is granted the work is assembly rather than design,
+and so nobody has to re-derive the awkward parts under time pressure.
 
 The bridge reads a live game world and turns part of it into ledger data: the
 **parcels** (buildings) a server hosts, the **containers** inside them, what is
@@ -144,21 +147,39 @@ export const GameBridge = {
 - `worker/src/game/http-bridge.js` — the real one: auth header, timeout, one
   retry on a 5xx, response-size cap, and **hard caps** on how much it will
   accept (see §9).
-- `worker/src/game/mock-bridge.js` — fixtures. Every test above this line runs
-  against it, so the planner, the reconciler and the item importer are finished
-  and proven before the real endpoint is ever called. This is the single most
-  useful thing that can be built *before* permission arrives.
+- `worker/src/game/mock-bridge.js` — **BUILT.** A fixture world and an adapter
+  over it. Every test above this line runs against it, so the planner, the
+  reconciler and the item importer can be finished and proven before the real
+  endpoint is ever called. The world is a live object rather than a frozen
+  fixture, so a test can move stock between two syncs; `faults` makes every
+  failure in §11 reachable — a server that is down, a chest that has vanished.
+  `worker/test/game-bridge.test.js` is also the **acceptance test the real
+  adapter must pass**, so the thing that talks to a live server is held to the
+  promises the mock is held to now.
 
 `ctx` carries `{ baseUrl, key, realmId }`, resolved by the Worker from the
-caller's realm. No module above the bridge ever sees the key.
+caller's realm. No module above the bridge ever sees the key. (The mock takes no
+`ctx` — it has no server to reach, and a parameter that exists only to be
+ignored is one a real adapter can forget to use.)
+
+**Two kinds of wrong, handled differently** — `bridge.js` draws this line and
+everything downstream inherits it:
+
+- **Structural** (a list that is not a list, more rows than a read allows, a
+  container with no id, a fractional count): the read is **refused whole**. A
+  shortened list looks complete, which is the entire problem with one.
+- **Cosmetic** (a tab in a name, a name longer than the index's 40 characters):
+  cleaned and **flagged**, so the importer can say "three names were shortened"
+  rather than either lying or refusing a read over something that is not a
+  mistake.
 
 ---
 
 ## 5. Data model
 
-Two new tables and one new column. Both tables carry `realm_id` and go in
-`REALM_TABLES`; both carry `business` and go in `BUSINESS_TABLES`, so a company
-rename or a realm transfer walks them like everything else.
+Three new tables (the third is in §7a) and one new column. All carry `realm_id`
+and go in `REALM_TABLES`; all carry `business` and go in `BUSINESS_TABLES`, so a
+company rename or a realm transfer walks them like everything else.
 
 ```sql
 -- A building in the game, and the company an admin has bound it to.
@@ -175,7 +196,11 @@ CREATE TABLE IF NOT EXISTS game_container (
   realm_id     TEXT NOT NULL DEFAULT 'default',
   container_id TEXT NOT NULL,
   parcel_id    TEXT NOT NULL DEFAULT '',
-  name         TEXT NOT NULL DEFAULT '',
+  name         TEXT NOT NULL DEFAULT '',    -- what the game calls it
+  -- What the SHOP calls it. A game with four barrels is not much help; blank
+  -- means "use the game's name", the same rule branding and the About page use,
+  -- and a sync never overwrites a label somebody typed.
+  label        TEXT NOT NULL DEFAULT '',
   business     TEXT NOT NULL DEFAULT '',
   -- '' | 'stock' | 'ingredients' | 'coffer'. Empty means the shop can see it
   -- and has said nothing about it, which is not the same as having said no.
@@ -260,26 +285,126 @@ export function planSync(containers, reads, inventory, master, cofferBalance, op
 
 ### What "the truth" means, per role
 
-- **`stock` / `ingredients` containers.** The union of the assigned containers is
-  authoritative **for the items that appear in them**. An item the shop lists but
-  which appears in no assigned container is *left alone*, because the most likely
-  explanation is that it lives somewhere the owner has not assigned — and a
-  partial list silently zeroing the rest is the worst thing a bulk edit can do
-  (the shelved inventory import taught this).
-  A per-shop opt-in — **"these containers are the whole of my stock"** — makes the
-  set fully authoritative and zeroes the remainder. Off by default, and the
-  preview spells out every row it would zero before anyone agrees to it.
-- **`coffer` container.** Its gold becomes the shop's coffer balance. Gold is an
-  *item* in the game, so this is a stack count, and the crucial rule is:
+- **`stock` / `ingredients` containers.** The **union of every assigned
+  container** is the shop's shelf: an item in two chests is one listing with the
+  counts added, and the same item in a third adds to it again. Which chests it
+  is in travels with it (§7a), because "you have thirty ales" and "you have
+  twenty-four in the barrel and six in the cupboard" are different amounts of
+  help when somebody is standing in the room.
 
-  > **The sync writes the DIFFERENCE, not the amount.**
+  The union is authoritative **for the items that appear in it**. An item the
+  shop lists but which is in no assigned container is *left alone*, because the
+  likeliest explanation is a chest nobody has assigned — and a partial list
+  silently zeroing the rest is the worst thing a bulk edit can do (the shelved
+  inventory import taught this). A shop that has assigned every chest it owns
+  says so ONCE, at setup — **"these containers are the whole of my stock"** —
+  and from then on an absent item really does mean none left. Asked once,
+  because a question asked at every sync is a question nobody reads.
 
-  The coffer is an append-only ledger, not a balance field. Writing "deposit
-  1,240" on every run would double the shop's money every sync. So a run writes
-  at most one entry — `kind: 'game-sync'`, `amount: now − was`, note
-  `"Game sync: coffer 1,240 → 1,310"` — and writes nothing at all when they
-  already agree.
+- **`coffer` containers.** See §7b. The coin in them IS the coffer.
+
 - **Unassigned containers** are read for display only and change nothing.
+
+### 7a. Where a thing is, not just how much of it
+
+A ledger listing is one row per item per shop, so *which chest* is extra
+knowledge the sync is uniquely able to supply. It is kept beside the listing
+rather than inside it:
+
+```sql
+CREATE TABLE IF NOT EXISTS game_item_location (
+  realm_id     TEXT NOT NULL DEFAULT 'default',
+  business     TEXT NOT NULL,
+  item         TEXT NOT NULL,          -- the ledger's own item name
+  container_id TEXT NOT NULL,
+  qty          INTEGER NOT NULL DEFAULT 0,
+  last_sync    TEXT,
+  PRIMARY KEY (realm_id, business, item, container_id));
+```
+
+The listing's stock is the SUM of its rows here, which is what makes the split
+checkable: if the two disagree, the sync is wrong and says so rather than
+quietly preferring one. Inventory shows it as a quiet line under the name —
+*in: Barrel (24), Cupboard (6)* — in the shape the kind pills already use.
+
+**Containers are nameable.** The game's own name for a chest is "Barrel", and a
+shop with four barrels needs better than that. `game_container.label` is the
+shop's own name for it, shown wherever the container is named and falling back
+to the game's `name` when blank — the same blank-means-inherit rule branding and
+the About page already follow. The game may rename a chest at any time; the
+shop's label is never overwritten by a sync.
+
+### 7b. The coffer is COUNTED, and the sales log is what it should have been
+
+A shop with a coffer container does not compute its balance. **The coin in the
+chest is the balance** — the game is where the money actually is, and a figure
+derived from a list of entries can only ever be a claim about it.
+
+What the ledger keeps being is the **expectation**: every sale credited, every
+delivery debited, every wage and levy and hand adjustment. So the shop has two
+numbers that should agree, and the interesting one is the gap:
+
+> **counted − expected = what is unaccounted for.**
+
+That is the answer to "is any money missing", and it is the reason to point the
+app at the strongbox at all. An owner who sold 400 gold's worth on Saturday and
+finds 340 more coin on Sunday has 60 to explain, and can say exactly which two
+syncs it went missing between.
+
+Mechanically this changes nothing about how the coffer is stored, and that is
+deliberate: it stays an append-only ledger whose SUM is the balance, so every
+query that already reads it — `cofferBalance`, the ledger screen, the
+Performance page's money in and out — keeps working untouched. A sync writes at
+most **one** entry:
+
+> **the DIFFERENCE, never the amount.**
+
+`kind: 'game-count'`, `amount: counted − expected`, worded as the finding it is:
+*"Counted in the Strongbox: 1,310 — 70 more than the ledger expected."* Writing
+the counted balance itself on every run would double the shop's money every
+sync, which is the trap this rule exists to name.
+
+- **Several coffer containers are summed.** A shop keeping a float behind the bar
+  and a strongbox upstairs has one coffer made of two piles.
+- **Which item is money is a REALM setting** (`goldItemId`), because only the
+  game knows. It is not guessable and must not be guessed.
+- **A run that finds no difference writes nothing.** No entry, no log line.
+- **The gap is never "corrected" silently.** The entry that squares the books is
+  also the record that something needed squaring, it names both figures, and it
+  is what the Performance page counts as unexplained rather than as takings.
+
+### 7c. A synced shop's stocktake is automatic — and its intake becomes MONEY
+
+Once a shop is synced, **counting the shelves is not a job any more**. The
+stocktake stops being something an owner does and becomes what the sync already
+is: the chest is the count, and the ledger follows it. The manual stocktake
+stays for shops that are not synced, and as the way to correct a shop whose
+bridge is switched off.
+
+The consequence is the part worth stating carefully, because getting it wrong
+double-counts a shop's stock:
+
+> **For a synced shop, recording a delivery records what was PAID, not what
+> arrived.** The goods already arrived — they are in the chest, and the sync saw
+> them. An intake that also incremented stock would count the same crate twice.
+
+So the Buying side of the register keeps its whole purpose (a vendor, a region,
+a price, a coffer debit, a cost history for margins) and loses exactly one
+effect: it no longer moves stock. The screen says so.
+
+**Market Analysis is then read from the SALES LOG ONLY.** Its buy side exists
+because a purchase at a stated price is evidence of what a thing is worth — and
+a sync states no price. Stock that appears because a chest was counted is
+evidence of nothing, and letting it in at a base value or a zero would quietly
+teach the realm that everything is cheap. A synced realm therefore values items
+on what they SELL for, which is the honest half of the figure and the half a
+shopkeeper cares about anyway.
+
+A hand-recorded intake still carries a real price, so whether those keep feeding
+realm-wide valuation is a realm setting (`marketFromBuys`), defaulting **off**
+where the bridge is on. Off is the safe default: a synced realm's buy data is
+sparse and volunteered, and a valuation built from what a handful of diligent
+owners typed in is worse than one built from every sale.
 
 ### Stock is corrected, never purchased
 
@@ -486,9 +611,11 @@ possible at all.
 
 ## 13. Order of work, once access exists
 
-1. `mock-bridge.js` + fixtures. **Buildable today, without any access.**
+1. ~~`mock-bridge.js` + fixtures.~~ **DONE** — with `bridge.js`, the contract and
+   the cleaning rules, beside it.
 2. `sync.js` planner + `items.js` matcher, with tests against the mock. This is
-   the bulk of the thinking and none of it needs the network.
+   the bulk of the thinking and none of it needs the network — **next, and still
+   buildable with no access.**
 3. Schema + `link.js`: bind a parcel, give a container a role.
 4. `http-bridge.js` against the real API; `/game/status` and nothing else.
 5. Preview screen — read-only, changes nothing, and is where the first real data
@@ -498,4 +625,4 @@ possible at all.
 8. Only then: an opt-in schedule.
 
 Steps 1 and 2 are the ones worth doing while permission is pending. They are
-also the ones that determine whether the rest is correct.
+also the ones that determine whether the rest is correct. Step 1 is done.

@@ -611,23 +611,36 @@ worked.
   system) are plain JS — port them faithfully; the original comments explain many
   hard-won edge cases worth preserving.
 
-## The Game Bridge is DESIGN ONLY
+## The Game Bridge is DORMANT
 
-[`docs/GAME-BRIDGE.md`](docs/GAME-BRIDGE.md) describes reading a game world —
-parcels, containers, their contents, item definitions — into the ledger. It is
-**not built and must not be half-wired in**: no `game_*` table, no `/game/*`
-route, no `worker/src/game/`, no tile. The design is settled and waiting on API
-access being granted.
+[`docs/GAME-BRIDGE.md`](docs/GAME-BRIDGE.md) is the design for reading a game
+world — parcels, containers, their contents, item definitions — into the ledger.
+It is waiting on API access.
 
-Two things in it are worth knowing even before then, because they are the wrong
-turns that look right: the master index keeps **the NAME as its key** (a game id
-is an alias column, since sale lines are historical records that must outlive any
-game server), and a coffer sync writes **the difference, never the amount** (the
-coffer is an append-only ledger, so writing the balance each run would double a
-shop's money every sync).
+WHAT EXISTS: `worker/src/game/bridge.js` (the adapter contract, the caps, and
+the cleaning rules for untrusted game data) and `worker/src/game/mock-bridge.js`
+(a fixture world), plus their tests. **Nothing is wired** — no `game_*` table, no
+`/game/*` route, no tile, and nothing imports either file outside its own test.
+Keep it that way until access is granted; a half-wired bridge that writes to a
+shop's inventory is worse than none.
 
-The two pieces buildable with no access at all are the mock adapter and the sync
-planner; everything else waits.
+The wrong turns that look right, worth knowing before touching any of it:
+
+- the master index keeps **the NAME as its key** — a game id is an alias column,
+  since sale lines are historical records that must outlive any game server;
+- a coffer sync writes **the difference, never the amount** — the coffer is an
+  append-only ledger, so writing the counted balance each run would double a
+  shop's money every sync. The counted coin IS the balance and the ledger is the
+  EXPECTATION; the gap between them is the "is money missing" answer, which is
+  the whole point of pointing the app at a strongbox;
+- for a synced shop, recording a delivery records **what was paid, not what
+  arrived** — the goods are already in the chest, and an intake that also moved
+  stock would count the same crate twice;
+- a sync states no price, so a synced realm's Market Analysis reads the **sales
+  log only**.
+
+Next buildable-without-access piece: the sync planner and the item matcher
+(step 2 in the doc's order of work).
 
 ## Git workflow
 
