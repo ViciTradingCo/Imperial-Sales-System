@@ -611,6 +611,24 @@ worked.
   system) are plain JS — port them faithfully; the original comments explain many
   hard-won edge cases worth preserving.
 
+## The Game Bridge is DESIGN ONLY
+
+[`docs/GAME-BRIDGE.md`](docs/GAME-BRIDGE.md) describes reading a game world —
+parcels, containers, their contents, item definitions — into the ledger. It is
+**not built and must not be half-wired in**: no `game_*` table, no `/game/*`
+route, no `worker/src/game/`, no tile. The design is settled and waiting on API
+access being granted.
+
+Two things in it are worth knowing even before then, because they are the wrong
+turns that look right: the master index keeps **the NAME as its key** (a game id
+is an alias column, since sale lines are historical records that must outlive any
+game server), and a coffer sync writes **the difference, never the amount** (the
+coffer is an append-only ledger, so writing the balance each run would double a
+shop's money every sync).
+
+The two pieces buildable with no access at all are the mock adapter and the sync
+planner; everything else waits.
+
 ## Git workflow
 
 - `main` is the default branch and is protected: never push directly to it without explicit user permission.
