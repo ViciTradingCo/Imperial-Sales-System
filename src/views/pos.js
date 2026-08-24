@@ -23,11 +23,11 @@
  */
 import { currency, money, coins, isTraveling, tagLabel } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
-import { openModal } from '../lib/modal.js';
 import { api } from '../lib/api.js';
 import { backToHome } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { newIdem } from '../lib/id.js';
+import { openFillSpecial } from './fill-special.js';
 import { enqueueSale, flushSales, queuedCount, isNetworkError } from '../lib/offline-queue.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { emptyState } from '../lib/empty.js';
@@ -240,30 +240,43 @@ export function renderPos(container, { me, mode }) {
       (b.needs && b.needs.length ? ' (your choice)' : ''))));
     const bundleQty = el('input', { type: 'number', min: '1', step: '1', value: '1', 'aria-label': 'How many of this special' });
     const qtyWrap = el('div', {}, [el('label', {}, 'How many'), bundleQty]);
-    // A special filled AT THE TILL goes in one at a time — each one is a
-    // different customer's choice, and there is no per-special half of seven
-    // sweet rolls. The Worker refuses a second one on the same line, so the
-    // quantity box would be offering something that cannot be done.
+    const bundleHint = el('p', { class: 'note' });
+    /**
+     * A special filled AT THE TILL still goes in ONE LINE EACH — its parts are
+     * per unit and two fillings need not divide evenly. What the quantity does
+     * for it is save the clerk's time: the chooser asks once for the whole
+     * amount and `dealSpecial` splits it, so three of a deal is one question
+     * and three lines rather than three questions.
+     */
     const paintBundlePick = () => {
       const b = bundles.find((x) => String(x.id) === bundleSel.value);
-      qtyWrap.hidden = !!(b && b.needs && b.needs.length);
+      const n = Math.max(1, Math.floor(Number(bundleQty.value)) || 1);
+      bundleHint.textContent = (b && b.needs && b.needs.length && n > 1)
+        ? 'You will be asked to choose for all ' + n + ' at once — ' +
+          b.needs.map((need) => (need.qty * n) + ' ' + tagLabel(need.tag)).join(' and ') +
+          ' — and they ring up as ' + n + ' lines.'
+        : '';
     };
+    bundleQty.addEventListener('input', paintBundlePick);
     bundleSel.addEventListener('change', paintBundlePick);
     const addBundle = el('button.secondary-btn', { onclick: () => {
       const b = bundles.find((x) => String(x.id) === bundleSel.value);
       if (!b) { setStatus('Pick a special first.', 'error'); return; }
       setStatus('', '');
+      const n = Math.floor(Number(bundleQty.value)) || 1;
+      if (n < 1) { setStatus('How many?', 'error'); return; }
       if (b.needs && b.needs.length) {
-        openFillSpecial(b, inventory, (parts) => {
+        // Asked once for all of them, then dealt into one filling each.
+        openFillSpecial(b, inventory, n, (fillings) => {
           if (!idemKey) idemKey = newIdem();
-          cart.push({ bundle: b.name, qty: 1, price: specialPrice(b, parts), parts, byKind: true });
-          bundleSel.value = ''; paintBundlePick();
+          fillings.forEach((parts) => {
+            cart.push({ bundle: b.name, qty: 1, price: specialPrice(b, parts), parts, byKind: true });
+          });
+          bundleSel.value = ''; bundleQty.value = '1'; paintBundlePick();
           renderCart();
         });
         return;
       }
-      const n = Math.floor(Number(bundleQty.value)) || 1;
-      if (n < 1) { setStatus('How many?', 'error'); return; }
       if (!idemKey) idemKey = newIdem();
       cart.push({ bundle: b.name, qty: n, price: specialPrice(b), parts: b.parts });
       bundleSel.value = ''; bundleQty.value = '1'; paintBundlePick();
@@ -276,6 +289,7 @@ export function renderPos(container, { me, mode }) {
         'drink — and lets the customer pick which.'),
       el('label', {}, 'Special'), bundleSel,
       qtyWrap,
+      bundleHint,
       el('div', { class: 'row-actions' }, [addBundle]),
     ]);
     paintBundlePick();
@@ -342,8 +356,8 @@ export function renderPos(container, { me, mode }) {
       discDir.value = d && d.percent < 0 ? 'on' : 'off';
       renderCart();
     });
-    discPct.addEventListener('input', () => renderCart());
-    discDir.addEventListener('change', () => renderCart());
+    discPct.addEventListener('input', () => paintTotal());
+    discDir.addEventListener('change', () => paintTotal());
 
     /**
      * Employee purchase — staff taking stock, at no charge.
@@ -370,7 +384,7 @@ export function renderPos(container, { me, mode }) {
       [discSel, discName, discPct, discDir].forEach((f) => { f.disabled = on; });
       if (on) { discSel.value = ''; discName.value = ''; discPct.value = ''; discDir.value = 'off'; }
       complete.textContent = on ? 'Record employee purchase' : 'Complete sale';
-      renderCart();
+      paintTotal();
     });
 
     // One idempotency key per order-in-progress, so a retried submit can't
@@ -379,30 +393,113 @@ export function renderPos(container, { me, mode }) {
 
     function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
-    function renderCart() {
-      if (!cart.length) { mount(cartHost, emptyState({ glyph: '🧺', title: 'Cart is empty', hint: 'Search the item index above and add items to build the order.' })); return; }
-      const rows = cart.map((line, i) => el('div.emp-row', {}, [
-        el('span', { class: 'emp-who', html: line.bundle
+    /**
+     * ONE ROW OF THE ORDER, with its quantity in reach.
+     *
+     * A cart you can only add to and remove from makes "they wanted three, not
+     * two" into: remove the line, find the item again, retype the price. So the
+     * count is a box, and it is edited where it is read.
+     *
+     * The row's own total repaints and the order's total repaints — the LIST
+     * does not, because re-mounting it under a cursor takes the focus out of
+     * the box somebody is still typing in.
+     */
+    function cartRow(line, index, repaintTotal) {
+      const lineTotal = el('span', { class: 'cart-line-total' });
+      const what = el('span', { class: 'emp-who' });
+      /**
+       * The row's own figures, repainted when its count changes — INCLUDING a
+       * bundle's contents, which say how many of each thing leaves the shelf
+       * and would otherwise still describe one of them after somebody asked
+       * for three.
+       */
+      const paintLine = () => {
+        lineTotal.textContent = money(line.qty * line.price);
+        what.innerHTML = line.bundle
           // A bundle says what is IN it, because "Feast ×1" alone does not tell
           // the clerk what is about to leave the shelf.
-          ? '<b>' + esc(line.bundle) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
-            ' = ' + money(line.qty * line.price) +
+          ? '<b>' + esc(line.bundle) + '</b> @ ' + money(line.price) +
             '<br><span class="note">' + esc(line.parts.map((p) =>
               // A by-kind special was filled for THIS line, so its parts are
               // already the whole of it; a fixed one lists what is in a single
               // special and multiplies.
               p.item + ' ×' + (line.byKind ? p.qty : p.qty * line.qty)).join(', ')) + '</span>'
-          : '<b>' + esc(line.item) + '</b> ×' + line.qty + ' @ ' + money(line.price) +
-            ' = ' + money(line.qty * line.price) }),
-        el('button.secondary-btn.small', { onclick: () => { cart.splice(i, 1); renderCart(); } }, 'Remove'),
-      ]));
-      const total = cart.reduce((s, l) => s + l.qty * l.price, 0);
+          : '<b>' + esc(line.item) + '</b> @ ' + money(line.price);
+      };
+
+      const remove = el('button.secondary-btn.small', {
+        onclick: () => { cart.splice(index, 1); renderCart(); },
+      }, 'Remove');
+
+      /**
+       * A special filled at the till has no quantity to edit: the line IS one
+       * filling, and its parts are what one customer chose. Two of them are two
+       * lines — so the way to have fewer is to remove one.
+       */
+      if (line.byKind) {
+        paintLine();
+        return el('div.emp-row.cart-row', {}, [
+          what,
+          el('span', { class: 'cart-qty-fixed' }, '×1'),
+          lineTotal,
+          remove,
+        ]);
+      }
+
+      const qtyBox = el('input', {
+        type: 'number', min: '1', step: '1', value: String(line.qty),
+        class: 'cart-qty', 'aria-label': 'How many ' + (line.item || line.bundle),
+      });
+      const setQty = (n) => {
+        // A cart line of nothing is a line that should not be there, but the
+        // box is left as typed while somebody is mid-edit — clamping a half-
+        // typed "" to 1 under the cursor is how a 12 becomes a 112.
+        line.qty = Math.max(1, Math.floor(Number(n)) || 1);
+        paintLine();
+        repaintTotal();
+      };
+      qtyBox.addEventListener('input', () => setQty(qtyBox.value));
+      // On the way out, the box is made to agree with the line it edits.
+      qtyBox.addEventListener('blur', () => { qtyBox.value = String(line.qty); });
+
+      const step = (by) => () => {
+        setQty(line.qty + by);
+        qtyBox.value = String(line.qty);
+      };
+      paintLine();
+      return el('div.emp-row.cart-row', {}, [
+        what,
+        el('span', { class: 'cart-step' }, [
+          el('button.secondary-btn.small', { onclick: step(-1), 'aria-label': 'One fewer' }, '−'),
+          qtyBox,
+          el('button.secondary-btn.small', { onclick: step(1), 'aria-label': 'One more' }, '+'),
+        ]),
+        lineTotal,
+        remove,
+      ]);
+    }
+
+    // The totals live in their own box so a quantity can be edited without the
+    // list being rebuilt underneath the cursor.
+    const totalHost = el('div', {});
+
+    function renderCart() {
+      if (!cart.length) {
+        mount(cartHost, emptyState({ glyph: '🧺', title: 'Cart is empty', hint: 'Search the item index above and add items to build the order.' }));
+        return;
+      }
+      mount(cartHost, ...cart.map((line, i) => cartRow(line, i, paintTotal)), totalHost);
+      paintTotal();
+    }
+
+    /** What the order comes to — repainted on its own whenever a figure moves. */
+    function paintTotal() {
+      const total = cart.reduce((sum, l) => sum + l.qty * l.price, 0);
       // On an employee purchase the line prices still say what the goods are
       // worth; the total is what will actually be taken, which is nothing.
       if (staffBox.checked) {
-        rows.push(el('p', { html: '<b>No charge</b> <span class="note">— employee purchase (would be ' +
+        mount(totalHost, el('p', { html: '<b>No charge</b> <span class="note">— employee purchase (would be ' +
           esc(money(total)) + ')</span>' }));
-        mount(cartHost, ...rows);
         return;
       }
       // WHAT THE CUSTOMER ACTUALLY PAYS, not just what the goods add up to.
@@ -411,15 +508,15 @@ export function renderPos(container, { me, mode }) {
       // clerk reads out has to be the figure that gets taken.
       const pct = adjustment();
       if (!pct) {
-        rows.push(el('p', { html: '<b>Total: ' + money(total) + '</b>' }));
-      } else {
-        rows.push(el('p', { class: 'buy-sub', html: 'Subtotal: ' + esc(money(total)) }));
-        rows.push(el('p', { class: 'buy-sub', html: (pct < 0 ? 'Upcharge +' : 'Discount −') +
-          esc(String(Math.abs(pct))) + '% · ' +
-          esc(money(Math.abs(coins(total * (100 - pct) / 100) - coins(total)))) }));
-        rows.push(el('p', { class: 'buy-total', html: '<b>Total: ' + money(total * (100 - pct) / 100) + '</b>' }));
+        mount(totalHost, el('p', { html: '<b>Total: ' + money(total) + '</b>' }));
+        return;
       }
-      mount(cartHost, ...rows);
+      mount(totalHost,
+        el('p', { class: 'buy-sub', html: 'Subtotal: ' + esc(money(total)) }),
+        el('p', { class: 'buy-sub', html: (pct < 0 ? 'Upcharge +' : 'Discount −') +
+          esc(String(Math.abs(pct))) + '% · ' +
+          esc(money(Math.abs(coins(total * (100 - pct) / 100) - coins(total)))) }),
+        el('p', { class: 'buy-total', html: '<b>Total: ' + money(total * (100 - pct) / 100) + '</b>' }));
     }
 
     function addToCart() {
@@ -548,95 +645,4 @@ export function renderPos(container, { me, mode }) {
     );
     renderCart();
   }
-}
-
-/**
- * FILLING A SPECIAL THAT ASKS FOR KINDS — "five food and five drink".
- *
- * The deal states what it wants; the customer states what they want; this is
- * where the second meets the first. One panel per requirement, listing what the
- * shop has tagged that kind and holds, with a count against each and a tally
- * that will not let the clerk go over or under.
- *
- * Each choice is handed back with the KIND IT FILLS, because an item may be
- * tagged both food and drink and one unit cannot pay for both halves of the
- * deal. The Worker re-checks all of it — the tags, the counts, the price — so
- * nothing here is trusted, only made easy.
- */
-function openFillSpecial(b, inventory, onFilled) {
-  const status = el('p', {});
-  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
-  const sellable = (inventory || []).filter((it) => !it.ingredient);
-  const panels = [];
-
-  const body = b.needs.map((need) => {
-    const options = sellable.filter((it) => (it.tags || []).includes(need.tag));
-    const tally = el('p', { class: 'note' });
-    const boxes = [];
-    const paint = () => {
-      const got = boxes.reduce((n, x) => n + (Math.floor(Number(x.input.value)) || 0), 0);
-      tally.textContent = got + ' of ' + need.qty + ' chosen';
-      tally.className = got === need.qty ? 'note ok' : 'note';
-    };
-    const rows = options.map((it) => {
-      const input = el('input', {
-        type: 'number', min: '0', step: '1', value: '0',
-        'aria-label': 'How many ' + it.item,
-      });
-      input.addEventListener('input', paint);
-      boxes.push({ input, item: it });
-      return el('div', { class: 'need-row' }, [
-        el('span', { class: 'emp-who', html: '<b>' + esc(it.item) + '</b> <span class="note">' +
-          esc(it.stock + ' in stock') + '</span>' }),
-        input,
-      ]);
-    });
-    paint();
-    panels.push({ need, boxes });
-    return el('div', { class: 'fill-need' }, [
-      el('h4', {}, need.qty + ' × ' + tagLabel(need.tag)),
-      options.length
-        ? el('div', {}, rows)
-        : el('p', { class: 'note error' }, 'Nothing in stock is tagged ' + tagLabel(need.tag) +
-          ' — tag it under Inventory → Kinds.'),
-      tally,
-    ]);
-  });
-
-  let modal;
-  function confirm() {
-    const parts = [];
-    for (const panel of panels) {
-      let got = 0;
-      for (const box of panel.boxes) {
-        const n = Math.floor(Number(box.input.value)) || 0;
-        if (n < 0) { setStatus('A count cannot be negative.', 'error'); return; }
-        if (!n) continue;
-        // Stock is checked properly server-side; this is so the clerk is told
-        // before the customer is, rather than after the whole order is rung up.
-        if (n > box.item.stock) {
-          setStatus('Only ' + box.item.stock + ' ' + box.item.item + ' in stock.', 'error');
-          return;
-        }
-        got += n;
-        parts.push({ item: box.item.item, qty: n, tag: panel.need.tag });
-      }
-      if (got !== panel.need.qty) {
-        setStatus(b.name + ' takes ' + panel.need.qty + ' ' + tagLabel(panel.need.tag) + ' — ' + got + ' chosen.', 'error');
-        return;
-      }
-    }
-    onFilled(parts);
-    modal.close();
-  }
-
-  modal = openModal([
-    el('h3', {}, b.name + ' — ' + (b.percentOff ? b.percentOff + '% off' : money(b.price))),
-    el('p', { class: 'note' }, 'Choose what goes in it. One special at a time: the next customer picks ' +
-      'their own, so add it again for another.' +
-      (b.percentOff ? ' What it costs follows what you chose, less ' + b.percentOff + '%.' : '')),
-    ...body,
-    el('div', { class: 'row-actions' }, [el('button.primary', { onclick: confirm }, 'Add to order')]),
-    status,
-  ]);
 }

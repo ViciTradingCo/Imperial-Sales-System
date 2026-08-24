@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.5', date: '2026-08-21', notes: [
+    'THE ORDER IS EDITABLE. Every line in the cart now has its count beside it — type over it, or use − and +. “They wanted three, not two” no longer means removing the line and typing the price in again.',
+    'The line’s total and the order’s total follow as you type, and a special’s contents follow with them: three of a set that holds two ales now reads six ales, where it used to still say two.',
+    'SPECIALS THAT ASK FOR KINDS TAKE A COUNT. Set How many to three and you are asked once for all three — fifteen food rather than five, three times over — and they ring up as three lines.',
+    'They stay three lines on purpose: each one is its own deal with its own choice, and seven sweet rolls and three stews fills “five food” twice without either half being a neat five. The app works out the split for you.',
+    'A special filled at the till has no count to edit in the cart, for the same reason — one line is one filling. Remove one if a customer changes their mind.',
+  ] },
   { version: '6.4', date: '2026-08-20', notes: [
     'Shop Ledger → Performance is easier to read. The small labels under every figure were handwritten, uppercased and fixed at twelve pixels; they are printed now, sentence case, and they grow with your text size like the rest of the app.',
     'THE LAST 30 DAYS, against the 30 before. Revenue and orders each say whether they are up or down on the previous month, so the page answers “is my shop growing” without you working it out.',

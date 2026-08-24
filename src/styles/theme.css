@@ -1036,6 +1036,34 @@ label.inline {
    the same column as one without — the row is `space-between`, and without
    this the name drifts to the middle of whatever is left over. */
 .emp-who { flex: 1 1 auto; min-width: 0; }
+/* ---- A LINE OF THE ORDER ----
+   The count is a control rather than a printed number: "they wanted three, not
+   two" should not mean removing the line and typing the price again. It wraps
+   on a narrow screen so the name keeps its own line and the controls sit under
+   it, rather than the three of them fighting over 90 pixels. */
+.cart-row { flex-wrap: wrap; row-gap: 6px; }
+.cart-step { display: flex; align-items: center; gap: 4px; }
+.cart-step button { min-width: 34px; padding: 4px 8px; }
+/* Narrow, and set as a figure — it is a quantity, and quantities line up. */
+.cart-qty {
+  width: 64px; text-align: center; padding: 6px 4px;
+  font-family: var(--font-data); font-variant-numeric: tabular-nums;
+}
+/* A special filled at the till is one filling and has no count to edit. */
+.cart-qty-fixed {
+  font-family: var(--font-data); color: var(--note);
+  padding: 0 var(--sp-2); white-space: nowrap;
+}
+.cart-line-total {
+  font-family: var(--font-data); font-variant-numeric: tabular-nums;
+  min-width: 72px; text-align: right; white-space: nowrap;
+}
+@media (max-width: 600px) {
+  /* The name takes the whole first line; the controls share the second. */
+  .cart-row .emp-who { flex: 1 0 100%; }
+  .cart-line-total { flex: 1 1 auto; }
+}
+
 /* A crate in a transfer list: a title line, a Show more, and the contents it
    opens. Top-aligned rather than centred — the left side grows when it is
    open, and a centred Accept button would drift down the page with it. */
