@@ -86,8 +86,8 @@ One deployment can host several realms, and each realm is a *different game
 server*. The bridge is therefore per realm, like regions, denomination and
 certification.
 
-- **Base URL, enabled flag, the count's hour, the assumed rate limit, the caps,
-  and `goldItemId`:** `sys_flags` under a realm-keyed name —
+- **Base URL, enabled flag, the count's hour, the settle delay after a sale
+  (§7e), the assumed rate limit, the caps, and `goldItemId`:** `sys_flags` under a realm-keyed name —
   `game_bridge:<realm>` — read/written by a `game-settings.js` in the shape of
   `realm-prefs.js`. A realm pointed at the **test server** is exactly this
   setting with a different URL, which is what makes staging free (§12d). Not `realm-prefs` itself: those are sent to every
@@ -468,6 +468,72 @@ The cadence is a per-realm setting (a quiet hour, daily by default). A manual
 **Sync now** stays, for setting a shop up and for the moment after somebody
 moves stock deliberately — but it is the exception, not the mode.
 
+### 7e. A sale makes a shop DUE for counting — it does not trigger a read
+
+**SETTLED (§12.9): counts are pulled on a schedule AND after a sale.** The
+second half needs care, because the obvious implementation of it is wrong in a
+way that would be blamed on the game rather than on us.
+
+A sale is exactly the moment the two worlds disagree. The till decrements the
+ledger the instant it is rung up; the ale leaves the barrel and the coin enters
+the strongbox whenever the two players actually get round to it — a minute
+later, five, sometimes after a conversation. **Counting immediately would read
+the chest before the goods had moved**, find the old numbers, and "correct" the
+sale away. The next count would put it back. A shop's stock would flap between
+two figures and its coffer would report money missing that is standing in front
+of the shopkeeper.
+
+So a sale does not read anything. **A sale marks the shop DUE**, and the count
+happens afterwards:
+
+- checkout stamps `due_at = now + settle` on the shop's bridge row, inside the
+  batch it was already writing. One tiny write, no network call;
+- the sweep (§7d's cron, running every few minutes rather than nightly) counts
+  the shops whose `due_at` has passed, plus any whose scheduled hour has come;
+- `settle` is a per-realm setting — long enough for two people to finish
+  handing things over, short enough that the books are current within the hour.
+
+Three properties fall out of it, all of them wanted:
+
+- **Sales COALESCE.** The `due_at` is set by the first sale after a count and
+  not pushed back by later ones, so a busy hour is one count at the end of the
+  settle window rather than forty. A quiet shop is counted when something
+  actually happened to it, and never otherwise.
+- **The till never waits on the game.** No API call happens on the checkout
+  path, so a game server that is down, slow, or rate-limiting cannot make a sale
+  fail or hang. This is not negotiable: the register works when the game does
+  not, exactly as it works when the network does not.
+- **It replays correctly.** The marker is written where the sale LANDS, inside
+  `checkout`, so a sale queued offline and replayed an hour later marks the shop
+  due when it is really recorded rather than when somebody's browser managed to
+  reach us.
+
+### 7f. Two ledgers, and the gap between them is the point
+
+With counts arriving after sales, the shape of the whole feature resolves into
+one idea it is worth naming, because every part of it follows the same rule:
+
+> **The ledger says what SHOULD be there. The count says what IS. The gap is a
+> finding, not an error to be smoothed away.**
+
+|  | Expected | Counted | The gap means |
+|---|---|---|---|
+| **Coin** | sales, deliveries, wages, the levy | gold in the coffer chests | money unaccounted for — the reason to point the app at a strongbox at all |
+| **Stock** | what the till and the deliveries say is left | items in the stock chests | goods that left without a sale, or arrived without a delivery |
+
+Both are applied — the count wins, because it is what is actually there — and
+both are **recorded as the difference**, so the shop can see when it happened
+and between which two counts. Counting after every sale narrows that window from
+a day to minutes, which is precisely what makes the answer useful: "somewhere
+this week" is a shrug, "between the count at 14:10 and the one at 14:25" is an
+answer.
+
+A stock gap is worded more carefully than a coin one, because most of them are
+innocent: an increase is usually the owner restocking from their own pack, and
+only a *shortfall beyond what the sales explain* is worth a word. It is reported
+on the sync's own line and totalled on Performance as unaccounted stock; it is
+never an alarm, and the app never accuses anybody of anything.
+
 **Phasing is unchanged by this.** Manual first while it is proven; the schedule
 switched on once a manual run has been boring for a fortnight. A cron that
 rewrites inventories unattended on a feature nobody has watched work is how a
@@ -615,6 +681,8 @@ Both follow the tile convention; both need their key added to `TILE_KEYS` in
 | A parcel changes hands in the game | The binding is flagged for an admin. Nothing is unbound automatically. |
 | Item id already on another index row | Refuse and report both rows — never silently move an alias. |
 | Contents unchanged since last run | No writes, no coffer entry, no log line. |
+| A shop is due but the game is unreachable | It **stays** due. The marker is not cleared by a failed attempt, so the count happens at the next sweep that works — a sale is never silently forgotten because a server blinked. |
+| The sweep is behind (many shops due at once) | Shops are counted oldest-due first, a bounded number per run. Nothing is dropped; the queue drains. |
 | Key missing / rejected | The bridge reports "not configured" rather than "broken": those are different problems with different fixes. |
 
 Every run — including one that changed nothing — is one `audit` row
@@ -638,7 +706,7 @@ section it settled says so and this is the record of why.
 | 6 | Do stacks expose instance data (enchanted, tempered, named)? | Unclear | §8's limitation stands, and §12b makes it a first-contact discovery |
 | 7 | Pagination and worst-case sizes | Unclear | §12b: the adapter hides paging; the caps refuse what is too big either way |
 | 8 | Is a read atomic? | **Do not read live** — a delayed count, for lore accuracy | §7d: the bridge takes a count on a schedule and every figure says as-of when |
-| 9 | Webhooks, or polling? | *(explained below — polling, and it is the right answer here)* | §12c |
+| 9 | Webhooks, or polling? | **Polling** — on a schedule, and again after a sale | §12c, and §7e: a sale marks the shop DUE rather than triggering a read |
 | 10 | Is there a **test server**? | **Yes** | §12d, and it reorders the work: the risky half can be learned somewhere harmless |
 
 ### 12a. "Standard" rate limits, until they are measured
@@ -691,9 +759,21 @@ latency.
 
 **For this app, latency is not wanted.** Answer 8 asks for a delayed count on
 purpose. Push would deliver exactly the thing the design is trying not to have,
-and would add an inbound attack surface to get it. So: **polling, on a schedule,
-and no webhook endpoint** — and if push ever appears, the right use of it is not
-to sync faster but to mark a shop as "worth counting at the next run".
+and would add an inbound attack surface to get it.
+
+**SETTLED (§12.9): polling, on a schedule, and again after a sale** — with no
+webhook endpoint anywhere. The second trigger is the interesting one, and it is
+deliberately *not* "a sale causes a read": a sale marks the shop DUE and the
+count follows a settle delay behind it (§7e). That keeps the delayed-count
+principle intact, gives two players time to actually hand goods over, coalesces
+a busy hour into one count, and keeps every API call off the checkout path so a
+game server having a bad day can never cost somebody a sale.
+
+Note what this gets us that push would not: the app decides *when* it is
+counted, so the count is never mid-transaction, and a shop nobody has traded at
+costs nothing. If push ever appears, the correct use of it is still not to sync
+faster — it is to mark a shop due, which is the same mechanism a sale already
+uses.
 
 ### 12d. The test server is where the risk goes
 
@@ -727,8 +807,10 @@ real server only once a full cycle has run there without surprises.
    mid-sync, delete a chest, loot one while it reads.
 7. Item import, limited to what bound containers actually contain.
 8. Point the LIVE realm at the real server, manual syncs only.
-9. Only then: the schedule (§7d), once a manual run has been boring for a
-   fortnight.
+9. Only then: the schedule — the cron sweep (§7d) and the sale-triggered due
+   marker (§7e) together, once a manual run has been boring for a fortnight.
+   The marker is one write in `checkout` and must stay that way; if it ever
+   grows into an API call on the checkout path, it has become a bug.
 
 Steps 1 and 2 need no access at all. Step 1 is done; step 2 is next and is the
 bulk of the thinking. Steps 4–7 need only the TEST server, which exists — so the

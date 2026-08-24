@@ -86,14 +86,6 @@ cannot edit. The browser is told only what it's allowed to see.
   (2) an optional daily R2 snapshot (`backup-cron.js`, keeps the last N);
   (3) D1 Time Travel (30-day point-in-time restore, built in). See SETUP.md.
 
-## Planned, not built
-
-- **The Game Bridge** — reading a live game world (parcels, containers, their
-  contents, item definitions) into the ledger, so a shop's inventory and coffer
-  come from the chests that actually are the shop. Designed in full in
-  [`GAME-BRIDGE.md`](GAME-BRIDGE.md) and **blocked on API access being granted**.
-  Nothing of it exists in the repo: no table, no route, no module, no screen.
-
 ## Repo layout
 
 ```
@@ -103,5 +95,6 @@ src/views/   role-scoped views
 src/styles/  the parchment theme
 worker/      the Cloudflare Worker API (the trust boundary)
 .github/workflows/  Pages deploy + Worker deploy
-docs/        SETUP.md, ARCHITECTURE.md, GAME-BRIDGE.md (design only)
+archive/     shelved features, each with a README saying how to restore it
+docs/        SETUP.md, ARCHITECTURE.md
 ```
