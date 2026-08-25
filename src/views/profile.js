@@ -142,10 +142,16 @@ function appearanceCard() {
   });
   langSel.addEventListener('change', () => { setLang(langSel.value); location.reload(); });
 
+  // Only OFFERED when there is a choice to make. A language is listed once its
+  // pack covers the whole app (see i18n.READY), so while a translation is still
+  // being written there is exactly one language and a dropdown holding it would
+  // be a control that does nothing.
+  const multilingual = Object.keys(LANGS).length > 1;
+
   return el('div.card', {}, [
     el('h2', {}, 'Appearance'),
-    el('p', { class: 'note' }, 'What the ledger is written on, and the language it is written in. ' +
-      'Both are for this device only.'),
+    el('p', { class: 'note' }, 'What the ledger is written on' +
+      (multilingual ? ', and the language it is written in. Both are' : '. It is') + ' for this device only.'),
     el('label', {}, 'Surface'),
     themeSel,
     el('p', { class: 'note' }, 'The writing stays the same; the page under it changes.'),
@@ -153,12 +159,14 @@ function appearanceCard() {
     textSel,
     el('p', { class: 'note' }, 'Sets the writing, the figures and the ruled lines together, so the ' +
       'entries still sit on the lines.'),
-    el('label', {}, 'Language'),
-    langSel,
-    el('p', { class: 'note' }, 'Starts as whatever your device asks for — ' + LANGS[deviceLang()] +
-      ', here — and this changes it for this device only. Dates follow it too, so the page is never ' +
-      'part in one language and part in another. Translations cover the interface; names and some ' +
-      'messages stay as written.'),
+    ...(multilingual ? [
+      el('label', {}, 'Language'),
+      langSel,
+      el('p', { class: 'note' }, 'Starts as whatever your device asks for — ' + LANGS[deviceLang()] +
+        ', here — and this changes it for this device only. Dates follow it too, so the page is never ' +
+        'part in one language and part in another. Names, and anything you or your staff have typed, ' +
+        'stay as written.'),
+    ] : []),
   ]);
 }
 

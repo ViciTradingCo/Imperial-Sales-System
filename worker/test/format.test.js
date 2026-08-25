@@ -9,6 +9,7 @@
  * nothing, so it runs here.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { LANGS, getLang } from '../../src/lib/i18n.js';
 import { money, setCurrency, currency, setRegion, regionLabel, regionWord, regionsOn,
   formatDate, formatDateTime, weekdayName } from '../../src/lib/format.js';
 import { coin } from '../src/money.js';
@@ -131,21 +132,53 @@ describe('dates', () => {
     try { return fn(); } finally { restore(); }
   };
 
-  it('come from the DEVICE when nobody has chosen a language', () => {
-    expect(onDevice(['fr-FR'], () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }))).toBe('août');
-    expect(onDevice(['de-DE'], () => weekdayName(6))).toBe('Samstag');
-    expect(onDevice(['es-MX'], () => weekdayName(1))).toBe('lunes');
+  /**
+   * Every language the app currently OFFERS. A language whose pack is not
+   * finished is not in here, is not auto-selected from the device, and is not
+   * reachable by an old stored setting — see `i18n.READY`. Driving the tests
+   * off it means they assert the gate today and the translations the moment a
+   * pack ships, without anybody remembering to come back and edit them.
+   */
+  const offered = Object.keys(LANGS).filter((l) => l !== 'en');
+
+  it('comes from the DEVICE when nobody has chosen a language', () => {
+    for (const lang of offered) {
+      expect(onDevice([lang + '-' + lang.toUpperCase()], () => getLang())).toBe(lang);
+    }
+    expect(onDevice(['en-GB'], () => getLang())).toBe('en');
   });
 
-  it('take the device’s ORDER of preference, not just its first answer', () => {
-    // Catalan first, Spanish second: we cannot write Catalan, so Spanish — the
-    // best of what we have, in the reader's own order — beats falling to English.
-    expect(onDevice(['ca-ES', 'es-ES', 'en'], () => weekdayName(1))).toBe('lunes');
+  /**
+   * THE GATE. A device asking for a language the app has not finished gets
+   * English — one language on the page, rather than a heading in theirs and
+   * the paragraph under it in ours.
+   */
+  it('gives English for a language the app does not fully speak', () => {
+    expect(onDevice(['ja-JP'], () => getLang())).toBe('en');
+    expect(onDevice([], () => getLang())).toBe('en');
+    // An unfinished language is refused exactly like one we never had.
+    const unfinished = ['es', 'fr', 'de', 'it'].filter((l) => !offered.includes(l));
+    for (const lang of unfinished) {
+      expect(onDevice([lang + '-FR'], () => getLang()), lang + ' is not finished').toBe('en');
+      // …including one left in storage from before it was withdrawn.
+      expect(asLang(lang, () => getLang(), ['en-GB']), lang + ' stored').toBe('en');
+    }
   });
 
-  it('fall back to English only when the device asks for nothing we write', () => {
-    expect(onDevice(['ja-JP'], () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }))).toBe('August');
-    expect(onDevice([], () => weekdayName(6))).toBe('Saturday');
+  it('takes the device’s ORDER of preference, not just its first answer', () => {
+    // Catalan first: we cannot write Catalan, so the next one we CAN write
+    // wins — the best of what we have, in the reader's own order.
+    const second = offered[0] || 'en';
+    expect(onDevice(['ca-ES', second, 'en'], () => getLang())).toBe(second === 'en' ? 'en' : second);
+  });
+
+  it('writes the date in whatever language it settled on', () => {
+    const d = '2026-08-16T12:00:00Z';
+    expect(onDevice(['en-GB'], () => formatDate(d, { month: 'long' }))).toBe('August');
+    for (const lang of offered) {
+      const out = onDevice([lang + '-' + lang.toUpperCase()], () => formatDate(d, { month: 'long' }));
+      expect(out, lang + ' month').not.toBe('August');
+    }
   });
 
   /**
@@ -153,30 +186,14 @@ describe('dates', () => {
    * and disagree about 16/8/2026, so within one language the device's own tag
    * decides — this is the whole reason the full tag is kept.
    */
-  it('write the date the reader’s own way within one language', () => {
+  it('writes the date the reader’s own way within one language', () => {
     const d = '2026-08-16T12:00:00Z';
     expect(onDevice(['en-US'], () => formatDate(d))).toBe('8/16/2026');
     expect(onDevice(['en-GB'], () => formatDate(d))).toBe('16/08/2026');
   });
 
-  it('follow Appearance when a reader overrules their device — the bug, both ways', () => {
-    // An English device told to render French gets French dates…
-    expect(asLang('fr', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }), ['en-US'])).toBe('août');
-    // …and a French device told to render English gets English ones.
-    expect(asLang('en', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }), ['fr-FR'])).toBe('August');
-  });
-
-  /**
-   * A chosen language the device did not ask for gets a sensible region for
-   * THAT language — an American picking French reads French dates, not
-   * American ones, because their region says nothing about how French is written.
-   */
-  it('ignore the device’s region once the language has been overruled', () => {
-    expect(asLang('fr', () => formatDate('2026-08-16T12:00:00Z'), ['en-US'])).toBe('16/08/2026');
-  });
-
-  it('treat a stored language nothing knows as no choice at all', () => {
-    expect(asLang('xx', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }), ['de-DE'])).toBe('August');
+  it('treats a stored language nothing knows as no choice at all', () => {
+    expect(asLang('xx', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }), ['en-GB'])).toBe('August');
   });
 
   it('read an unusable date as nothing rather than as "Invalid Date"', () => {

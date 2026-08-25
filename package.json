@@ -1,14 +1,16 @@
 {
   "name": "eec-sales-system",
   "version": "0.1.0",
-  "description": "Vici Trading Co. sales network — static web frontend (GitHub Pages) backed by a Cloudflare Worker + D1 API.",
+  "description": "Vici Trading Co. sales network \u2014 static web frontend (GitHub Pages) backed by a Cloudflare Worker + D1 API.",
   "type": "module",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "audit": "node scripts/audit.mjs"
+    "audit": "node scripts/audit.mjs",
+    "i18n:extract": "node scripts/i18n-extract.mjs",
+    "i18n:check": "node scripts/i18n-check.mjs"
   },
   "devDependencies": {
     "vite": "^5.4.0"

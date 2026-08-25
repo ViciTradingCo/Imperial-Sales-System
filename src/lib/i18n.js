@@ -14,13 +14,42 @@
  *  • The choice is per-device (localStorage), like the theme. Changing it
  *    reloads so every surface re-renders cleanly in the new language.
  */
-export const LANGS = {
+/**
+ * Every language the app has a pack for, finished or not.
+ *
+ * What a reader is actually OFFERED is `LANGS` below, which is this list
+ * narrowed to the ones that are done.
+ */
+const ALL = {
   en: 'English',
   es: 'Español',
   fr: 'Français',
   de: 'Deutsch',
   it: 'Italiano',
 };
+
+/**
+ * THE LANGUAGES THAT ARE FINISHED — the only ones anyone is given.
+ *
+ * A pack that covers part of the app renders the rest in English, and the
+ * result is one language in the heading and another in the paragraph under it.
+ * That is not a smaller version of being translated; it is its own kind of
+ * broken, and it is what the app shipped for months without anyone noticing,
+ * because nothing fails when a phrase is missing.
+ *
+ * So completeness is a GATE, not a percentage to feel bad about. A language
+ * appears here when `npm run i18n:check` says its pack covers every string the
+ * app renders, and until then it is not offered, not auto-selected from the
+ * device, and not reachable by an old stored setting. English in the meantime,
+ * which at least is one language.
+ *
+ * `i18n:check` fails if a language listed here is not actually complete, so
+ * this cannot be edited optimistically.
+ */
+const READY = ['en'];
+
+/** What a reader may choose: English, plus every finished translation. */
+export const LANGS = Object.fromEntries(READY.map((l) => [l, ALL[l]]));
 
 const KEY = 'eec.lang';
 
@@ -81,171 +110,115 @@ export function setLang(l) {
   try { localStorage.setItem(KEY, l); } catch (e) { /* private mode */ }
 }
 
-// English phrase → per-language translation. Keep keys EXACTLY as they appear in
-// the UI (trimmed). Add rows freely; missing rows fall back to English.
-const T = {
-  // Nav + shell
-  'Home': { es: 'Inicio', fr: 'Accueil', de: 'Start', it: 'Home' },
-  'Admin Panel': { es: 'Panel de administración', fr: 'Panneau d’administration', de: 'Admin-Bereich', it: 'Pannello admin' },
-  'Ledger Settings': { es: 'Ajustes del negocio', fr: 'Réglages du registre', de: 'Ladeneinstellungen', it: 'Impostazioni registro' },
-  'Network Settings': { es: 'Ajustes de red', fr: 'Réglages du réseau', de: 'Netzwerk­einstellungen', it: 'Impostazioni rete' },
-  'Profile': { es: 'Perfil', fr: 'Profil', de: 'Profil', it: 'Profilo' },
-  'Patch Notes': { es: 'Notas de versión', fr: 'Notes de version', de: 'Änderungen', it: 'Note di rilascio' },
-  'About': { es: 'Acerca de', fr: 'À propos', de: 'Über', it: 'Informazioni' },
-  'Sign Out': { es: 'Cerrar sesión', fr: 'Se déconnecter', de: 'Abmelden', it: 'Esci' },
-  'Sign out': { es: 'Cerrar sesión', fr: 'Se déconnecter', de: 'Abmelden', it: 'Esci' },
-
-  // Action bars / lists
-  'Register': { es: 'Caja', fr: 'Caisse', de: 'Kasse', it: 'Cassa' },
-  'Inventory': { es: 'Inventario', fr: 'Inventaire', de: 'Inventar', it: 'Inventario' },
-  'Employees': { es: 'Empleados', fr: 'Employés', de: 'Mitarbeiter', it: 'Dipendenti' },
-  'Member List': { es: 'Lista de miembros', fr: 'Liste des membres', de: 'Mitgliederliste', it: 'Elenco membri' },
-  'Company List': { es: 'Lista de empresas', fr: 'Liste des entreprises', de: 'Firmenliste', it: 'Elenco aziende' },
-
-  // Common buttons
-  'Save': { es: 'Guardar', fr: 'Enregistrer', de: 'Speichern', it: 'Salva' },
-  'Save profile': { es: 'Guardar perfil', fr: 'Enregistrer le profil', de: 'Profil speichern', it: 'Salva profilo' },
-  'Save note': { es: 'Guardar nota', fr: 'Enregistrer la note', de: 'Notiz speichern', it: 'Salva nota' },
-  'Edit': { es: 'Editar', fr: 'Modifier', de: 'Bearbeiten', it: 'Modifica' },
-  'Delete': { es: 'Eliminar', fr: 'Supprimer', de: 'Löschen', it: 'Elimina' },
-  'Remove': { es: 'Quitar', fr: 'Retirer', de: 'Entfernen', it: 'Rimuovi' },
-  'Cancel': { es: 'Cancelar', fr: 'Annuler', de: 'Abbrechen', it: 'Annulla' },
-  'Search': { es: 'Buscar', fr: 'Rechercher', de: 'Suchen', it: 'Cerca' },
-  'Notes': { es: 'Notas', fr: 'Notes', de: 'Notizen', it: 'Note' },
-  'Subscription': { es: 'Suscripción', fr: 'Abonnement', de: 'Abonnement', it: 'Abbonamento' },
-  'Activate': { es: 'Activar', fr: 'Activer', de: 'Aktivieren', it: 'Attiva' },
-  'Add to order': { es: 'Añadir al pedido', fr: 'Ajouter à la commande', de: 'Zur Bestellung', it: 'Aggiungi all’ordine' },
-  'Complete sale': { es: 'Completar venta', fr: 'Finaliser la vente', de: 'Verkauf abschließen', it: 'Completa vendita' },
-  'Record delivery': { es: 'Registrar entrega', fr: 'Enregistrer la livraison', de: 'Lieferung erfassen', it: 'Registra consegna' },
-  '+ Add another item': { es: '+ Añadir otro artículo', fr: '+ Ajouter un autre article', de: '+ Weiteren Artikel', it: '+ Aggiungi un altro articolo' },
-  'Sells for': { es: 'Se vende a', fr: 'Vendu à', de: 'Verkaufspreis', it: 'Prezzo di vendita' },
-  // Intake's line columns.
-  'Item': { es: 'Artículo', fr: 'Article', de: 'Artikel', it: 'Articolo' },
-  'Qty': { es: 'Cant.', fr: 'Qté', de: 'Anz.', it: 'Qtà' },
-  'Cost each': { es: 'Coste unitario', fr: 'Coût unitaire', de: 'Kosten je Stück', it: 'Costo unitario' },
-  'Line total': { es: 'Total de línea', fr: 'Total de la ligne', de: 'Zeilensumme', it: 'Totale riga' },
-  // Feedback review: the three queues, and the delivery report's own subject.
-  'Active': { es: 'Activos', fr: 'En cours', de: 'Offen', it: 'Attivi' },
-  'Appointments': { es: 'Citas', fr: 'Rendez-vous', de: 'Termine', it: 'Appuntamenti' },
-  'Archive': { es: 'Archivo', fr: 'Archives', de: 'Archiv', it: 'Archivio' },
-  'Report Delivery': { es: 'Notificar una entrega', fr: 'Signaler une livraison', de: 'Lieferung melden', it: 'Segnala una consegna' },
-  'Mark complete': { es: 'Marcar completado', fr: 'Marquer terminé', de: 'Als erledigt markieren', it: 'Segna completato' },
-  'Reopen': { es: 'Reabrir', fr: 'Rouvrir', de: 'Wieder öffnen', it: 'Riapri' },
-  // The register's two sides.
-  'Selling': { es: 'Vendiendo', fr: 'Vente', de: 'Verkauf', it: 'Vendita' },
-  'Buying': { es: 'Comprando', fr: 'Achat', de: 'Einkauf', it: 'Acquisto' },
-  'Harvest': { es: 'Cosecha', fr: 'Récolte', de: 'Ernte', it: 'Raccolto' },
-  // Appearance: the text-size steps.
-  'Text size': { es: 'Tamaño del texto', fr: 'Taille du texte', de: 'Schriftgröße', it: 'Dimensione del testo' },
-  'Small': { es: 'Pequeño', fr: 'Petit', de: 'Klein', it: 'Piccolo' },
-  'Normal': { es: 'Normal', fr: 'Normal', de: 'Normal', it: 'Normale' },
-  'Large': { es: 'Grande', fr: 'Grand', de: 'Groß', it: 'Grande' },
-  'Largest': { es: 'El más grande', fr: 'Très grand', de: 'Am größten', it: 'Massimo' },
-  'Surface': { es: 'Superficie', fr: 'Support', de: 'Untergrund', it: 'Superficie' },
-  'Craft': { es: 'Fabricar', fr: 'Fabriquer', de: 'Herstellen', it: 'Fabbrica' },
-  'Farm / Harvest': { es: 'Cultivo / cosecha', fr: 'Culture / récolte', de: 'Anbau / Ernte', it: 'Coltivazione / raccolto' },
-  'Add to stock': { es: 'Añadir al stock', fr: 'Ajouter au stock', de: 'Zum Bestand', it: 'Aggiungi alle scorte' },
-  'Manager': { es: 'Encargado', fr: 'Gérant', de: 'Verwalter', it: 'Responsabile' },
-  'Make manager': { es: 'Nombrar encargado', fr: 'Nommer gérant', de: 'Zum Verwalter machen', it: 'Nomina responsabile' },
-  'Stand down': { es: 'Destituir', fr: 'Révoquer', de: 'Absetzen', it: 'Revoca' },
-  'Hourly rate': { es: 'Tarifa por hora', fr: 'Taux horaire', de: 'Stundensatz', it: 'Tariffa oraria' },
-  'Hourly owed': { es: 'Adeudado por horas', fr: 'Dû à l’heure', de: 'Stundenlohn offen', it: 'Dovuto a ore' },
-  'Commission owed': { es: 'Comisión adeudada', fr: 'Commission due', de: 'Provision offen', it: 'Provvigione dovuta' },
-  'Total payout': { es: 'Pago total', fr: 'Versement total', de: 'Gesamtauszahlung', it: 'Pagamento totale' },
-  'Total owed': { es: 'Total adeudado', fr: 'Total dû', de: 'Gesamt offen', it: 'Totale dovuto' },
-  'Stocktake': { es: 'Recuento', fr: 'Inventaire', de: 'Bestandsaufnahme', it: 'Inventario' },
-  'Specials': { es: 'Ofertas', fr: 'Offres', de: 'Angebote', it: 'Offerte' },
-  // What a thing IS — food, drink, a weapon — on the listing and in a special.
-  'Kinds': { es: 'Tipos', fr: 'Types', de: 'Arten', it: 'Tipi' },
-  'Kind': { es: 'Tipo', fr: 'Type', de: 'Art', it: 'Tipo' },
-  'Kinds of item': { es: 'Tipos de artículo', fr: 'Types d’article', de: 'Artikelarten', it: 'Tipi di articolo' },
-  'Item kinds': { es: 'Tipos de artículo', fr: 'Types d’article', de: 'Artikelarten', it: 'Tipi di articolo' },
-  'Specials & Discounts': { es: 'Ofertas y descuentos', fr: 'Offres et remises', de: 'Angebote und Rabatte', it: 'Offerte e sconti' },
-  'Add special': { es: 'Añadir oferta', fr: 'Ajouter l’offre', de: 'Angebot hinzufügen', it: 'Aggiungi offerta' },
-  'Save special': { es: 'Guardar oferta', fr: 'Enregistrer l’offre', de: 'Angebot speichern', it: 'Salva offerta' },
-  '+ Add item': { es: '+ Añadir artículo', fr: '+ Ajouter un article', de: '+ Artikel hinzufügen', it: '+ Aggiungi articolo' },
-  'Leave your shop': { es: 'Dejar tu tienda', fr: 'Quitter votre boutique', de: 'Laden verlassen', it: 'Lascia il negozio' },
-  'Stop working here': { es: 'Dejar de trabajar aquí', fr: 'Cesser d’y travailler', de: 'Hier aufhören', it: 'Smetti di lavorare qui' },
-  'Check this paste': { es: 'Comprobar lo pegado', fr: 'Vérifier ce collage', de: 'Eingefügtes prüfen', it: 'Controlla l’incollato' },
-  'Apply': { es: 'Aplicar', fr: 'Appliquer', de: 'Anwenden', it: 'Applica' },
-  'Restore': { es: 'Restaurar', fr: 'Restaurer', de: 'Wiederherstellen', it: 'Ripristina' },
-  'Archived companies': { es: 'Empresas archivadas', fr: 'Entreprises archivées', de: 'Archivierte Firmen', it: 'Aziende archiviate' },
-  'Discounts & upcharges': { es: 'Descuentos y recargos', fr: 'Remises et majorations', de: 'Rabatte und Aufschläge', it: 'Sconti e maggiorazioni' },
-  'Discount or upcharge': { es: 'Descuento o recargo', fr: 'Remise ou majoration', de: 'Rabatt oder Aufschlag', it: 'Sconto o maggiorazione' },
-  'Adjust the price': { es: 'Ajustar el precio', fr: 'Ajuster le prix', de: 'Preis anpassen', it: 'Modifica il prezzo' },
-  'Take off': { es: 'Descontar', fr: 'Retirer', de: 'Abziehen', it: 'Sottrai' },
-  'Add on': { es: 'Recargar', fr: 'Ajouter', de: 'Aufschlagen', it: 'Aggiungi' },
-  'What to call it': { es: 'Cómo llamarlo', fr: 'Comment l’appeler', de: 'Wie es heißen soll', it: 'Come chiamarlo' },
-  'Claim the harvest payment': { es: 'Reclamar el pago por la cosecha', fr: 'Réclamer le paiement de la récolte', de: 'Erntelohn beanspruchen', it: 'Richiedi il pagamento del raccolto' },
-  'Employee harvest value — paid per item': { es: 'Valor de cosecha para empleados — pagado por unidad', fr: 'Valeur de récolte pour l’employé — payée à l’unité', de: 'Erntewert für Mitarbeiter — je Stück gezahlt', it: 'Valore di raccolto per il dipendente — pagato a pezzo' },
-  'Intake Ingredients/Stock': { es: 'Registrar ingredientes/existencias', fr: 'Réception d’ingrédients / stock', de: 'Zutaten/Warenzugang erfassen', it: 'Carico ingredienti/scorte' },
-  'How this works': { es: 'Cómo funciona', fr: 'Comment ça marche', de: 'So funktioniert es', it: 'Come funziona' },
-  'Void this sale': { es: 'Anular esta venta', fr: 'Annuler cette vente', de: 'Verkauf stornieren', it: 'Annulla vendita' },
-
-  // Headings
-  'Appearance': { es: 'Apariencia', fr: 'Apparence', de: 'Darstellung', it: 'Aspetto' },
-  'Language': { es: 'Idioma', fr: 'Langue', de: 'Sprache', it: 'Lingua' },
-  'Order': { es: 'Pedido', fr: 'Commande', de: 'Bestellung', it: 'Ordine' },
-  'Customer Details': { es: 'Datos del cliente', fr: 'Détails du client', de: 'Kundendaten', it: 'Dati cliente' },
-  'Recent deliveries': { es: 'Entregas recientes', fr: 'Livraisons récentes', de: 'Letzte Lieferungen', it: 'Consegne recenti' },
-  'Credits': { es: 'Créditos', fr: 'Crédits', de: 'Mitwirkende', it: 'Crediti' },
-  'What you can do': { es: 'Qué puedes hacer', fr: 'Ce que vous pouvez faire', de: 'Was du tun kannst', it: 'Cosa puoi fare' },
-  'Sign in to begin': { es: 'Inicia sesión para empezar', fr: 'Connectez-vous pour commencer', de: 'Zum Start anmelden', it: 'Accedi per iniziare' },
-  'Edit company': { es: 'Editar empresa', fr: 'Modifier l’entreprise', de: 'Firma bearbeiten', it: 'Modifica azienda' },
-  'Edit member': { es: 'Editar miembro', fr: 'Modifier le membre', de: 'Mitglied bearbeiten', it: 'Modifica membro' },
-
-  // Labels / fields
-  'Character name': { es: 'Nombre del personaje', fr: 'Nom du personnage', de: 'Charaktername', it: 'Nome personaggio' },
-  'Business name': { es: 'Nombre del negocio', fr: 'Nom de l’entreprise', de: 'Firmenname', it: 'Nome attività' },
-  'Company name': { es: 'Nombre de la empresa', fr: 'Nom de l’entreprise', de: 'Firmenname', it: 'Nome azienda' },
-  'Business': { es: 'Negocio', fr: 'Entreprise', de: 'Firma', it: 'Attività' },
-  'Company': { es: 'Empresa', fr: 'Entreprise', de: 'Firma', it: 'Azienda' },
-  'Role': { es: 'Rol', fr: 'Rôle', de: 'Rolle', it: 'Ruolo' },
-  'Status': { es: 'Estado', fr: 'Statut', de: 'Status', it: 'Stato' },
-  'Email': { es: 'Correo', fr: 'E-mail', de: 'E-Mail', it: 'Email' },
-  'Region': { es: 'Feudo', fr: 'Fief', de: 'Fürstentum', it: 'Contea' },
-  'Theme': { es: 'Tema', fr: 'Thème', de: 'Design', it: 'Tema' },
-  'Customer': { es: 'Cliente', fr: 'Client', de: 'Kunde', it: 'Cliente' },
-  'Quantity': { es: 'Cantidad', fr: 'Quantité', de: 'Menge', it: 'Quantità' },
-  'Vendor': { es: 'Proveedor', fr: 'Fournisseur', de: 'Lieferant', it: 'Fornitore' },
-  'Sale price': { es: 'Precio de venta', fr: 'Prix de vente', de: 'Verkaufspreis', it: 'Prezzo di vendita' },
-
-  // Statuses / words
-  'active': { es: 'activo', fr: 'actif', de: 'aktiv', it: 'attivo' },
-  'pending': { es: 'pendiente', fr: 'en attente', de: 'ausstehend', it: 'in attesa' },
-  'guest': { es: 'invitado', fr: 'invité', de: 'Gast', it: 'ospite' },
-  'admin': { es: 'administrador', fr: 'administrateur', de: 'Administrator', it: 'amministratore' },
-  'owner': { es: 'propietario', fr: 'propriétaire', de: 'Inhaber', it: 'proprietario' },
-  'employee': { es: 'empleado', fr: 'employé', de: 'Mitarbeiter', it: 'dipendente' },
-  'Shop Owner': { es: 'Propietario', fr: 'Propriétaire', de: 'Ladeninhaber', it: 'Proprietario' },
-  'Employee': { es: 'Empleado', fr: 'Employé', de: 'Mitarbeiter', it: 'Dipendente' },
-  'Cart is empty': { es: 'El carrito está vacío', fr: 'Le panier est vide', de: 'Warenkorb ist leer', it: 'Il carrello è vuoto' },
-  'Your account is active.': { es: 'Tu cuenta está activa.', fr: 'Votre compte est actif.', de: 'Dein Konto ist aktiv.', it: 'Il tuo account è attivo.' },
+/**
+ * THE PACKS — one module per language, fetched only when it is the one in use.
+ *
+ * The dictionary used to be an object inlined in this file, which meant every
+ * reader downloaded all five languages to use one of them. That was tolerable
+ * at 121 phrases and is not at 849: a pack is its own module now, pulled in by
+ * a dynamic `import()` that Vite splits into its own chunk. An English reader
+ * downloads none of them; everyone else downloads exactly one, once, and the
+ * service worker keeps it for offline use like the rest of the shell.
+ *
+ * Keyed on the English EXACTLY as `scripts/i18n-extract.mjs` found it, so the
+ * catalogue and the packs cannot drift: `npm run i18n:check` fails on a key
+ * that no longer appears on screen and reports every string still missing.
+ */
+const PACKS = {
+  es: () => import('./i18n/es.js'),
+  fr: () => import('./i18n/fr.js'),
+  de: () => import('./i18n/de.js'),
+  it: () => import('./i18n/it.js'),
 };
 
-let cache = null;
-let cacheLang = null;
-function dict() {
-  const l = getLang();
-  if (l === 'en') return null;
-  if (cacheLang === l && cache) return cache;
-  const out = {};
-  for (const en in T) { if (T[en][l]) out[en] = T[en][l]; }
-  cache = out; cacheLang = l;
-  return out;
+/** The loaded pack: exact phrases, plus templates compiled to matchers. */
+let pack = null;
+let packLang = null;
+
+/**
+ * A template's English side, turned into something that can recognise the
+ * finished sentence on the page.
+ *
+ * `'Close {0} permanently'` becomes `/^Close (.*?) permanently$/`, anchored so
+ * it identifies a whole text node and never a phrase buried in a longer one.
+ * The holes are non-greedy so the LITERAL text either side is what decides
+ * where they end, which is the only reliable anchor available.
+ */
+function compile(en) {
+  const parts = en.split(/\{\d+\}/);
+  const body = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('(.*?)');
+  return new RegExp('^' + body + '$');
 }
 
+/**
+ * How trustworthy a template is when several could match.
+ *
+ * Counted in LETTERS outside the holes: `'{0} — peak {1}'` carries four and
+ * `'Nothing was traded in your {0} last week.'` carries thirty-two, and if a
+ * node somehow satisfies both, the second is far more likely to be what it
+ * actually is. Sorted once at load, so matching is a walk down that order.
+ */
+function weight(en) {
+  return (en.replace(/\{\d+\}/g, '').match(/[A-Za-z]/g) || []).length;
+}
+
+/** Loads the pack for the current language. Resolves to null for English. */
+async function loadPack() {
+  const l = getLang();
+  if (l === packLang) return pack;
+  const make = PACKS[l];
+  if (!make) { pack = null; packLang = l; return null; }
+  let table;
+  try { table = (await make()).default || {}; }
+  catch (e) { pack = null; packLang = l; return null; } // a missing pack is English, not a crash
+  const exact = new Map();
+  const templates = [];
+  for (const en in table) {
+    const to = table[en];
+    if (!to) continue;
+    if (en.indexOf('{') === -1) exact.set(en, to);
+    else templates.push({ re: compile(en), to, w: weight(en) });
+  }
+  templates.sort((a, b) => b.w - a.w);
+  pack = { exact, templates };
+  packLang = l;
+  return pack;
+}
+
+/**
+ * One text node's worth of English, in the reader's language.
+ *
+ * EXACT FIRST, always. A template is only consulted when nothing matched
+ * outright, so a sentence that happens to fit a loose pattern still gets its
+ * own translation when it has one.
+ *
+ * The node's own leading and trailing whitespace is preserved: text nodes carry
+ * the spacing between inline elements, and trimming it here would run words
+ * together on the page.
+ */
 function translatePhrase(s) {
-  const d = dict();
-  if (!d) return s;
-  const key = s.trim();
+  if (!pack) return s;
+  const key = String(s).trim();
   if (!key) return s;
-  const hit = d[key];
-  return hit == null ? s : s.replace(key, hit);
+  const hit = pack.exact.get(key);
+  if (hit != null) return s.replace(key, hit);
+  for (const t of pack.templates) {
+    const m = t.re.exec(key);
+    if (!m) continue;
+    // Put what fell in the holes back into the translated sentence, in the
+    // order the translation asks for — a language that reorders a clause moves
+    // its {1} in front of its {0}, and that has to keep working.
+    const out = t.to.replace(/\{(\d+)\}/g, (whole, i) => {
+      const v = m[Number(i) + 1];
+      return v == null ? whole : v;
+    });
+    return s.replace(key, out);
+  }
+  return s;
 }
 
 function translateNode(node) {
-  if (!dict()) return;
+  if (!pack) return;
   if (node.nodeType === 3) { // text
     const t = translatePhrase(node.nodeValue);
     if (t !== node.nodeValue) node.nodeValue = t;
@@ -266,10 +239,18 @@ function translateNode(node) {
 
 let observer = null;
 
-/** Translate the current document and keep translating anything rendered later. */
-export function applyLang() {
-  cache = null; cacheLang = null; // pick up the current language
-  if (getLang() === 'en') return;
+/**
+ * Translate the document and keep translating anything rendered later.
+ *
+ * AWAITED BEFORE THE FIRST PAINT (`main()` does this before it loads anything
+ * else), because the pack now arrives over the network: starting the render
+ * first would show a page of English that rewrote itself a moment later, which
+ * is worse than the wait. The pack is a few tens of kilobytes from the same
+ * origin, and after the first visit it is in the service worker's cache.
+ */
+export async function applyLang() {
+  await loadPack();
+  if (!pack) return;
   translateNode(document.body);
   if (!observer) {
     observer = new MutationObserver((muts) => {

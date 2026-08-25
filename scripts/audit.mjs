@@ -42,11 +42,21 @@ const add = (group, file, what, suggestion) => findings[group].push({ file, what
 
 /* ---------------------------------------------------------------- helpers */
 
+/**
+ * Directories of GENERATED data that happen to be .js.
+ *
+ * The language packs are a catalogue of English sentences paired with their
+ * translations — every check here reads them as code and finds thousands of
+ * repeated literals and no callers. `npm run i18n:check` is what audits them,
+ * against the extracted catalogue rather than against the rules for code.
+ */
+const NOT_CODE = new Set(['node_modules', 'i18n']);
+
 function jsFiles(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((name) => {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) return name === 'node_modules' ? [] : jsFiles(p);
+    if (statSync(p).isDirectory()) return NOT_CODE.has(name) ? [] : jsFiles(p);
     return name.endsWith('.js') || name.endsWith('.mjs') ? [p] : [];
   });
 }
@@ -242,52 +252,6 @@ function staleTranslations() {
     add('left', rel(path), `${stale.length} translation(s) for text nothing renders: ${stale.slice(0, 8).map((p) => `"${p}"`).join(', ')}${stale.length > 8 ? ', …' : ''}`,
       'Delete the rows. Check first that the phrase is not assembled at runtime — this only sees whole literals.');
   }
-}
-
-/**
- * HOW MUCH OF THE APP A CHOSEN LANGUAGE ACTUALLY COVERS.
- *
- * The dictionary falls through to English for anything it does not hold, and
- * nothing fails when it does — so a language can be OFFERED in Appearance while
- * translating a tenth of the page, and the reader gets one language in the nav
- * and another in the paragraph under it. Nothing in the build said so, which is
- * how it went unnoticed: `staleTranslations` above watches for rows that are no
- * longer needed, and until now nothing watched the far larger direction.
- *
- * Counted against the strings the app RENDERS — literals in a text position —
- * so it under-reports if anything: a phrase assembled at runtime is invisible
- * here, and the real gap is wider than the number given.
- */
-function translationCoverage() {
-  const path = join(SRC, 'lib', 'i18n.js');
-  if (!existsSync(path)) return;
-  const dict = read(path);
-  const keys = new Set([...dict.slice(dict.indexOf('const T = {'))
-    .matchAll(/^\s*'((?:[^'\\]|\\.)*)':\s*\{/gm)].map((m) => m[1].replace(/\\'/g, "'")));
-
-  const rendered = new Set();
-  for (const f of jsFiles(SRC)) {
-    if (f === path || f.endsWith('patch-notes.js')) continue;
-    const t = read(f);
-    // A literal handed to el() as its text, or used as a label/hint/placeholder.
-    for (const re of [/(?:\}|\{\}|\)),\s*'((?:[^'\\]|\\.)+)'\s*\)/g,
-      /\b(?:label|hint|title|placeholder)\s*:\s*'((?:[^'\\]|\\.)+)'/g,
-      /'((?:[^'\\]|\\.){25,})'/g]) {
-      for (const m of t.matchAll(re)) {
-        const v = m[1].replace(/\\'/g, "'").trim();
-        // Skip anything that is plainly not prose: routes, css classes, keys.
-        if (!v || !/[A-Za-z]/.test(v) || /^[a-z0-9_./#-]+$/.test(v)) continue;
-        rendered.add(v);
-      }
-    }
-  }
-  const missing = [...rendered].filter((s) => !keys.has(s));
-  if (!missing.length) return;
-  const pct = Math.round(((rendered.size - missing.length) / rendered.size) * 100);
-  add('left', rel(path),
-    `${missing.length} of ${rendered.size} rendered strings have no translation (${pct}% covered)`,
-    'A language that covers part of the page renders the rest in English, which reads as two languages at ' +
-    'once. Either finish the dictionary or stop offering the language — see LANGS.');
 }
 
 /**
@@ -599,7 +563,6 @@ unusedLocals(all);
 apiClientDrift();
 unusedCss();
 staleTranslations();
-translationCoverage();
 duplicateTranslations();
 unusedDeps();
 repeatedLiterals(all);

@@ -447,7 +447,10 @@ async function onSignedIn() {
 
 async function main() {
   applyPrefs(); // apply saved GUI theme before anything paints
-  applyLang();  // translate the shell + every subsequent render to the chosen language
+  // AWAITED. The language pack is its own chunk now, fetched over the network,
+  // so starting the render first would paint a page of English that rewrote
+  // itself a moment later. English loads no pack and returns immediately.
+  await applyLang();
 
   let config;
   try {
