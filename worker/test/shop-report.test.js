@@ -117,14 +117,16 @@ describe('the last 30 days', () => {
     expect((await report()).period.activeDays).toBe(2);
   });
 
-  it('names the best weekday of the window', async () => {
+  /**
+   * The day's NUMBER, never its name: what Saturday is called depends on who is
+   * reading, and this end of the app has no idea. The browser names it.
+   */
+  it('gives the best weekday as a number, and nothing when nothing sold', async () => {
     const { period } = await report();
-    expect(period.busiestDay).toBe(''); // nothing sold, nothing claimed
+    expect(period.busiestDay).toBe(null); // an absent day is not Sunday
     await saleOn(2, { total: 80, qty: 1, lines: [{ name: 'Ale', qty: 1, price: 80 }] });
-    const day = new Date(Date.now() - 2 * 86400000)
-      .toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
     const after = await report();
-    expect([after.period.busiestDay]).toContain(day);
+    expect(after.period.busiestDay).toBe(new Date(Date.now() - 2 * 86400000).getDay());
     expect(after.period.busiestRevenue).toBe(80);
   });
 

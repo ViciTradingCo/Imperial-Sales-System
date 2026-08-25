@@ -33,7 +33,7 @@ import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { openFocalMenu } from '../lib/tiles.js';
 import { pager } from '../lib/paginate.js';
-import { money } from '../lib/format.js';
+import { money, formatDate } from '../lib/format.js';
 
 const UNSORTED = 'Unsorted';
 const ALL = '';          // the filter's "every table" value
@@ -149,7 +149,7 @@ export function renderItemIndex(container) {
   }
 
   function pendingRow(p) {
-    const when = p.firstSeen ? new Date(p.firstSeen).toLocaleDateString() : '';
+    const when = p.firstSeen ? formatDate(p.firstSeen) : '';
     // Who rang it up and where. The shop matters as much as the person: one
     // till producing most of the duplicates is a training answer, not a data one.
     const who = [p.firstBy, p.firstShop && 'at ' + p.firstShop].filter(Boolean).join(' ');

@@ -12,7 +12,8 @@ import { getDb, renameBusinessData, moveBusinessData, countBusinessTransfers, DE
 import { generateCode } from './realm.js';
 import { readRealmPrefs } from './realm-prefs.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
-import { appendUser, findUserByEmail, bustUserCache, listMemberships, switchMembership } from './users.js';
+import { appendUser, findUserByEmail, bustUserCache, listMemberships, switchMembership,
+  listUsersByBusiness, deleteMember } from './users.js';
 
 /**
  * The date a new shop's trial runs until, as YYYY-MM-DD — or '' when the realm
@@ -426,4 +427,42 @@ export async function restoreCompany(env, id, realmId) {
   bustRegistryCache();
   bustUserCache(); // its people came back with it
   return { business: wanted, companies: await listCompanies(env, realm) };
+}
+
+/**
+ * CLOSING A SHOP — the owner's own version of what an admin does with Archive.
+ *
+ * "Delete my business" and "keep the books" are the same request: a shop that
+ * has stopped trading should leave the roster, free its name, and release its
+ * people — and none of that is a reason to lose what it traded. The network's
+ * figures are built from every sale ever rung up, and a shop closing does not
+ * unhappen them.
+ *
+ * So this is `archiveCompany` plus the memberships, and NOTHING IS DESTROYED.
+ * The company is renamed to a unique key and flagged ARCHIVED, which carries
+ * its sales, deliveries, coffer and time cards with it under the new name;
+ * `restoreCompany` can still put the whole thing back as itself, which is the
+ * reason an admin can undo a closure somebody regrets.
+ *
+ * The uids are read BEFORE the archive, because archiving renames the business
+ * everywhere including the `users` rows — a roster read afterwards would be
+ * looking for a shop that no longer answers to that name.
+ */
+export async function closeCompany(env, business, realmId) {
+  const realm = String(realmId || DEFAULT_REALM_ID);
+  const name = String(business || '').trim();
+  if (!name) throw new Error('Which shop?');
+  const db = await getDb(env);
+  const row = await db.prepare(
+    'SELECT id FROM companies WHERE realm_id = ? AND lower(business) = ?').bind(realm, name.toLowerCase()).first();
+  if (!row) throw new Error('That shop is not in the registry.');
+
+  const roster = await listUsersByBusiness(env, name, realm);
+  await archiveCompany(env, row.id, realm);
+  // Every membership at it ends. `deleteMember` revokes sessions only where
+  // somebody is left with no shop at all, so a person who also works elsewhere
+  // stays signed in and lands there.
+  for (const u of roster) await deleteMember(env, u.uid, realm);
+
+  return { business: name, released: roster.length };
 }

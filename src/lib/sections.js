@@ -17,7 +17,7 @@
  * no tile grid at all, and Market's sub-pages are sections of one screen rather
  * than destinations of their own.
  */
-import { regionLabel, regionsOn, certificationOn } from './format.js';
+import { regionLabel, regionsOn, certificationOn, formatDateTime } from './format.js';
 import { el, mount, esc } from './dom.js';
 import { navigate, currentPath } from './router.js';
 import { setActions } from './actions.js';
@@ -134,7 +134,7 @@ export function recentErrorsPanel(errors, me, onCleared) {
       btn,
     ]),
     ...errs.slice(0, 8).map((e) => el('p', { class: 'note error' },
-      new Date(e.ts).toLocaleString() + ' · ' + e.where + ' — ' + e.message +
+      formatDateTime(e.ts) + ' · ' + e.where + ' — ' + e.message +
       // Which server it came from, when that isn't the one being viewed.
       (e.realmId && me && e.realmId !== me.activeRealm ? ' (realm ' + e.realmId + ')' : ''))));
   return host;

@@ -10,7 +10,7 @@
  * what is owed; a person confirms it was actually handed over, in whatever way
  * the fiction settles it.
  */
-import { money } from '../lib/format.js';
+import { money, formatDateTime } from '../lib/format.js';
 import { el, mount, esc, statTiles } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { backToHome } from '../lib/sections.js';
@@ -49,7 +49,7 @@ function hm(hours) {
 
 function when(ts) {
   const d = new Date(ts);
-  return isNaN(d.getTime()) ? '' : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+  return isNaN(d.getTime()) ? '' : formatDateTime(d, { dateStyle: 'short', timeStyle: 'short' });
 }
 
 export function renderTimecard(container, { me }) {

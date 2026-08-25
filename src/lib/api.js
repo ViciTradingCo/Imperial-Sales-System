@@ -246,6 +246,14 @@ export const api = {
   leavePreview: () => request('GET', '/business/leave'),
   /** Leave the shop I work for. My membership goes; what I am owed does not. */
   leaveBusiness: () => request('POST', '/business/leave', { confirm: true }),
+  /** Owner: what closing the shop would mean — what is kept, and whether I may. */
+  closePreview: () => request('GET', '/business/close'),
+  /**
+   * Owner: close the shop. `confirm` is its name typed out — the Worker checks
+   * it against the shop's own, so a click alone cannot do this. Nothing is
+   * destroyed: the company is archived and its books stay on the network's.
+   */
+  closeBusiness: (confirm) => request('POST', '/business/close', { confirm }),
   /** The shop's bundles — several items sold together for one price. */
   getBundles: () => request('GET', '/business/bundles'),
   /**

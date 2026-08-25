@@ -13,7 +13,7 @@
  * delivery stays owner-only; it rewrites the coffer. Every one of those is
  * enforced in the Worker, not here.
  */
-import { money, coins } from '../lib/format.js';
+import { money, coins, formatDate } from '../lib/format.js';
 import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
@@ -86,7 +86,7 @@ export function renderSales(host) {
 
 function shortDate(ts) {
   const d = new Date(ts);
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+  return isNaN(d.getTime()) ? '' : formatDate(d);
 }
 
 export function renderIntake(host, canEdit) {

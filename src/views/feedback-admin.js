@@ -18,6 +18,7 @@
  * its author changes job or their shop is renamed.
  */
 import { el, mount, esc } from '../lib/dom.js';
+import { formatDateTime } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { toast } from '../lib/toast.js';
 import { navigate } from '../lib/router.js';
@@ -132,5 +133,5 @@ function roleLabel(f) {
 function stamp(ts) {
   if (!ts) return '—';
   const d = new Date(ts);
-  return isNaN(d.getTime()) ? String(ts) : d.toLocaleString();
+  return isNaN(d.getTime()) ? String(ts) : formatDateTime(d);
 }

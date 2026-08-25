@@ -9,7 +9,8 @@
  * nothing, so it runs here.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { money, setCurrency, currency, setRegion, regionLabel, regionWord, regionsOn } from '../../src/lib/format.js';
+import { money, setCurrency, currency, setRegion, regionLabel, regionWord, regionsOn,
+  formatDate, formatDateTime, weekdayName } from '../../src/lib/format.js';
 import { coin } from '../src/money.js';
 
 beforeEach(() => setCurrency('gp'));
@@ -92,5 +93,48 @@ describe('region wording', () => {
   it('can switch regions off entirely', () => {
     setRegion({ regionLabel: 'Sector', showRegion: false });
     expect(regionsOn()).toBe(false);
+  });
+});
+
+/**
+ * DATES FOLLOW THE APP'S LANGUAGE, NEVER THE BROWSER'S.
+ *
+ * They used to go through `toLocaleDateString()` with no locale, which asks the
+ * reader's SYSTEM — so an English interface on a French machine printed
+ * "16 – 22 août", the setting saying one thing and the date another in the
+ * middle of the same sentence.
+ */
+describe('dates', () => {
+  const asLang = (lang, fn) => {
+    const had = globalThis.localStorage;
+    globalThis.localStorage = { getItem: () => lang, setItem: () => {} };
+    try { return fn(); } finally { globalThis.localStorage = had; }
+  };
+
+  it('are English when no language has been chosen', () => {
+    expect(formatDate('2026-08-16T12:00:00Z', { month: 'long' })).toBe('August');
+    expect(weekdayName(6)).toBe('Saturday');
+  });
+
+  it('follow the app’s setting — the reported bug, from the other side', () => {
+    expect(asLang('fr', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }))).toBe('août');
+    expect(asLang('de', () => weekdayName(6))).toBe('Samstag');
+    expect(asLang('es', () => weekdayName(1))).toBe('lunes');
+  });
+
+  it('fall back to English for a language nothing knows', () => {
+    expect(asLang('xx', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }))).toBe('August');
+  });
+
+  it('read an unusable date as nothing rather than as "Invalid Date"', () => {
+    expect(formatDate('not a date')).toBe('');
+    expect(formatDateTime(undefined)).toBe('');
+    expect(weekdayName(9)).toBe('');
+    expect(weekdayName('Tuesday')).toBe('');
+  });
+
+  it('take a Date or a string, since call sites hold both', () => {
+    const d = new Date('2026-08-16T12:00:00Z');
+    expect(formatDate(d, { month: 'long' })).toBe(formatDate('2026-08-16T12:00:00Z', { month: 'long' }));
   });
 });

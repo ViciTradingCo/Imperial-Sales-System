@@ -19,7 +19,7 @@ import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
 import { openModal } from '../lib/modal.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
-import { certificationOn } from '../lib/format.js';
+import { certificationOn, formatDateTime } from '../lib/format.js';
 
 export function renderMotdAdmin(container) {
   setAdminActions(); // keep the admin tools on the bar across sub-pages
@@ -201,7 +201,7 @@ function windowLabel(m) {
 function fmt(s) {
   if (!s) return '';
   const d = new Date(s);
-  return isNaN(d.getTime()) ? s : d.toLocaleString();
+  return isNaN(d.getTime()) ? s : formatDateTime(d);
 }
 /** ISO (UTC) → the local value a datetime-local input expects. */
 function toLocalInput(iso) {

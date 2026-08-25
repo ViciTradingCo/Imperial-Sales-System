@@ -16,7 +16,7 @@
  * pricing against their till by the hour, which is not knowing a market. The
  * figures change once, when the week turns over, and hold still for seven days.
  */
-import { regionWord, regionsOn } from '../lib/format.js';
+import { regionWord, regionsOn, formatDate } from '../lib/format.js';
 import { el, mount } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { backToHome } from '../lib/sections.js';
@@ -41,9 +41,9 @@ function weekLabel(week) {
   const dayMonth = { day: 'numeric', month: 'short' };
   // Drop the repeated month when the week does not straddle one.
   const left = from.getMonth() === to.getMonth()
-    ? from.toLocaleDateString(undefined, { day: 'numeric' })
-    : from.toLocaleDateString(undefined, dayMonth);
-  return left + ' – ' + to.toLocaleDateString(undefined, dayMonth);
+    ? formatDate(from, { day: 'numeric' })
+    : formatDate(from, dayMonth);
+  return left + ' – ' + formatDate(to, dayMonth);
 }
 
 export function renderMarketInfo(container, { me }) {

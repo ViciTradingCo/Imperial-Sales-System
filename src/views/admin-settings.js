@@ -5,6 +5,7 @@
  * zone. The API enforces admin-only access.
  */
 import { el, mount } from '../lib/dom.js';
+import { formatDateTime } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { setAdminActions, recentErrorsPanel } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
@@ -385,6 +386,7 @@ const TILE_KEYS = [
   ['led-style', 'Ledger · Style'],
   ['led-export', 'Ledger · Export'], ['led-company', 'Ledger · Company'],
   ['led-settings', 'Ledger · Shop settings'],
+  ['led-close', 'Ledger · Close the shop'],
   // Employees + Notices sections
   ['emp-roster', 'Employees · Roster'], ['emp-performance', 'Employees · Performance'],
   ['not-post', 'Notices · Post'], ['not-list', 'Notices · List'],
@@ -458,7 +460,7 @@ function statusCard(me) {
     showErrors(s.errors || []);
     mount(host,
       el('div', { class: 'readonly-facts' }, facts),
-      el('p', { class: 'note' }, 'Last sale: ' + (s.lastSale ? new Date(s.lastSale).toLocaleString() : '—')),
+      el('p', { class: 'note' }, 'Last sale: ' + (s.lastSale ? formatDateTime(s.lastSale) : '—')),
       el('p', { class: 'note' }, 'Error alerts to Discord: ' + (s.discordConfigured ? 'on' : 'off (set DISCORD_WEBHOOK_URL to enable)')),
       errorHost);
   }).catch((e) => mount(host, el('p', { class: 'error' }, e.message || String(e))));
@@ -518,7 +520,7 @@ function backupCard(me) {
         el('span', { class: 'fact-value' }, p.diff[t].current + ' → ' + p.diff[t].incoming),
       ]));
       mount(diffHost,
-        el('p', { class: 'note' }, 'This file was made ' + (p.exportedAt ? new Date(p.exportedAt).toLocaleString() : 'at an unknown time') +
+        el('p', { class: 'note' }, 'This file was made ' + (p.exportedAt ? formatDateTime(p.exportedAt) : 'at an unknown time') +
           ' and covers ' + (p.fileScope === 'realm' ? 'one realm' : 'the whole deployment') + '. Restoring replaces ' +
           p.currentTotal + ' current rows with ' + p.incomingTotal + ' in ' +
           (p.scope === 'realm' ? 'THIS REALM ONLY' : 'EVERY REALM') + ' (current → incoming):'),

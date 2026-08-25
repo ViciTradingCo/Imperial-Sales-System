@@ -3,6 +3,7 @@
  * Read-only; the API enforces admin-only access.
  */
 import { el, mount } from '../lib/dom.js';
+import { formatDateTime } from '../lib/format.js';
 import { api } from '../lib/api.js';
 import { setAdminActions } from '../lib/sections.js';
 import { navigate } from '../lib/router.js';
@@ -81,5 +82,5 @@ export function renderAudit(container) {
 
 function when(ts) {
   const d = new Date(ts);
-  return isNaN(d.getTime()) ? '' : d.toLocaleString();
+  return isNaN(d.getTime()) ? '' : formatDateTime(d);
 }

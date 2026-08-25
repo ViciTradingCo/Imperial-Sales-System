@@ -10,6 +10,15 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.6', date: '2026-08-25', notes: [
+    'YOU CAN CLOSE YOUR SHOP. Shop Settings → Close the Shop, for an owner, ends the business for good: it stops trading, its name is freed for someone else, and everyone on the roster is released.',
+    'YOUR BOOKS ARE KEPT. Every sale, delivery, coffer entry and time card stays on the network’s records, and the page counts them for you before you decide. Nothing is erased — an admin can put the whole shop back if you change your mind.',
+    'What the shop still owes stays owed. A departed employee’s hours and commission are still on the log and can still be settled.',
+    'It will not let you close with anyone clocked in, or with a transfer still waiting — an open shift or a crate in mid-air would have nowhere to go. You are told which, by name.',
+    'Owner only, and it asks you to write the shop’s name out. A manager runs the shop; ending it is not running it.',
+    'DATES ARE IN THE APP’S LANGUAGE NOW. They followed whatever your device was set to, so an English page could print “16 – 22 août”. They follow your Appearance setting, like everything else.',
+    'That covers Market Info’s week, the shift log, the sales and delivery lists, the audit trail, the item index, notices, and your best day of the week on Performance.',
+  ] },
   { version: '6.5', date: '2026-08-21', notes: [
     'THE ORDER IS EDITABLE. Every line in the cart now has its count beside it — type over it, or use − and +. “They wanted three, not two” no longer means removing the line and typing the price in again.',
     'The line’s total and the order’s total follow as you type, and a special’s contents follow with them: three of a set that holds two ales now reads six ales, where it used to still say two.',

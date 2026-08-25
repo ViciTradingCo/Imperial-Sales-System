@@ -25,7 +25,6 @@ import { listItemIndex } from './item-index.js';
 import { itemStats, withoutTrend, NOT_HARVEST } from './market.js';
 
 const DAY = 86400000;
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /**
  * ONE WALK over every countable sale, producing everything that can be counted
@@ -58,8 +57,11 @@ function salePass(saleRows, since, before) {
       recent.revenue += total;
       recent.orders += 1;
       if (day) activeDays.add(day);
-      const wd = WEEKDAYS[new Date(ts).getDay()];
-      if (wd) byWeekday.set(wd, (byWeekday.get(wd) || 0) + total);
+      // The DAY NUMBER, not its name. What Saturday is called depends on who
+      // is reading, and the Worker has no idea — so the name is made in the
+      // browser, in the reader's own language, like money and regions are.
+      const wd = new Date(ts).getDay();
+      byWeekday.set(wd, (byWeekday.get(wd) || 0) + total);
     } else if (ts >= before) {
       prior.revenue += total;
       prior.orders += 1;
@@ -223,7 +225,8 @@ export async function businessReport(env, business, realmId) {
       itemsSold: pass.recent.itemsSold,
       avgOrder: pass.recent.orders ? pass.recent.revenue / pass.recent.orders : 0,
       activeDays: pass.activeDays.size,
-      busiestDay: busiest ? busiest[0] : '',
+      // 0–6, Sunday first. Null when nothing sold — an absent day is not Sunday.
+      busiestDay: busiest ? busiest[0] : null,
       busiestRevenue: busiest ? busiest[1] : 0,
       moneyIn,
       // Negative in the coffer; reported as what it COST, since "outgoings

@@ -6,6 +6,51 @@
  * as "gp" and every amount in the app renders through here, which is why there
  * is a single mutable value instead of threading it through every caller.
  */
+import { getLang } from './i18n.js';
+
+/**
+ * WHAT LANGUAGE A DATE IS WRITTEN IN — the app's, never the browser's.
+ *
+ * Every date here went through `toLocaleDateString()` with no locale, which
+ * asks the READER'S SYSTEM. So an English interface handed a French browser
+ * "16 – 22 août": the app's own language setting said one thing and the dates
+ * said another, in the middle of a sentence.
+ *
+ * The app already knows what language it is in — it is a per-device choice in
+ * Appearance, and the whole interface honours it — so the dates follow that,
+ * and only that. A reader who picks French gets French dates because they asked
+ * for French, not because of what their laptop was set to at the factory.
+ */
+const LOCALES = { en: 'en-GB', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', it: 'it-IT' };
+function locale() { return LOCALES[getLang()] || LOCALES.en; }
+
+/** A date, in the app's language. Anything unreadable comes back as ''. */
+export function formatDate(value, opts) {
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString(locale(), opts);
+}
+
+/** A date and a time, same rule. */
+export function formatDateTime(value, opts) {
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? '' : d.toLocaleString(locale(), opts);
+}
+
+/**
+ * A weekday by number, 0 = Sunday.
+ *
+ * The Worker works out WHICH day a shop trades best on; it must not also decide
+ * what that day is CALLED, because it has no idea who is reading. So it sends
+ * the number and the name is made here, in the reader's language — the same
+ * division as money and regions.
+ */
+export function weekdayName(index) {
+  const n = Math.floor(Number(index));
+  if (!isFinite(n) || n < 0 || n > 6) return '';
+  // 2024-01-07 was a Sunday; adding the index lands on the day wanted.
+  return new Date(Date.UTC(2024, 0, 7 + n)).toLocaleDateString(locale(), { weekday: 'long', timeZone: 'UTC' });
+}
+
 let unit = 'gp';
 let region = { label: 'Region', shown: true };
 

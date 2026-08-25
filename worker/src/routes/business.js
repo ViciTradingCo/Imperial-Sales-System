@@ -7,9 +7,9 @@
  * Court — the notice on its board, and its own standing.
  */
 import { requireRegistered, requireManages, requireOwner, managesBusiness, leaveRefusal, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
-import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate, setManagerRole, deleteMember } from '../users.js';
-import { renameBusiness, listBusinessCards } from '../registry.js';
-import { getFlag } from '../db.js';
+import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate, setManagerRole, deleteMember, listMemberships } from '../users.js';
+import { renameBusiness, listBusinessCards, closeCompany } from '../registry.js';
+import { getFlag, getDb, countBusinessTransfers } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock, setItemTag, stockText, planStockImport, importStockText } from '../inventory.js';
@@ -353,6 +353,92 @@ async function leavePreviewRoute({ request, env }) {
     onShift: !!(await openShift(env, caller.uid, realmId)),
     owed: { hourly, commission: commission.owed, total: hourly + commission.owed },
   };
+}
+
+/**
+ * CLOSING THE SHOP — what it would cost, and then doing it.
+ *
+ * Two routes sharing one set of refusals, so the screen can never offer a
+ * button the server will turn down. Same rule as `leaveRefusal`.
+ *
+ * NOTHING IS DESTROYED, and the preview says so in figures: the sales and
+ * deliveries are counted and named, because "delete my business" and "keep the
+ * books" are the same request and an owner should be able to see that the
+ * second half is true before they answer for the first.
+ */
+async function closeChecks(env, caller, realmId) {
+  const business = String(caller.business || '').trim();
+  // `requireOwner` also admits an admin, who may be signed in with no shop of
+  // their own. An admin archives a company from the Company List; this route is
+  // an owner closing THEIR shop, so with no shop there is nothing to answer.
+  if (!business) throw new Error('You have no shop to close.');
+  const db = await getDb(env);
+  const one = async (sql) => {
+    const r = await db.prepare(sql).bind(realmId, business).first();
+    return (r && r.n) || 0;
+  };
+  // Transfers are counted in BOTH directions by one helper — a crate this shop
+  // is waiting on and a crate it has sent are the same problem, and asking twice
+  // is how the two answers drift.
+  const [sales, deliveries, roster, pending] = await Promise.all([
+    one("SELECT COUNT(*) AS n FROM sales WHERE realm_id = ? AND business = ?"),
+    one("SELECT COUNT(*) AS n FROM intake WHERE realm_id = ? AND business = ?"),
+    listUsersByBusiness(env, business, realmId),
+    countBusinessTransfers(env, business, realmId, true),
+  ]);
+
+  // A shift nobody closed would stay open forever against a shop that no longer
+  // exists, and it is somebody's wages. The owner can settle or delete it in the
+  // Time Card log, so the refusal is one they can act on.
+  const onShift = [];
+  for (const u of roster) {
+    if (await openShift(env, u.uid, realmId)) onShift.push(u.character || u.email);
+  }
+
+  let refusal = '';
+  if (onShift.length) {
+    refusal = onShift.length + ' ' + (onShift.length === 1 ? 'person is' : 'people are') +
+      ' still clocked in (' + onShift.join(', ') + '). They have to clock out — or you can close ' +
+      'their shift in the Time Card log — before the shop can close.';
+  } else if (pending) {
+    refusal = 'There ' + (pending === 1 ? 'is 1 transfer' : 'are ' + pending + ' transfers') +
+      ' still waiting. Accept, decline or cancel them first, or the goods in them end up nowhere.';
+  }
+
+  return { business, canClose: !refusal, refusal, staff: roster.length, kept: { sales, deliveries }, pending };
+}
+
+async function closePreviewRoute({ request, env }) {
+  const caller = await requireOwner(request, env);
+  return await closeChecks(env, caller, realmIdOf(caller, env));
+}
+
+async function closeBusinessRoute({ request, env, body }) {
+  const caller = await requireOwner(request, env);
+  const realmId = realmIdOf(caller, env);
+  const checks = await closeChecks(env, caller, realmId);
+  if (!checks.canClose) { const e = new Error(checks.refusal); e.forbidden = true; throw e; }
+
+  // The shop's own name, typed out. A confirmation that can be clicked through
+  // is not one, and this is the most consequential thing an owner can do.
+  const typed = String((body && body.confirm) || '').trim().toLowerCase();
+  if (!typed || typed !== String(caller.business || '').trim().toLowerCase()) {
+    throw new Error('Type the shop’s name exactly as it is written to close it.');
+  }
+
+  const business = caller.business;
+  // Written BEFORE the close: afterwards the shop answers to an archived name,
+  // and the line explaining what happened should say what it was called.
+  await logAudit(env, { actor: actorName(caller), business, action: 'business.closed',
+    detail: business + ' closed by its owner · ' + checks.staff + ' membership(s) ended · ' +
+      checks.kept.sales + ' sale(s) and ' + checks.kept.deliveries + ' delivery(s) kept', realmId });
+  const res = await closeCompany(env, business, realmId);
+  // Whether this person still belongs anywhere. Someone who runs two shops and
+  // closes one is still signed in and still works at the other — `deleteMember`
+  // has already moved them onto it — so the screen reloads rather than signing
+  // them out. Only a person left with nothing has nothing to reload into.
+  const remaining = (await listMemberships(env, caller.email)).length;
+  return { ok: true, closed: business, released: res.released, kept: checks.kept, remaining };
 }
 
 /* ---- feedback on the app ---- */
@@ -927,6 +1013,8 @@ export const routes = [
   { method: 'POST', path: '/business/bundles/delete', handler: deleteBundleRoute },
   { method: 'GET', path: '/business/leave', handler: leavePreviewRoute },
   { method: 'POST', path: '/business/leave', handler: leaveBusinessRoute },
+  { method: 'GET', path: '/business/close', handler: closePreviewRoute },
+  { method: 'POST', path: '/business/close', handler: closeBusinessRoute },
   { method: 'GET', path: '/inventory/stocktake', handler: stockTextRoute },
   { method: 'POST', path: '/inventory/stocktake', handler: stockImportRoute },
   { method: 'GET', path: '/intake', handler: getIntake },

@@ -15,7 +15,7 @@
  */
 import { el, mount, tableEl } from '../lib/dom.js';
 import { api } from '../lib/api.js';
-import { money, coins, tagLabel } from '../lib/format.js';
+import { money, coins, tagLabel, weekdayName } from '../lib/format.js';
 import { skeletonLines } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 
@@ -136,7 +136,11 @@ function tradeTable(o, p) {
     ['Customers by name', String(o.customers || 0)],
     ['Of those, came back', String(o.repeat || 0)],
   ];
-  if (p && p.busiestDay) rows.push(['Best day of the week', p.busiestDay + ' · ' + money(p.busiestRevenue)]);
+  // The Worker sends the day's NUMBER; what it is called is decided here, in
+  // whatever language the reader has the app set to.
+  if (p && p.busiestDay != null) {
+    rows.push(['Best day of the week', weekdayName(p.busiestDay) + ' · ' + money(p.busiestRevenue)]);
+  }
   // Wording, not a sign: nobody should have to read a minus to learn they
   // charged over the odds.
   const given = Number(o.discountGiven) || 0;
