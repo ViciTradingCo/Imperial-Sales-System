@@ -245,6 +245,52 @@ function staleTranslations() {
 }
 
 /**
+ * HOW MUCH OF THE APP A CHOSEN LANGUAGE ACTUALLY COVERS.
+ *
+ * The dictionary falls through to English for anything it does not hold, and
+ * nothing fails when it does — so a language can be OFFERED in Appearance while
+ * translating a tenth of the page, and the reader gets one language in the nav
+ * and another in the paragraph under it. Nothing in the build said so, which is
+ * how it went unnoticed: `staleTranslations` above watches for rows that are no
+ * longer needed, and until now nothing watched the far larger direction.
+ *
+ * Counted against the strings the app RENDERS — literals in a text position —
+ * so it under-reports if anything: a phrase assembled at runtime is invisible
+ * here, and the real gap is wider than the number given.
+ */
+function translationCoverage() {
+  const path = join(SRC, 'lib', 'i18n.js');
+  if (!existsSync(path)) return;
+  const dict = read(path);
+  const keys = new Set([...dict.slice(dict.indexOf('const T = {'))
+    .matchAll(/^\s*'((?:[^'\\]|\\.)*)':\s*\{/gm)].map((m) => m[1].replace(/\\'/g, "'")));
+
+  const rendered = new Set();
+  for (const f of jsFiles(SRC)) {
+    if (f === path || f.endsWith('patch-notes.js')) continue;
+    const t = read(f);
+    // A literal handed to el() as its text, or used as a label/hint/placeholder.
+    for (const re of [/(?:\}|\{\}|\)),\s*'((?:[^'\\]|\\.)+)'\s*\)/g,
+      /\b(?:label|hint|title|placeholder)\s*:\s*'((?:[^'\\]|\\.)+)'/g,
+      /'((?:[^'\\]|\\.){25,})'/g]) {
+      for (const m of t.matchAll(re)) {
+        const v = m[1].replace(/\\'/g, "'").trim();
+        // Skip anything that is plainly not prose: routes, css classes, keys.
+        if (!v || !/[A-Za-z]/.test(v) || /^[a-z0-9_./#-]+$/.test(v)) continue;
+        rendered.add(v);
+      }
+    }
+  }
+  const missing = [...rendered].filter((s) => !keys.has(s));
+  if (!missing.length) return;
+  const pct = Math.round(((rendered.size - missing.length) / rendered.size) * 100);
+  add('left', rel(path),
+    `${missing.length} of ${rendered.size} rendered strings have no translation (${pct}% covered)`,
+    'A language that covers part of the page renders the rest in English, which reads as two languages at ' +
+    'once. Either finish the dictionary or stop offering the language — see LANGS.');
+}
+
+/**
  * The same English phrase keyed twice in the translation dictionary.
  *
  * A JS object literal takes the LAST of two duplicate keys, silently. So a
@@ -553,6 +599,7 @@ unusedLocals(all);
 apiClientDrift();
 unusedCss();
 staleTranslations();
+translationCoverage();
 duplicateTranslations();
 unusedDeps();
 repeatedLiterals(all);

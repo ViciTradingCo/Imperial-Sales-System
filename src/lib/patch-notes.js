@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.7', date: '2026-08-25', notes: [
+    'THE APP OPENS IN YOUR OWN LANGUAGE. It asked your device all along and never listened — it started in English and waited for you to find the setting. It now starts in whatever your device asks for, and Appearance still overrules it if you want something else.',
+    'If your device lists more than one language, it takes the first one this app can write. Dates follow the same answer, so the words and the figures can never be in two different languages.',
+    'Dates are also written YOUR way within a language — an American reads 8/16/2026 and a Briton reads 16/08/2026, with every word on the page the same.',
+    'ANYTHING THAT DESTROYS SOMETHING IS NOW RED. Delete, Remove, Void, Archive, Purge, Leave, Close — one filled red button, the same everywhere, and nothing that is safe wears it. You no longer have to read the label to spot the one you cannot take back.',
+    'Removing an inventory listing, voiding a sale and purging old logs were dressed as ordinary buttons. They are not, and now they do not look it.',
+  ] },
   { version: '6.6', date: '2026-08-25', notes: [
     'YOU CAN CLOSE YOUR SHOP. Shop Settings → Close the Shop, for an owner, ends the business for good: it stops trading, its name is freed for someone else, and everyone on the roster is released.',
     'YOUR BOOKS ARE KEPT. Every sale, delivery, coffer entry and time card stays on the network’s records, and the page counts them for you before you decide. Nothing is erased — an admin can put the whole shop back if you change your mind.',

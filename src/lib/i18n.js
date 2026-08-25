@@ -24,8 +24,58 @@ export const LANGS = {
 
 const KEY = 'eec.lang';
 
+/**
+ * WHAT LANGUAGE SOMEONE GETS BEFORE THEY ASK FOR ONE — their device's.
+ *
+ * English was the default, so a French speaker opening the app for the first
+ * time got an English interface until they found Appearance and said so. Their
+ * browser has been telling us the answer the whole time; we were not listening.
+ *
+ * `navigator.languages` is their ORDERED preference, not one value, so a reader
+ * who lists Catalan first and Spanish second gets Spanish here rather than
+ * English — the best of what we can actually write, in their own order. Only a
+ * device asking for nothing we have translated falls back to English.
+ *
+ * Matched on the BASE subtag: fr-CA and fr-FR are both `fr`, because this
+ * dictionary is a language and not a region. What the region is good for is
+ * DATES, and those read the full tag — see `deviceLocale`.
+ */
+export function deviceLang() {
+  const nav = typeof navigator === 'undefined' ? null : navigator;
+  const tags = (nav && (nav.languages && nav.languages.length ? nav.languages : [nav.language])) || [];
+  for (const tag of tags) {
+    const base = String(tag || '').trim().toLowerCase().split('-')[0];
+    if (LANGS[base]) return base;
+  }
+  return 'en';
+}
+
+/**
+ * The device's own locale tag, region and all — 'en-US', 'fr-CA', 'de-AT'.
+ *
+ * Empty when the device does not say. `format.js` uses it so a date is written
+ * the way its reader writes dates, which is a REGIONAL habit and not a language
+ * one: an American and a Briton share every word on this page and disagree
+ * about 3/4/2026.
+ */
+export function deviceLocale() {
+  const nav = typeof navigator === 'undefined' ? null : navigator;
+  const tags = (nav && (nav.languages && nav.languages.length ? nav.languages : [nav.language])) || [];
+  return String(tags[0] || '').trim();
+}
+
+/**
+ * The language everything renders in: what this device asked for, or what its
+ * reader chose in Appearance if they have overruled it.
+ *
+ * A stored value not in `LANGS` is treated as no choice at all rather than
+ * passed on, so a stale key from an older build cannot leave the interface
+ * half-translated.
+ */
 export function getLang() {
-  try { return localStorage.getItem(KEY) || 'en'; } catch (e) { return 'en'; }
+  let stored = '';
+  try { stored = localStorage.getItem(KEY) || ''; } catch (e) { /* private mode */ }
+  return LANGS[stored] ? stored : deviceLang();
 }
 export function setLang(l) {
   try { localStorage.setItem(KEY, l); } catch (e) { /* private mode */ }

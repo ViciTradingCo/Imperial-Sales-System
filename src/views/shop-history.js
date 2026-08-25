@@ -64,7 +64,7 @@ export function renderSales(host) {
           '<span class="note">by ' + esc(s.employee || '') + (s.discount ? ' · ' + esc(s.discount) : '') + '</span>' }),
       ]);
       if (!voided) {
-        card.appendChild(el('button.secondary-btn.small', {
+        card.appendChild(el('button.danger.small', {
           onclick: async () => {
             if (!confirm('Void ' + s.orderNo + '? This returns the items to stock.')) return;
             try { await api.voidSale(s.orderNo); toast('Order voided.', 'ok'); run(); }

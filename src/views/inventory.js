@@ -144,7 +144,9 @@ function itemTable(title, note, rows, cost, emptyNote, actions) {
       cells.push(el('span', { class: 'row-actions' }, [
         el('button.primary.small', { onclick: () => actions.edit(it) }, 'Edit'),
         el('button.secondary-btn.small', { onclick: () => actions.stock(it) }, 'Stock'),
-        el('button.secondary-btn.small', { onclick: () => actions.remove(it) }, 'Remove'),
+        // Danger, unlike the Remove that takes a line out of a form you are
+        // still filling in: this one deletes a listing the shop actually holds.
+        el('button.danger.small', { onclick: () => actions.remove(it) }, 'Remove'),
       ]));
     }
     return cells;

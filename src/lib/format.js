@@ -6,23 +6,36 @@
  * as "gp" and every amount in the app renders through here, which is why there
  * is a single mutable value instead of threading it through every caller.
  */
-import { getLang } from './i18n.js';
+import { getLang, deviceLocale } from './i18n.js';
 
 /**
- * WHAT LANGUAGE A DATE IS WRITTEN IN — the app's, never the browser's.
+ * WHAT LANGUAGE A DATE IS WRITTEN IN — the same one the sentence around it is.
  *
  * Every date here went through `toLocaleDateString()` with no locale, which
- * asks the READER'S SYSTEM. So an English interface handed a French browser
- * "16 – 22 août": the app's own language setting said one thing and the dates
- * said another, in the middle of a sentence.
+ * asks the READER'S SYSTEM and nothing else. So an English interface on a
+ * French device printed "16 – 22 août" — one language in the words, another in
+ * the figures, in the middle of a sentence.
  *
- * The app already knows what language it is in — it is a per-device choice in
- * Appearance, and the whole interface honours it — so the dates follow that,
- * and only that. A reader who picks French gets French dates because they asked
- * for French, not because of what their laptop was set to at the factory.
+ * ONE ANSWER FOR BOTH HALVES. `getLang()` now starts from the device too
+ * (`i18n.deviceLang`), so the words and the dates come from the same place by
+ * default and cannot disagree. When a reader OVERRULES it in Appearance the
+ * dates follow them there, because a French interface with English dates is the
+ * same fault the other way round.
+ *
+ * The REGION is a second question. `en-US` and `en-GB` are one language and two
+ * ways of writing 3/4/2026, so when the device's own tag is in the language we
+ * are rendering, its full tag wins — an American reads American dates. Only
+ * when someone has chosen a language their device did not ask for do we fall
+ * back to a sensible region for it, since their device's region says nothing
+ * about how that language is written.
  */
 const LOCALES = { en: 'en-GB', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', it: 'it-IT' };
-function locale() { return LOCALES[getLang()] || LOCALES.en; }
+function locale() {
+  const lang = getLang();
+  const device = deviceLocale();
+  if (device && device.toLowerCase().split('-')[0] === lang) return device;
+  return LOCALES[lang] || LOCALES.en;
+}
 
 /** A date, in the app's language. Anything unreadable comes back as ''. */
 export function formatDate(value, opts) {

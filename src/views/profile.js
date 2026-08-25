@@ -13,7 +13,7 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { THEMES, TEXT_SIZES, loadPrefs, savePrefs, resolveTheme, resolveText } from '../lib/theme.js';
-import { LANGS, getLang, setLang } from '../lib/i18n.js';
+import { LANGS, getLang, setLang, deviceLang } from '../lib/i18n.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { signOut } from '../lib/auth.js';
 import { money } from '../lib/format.js';
@@ -131,8 +131,9 @@ function appearanceCard() {
   });
   textSel.addEventListener('change', () => savePrefs({ text: textSel.value }));
 
-  // Language — swaps the interface language for this device. Reloads so every
-  // surface re-renders cleanly in the new language.
+  // Language — the DEVICE'S by default, and this only overrules it. Reloads so
+  // every surface re-renders cleanly, dates included: the words and the figures
+  // read one setting, so the page can never be half in one language.
   const langSel = el('select', {});
   Object.keys(LANGS).forEach((code) => {
     const opt = el('option', { value: code }, LANGS[code]);
@@ -154,7 +155,9 @@ function appearanceCard() {
       'entries still sit on the lines.'),
     el('label', {}, 'Language'),
     langSel,
-    el('p', { class: 'note' }, 'Translations cover the interface; names and some ' +
+    el('p', { class: 'note' }, 'Starts as whatever your device asks for — ' + LANGS[deviceLang()] +
+      ', here — and this changes it for this device only. Dates follow it too, so the page is never ' +
+      'part in one language and part in another. Translations cover the interface; names and some ' +
       'messages stay as written.'),
   ]);
 }

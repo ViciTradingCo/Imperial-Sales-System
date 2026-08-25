@@ -585,7 +585,9 @@ function logsCard(me) {
     el('option', { value: 'weeks' }, 'weeks'),
     el('option', { value: 'months', selected: true }, 'months'),
   ]);
-  const purgeBtn = el('button.secondary-btn', { onclick: doPurge }, 'Purge older');
+  // Deletes real rows, so it wears the same red as Clear all logs beside it —
+  // "older than six months" is a smaller blast radius, not a different kind of act.
+  const purgeBtn = el('button.danger', { onclick: doPurge }, 'Purge older');
   const clearBtn = el('button.danger', { onclick: doClear }, 'Clear all logs');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 

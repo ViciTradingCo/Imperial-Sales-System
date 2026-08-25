@@ -97,33 +97,86 @@ describe('region wording', () => {
 });
 
 /**
- * DATES FOLLOW THE APP'S LANGUAGE, NEVER THE BROWSER'S.
+ * ONE LANGUAGE ON THE PAGE.
  *
- * They used to go through `toLocaleDateString()` with no locale, which asks the
- * reader's SYSTEM — so an English interface on a French machine printed
- * "16 – 22 août", the setting saying one thing and the date another in the
- * middle of the same sentence.
+ * The words and the dates were read from two different places: the interface
+ * from a setting that started as English, the dates from `toLocaleDateString()`
+ * with no locale, which asks the reader's SYSTEM. So an English interface on a
+ * French machine printed "16 – 22 août" — two languages in one sentence.
+ *
+ * Both halves start from the DEVICE now, so by default they agree without
+ * anyone choosing anything; a reader who overrules it in Appearance moves both.
+ * What is pinned down here is that neither can be moved on its own.
  */
 describe('dates', () => {
-  const asLang = (lang, fn) => {
-    const had = globalThis.localStorage;
+  // `globalThis.navigator` is getter-only under Node, so it is redefined rather
+  // than assigned, and put back exactly as it was afterwards.
+  const hadNav = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const stub = (tags, lang) => {
+    Object.defineProperty(globalThis, 'navigator',
+      { value: { languages: tags, language: tags[0] }, configurable: true });
     globalThis.localStorage = { getItem: () => lang, setItem: () => {} };
-    try { return fn(); } finally { globalThis.localStorage = had; }
+  };
+  const restore = () => {
+    if (hadNav) Object.defineProperty(globalThis, 'navigator', hadNav);
+    else delete globalThis.navigator;
+    delete globalThis.localStorage;
   };
 
-  it('are English when no language has been chosen', () => {
-    expect(formatDate('2026-08-16T12:00:00Z', { month: 'long' })).toBe('August');
-    expect(weekdayName(6)).toBe('Saturday');
+  /** The device saying what it wants, with nothing chosen in Appearance. */
+  const onDevice = (tags, fn) => { stub(tags, null); try { return fn(); } finally { restore(); } };
+  /** A reader who has overruled their device in Appearance. */
+  const asLang = (lang, fn, deviceTags) => {
+    stub(deviceTags || [], lang);
+    try { return fn(); } finally { restore(); }
+  };
+
+  it('come from the DEVICE when nobody has chosen a language', () => {
+    expect(onDevice(['fr-FR'], () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }))).toBe('août');
+    expect(onDevice(['de-DE'], () => weekdayName(6))).toBe('Samstag');
+    expect(onDevice(['es-MX'], () => weekdayName(1))).toBe('lunes');
   });
 
-  it('follow the app’s setting — the reported bug, from the other side', () => {
-    expect(asLang('fr', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }))).toBe('août');
-    expect(asLang('de', () => weekdayName(6))).toBe('Samstag');
-    expect(asLang('es', () => weekdayName(1))).toBe('lunes');
+  it('take the device’s ORDER of preference, not just its first answer', () => {
+    // Catalan first, Spanish second: we cannot write Catalan, so Spanish — the
+    // best of what we have, in the reader's own order — beats falling to English.
+    expect(onDevice(['ca-ES', 'es-ES', 'en'], () => weekdayName(1))).toBe('lunes');
   });
 
-  it('fall back to English for a language nothing knows', () => {
-    expect(asLang('xx', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }))).toBe('August');
+  it('fall back to English only when the device asks for nothing we write', () => {
+    expect(onDevice(['ja-JP'], () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }))).toBe('August');
+    expect(onDevice([], () => weekdayName(6))).toBe('Saturday');
+  });
+
+  /**
+   * The REGION is a second question. Two readers share every word on the page
+   * and disagree about 16/8/2026, so within one language the device's own tag
+   * decides — this is the whole reason the full tag is kept.
+   */
+  it('write the date the reader’s own way within one language', () => {
+    const d = '2026-08-16T12:00:00Z';
+    expect(onDevice(['en-US'], () => formatDate(d))).toBe('8/16/2026');
+    expect(onDevice(['en-GB'], () => formatDate(d))).toBe('16/08/2026');
+  });
+
+  it('follow Appearance when a reader overrules their device — the bug, both ways', () => {
+    // An English device told to render French gets French dates…
+    expect(asLang('fr', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }), ['en-US'])).toBe('août');
+    // …and a French device told to render English gets English ones.
+    expect(asLang('en', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }), ['fr-FR'])).toBe('August');
+  });
+
+  /**
+   * A chosen language the device did not ask for gets a sensible region for
+   * THAT language — an American picking French reads French dates, not
+   * American ones, because their region says nothing about how French is written.
+   */
+  it('ignore the device’s region once the language has been overruled', () => {
+    expect(asLang('fr', () => formatDate('2026-08-16T12:00:00Z'), ['en-US'])).toBe('16/08/2026');
+  });
+
+  it('treat a stored language nothing knows as no choice at all', () => {
+    expect(asLang('xx', () => formatDate('2026-08-16T12:00:00Z', { month: 'long' }), ['de-DE'])).toBe('August');
   });
 
   it('read an unusable date as nothing rather than as "Invalid Date"', () => {

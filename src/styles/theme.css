@@ -1075,13 +1075,39 @@ label.inline {
 .crate-lines p { margin: 0; font-family: var(--font-data); font-size: var(--data-size); }
 button.primary.small { padding: 5px 10px; font-size: 12px; margin: 0; width: auto; }
 button.secondary-btn.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto; }
+/* ---- DANGER: THE ONE STYLE FOR ANYTHING THAT DESTROYS ----
+   Deleting a listing, voiding a sale, archiving a company, purging logs,
+   leaving a shop, closing one. Every one of them wears this and nothing else
+   does, so the colour alone is the warning — you do not have to read the label
+   to know which button in a row is the one you cannot take back.
+
+   FILLED, not outlined. It was an outline in `--bad` that only coloured in on
+   hover, which is no warning at all on a phone (there is no hover) and reads
+   as an ordinary button on a desk. Filled is the same weight `.primary` has:
+   these are the two kinds of button that DO something, and the red is the only
+   thing separating them.
+
+   Shaped from `.primary` deliberately — same padding, same radius, same
+   disabled state — because a destructive button that is also a different SHAPE
+   invites reading the difference as decoration. One difference, and it is the
+   colour.
+
+   `--paper` for the text rather than white: `--bad` is a deep red on the light
+   surfaces and a pale one on the tome, so white would be unreadable on one of
+   them. The page's own paper is dark exactly where the red is light. */
 button.danger {
-  font: inherit; cursor: pointer; border: 1px solid var(--bad);
-  background: transparent; color: var(--bad); border-radius: var(--radius);
-  padding: 8px 14px; font-weight: bold;
+  background: var(--bad);
+  color: var(--paper);
+  border: none;
+  border-radius: var(--radius);
+  padding: 9px 18px;
+  cursor: pointer;
+  font-weight: 700;
 }
-button.danger:hover { background: var(--bad); color: var(--paper); }
-button.danger.small { padding: 4px 9px; font-size: 12px; margin: 0; width: auto; }
+button.danger:hover:not(:disabled) { filter: brightness(1.08); }
+button.danger:disabled { opacity: 0.6; cursor: default; }
+/* The row-action size, matching `.primary.small` for the same reason. */
+button.danger.small { padding: 5px 10px; font-size: 12px; margin: 0; width: auto; }
 .row-actions { display: flex; gap: 6px; flex: none; flex-wrap: wrap; }
 
 /* A section heading with its own action pushed to the far end. */
