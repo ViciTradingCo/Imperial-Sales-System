@@ -41,6 +41,7 @@ import { parseAst } from 'rollup/parseAst';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'src');
+const WORKER = join(ROOT, 'worker', 'src');
 const OUT = join(SRC, 'lib', 'i18n', 'strings.json');
 
 /** Files whose strings are never shown as interface text. */
@@ -71,9 +72,18 @@ const SKIP_PROPS = new Set(['glyph', 'key', 'class', 'className', 'type', 'value
  */
 const SKIP_CALLS = new Set(['request', 'getItem', 'setItem', 'removeItem', 'querySelector', 'querySelectorAll',
   'getElementById', 'addEventListener', 'removeEventListener', 'setAttribute', 'getAttribute', 'hasAttribute',
-  'removeAttribute', 'createElement', 'navigate', 'route', 'add', 'remove', 'toggle', 'contains', 'matches',
-  'split', 'join', 'startsWith', 'endsWith', 'includes', 'indexOf', 'replace', 'replaceAll', 'match', 'test',
-  'setProperty', 'getPropertyValue', 'importScripts', 'postMessage', 'open', 'fetch', 'assign', 'push']);
+  'removeAttribute', 'createElement', 'navigate', 'route',
+  'split', 'startsWith', 'endsWith', 'includes', 'indexOf', 'match', 'test',
+  'setProperty', 'getPropertyValue', 'importScripts', 'postMessage', 'fetch']);
+
+/*
+ * NOT on that list, though they look like they belong: `push`, `add`, `join`,
+ * `replace`, `open`, `assign`. Every one of them is used both for machinery and
+ * for words — `items.push({ label: 'About' })` builds the nav, and skipping it
+ * quietly took the About link, the Inventory toolbar and half a dozen headings
+ * out of the catalogue while the pack still reported 100%. The rule stays: skip
+ * only what could never be prose, and let `isProse` judge the rest.
+ */
 
 function jsFiles(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -96,6 +106,8 @@ function isProse(s) {
   if (!/[A-Za-z]/.test(v)) return false;              // pure punctuation/emoji
   if (/^[a-z0-9_.\/#:-]+$/.test(v)) return false;      // route, key, class, path
   if (/^https?:/.test(v)) return false;
+  // An HTML entity from the escaper — `&amp;`, `&#39;`. Markup, not a word.
+  if (/^&[a-z]+;$|^&#\d+;$/.test(v)) return false;
   if (/^[A-Z_]+$/.test(v) && v.length < 20) return false; // CONSTANT
   // A one-word camelCase identifier — `supportTitle`, a settings key. Prose has
   // spaces or starts with a capital; this has neither.
@@ -203,7 +215,44 @@ function walk(node, visit) {
   }
 }
 
+/**
+ * THE WORKER'S SIDE OF THE CONVERSATION.
+ *
+ * Everything above reads the frontend, and it was enough right up until a
+ * French shop hit a refusal and read "That shop is not in the registry." in
+ * English. Every message the Worker throws is rendered verbatim by whichever
+ * screen made the call, and so is the status it puts on an inventory row — so
+ * they are as much interface text as anything in a view.
+ *
+ * Only the two POSITIONS that reach a screen are taken: the argument of
+ * `new Error(...)`, and a bare string returned from a function. Everything else
+ * in there — table names, SQL, flag keys, idempotency stems — never leaves the
+ * server, and hoovering it up would bury the real strings in machinery.
+ */
+function collectWorker(file) {
+  let ast;
+  try { ast = parseAst(readFileSync(file, 'utf8')); }
+  catch (e) { console.error('parse failed:', relative(ROOT, file), e.message); return; }
+  walk(ast, (node) => {
+    if (node.type === 'NewExpression' && node.callee.type === 'Identifier' && node.callee.name === 'Error') {
+      const a = node.arguments[0];
+      if (a && (a.type === 'Literal' || a.type === 'BinaryExpression' || a.type === 'TemplateLiteral')) collect(a, file);
+    }
+    if (node.type === 'ReturnStatement' && node.argument) {
+      const a = node.argument;
+      if (a.type === 'Literal' && typeof a.value === 'string') collect(a, file);
+      // `cond ? 'Low' : 'In Stock'` — the same thing said in one line.
+      if (a.type === 'ConditionalExpression') {
+        for (const b of [a.consequent, a.alternate]) {
+          if (b.type === 'Literal' && typeof b.value === 'string') collect(b, file);
+        }
+      }
+    }
+  });
+}
+
 const files = jsFiles(SRC).filter((f) => !SKIP.some((s) => relative(SRC, f).replace(/\\/g, '/').startsWith(s)));
+for (const file of jsFiles(WORKER)) collectWorker(file);
 for (const file of files) {
   let ast;
   try { ast = parseAst(readFileSync(file, 'utf8')); }

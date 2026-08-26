@@ -24,15 +24,26 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = join(ROOT, 'src', 'lib', 'i18n');
 const NAMES = { es: 'Spanish', fr: 'French', de: 'German', it: 'Italian' };
 
-const [lang, batchPath] = process.argv.slice(2);
-if (!NAMES[lang] || !batchPath) {
-  console.error('usage: i18n-merge.mjs <es|fr|de|it> <batch.json>');
+const args = process.argv.slice(2);
+/**
+ * Drop rows the catalogue no longer holds.
+ *
+ * Reworded a sentence in a view and the old row is now dead weight in a chunk
+ * somebody downloads — and, worse, the reworded one is missing while the pack
+ * still reports as full. It is a FLAG rather than automatic: a stale row is
+ * usually a rewording whose translation you want to copy across first, and
+ * discarding it silently would throw that away.
+ */
+const prune = args.includes('--prune');
+const [lang, batchPath] = args.filter((a) => a !== '--prune');
+if (!NAMES[lang] || (!batchPath && !prune)) {
+  console.error('usage: i18n-merge.mjs <es|fr|de|it> [batch.json] [--prune]');
   process.exit(2);
 }
 
 const catalogue = JSON.parse(readFileSync(join(DIR, 'strings.json'), 'utf8'));
 const known = new Map(catalogue.map((r) => [r.en, r]));
-const batch = JSON.parse(readFileSync(batchPath, 'utf8'));
+const batch = batchPath ? JSON.parse(readFileSync(batchPath, 'utf8')) : {};
 
 const file = join(DIR, `${lang}.js`);
 const existing = existsSync(file) ? (await import(pathToFileURL(file).href)).default || {} : {};
@@ -41,7 +52,14 @@ const holesOf = (s) => new Set([...s.matchAll(/\{(\d+)\}/g)].map((m) => m[1]));
 const merged = { ...existing };
 let added = 0;
 let changed = 0;
+let pruned = 0;
 const problems = [];
+
+if (prune) {
+  for (const en of Object.keys(merged)) {
+    if (!known.has(en)) { delete merged[en]; pruned++; }
+  }
+}
 
 for (const [en, to] of Object.entries(batch)) {
   const row = known.get(en);
@@ -93,4 +111,5 @@ ${body}
 
 const total = Object.keys(merged).length;
 const want = catalogue.filter((r) => !r.ambiguous).length;
-console.log(`${lang}: +${added} new, ${changed} changed → ${total}/${want} (${Math.round((total / want) * 100)}%)`);
+console.log(`${lang}: +${added} new, ${changed} changed` + (pruned ? `, ${pruned} pruned` : '') +
+  ` → ${total}/${want} (${Math.round((total / want) * 100)}%)`);

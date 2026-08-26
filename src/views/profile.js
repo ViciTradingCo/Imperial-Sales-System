@@ -13,7 +13,8 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 import { THEMES, TEXT_SIZES, loadPrefs, savePrefs, resolveTheme, resolveText } from '../lib/theme.js';
-import { LANGS, getLang, setLang, deviceLang } from '../lib/i18n.js';
+import { LANGS, getLang, setLang, deviceLang, t } from '../lib/i18n.js';
+import { roleLabel } from '../lib/roles.js';
 import { tileGrid, sectionTiles } from '../lib/tiles.js';
 import { signOut } from '../lib/auth.js';
 import { money } from '../lib/format.js';
@@ -90,7 +91,7 @@ function profileCard(me, onProfileUpdated) {
     status,
     el('div', { class: 'readonly-facts' }, [
       factRow('Business', me.business || '—'),
-      factRow('Role', me.role),
+      factRow('Role', roleLabel(me.role)),
       factRow('Status', me.status),
       factRow('Email', me.email || '—'),
       factRow('UID', me.uid),
@@ -113,8 +114,11 @@ function appearanceCard() {
   const current = resolveTheme(prefs.theme);
   const themeSel = el('select', {});
   Object.keys(THEMES).forEach((key) => {
-    const t = THEMES[key];
-    const opt = el('option', { value: key }, t.label + (t.hint ? ' — ' + t.hint : ''));
+    const th = THEMES[key];
+    // Translated BEFORE they are joined. The two halves are each in the
+    // catalogue; the sentence they make is not, and a text node holding both
+    // matches neither. See i18n.t.
+    const opt = el('option', { value: key }, t(th.label) + (th.hint ? ' — ' + t(th.hint) : ''));
     if (key === current) opt.selected = true;
     themeSel.appendChild(opt);
   });
@@ -150,8 +154,13 @@ function appearanceCard() {
 
   return el('div.card', {}, [
     el('h2', {}, 'Appearance'),
-    el('p', { class: 'note' }, 'What the ledger is written on' +
-      (multilingual ? ', and the language it is written in. Both are' : '. It is') + ' for this device only.'),
+    // Two WHOLE sentences rather than one with a clause spliced into it. A hole
+    // that swallows a clause cannot be translated: the catalogue would hold
+    // "written on{0} for this device only" and the words that go in the gap
+    // would never be looked up at all.
+    el('p', { class: 'note' }, multilingual
+      ? 'What the ledger is written on, and the language it is written in. Both are for this device only.'
+      : 'What the ledger is written on. It is for this device only.'),
     el('label', {}, 'Surface'),
     themeSel,
     el('p', { class: 'note' }, 'The writing stays the same; the page under it changes.'),

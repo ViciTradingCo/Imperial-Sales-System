@@ -38,5 +38,8 @@ export function roleLabel(role) {
   if (role === 'owner') return 'Shop Owner';
   if (role === 'manager') return 'Manager';
   if (role === 'admin') return 'Admin';
+  // Somebody signed in who has not registered yet. Not an employee of anything,
+  // and the badge is the one place that renders it.
+  if (role === 'guest') return 'Guest';
   return 'Employee';
 }

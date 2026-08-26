@@ -48,6 +48,22 @@
     ]
   },
   {
+    "en": ". Every page shows",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "src/views/home.js"
+    ]
+  },
+  {
+    "en": ". Every page shows that realm and nothing else — switch realms from Realm Management.",
+    "holes": 0,
+    "lits": 68,
+    "seen": [
+      "src/views/home.js"
+    ]
+  },
+  {
     "en": ". Tell the Company who you trade as, and enter the code you were given.",
     "holes": 0,
     "lits": 54,
@@ -97,6 +113,31 @@
     ]
   },
   {
+    "en": "\"{0}\" does not trade in your region.",
+    "holes": 1,
+    "lits": 24,
+    "seen": [
+      "worker/src/court.js",
+      "worker/src/oversight.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" is asked for twice. Ask for it once, with the full number.",
+    "holes": 1,
+    "lits": 44,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" is in this bundle twice. Put it in once with the full quantity.",
+    "holes": 1,
+    "lits": 49,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
     "en": "\"{0}\" is new — enter what it sold for.",
     "holes": 1,
     "lits": 23,
@@ -113,6 +154,46 @@
     ]
   },
   {
+    "en": "\"{0}\" is not in the index.",
+    "holes": 1,
+    "lits": 15,
+    "seen": [
+      "worker/src/item-index.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" is not in the item index — an admin must add it first.",
+    "holes": 1,
+    "lits": 40,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" is not in your inventory. Record an intake to stock it first.",
+    "holes": 1,
+    "lits": 48,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" is not one of this shop's bundles.",
+    "holes": 1,
+    "lits": 26,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "“{0}” is reserved — it is how a company with no fixed region is marked, so it cannot also be one of the regions.",
+    "holes": 1,
+    "lits": 81,
+    "seen": [
+      "worker/src/regions.js"
+    ]
+  },
+  {
     "en": "\"{0}\" kept.",
     "holes": 1,
     "lits": 4,
@@ -121,11 +202,46 @@
     ]
   },
   {
+    "en": "\"{0}\" must be a number.",
+    "holes": 1,
+    "lits": 13,
+    "seen": [
+      "worker/src/business-settings.js",
+      "worker/src/settings.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" must be at least {1}.",
+    "holes": 2,
+    "lits": 13,
+    "seen": [
+      "worker/src/business-settings.js",
+      "worker/src/settings.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" must be at most {1}.",
+    "holes": 2,
+    "lits": 12,
+    "seen": [
+      "worker/src/business-settings.js",
+      "worker/src/settings.js"
+    ]
+  },
+  {
     "en": "\"{0}\" removed.",
     "holes": 1,
     "lits": 7,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" still holds {1} shop(s) and {2} member(s). Move or remove them first — a realm with people in it cannot be deleted outright.",
+    "holes": 3,
+    "lits": 89,
+    "seen": [
+      "worker/src/realm.js"
     ]
   },
   {
@@ -236,6 +352,14 @@
     ]
   },
   {
+    "en": "{0} · {1} item{2}",
+    "holes": 3,
+    "lits": 4,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "{0} {1} needed — {2} chosen.",
     "holes": 3,
     "lits": 12,
@@ -260,11 +384,92 @@
     ]
   },
   {
+    "en": "{0} already correct.",
+    "holes": 1,
+    "lits": 14,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
     "en": "{0} an hour",
     "holes": 1,
     "lits": 6,
     "seen": [
-      "src/views/employees.js"
+      "src/views/employees.js",
+      "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "{0} cannot be filled with {1} — it is marked as an ingredient, stock you craft with rather than sell.",
+    "holes": 2,
+    "lits": 73,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} contains {1}, which is marked as an ingredient — stock you craft with, not stock you sell.",
+    "holes": 2,
+    "lits": 67,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} Court caps {1} at {2} — this line is at {3}.",
+    "holes": 4,
+    "lits": 23,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} Court caps what is in {1} at {2} — the bundle is priced at {3}.",
+    "holes": 4,
+    "lits": 38,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} Court caps what was chosen for {1} at {2} — the special is priced at {3}.",
+    "holes": 4,
+    "lits": 47,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} Court sets a floor of {1} on {2} — this line is at {3}.",
+    "holes": 4,
+    "lits": 31,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} Court sets a floor of {1} on what is in {2} — the bundle is priced at {3}.",
+    "holes": 4,
+    "lits": 46,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} Court sets a floor of {1} on what was chosen for {2} — the special is priced at {3}.",
+    "holes": 4,
+    "lits": 55,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} does not ask for anything tagged \"{1}\".",
+    "holes": 2,
+    "lits": 27,
+    "seen": [
+      "worker/src/sales.js"
     ]
   },
   {
@@ -273,6 +478,30 @@
     "lits": 15,
     "seen": [
       "src/lib/sections.js"
+    ]
+  },
+  {
+    "en": "{0} has nothing in it.",
+    "holes": 1,
+    "lits": 14,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} held for another shop or realm.",
+    "holes": 1,
+    "lits": 25,
+    "seen": [
+      "src/views/pos.js"
+    ]
+  },
+  {
+    "en": "{0} in hours and {1} in commission.",
+    "holes": 2,
+    "lits": 22,
+    "seen": [
+      "src/views/profile.js"
     ]
   },
   {
@@ -291,6 +520,30 @@
     "lits": 20,
     "seen": [
       "src/views/pos.js"
+    ]
+  },
+  {
+    "en": "{0} ingredient listings besides",
+    "holes": 1,
+    "lits": 25,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "{0} is a System Admin (set by the deployment’s ADMIN_EMAILS). Change that setting to alter this account’s role.",
+    "holes": 1,
+    "lits": 84,
+    "seen": [
+      "worker/src/routes/admin.js"
+    ]
+  },
+  {
+    "en": "{0} is already registered in the destination realm.",
+    "holes": 1,
+    "lits": 40,
+    "seen": [
+      "worker/src/registry.js"
     ]
   },
   {
@@ -318,11 +571,59 @@
     ]
   },
   {
+    "en": "{0} is filled at the till, so it is rung up one at a time — add it again for another.",
+    "holes": 1,
+    "lits": 59,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} is marked as an ingredient — it is stock you craft with, not stock you sell. Untick \"Ingredient\" on the item in Inventory to sell it.",
+    "holes": 1,
+    "lits": 102,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} is not in your inventory, so it cannot fill {1}.",
+    "holes": 2,
+    "lits": 34,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} is not tagged \"{1}\", so it cannot fill that part of {2}.",
+    "holes": 3,
+    "lits": 35,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
     "en": "{0} is now a manager.",
     "holes": 1,
     "lits": 13,
     "seen": [
       "src/views/employees.js"
+    ]
+  },
+  {
+    "en": "{0} is the default table and cannot be removed — it is where a removed table's items go.",
+    "holes": 1,
+    "lits": 65,
+    "seen": [
+      "worker/src/item-index.js"
+    ]
+  },
+  {
+    "en": "{0} is the default table and cannot be renamed.",
+    "holes": 1,
+    "lits": 35,
+    "seen": [
+      "worker/src/item-index.js"
     ]
   },
   {
@@ -351,6 +652,14 @@
     ]
   },
   {
+    "en": "{0} item{1} in your inventory {2} not in the paste, and {3} left exactly as {4}.",
+    "holes": 5,
+    "lits": 48,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
     "en": "{0} logged · {1} unpaid{2}",
     "holes": 3,
     "lits": 12,
@@ -364,6 +673,14 @@
     "lits": 8,
     "seen": [
       "src/views/fill-special.js"
+    ]
+  },
+  {
+    "en": "{0} out, {1} low",
+    "holes": 2,
+    "lits": 6,
+    "seen": [
+      "src/views/shop-report.js"
     ]
   },
   {
@@ -412,7 +729,16 @@
     "holes": 4,
     "lits": 11,
     "seen": [
-      "src/views/fill-special.js"
+      "src/views/fill-special.js",
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} takes its price from what its items cost, and {1} is not in your inventory. Add it, or give the special a flat price.",
+    "holes": 2,
+    "lits": 87,
+    "seen": [
+      "worker/src/sales.js"
     ]
   },
   {
@@ -473,6 +799,14 @@
     ]
   },
   {
+    "en": "{0}% of what you sell",
+    "holes": 1,
+    "lits": 13,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
     "en": "{0}% off its items",
     "holes": 1,
     "lits": 11,
@@ -510,7 +844,8 @@
       "src/views/item-index.js",
       "src/views/members.js",
       "src/views/motd-admin.js",
-      "src/views/profile.js"
+      "src/views/profile.js",
+      "src/views/settings-form.js"
     ]
   },
   {
@@ -600,6 +935,14 @@
     "lits": 37,
     "seen": [
       "src/views/pos.js"
+    ]
+  },
+  {
+    "en": "✎ Edit this page",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "src/views/landing.js"
     ]
   },
   {
@@ -699,6 +1042,14 @@
     ]
   },
   {
+    "en": "$ per item must be a number ≥ 0.{0}",
+    "holes": 1,
+    "lits": 20,
+    "seen": [
+      "worker/src/intake.js"
+    ]
+  },
+  {
     "en": "1 · What arrived?",
     "holes": 0,
     "lits": 11,
@@ -739,11 +1090,107 @@
     ]
   },
   {
+    "en": "A bundle can hold at most {0} different items.",
+    "holes": 1,
+    "lits": 34,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
+    "en": "A bundle needs at least one item in it.",
+    "holes": 0,
+    "lits": 30,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
+    "en": "A bundle price must be a number, 0 or more.",
+    "holes": 0,
+    "lits": 31,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
+    "en": "A business name is required to register.",
+    "holes": 0,
+    "lits": 33,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "A business named \"{0}\" already exists.",
+    "holes": 1,
+    "lits": 27,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "A business named \"{0}\" is already registered. If you own it, ask an admin to link your account; otherwise choose a different name.",
+    "holes": 1,
+    "lits": 99,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "A commission cannot be more than 100% of the sale.",
+    "holes": 0,
+    "lits": 36,
+    "seen": [
+      "worker/src/users.js"
+    ]
+  },
+  {
+    "en": "A commission must be a number ≥ 0.",
+    "holes": 0,
+    "lits": 24,
+    "seen": [
+      "worker/src/users.js"
+    ]
+  },
+  {
+    "en": "A company marked as {0} has no region to govern. An admin needs to give it a region, or move the Court flag to a company based in one.",
+    "holes": 1,
+    "lits": 100,
+    "seen": [
+      "worker/src/oversight.js"
+    ]
+  },
+  {
+    "en": "A company named \"{0}\" already exists in the destination realm.",
+    "holes": 1,
+    "lits": 47,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "A company named \"{0}\" is registered again, so this one cannot take its name back. Rename or archive that one first, or restore this one and rename it afterwards.",
+    "holes": 1,
+    "lits": 124,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
     "en": "A count cannot be negative.",
     "holes": 0,
     "lits": 22,
     "seen": [
       "src/views/fill-special.js"
+    ]
+  },
+  {
+    "en": "A Court cannot bar itself from trading.",
+    "holes": 0,
+    "lits": 32,
+    "seen": [
+      "worker/src/court.js"
     ]
   },
   {
@@ -763,11 +1210,35 @@
     ]
   },
   {
+    "en": "A discount cannot be more than 100%.",
+    "holes": 0,
+    "lits": 25,
+    "seen": [
+      "worker/src/discounts.js"
+    ]
+  },
+  {
+    "en": "A discount or upcharge named \"{0}\" already exists.",
+    "holes": 1,
+    "lits": 37,
+    "seen": [
+      "worker/src/discounts.js"
+    ]
+  },
+  {
     "en": "A floor and a ceiling on what may be charged for an item anywhere in your {0}. The register refuses a sale outside them and tells the clerk the bound.",
     "holes": 1,
     "lits": 116,
     "seen": [
       "src/views/court.js"
+    ]
+  },
+  {
+    "en": "A language is only offered once it is FINISHED. A page half in your language and half in ours is not a smaller version of being translated, so a translation that is still being written is not shown at all. Spanish, German and Italian are on their way.",
+    "holes": 0,
+    "lits": 199,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -811,11 +1282,27 @@
     ]
   },
   {
+    "en": "A pay rate must be a number ≥ 0.",
+    "holes": 0,
+    "lits": 21,
+    "seen": [
+      "worker/src/users.js"
+    ]
+  },
+  {
     "en": "A percentage off its items",
     "holes": 0,
     "lits": 22,
     "seen": [
       "src/views/shop-deals.js"
+    ]
+  },
+  {
+    "en": "A price control must be a number ≥ 0.",
+    "holes": 0,
+    "lits": 26,
+    "seen": [
+      "worker/src/court.js"
     ]
   },
   {
@@ -851,11 +1338,27 @@
     ]
   },
   {
+    "en": "A realm can name at most {0} kinds of item.",
+    "holes": 1,
+    "lits": 30,
+    "seen": [
+      "worker/src/realm-prefs.js"
+    ]
+  },
+  {
     "en": "A realm is a self-contained server: its own shops, members, item index, holds, economy settings, and notices. Nothing is shared between realms, and no report or search ever crosses from one into another.",
     "holes": 0,
     "lits": 161,
     "seen": [
       "src/views/realms.js"
+    ]
+  },
+  {
+    "en": "A realm with that name or slug already exists.",
+    "holes": 0,
+    "lits": 37,
+    "seen": [
+      "worker/src/realm.js"
     ]
   },
   {
@@ -891,11 +1394,35 @@
     ]
   },
   {
+    "en": "A shift has to end after it starts.",
+    "holes": 0,
+    "lits": 27,
+    "seen": [
+      "worker/src/timecard.js"
+    ]
+  },
+  {
+    "en": "A shop cannot record buying from itself.",
+    "holes": 0,
+    "lits": 33,
+    "seen": [
+      "worker/src/intake.js"
+    ]
+  },
+  {
     "en": "A shop founded today would be certified until {0}.",
     "holes": 1,
     "lits": 38,
     "seen": [
       "src/views/admin-settings.js"
+    ]
+  },
+  {
+    "en": "A special can ask for at most {0} kinds.",
+    "holes": 1,
+    "lits": 28,
+    "seen": [
+      "worker/src/bundles.js"
     ]
   },
   {
@@ -915,6 +1442,14 @@
     ]
   },
   {
+    "en": "A special either names its items or asks for kinds of item — not both.",
+    "holes": 0,
+    "lits": 54,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
     "en": "A special filled at the till has no count to edit in the cart, for the same reason — one line is one filling. Remove one if a customer changes their mind.",
     "holes": 0,
     "lits": 119,
@@ -928,6 +1463,22 @@
     "lits": 142,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "A special’s discount must be between 0 and 100 percent.",
+    "holes": 0,
+    "lits": 40,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
+    "en": "A table called \"{0}\" already exists.",
+    "holes": 1,
+    "lits": 25,
+    "seen": [
+      "worker/src/item-index.js"
     ]
   },
   {
@@ -971,6 +1522,14 @@
     ]
   },
   {
+    "en": "About",
+    "holes": 0,
+    "lits": 5,
+    "seen": [
+      "src/lib/nav.js"
+    ]
+  },
+  {
     "en": "About page",
     "holes": 0,
     "lits": 9,
@@ -1001,6 +1560,22 @@
     "seen": [
       "src/views/admin-settings.js",
       "src/views/ledger-settings.js"
+    ]
+  },
+  {
+    "en": "Accent must be a hex colour like #7a4a1f.",
+    "holes": 0,
+    "lits": 29,
+    "seen": [
+      "worker/src/branding.js"
+    ]
+  },
+  {
+    "en": "Accept",
+    "holes": 0,
+    "lits": 6,
+    "seen": [
+      "src/views/transfers.js"
     ]
   },
   {
@@ -1135,6 +1710,14 @@
     ]
   },
   {
+    "en": "Add at least one ingredient.",
+    "holes": 0,
+    "lits": 23,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
     "en": "Add at least one item from your stock.",
     "holes": 0,
     "lits": 30,
@@ -1147,7 +1730,8 @@
     "holes": 0,
     "lits": 30,
     "seen": [
-      "src/views/intake-form.js"
+      "src/views/intake-form.js",
+      "worker/src/intake.js"
     ]
   },
   {
@@ -1241,11 +1825,27 @@
     ]
   },
   {
+    "en": "Added",
+    "holes": 0,
+    "lits": 5,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
     "en": "added {0} listing{1}",
     "holes": 2,
     "lits": 12,
     "seen": [
       "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Added in upcharges",
+    "holes": 0,
+    "lits": 16,
+    "seen": [
+      "src/views/shop-report.js"
     ]
   },
   {
@@ -1298,6 +1898,22 @@
     "lits": 226,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Admins keep the network and its settings in order.",
+    "holes": 0,
+    "lits": 41,
+    "seen": [
+      "src/views/landing.js"
+    ]
+  },
+  {
+    "en": "Admins only.",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "worker/src/guards.js"
     ]
   },
   {
@@ -1381,6 +1997,14 @@
     ]
   },
   {
+    "en": "All time",
+    "holes": 0,
+    "lits": 7,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Already crafted.",
     "holes": 0,
     "lits": 14,
@@ -1402,6 +2026,7 @@
     "lits": 6,
     "seen": [
       "src/views/court.js",
+      "src/views/inventory.js",
       "src/views/transfers.js"
     ]
   },
@@ -1422,6 +2047,14 @@
     ]
   },
   {
+    "en": "An admin has no shop to leave.",
+    "holes": 0,
+    "lits": 23,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
     "en": "An announcement to every shop trading here…",
     "holes": 0,
     "lits": 36,
@@ -1435,6 +2068,30 @@
     "lits": 100,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "An item cannot be its own ingredient.",
+    "holes": 0,
+    "lits": 30,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "An item named \"{0}\" already exists.",
+    "holes": 1,
+    "lits": 24,
+    "seen": [
+      "worker/src/item-index.js"
+    ]
+  },
+  {
+    "en": "An upcharge cannot be more than {0}%.",
+    "holes": 1,
+    "lits": 26,
+    "seen": [
+      "worker/src/discounts.js"
     ]
   },
   {
@@ -1649,6 +2306,14 @@
     ]
   },
   {
+    "en": "As a Realm Admin your tools cover this realm only — its members, shops, items, and settings. Other realms are not visible to you.",
+    "holes": 0,
+    "lits": 100,
+    "seen": [
+      "src/views/home.js"
+    ]
+  },
+  {
     "en": "as a shop owner. Name your business",
     "holes": 0,
     "lits": 28,
@@ -1689,6 +2354,14 @@
     ]
   },
   {
+    "en": "at your own prices",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Audit Log",
     "holes": 0,
     "lits": 8,
@@ -1711,6 +2384,14 @@
     "lits": 118,
     "seen": [
       "src/views/motd-admin.js"
+    ]
+  },
+  {
+    "en": "Average order",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "src/views/shop-report.js"
     ]
   },
   {
@@ -1770,6 +2451,22 @@
     ]
   },
   {
+    "en": "Bad quantity for {0}.",
+    "holes": 1,
+    "lits": 14,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "Balance & ledger",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/ledger-settings.js"
+    ]
+  },
+  {
     "en": "Balance: {0}",
     "holes": 1,
     "lits": 7,
@@ -1803,9 +2500,33 @@
     ]
   },
   {
+    "en": "Base value must be a number ≥ 0.",
+    "holes": 0,
+    "lits": 22,
+    "seen": [
+      "worker/src/item-index.js"
+    ]
+  },
+  {
     "en": "Best day {0} ({1}) · {2} day{3} shown",
     "holes": 4,
     "lits": 15,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Best day of the week",
+    "holes": 0,
+    "lits": 16,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Best sellers",
+    "holes": 0,
+    "lits": 11,
     "seen": [
       "src/views/shop-report.js"
     ]
@@ -1848,6 +2569,14 @@
     "lits": 8,
     "seen": [
       "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Bought from",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "src/views/intake-form.js"
     ]
   },
   {
@@ -1968,7 +2697,16 @@
     "holes": 0,
     "lits": 6,
     "seen": [
-      "src/views/landing.js"
+      "src/views/landing.js",
+      "src/views/transfers.js"
+    ]
+  },
+  {
+    "en": "Cannot create a session without an email.",
+    "holes": 0,
+    "lits": 34,
+    "seen": [
+      "worker/src/sessions.js"
     ]
   },
   {
@@ -2061,6 +2799,14 @@
     ]
   },
   {
+    "en": "Changed",
+    "holes": 0,
+    "lits": 7,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
     "en": "Character",
     "holes": 0,
     "lits": 9,
@@ -2149,6 +2895,14 @@
     "lits": 95,
     "seen": [
       "src/views/fill-special.js"
+    ]
+  },
+  {
+    "en": "Choose what goes in {0}.",
+    "holes": 1,
+    "lits": 16,
+    "seen": [
+      "worker/src/sales.js"
     ]
   },
   {
@@ -2338,6 +3092,14 @@
     ]
   },
   {
+    "en": "Close the Shop",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "src/views/ledger-settings.js"
+    ]
+  },
+  {
     "en": "Closing…",
     "holes": 0,
     "lits": 7,
@@ -2460,7 +3222,16 @@
     "holes": 0,
     "lits": 21,
     "seen": [
-      "src/views/companies.js"
+      "src/views/companies.js",
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "Company not found.",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "worker/src/registry.js"
     ]
   },
   {
@@ -2594,6 +3365,14 @@
     ]
   },
   {
+    "en": "Could not read",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
     "en": "Counts + errors",
     "holes": 0,
     "lits": 12,
@@ -2623,6 +3402,14 @@
     "lits": 18,
     "seen": [
       "src/views/companies.js"
+    ]
+  },
+  {
+    "en": "Court Tools",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "src/lib/nav.js"
     ]
   },
   {
@@ -2843,6 +3630,22 @@
     ]
   },
   {
+    "en": "Days traded",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Decline",
+    "holes": 0,
+    "lits": 7,
+    "seen": [
+      "src/views/transfers.js"
+    ]
+  },
+  {
     "en": "Defaults to the realm you are viewing. The lists below come from whichever realm you pick here.",
     "holes": 0,
     "lits": 77,
@@ -2954,6 +3757,14 @@
     ]
   },
   {
+    "en": "Delivery total",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/intake-form.js"
+    ]
+  },
+  {
     "en": "Delivery: {0}",
     "holes": 1,
     "lits": 8,
@@ -2999,6 +3810,15 @@
     "lits": 18,
     "seen": [
       "src/views/pos.js"
+    ]
+  },
+  {
+    "en": "Discounts",
+    "holes": 0,
+    "lits": 9,
+    "seen": [
+      "src/views/companies.js",
+      "src/views/court.js"
     ]
   },
   {
@@ -3148,6 +3968,14 @@
     ]
   },
   {
+    "en": "Each choice in {0} must say which part of the deal it fills.",
+    "holes": 1,
+    "lits": 44,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
     "en": "Each ingredient needs a quantity.",
     "holes": 0,
     "lits": 28,
@@ -3156,11 +3984,43 @@
     ]
   },
   {
+    "en": "Each ingredient needs a whole quantity ≥ 1.",
+    "holes": 0,
+    "lits": 33,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
     "en": "Each is separate. You might own one shop and be a new hire at the next, and being the owner of one gives you nothing at the other — you are activated there the same way anybody is.",
     "holes": 0,
     "lits": 139,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Each item in a bundle needs a quantity of 1 or more.",
+    "holes": 0,
+    "lits": 39,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
+    "en": "Each kind in a special needs a quantity of 1 or more.",
+    "holes": 0,
+    "lits": 40,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
+    "en": "Each line needs an item.",
+    "holes": 0,
+    "lits": 19,
+    "seen": [
+      "worker/src/sales.js"
     ]
   },
   {
@@ -3193,6 +4053,7 @@
     "lits": 4,
     "seen": [
       "src/views/companies.js",
+      "src/views/inventory.js",
       "src/views/item-index.js",
       "src/views/members.js",
       "src/views/motd-admin.js",
@@ -3320,6 +4181,14 @@
     ]
   },
   {
+    "en": "Employee purchases",
+    "holes": 0,
+    "lits": 17,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Employees",
     "holes": 0,
     "lits": 9,
@@ -3362,6 +4231,14 @@
     ]
   },
   {
+    "en": "Employees ring up sales at their shop’s register.",
+    "holes": 0,
+    "lits": 40,
+    "seen": [
+      "src/views/landing.js"
+    ]
+  },
+  {
     "en": "Employees: an hourly Pay rate on each person. It applies to shifts from then on, so a raise never changes what past work was worth.",
     "holes": 0,
     "lits": 103,
@@ -3382,7 +4259,9 @@
     "holes": 0,
     "lits": 17,
     "seen": [
-      "src/views/ledger-settings.js"
+      "src/views/ledger-settings.js",
+      "worker/src/registry.js",
+      "worker/src/routes/business.js"
     ]
   },
   {
@@ -3391,7 +4270,32 @@
     "lits": 13,
     "seen": [
       "src/views/motd-admin.js",
-      "src/views/shop-notices.js"
+      "src/views/shop-notices.js",
+      "worker/src/motd.js"
+    ]
+  },
+  {
+    "en": "Enter a name for the table.",
+    "holes": 0,
+    "lits": 21,
+    "seen": [
+      "worker/src/item-index.js"
+    ]
+  },
+  {
+    "en": "Enter a name.",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "worker/src/discounts.js"
+    ]
+  },
+  {
+    "en": "Enter a non-zero amount (negative to withdraw).",
+    "holes": 0,
+    "lits": 37,
+    "seen": [
+      "worker/src/coffers.js"
     ]
   },
   {
@@ -3403,11 +4307,27 @@
     ]
   },
   {
+    "en": "Enter a percentage — off for a discount, on for an upcharge.",
+    "holes": 0,
+    "lits": 46,
+    "seen": [
+      "worker/src/discounts.js"
+    ]
+  },
+  {
     "en": "Enter a percentage.",
     "holes": 0,
     "lits": 16,
     "seen": [
       "src/views/shop-deals.js"
+    ]
+  },
+  {
+    "en": "Enter a quantity of at least 1.{0}",
+    "holes": 1,
+    "lits": 23,
+    "seen": [
+      "worker/src/transfers.js"
     ]
   },
   {
@@ -3423,7 +4343,8 @@
     "holes": 0,
     "lits": 15,
     "seen": [
-      "src/views/realms.js"
+      "src/views/realms.js",
+      "worker/src/realm.js"
     ]
   },
   {
@@ -3439,7 +4360,16 @@
     "holes": 0,
     "lits": 14,
     "seen": [
-      "src/views/item-index.js"
+      "src/views/item-index.js",
+      "worker/src/item-index.js"
+    ]
+  },
+  {
+    "en": "Enter an amount greater than zero.",
+    "holes": 0,
+    "lits": 28,
+    "seen": [
+      "worker/src/court.js"
     ]
   },
   {
@@ -3447,7 +4377,8 @@
     "holes": 0,
     "lits": 15,
     "seen": [
-      "src/views/item-index.js"
+      "src/views/item-index.js",
+      "worker/src/item-index.js"
     ]
   },
   {
@@ -3464,6 +4395,14 @@
     "lits": 24,
     "seen": [
       "src/lib/businesses.js"
+    ]
+  },
+  {
+    "en": "Enter what the money is called (e.g. gp, credits, ₽).",
+    "holes": 0,
+    "lits": 36,
+    "seen": [
+      "worker/src/realm-prefs.js"
     ]
   },
   {
@@ -3487,7 +4426,16 @@
     "holes": 0,
     "lits": 23,
     "seen": [
-      "src/views/register.js"
+      "src/views/register.js",
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "Entry not found.",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "worker/src/motd.js"
     ]
   },
   {
@@ -3743,6 +4691,7 @@
     "holes": 0,
     "lits": 8,
     "seen": [
+      "src/lib/nav.js",
       "src/views/feedback-admin.js",
       "src/views/feedback.js"
     ]
@@ -3952,7 +4901,8 @@
     "holes": 0,
     "lits": 4,
     "seen": [
-      "src/views/intake-form.js"
+      "src/views/intake-form.js",
+      "src/views/inventory.js"
     ]
   },
   {
@@ -4004,6 +4954,14 @@
     ]
   },
   {
+    "en": "Give the bundle a name.",
+    "holes": 0,
+    "lits": 18,
+    "seen": [
+      "worker/src/bundles.js"
+    ]
+  },
+  {
     "en": "Give the special a name.",
     "holes": 0,
     "lits": 19,
@@ -4028,6 +4986,14 @@
     ]
   },
   {
+    "en": "Given away in discounts",
+    "holes": 0,
+    "lits": 20,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Global notices",
     "holes": 0,
     "lits": 13,
@@ -4044,6 +5010,22 @@
     ]
   },
   {
+    "en": "Google email is not verified.",
+    "holes": 0,
+    "lits": 24,
+    "seen": [
+      "worker/src/verify.js"
+    ]
+  },
+  {
+    "en": "Guest",
+    "holes": 0,
+    "lits": 5,
+    "seen": [
+      "src/lib/roles.js"
+    ]
+  },
+  {
     "en": "Harvest",
     "holes": 0,
     "lits": 7,
@@ -4057,6 +5039,22 @@
     "lits": 213,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Harvest pay must be a number ≥ 0.",
+    "holes": 0,
+    "lits": 23,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "Harvest pays",
+    "holes": 0,
+    "lits": 11,
+    "seen": [
+      "src/views/inventory.js"
     ]
   },
   {
@@ -4223,6 +5221,14 @@
     ]
   },
   {
+    "en": "How many are you making? Enter a whole number ≥ 1.",
+    "holes": 0,
+    "lits": 36,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
     "en": "How many arrived? Enter at least 1.{0}",
     "holes": 1,
     "lits": 26,
@@ -4279,6 +5285,14 @@
     ]
   },
   {
+    "en": "How many? Enter a whole number of 1 or more.{0}",
+    "holes": 1,
+    "lits": 32,
+    "seen": [
+      "worker/src/intake.js"
+    ]
+  },
+  {
     "en": "How many? Enter at least 1.{0}",
     "holes": 1,
     "lits": 19,
@@ -4311,6 +5325,22 @@
     ]
   },
   {
+    "en": "ID token has expired — sign in again.",
+    "holes": 0,
+    "lits": 28,
+    "seen": [
+      "worker/src/verify.js"
+    ]
+  },
+  {
+    "en": "ID token signature is invalid.",
+    "holes": 0,
+    "lits": 25,
+    "seen": [
+      "worker/src/verify.js"
+    ]
+  },
+  {
     "en": "idem-{0}-{1}",
     "holes": 2,
     "lits": 4,
@@ -4327,6 +5357,14 @@
     ]
   },
   {
+    "en": "If your device asks for French, that is what you get, with nothing to switch on. Appearance still lets you choose English instead.",
+    "holes": 0,
+    "lits": 104,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "If your device lists more than one language, it takes the first one this app can write. Dates follow the same answer, so the words and the figures can never be in two different languages.",
     "holes": 0,
     "lits": 149,
@@ -4340,6 +5378,15 @@
     "lits": 116,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Image links must be full https:// URLs ({0}).",
+    "holes": 1,
+    "lits": 29,
+    "seen": [
+      "worker/src/branding.js",
+      "worker/src/routes/admin.js"
     ]
   },
   {
@@ -4421,6 +5468,14 @@
     "seen": [
       "src/views/inventory.js",
       "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "In Stock",
+    "holes": 0,
+    "lits": 7,
+    "seen": [
+      "worker/src/inventory.js"
     ]
   },
   {
@@ -4887,6 +5942,7 @@
     "holes": 0,
     "lits": 4,
     "seen": [
+      "src/views/companies.js",
       "src/views/court.js",
       "src/views/intake-form.js",
       "src/views/inventory.js",
@@ -4926,6 +5982,30 @@
     "lits": 8,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "Item name is required.",
+    "holes": 0,
+    "lits": 18,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "Item name is required.{0}",
+    "holes": 1,
+    "lits": 18,
+    "seen": [
+      "worker/src/intake.js"
+    ]
+  },
+  {
+    "en": "Item not found in your inventory: {0}",
+    "holes": 1,
+    "lits": 27,
+    "seen": [
+      "worker/src/transfers.js"
     ]
   },
   {
@@ -5025,7 +6105,8 @@
     "lits": 9,
     "seen": [
       "src/views/companies.js",
-      "src/views/court.js"
+      "src/views/court.js",
+      "src/views/shop-report.js"
     ]
   },
   {
@@ -5053,6 +6134,14 @@
     ]
   },
   {
+    "en": "Kept",
+    "holes": 0,
+    "lits": 4,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Kind",
     "holes": 0,
     "lits": 4,
@@ -5066,7 +6155,8 @@
     "holes": 0,
     "lits": 5,
     "seen": [
-      "src/views/admin-settings.js"
+      "src/views/admin-settings.js",
+      "src/views/inventory.js"
     ]
   },
   {
@@ -5187,6 +6277,30 @@
     "lits": 39,
     "seen": [
       "src/views/shop-history.js"
+    ]
+  },
+  {
+    "en": "Leave your shop",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/profile.js"
+    ]
+  },
+  {
+    "en": "Leaving does NOT cancel it. Your shifts and your sales stay on the shop’s books, and your owner still sees what they owe you and can still settle it.",
+    "holes": 0,
+    "lits": 117,
+    "seen": [
+      "src/views/profile.js"
+    ]
+  },
+  {
+    "en": "Leaving has to be confirmed.",
+    "holes": 0,
+    "lits": 23,
+    "seen": [
+      "worker/src/routes/business.js"
     ]
   },
   {
@@ -5374,6 +6488,14 @@
     ]
   },
   {
+    "en": "Listings",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Loading",
     "holes": 0,
     "lits": 7,
@@ -5483,7 +6605,8 @@
     "holes": 0,
     "lits": 3,
     "seen": [
-      "src/views/inventory.js"
+      "src/views/inventory.js",
+      "worker/src/inventory.js"
     ]
   },
   {
@@ -5524,6 +6647,14 @@
     "lits": 5,
     "seen": [
       "src/views/produce.js"
+    ]
+  },
+  {
+    "en": "Malformed ID token.",
+    "holes": 0,
+    "lits": 16,
+    "seen": [
+      "worker/src/verify.js"
     ]
   },
   {
@@ -5605,6 +6736,7 @@
     "holes": 0,
     "lits": 14,
     "seen": [
+      "src/lib/nav.js",
       "src/views/market.js"
     ]
   },
@@ -5684,6 +6816,14 @@
     ]
   },
   {
+    "en": "Member not found.",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "worker/src/users.js"
+    ]
+  },
+  {
     "en": "Message",
     "holes": 0,
     "lits": 7,
@@ -5717,6 +6857,46 @@
     ]
   },
   {
+    "en": "Missing bearer token.",
+    "holes": 0,
+    "lits": 18,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
+    "en": "Missing company id.",
+    "holes": 0,
+    "lits": 16,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "Missing member uid.",
+    "holes": 0,
+    "lits": 16,
+    "seen": [
+      "worker/src/users.js"
+    ]
+  },
+  {
+    "en": "Money in",
+    "holes": 0,
+    "lits": 7,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Money in and out is your coffer over the same {0} days — every sale, delivery, wage and adjustment — so this page and your ledger cannot disagree.",
+    "holes": 1,
+    "lits": 111,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Money in, money out, and what you kept — taken straight from your coffer over the same 30 days, so this page and your ledger can never disagree.",
     "holes": 0,
     "lits": 110,
@@ -5730,6 +6910,14 @@
     "lits": 191,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Money out",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/views/shop-report.js"
     ]
   },
   {
@@ -5906,6 +7094,7 @@
     "holes": 0,
     "lits": 4,
     "seen": [
+      "src/views/court.js",
       "src/views/realms.js",
       "src/views/shop-deals.js"
     ]
@@ -5975,11 +7164,27 @@
     ]
   },
   {
+    "en": "Names stay as they are written — your shop, your characters, your items, and the kinds your realm has named. Those are yours, not ours to translate.",
+    "holes": 0,
+    "lits": 115,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "Naming a REGISTERED shop credits it for the supply in its own region’s trade. Anyone else — an NPC smith, a traveller, a mine — is recorded as typed.",
     "holes": 0,
     "lits": 114,
     "seen": [
       "src/views/intake-form.js"
+    ]
+  },
+  {
+    "en": "Needs restocking",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "src/views/shop-report.js"
     ]
   },
   {
@@ -6021,6 +7226,14 @@
     "lits": 14,
     "seen": [
       "src/views/pos.js"
+    ]
+  },
+  {
+    "en": "New listings take their price from the item index. {0}",
+    "holes": 1,
+    "lits": 41,
+    "seen": [
+      "src/views/inventory.js"
     ]
   },
   {
@@ -6069,6 +7282,14 @@
     "lits": 45,
     "seen": [
       "src/views/intake-form.js"
+    ]
+  },
+  {
+    "en": "New-shop trial must be between 0 and 365 days.",
+    "holes": 0,
+    "lits": 32,
+    "seen": [
+      "worker/src/realm-prefs.js"
     ]
   },
   {
@@ -6129,6 +7350,22 @@
     ]
   },
   {
+    "en": "No business named \"{0}\" is registered yet. Ask its owner to register it first, or register as its owner if it's yours.",
+    "holes": 1,
+    "lits": 88,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "No business.",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "worker/src/motd.js"
+    ]
+  },
+  {
     "en": "No charge",
     "holes": 0,
     "lits": 8,
@@ -6141,6 +7378,8 @@
     "holes": 0,
     "lits": 19,
     "seen": [
+      "src/views/companies.js",
+      "src/views/court.js",
       "src/views/ledger-settings.js"
     ]
   },
@@ -6166,6 +7405,14 @@
     "lits": 14,
     "seen": [
       "src/views/companies.js"
+    ]
+  },
+  {
+    "en": "No company called \"{0}\" in this realm.",
+    "holes": 1,
+    "lits": 26,
+    "seen": [
+      "worker/src/routes/admin.js"
     ]
   },
   {
@@ -6214,6 +7461,14 @@
     "lits": 23,
     "seen": [
       "src/views/motd-admin.js"
+    ]
+  },
+  {
+    "en": "No item called \"{0}\" in this realm's index.",
+    "holes": 1,
+    "lits": 29,
+    "seen": [
+      "worker/src/market.js"
     ]
   },
   {
@@ -6340,6 +7595,15 @@
     ]
   },
   {
+    "en": "No named discounts.",
+    "holes": 0,
+    "lits": 16,
+    "seen": [
+      "src/views/companies.js",
+      "src/views/court.js"
+    ]
+  },
+  {
     "en": "No notices posted",
     "holes": 0,
     "lits": 15,
@@ -6401,6 +7665,14 @@
     "lits": 52,
     "seen": [
       "src/lib/item-picker.js"
+    ]
+  },
+  {
+    "en": "No registered company called \"{0}\" in this realm.",
+    "holes": 1,
+    "lits": 36,
+    "seen": [
+      "worker/src/intake.js"
     ]
   },
   {
@@ -6502,6 +7774,22 @@
     ]
   },
   {
+    "en": "No such employee.",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "No table called \"{0}\".",
+    "holes": 1,
+    "lits": 13,
+    "seen": [
+      "worker/src/item-index.js"
+    ]
+  },
+  {
     "en": "No trade with a {0} recorded yet.",
     "holes": 1,
     "lits": 23,
@@ -6518,11 +7806,27 @@
     ]
   },
   {
+    "en": "No transfers waiting for you.",
+    "holes": 0,
+    "lits": 24,
+    "seen": [
+      "src/views/transfers.js"
+    ]
+  },
+  {
     "en": "Nobody has clocked in yet",
     "holes": 0,
     "lits": 21,
     "seen": [
       "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "Nobody registered to this company.",
+    "holes": 0,
+    "lits": 29,
+    "seen": [
+      "src/views/court.js"
     ]
   },
   {
@@ -6539,6 +7843,14 @@
     "lits": 10,
     "seen": [
       "src/views/pos.js"
+    ]
+  },
+  {
+    "en": "None pending.",
+    "holes": 0,
+    "lits": 11,
+    "seen": [
+      "src/views/transfers.js"
     ]
   },
   {
@@ -6563,6 +7875,30 @@
     "lits": 12,
     "seen": [
       "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "Not enough {0} — you have {1}, this needs {2}.",
+    "holes": 3,
+    "lits": 25,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "Not enough {0} (have {1}, transferring {2}).",
+    "holes": 3,
+    "lits": 25,
+    "seen": [
+      "worker/src/transfers.js"
+    ]
+  },
+  {
+    "en": "Not enough stock for {0} (have {1}, cart wants {2}).",
+    "holes": 3,
+    "lits": 30,
+    "seen": [
+      "worker/src/sales.js"
     ]
   },
   {
@@ -6598,6 +7934,14 @@
     ]
   },
   {
+    "en": "Not moving",
+    "holes": 0,
+    "lits": 9,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "NOT MOVING — the list a best-seller chart cannot show you: stock you are holding that has not sold in sixty days, worth most first. That is the money sitting on your shelves.",
     "holes": 0,
     "lits": 136,
@@ -6611,6 +7955,14 @@
     "lits": 76,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "not priced",
+    "holes": 0,
+    "lits": 9,
+    "seen": [
+      "src/views/inventory.js"
     ]
   },
   {
@@ -6817,6 +8169,15 @@
     ]
   },
   {
+    "en": "Nothing sold yet.",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "src/views/companies.js",
+      "src/views/court.js"
+    ]
+  },
+  {
     "en": "Nothing spent yet.",
     "holes": 0,
     "lits": 15,
@@ -6836,6 +8197,14 @@
     "en": "Nothing stocked yet.",
     "holes": 0,
     "lits": 17,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Nothing to change — every count in the paste already matches.",
+    "holes": 0,
+    "lits": 49,
     "seen": [
       "src/views/inventory.js"
     ]
@@ -6938,6 +8307,14 @@
     ]
   },
   {
+    "en": "Notice not found.",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "worker/src/motd.js"
+    ]
+  },
+  {
     "en": "Notice posted",
     "holes": 0,
     "lits": 12,
@@ -6958,6 +8335,7 @@
     "holes": 0,
     "lits": 7,
     "seen": [
+      "src/views/ledger-settings.js",
       "src/views/shop-notices.js"
     ]
   },
@@ -6983,6 +8361,14 @@
     "lits": 12,
     "seen": [
       "src/views/realms.js"
+    ]
+  },
+  {
+    "en": "Number of items must be a whole number ≥ 1.{0}",
+    "holes": 1,
+    "lits": 31,
+    "seen": [
+      "worker/src/intake.js"
     ]
   },
   {
@@ -7058,6 +8444,14 @@
     ]
   },
   {
+    "en": "On the shelf",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "ON THE SHELF: what your stock is worth at your own prices, how many units you hold, and how many listings need restocking.",
     "holes": 0,
     "lits": 96,
@@ -7114,6 +8508,14 @@
     ]
   },
   {
+    "en": "One kind at a time.",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
     "en": "One line per item. Add as many as the delivery brought.",
     "holes": 0,
     "lits": 43,
@@ -7138,6 +8540,94 @@
     ]
   },
   {
+    "en": "Only a business owner, a manager or an admin can activate employees.",
+    "holes": 0,
+    "lits": 55,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Only a business owner, a manager or an admin can add employee notes.",
+    "holes": 0,
+    "lits": 54,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Only a business owner, a manager or an admin can do that.",
+    "holes": 0,
+    "lits": 44,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
+    "en": "Only a business owner, a manager or an admin can view the employee roster.",
+    "holes": 0,
+    "lits": 59,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Only a shop owner or an admin can rename the company — a manager cannot.",
+    "holes": 0,
+    "lits": 56,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Only a shop owner, a manager or an admin can edit inventory.",
+    "holes": 0,
+    "lits": 47,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Only a shop owner, a manager or an admin can manage ledger settings.",
+    "holes": 0,
+    "lits": 54,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Only a shop owner, a manager or an admin can record intake.",
+    "holes": 0,
+    "lits": 46,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Only a System Admin can do that. Realm Admins are confined to their own realm.",
+    "holes": 0,
+    "lits": 62,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
+    "en": "Only an employee can be made a manager.",
+    "holes": 0,
+    "lits": 31,
+    "seen": [
+      "worker/src/users.js"
+    ]
+  },
+  {
+    "en": "Only the business owner or an admin can do that — a manager cannot.",
+    "holes": 0,
+    "lits": 52,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
     "en": "Only you (the business owner/admin) can see these notes.",
     "holes": 0,
     "lits": 44,
@@ -7150,6 +8640,7 @@
     "holes": 0,
     "lits": 4,
     "seen": [
+      "src/main.js",
       "src/views/court.js",
       "src/views/feedback.js"
     ]
@@ -7188,6 +8679,14 @@
     ]
   },
   {
+    "en": "Order not found: {0}",
+    "holes": 1,
+    "lits": 13,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
     "en": "Order voided.",
     "holes": 0,
     "lits": 11,
@@ -7202,7 +8701,8 @@
     "seen": [
       "src/views/companies.js",
       "src/views/court.js",
-      "src/views/employees.js"
+      "src/views/employees.js",
+      "src/views/shop-report.js"
     ]
   },
   {
@@ -7210,7 +8710,24 @@
     "holes": 0,
     "lits": 10,
     "seen": [
-      "src/views/inventory.js"
+      "src/views/inventory.js",
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "Out of stock ({0})",
+    "holes": 1,
+    "lits": 10,
+    "seen": [
+      "src/views/low-stock.js"
+    ]
+  },
+  {
+    "en": "Outgoing (awaiting acceptance)",
+    "holes": 0,
+    "lits": 26,
+    "seen": [
+      "src/views/transfers.js"
     ]
   },
   {
@@ -7250,7 +8767,8 @@
     "holes": 0,
     "lits": 5,
     "seen": [
-      "src/lib/businesses.js"
+      "src/lib/businesses.js",
+      "src/views/court.js"
     ]
   },
   {
@@ -7259,6 +8777,14 @@
     "lits": 84,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Owners manage their shop: inventory, staff, and pricing.",
+    "holes": 0,
+    "lits": 45,
+    "seen": [
+      "src/views/landing.js"
     ]
   },
   {
@@ -7282,6 +8808,7 @@
     "holes": 0,
     "lits": 10,
     "seen": [
+      "src/lib/nav.js",
       "src/lib/patch-notes.js"
     ]
   },
@@ -7326,6 +8853,14 @@
     ]
   },
   {
+    "en": "Pending Transfer",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "src/views/transfers.js"
+    ]
+  },
+  {
     "en": "Per item. Leave a price blank to keep whatever it is already listed at.",
     "holes": 0,
     "lits": 56,
@@ -7362,7 +8897,8 @@
     "holes": 0,
     "lits": 11,
     "seen": [
-      "src/views/employees.js"
+      "src/views/employees.js",
+      "src/views/ledger-settings.js"
     ]
   },
   {
@@ -7419,7 +8955,8 @@
     "holes": 0,
     "lits": 13,
     "seen": [
-      "src/views/motd-admin.js"
+      "src/views/motd-admin.js",
+      "worker/src/motd.js"
     ]
   },
   {
@@ -7444,6 +8981,15 @@
     "lits": 24,
     "seen": [
       "src/views/companies.js"
+    ]
+  },
+  {
+    "en": "Pick a destination realm.",
+    "holes": 0,
+    "lits": 21,
+    "seen": [
+      "worker/src/registry.js",
+      "worker/src/users.js"
     ]
   },
   {
@@ -7475,7 +9021,8 @@
     "holes": 0,
     "lits": 21,
     "seen": [
-      "src/views/transfers.js"
+      "src/views/transfers.js",
+      "worker/src/transfers.js"
     ]
   },
   {
@@ -7492,6 +9039,14 @@
     "lits": 12,
     "seen": [
       "src/views/pos.js"
+    ]
+  },
+  {
+    "en": "Pick an item to transfer.{0}",
+    "holes": 1,
+    "lits": 20,
+    "seen": [
+      "worker/src/transfers.js"
     ]
   },
   {
@@ -7519,11 +9074,20 @@
     ]
   },
   {
+    "en": "Pick the {0} this sale happened in.",
+    "holes": 1,
+    "lits": 25,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
     "en": "Pick what you are making.",
     "holes": 0,
     "lits": 20,
     "seen": [
-      "src/views/produce.js"
+      "src/views/produce.js",
+      "worker/src/inventory.js"
     ]
   },
   {
@@ -7566,6 +9130,14 @@
     "seen": [
       "src/views/court.js",
       "src/views/shop-notices.js"
+    ]
+  },
+  {
+    "en": "Post to your staff",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "src/views/ledger-settings.js"
     ]
   },
   {
@@ -7674,6 +9246,14 @@
     ]
   },
   {
+    "en": "Price must be a number ≥ 0.",
+    "holes": 0,
+    "lits": 18,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
     "en": "Priority (higher rate-limit ceiling)",
     "holes": 0,
     "lits": 30,
@@ -7694,6 +9274,7 @@
     "holes": 0,
     "lits": 7,
     "seen": [
+      "src/lib/nav.js",
       "src/views/profile.js"
     ]
   },
@@ -7822,6 +9403,8 @@
     "holes": 0,
     "lits": 7,
     "seen": [
+      "src/views/companies.js",
+      "src/views/court.js",
       "src/views/region-report.js"
     ]
   },
@@ -7931,11 +9514,27 @@
     ]
   },
   {
+    "en": "Realm Management",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "src/lib/nav.js"
+    ]
+  },
+  {
     "en": "Realm name",
     "holes": 0,
     "lits": 9,
     "seen": [
       "src/views/realms.js"
+    ]
+  },
+  {
+    "en": "Realm not found.",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "worker/src/realm.js"
     ]
   },
   {
@@ -8015,7 +9614,8 @@
     "holes": 0,
     "lits": 20,
     "seen": [
-      "src/views/companies.js"
+      "src/views/companies.js",
+      "src/views/court.js"
     ]
   },
   {
@@ -8284,6 +9884,7 @@
     "holes": 0,
     "lits": 6,
     "seen": [
+      "src/views/inventory.js",
       "src/views/item-index.js",
       "src/views/pos.js",
       "src/views/produce.js",
@@ -8429,6 +10030,14 @@
     ]
   },
   {
+    "en": "Request body was not valid JSON.",
+    "holes": 0,
+    "lits": 26,
+    "seen": [
+      "worker/src/http.js"
+    ]
+  },
+  {
     "en": "Require certification to sell",
     "holes": 0,
     "lits": 26,
@@ -8450,6 +10059,14 @@
     "lits": 14,
     "seen": [
       "src/views/admin-settings.js"
+    ]
+  },
+  {
+    "en": "Reset not confirmed.",
+    "holes": 0,
+    "lits": 17,
+    "seen": [
+      "worker/src/routes/admin.js"
     ]
   },
   {
@@ -8551,7 +10168,24 @@
       "src/views/companies.js",
       "src/views/court.js",
       "src/views/employees.js",
-      "src/views/region-report.js"
+      "src/views/region-report.js",
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Revenue — last 30 active days",
+    "holes": 0,
+    "lits": 21,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Revenue & best sellers",
+    "holes": 0,
+    "lits": 18,
+    "seen": [
+      "src/views/ledger-settings.js"
     ]
   },
   {
@@ -8591,8 +10225,17 @@
     "holes": 0,
     "lits": 4,
     "seen": [
+      "src/views/court.js",
       "src/views/members.js",
       "src/views/profile.js"
+    ]
+  },
+  {
+    "en": "Role must be admin, owner, manager, or employee.",
+    "holes": 0,
+    "lits": 37,
+    "seen": [
+      "worker/src/users.js"
     ]
   },
   {
@@ -8628,6 +10271,14 @@
     ]
   },
   {
+    "en": "Running low ({0})",
+    "holes": 1,
+    "lits": 10,
+    "seen": [
+      "src/views/low-stock.js"
+    ]
+  },
+  {
     "en": "Sale complete — {0} · {1}",
     "holes": 2,
     "lits": 12,
@@ -8641,6 +10292,14 @@
     "lits": 39,
     "seen": [
       "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Sale price must be a number ≥ 0.{0}",
+    "holes": 1,
+    "lits": 22,
+    "seen": [
+      "worker/src/intake.js"
     ]
   },
   {
@@ -8713,6 +10372,14 @@
     "lits": 41,
     "seen": [
       "src/views/employees.js"
+    ]
+  },
+  {
+    "en": "Sales voided",
+    "holes": 0,
+    "lits": 11,
+    "seen": [
+      "src/views/shop-report.js"
     ]
   },
   {
@@ -9065,11 +10732,27 @@
     ]
   },
   {
+    "en": "Select all pending",
+    "holes": 0,
+    "lits": 16,
+    "seen": [
+      "src/views/employees.js"
+    ]
+  },
+  {
     "en": "Select and copy — the browser would not do it for us.",
     "holes": 0,
     "lits": 40,
     "seen": [
       "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Select at least one item to move.",
+    "holes": 0,
+    "lits": 26,
+    "seen": [
+      "worker/src/item-index.js"
     ]
   },
   {
@@ -9299,6 +10982,14 @@
     ]
   },
   {
+    "en": "Settle this shop's {0} pending transfer(s) before moving it to another realm.",
+    "holes": 1,
+    "lits": 59,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
     "en": "Setup needed",
     "holes": 0,
     "lits": 11,
@@ -9421,6 +11112,7 @@
     "holes": 0,
     "lits": 12,
     "seen": [
+      "src/lib/nav.js",
       "src/views/admin-settings.js",
       "src/views/home.js",
       "src/views/ledger-settings.js"
@@ -9432,6 +11124,14 @@
     "lits": 99,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Shop style",
+    "holes": 0,
+    "lits": 9,
+    "seen": [
+      "src/views/companies.js"
     ]
   },
   {
@@ -9564,11 +11264,35 @@
     ]
   },
   {
+    "en": "Shut it down for good",
+    "holes": 0,
+    "lits": 17,
+    "seen": [
+      "src/views/ledger-settings.js"
+    ]
+  },
+  {
     "en": "Shut the shop down for good. Use this when the business is finished — not to take a break, and not to rename it (that is under Settings).",
     "holes": 0,
     "lits": 104,
     "seen": [
       "src/views/ledger-settings.js"
+    ]
+  },
+  {
+    "en": "Sign in to begin",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/landing.js"
+    ]
+  },
+  {
+    "en": "Sign in with Google to start a new session.",
+    "holes": 0,
+    "lits": 34,
+    "seen": [
+      "worker/src/routes/auth.js"
     ]
   },
   {
@@ -9633,6 +11357,14 @@
     "lits": 132,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Signing key not found in Google JWKS.",
+    "holes": 0,
+    "lits": 30,
+    "seen": [
+      "worker/src/verify.js"
     ]
   },
   {
@@ -9813,6 +11545,14 @@
     ]
   },
   {
+    "en": "spent more than it took",
+    "holes": 0,
+    "lits": 19,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Staff",
     "holes": 0,
     "lits": 5,
@@ -9861,9 +11601,9 @@
     ]
   },
   {
-    "en": "Starts as whatever your device asks for — {0}, here — and this changes it for this device only. Dates follow it too, so the page is never part in one language and part in another. Translations cover the interface; names and some messages stay as written.",
+    "en": "Starts as whatever your device asks for — {0}, here — and this changes it for this device only. Dates follow it too, so the page is never part in one language and part in another. Names, and anything you or your staff have typed, stay as written.",
     "holes": 1,
-    "lits": 197,
+    "lits": 187,
     "seen": [
       "src/views/profile.js"
     ]
@@ -9873,6 +11613,7 @@
     "holes": 0,
     "lits": 6,
     "seen": [
+      "src/views/court.js",
       "src/views/inventory.js",
       "src/views/profile.js"
     ]
@@ -9935,6 +11676,14 @@
     ]
   },
   {
+    "en": "Stock must be a whole number, 0 or more.",
+    "holes": 0,
+    "lits": 29,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
     "en": "Stock on hand",
     "holes": 0,
     "lits": 11,
@@ -9951,6 +11700,22 @@
     ]
   },
   {
+    "en": "Stock value",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Stock you are holding that has not sold in sixty days, and what it is worth at your prices. The most tied-up first.",
+    "holes": 0,
+    "lits": 89,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "Stock you produced rather than bought — a crop, a hunt, a dig.",
     "holes": 0,
     "lits": 46,
@@ -9959,11 +11724,27 @@
     ]
   },
   {
+    "en": "Stocktake",
+    "holes": 0,
+    "lits": 9,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
     "en": "STOCKTAKE. Inventory has a Stocktake button: your counts as plain text, one “Name, Amount” per line. Copy it out, count the back room, paste it back. It shows you exactly what will change before it changes anything.",
     "holes": 0,
     "lits": 168,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Stop working here",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "src/views/profile.js"
     ]
   },
   {
@@ -10072,6 +11853,22 @@
     ]
   },
   {
+    "en": "Switch Business",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "src/lib/nav.js"
+    ]
+  },
+  {
+    "en": "Switch or add one",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "src/views/profile.js"
+    ]
+  },
+  {
     "en": "Switch to",
     "holes": 0,
     "lits": 8,
@@ -10107,6 +11904,14 @@
     "en": "Sync now",
     "holes": 0,
     "lits": 7,
+    "seen": [
+      "src/views/pos.js"
+    ]
+  },
+  {
+    "en": "Synced {0} sale{1}.",
+    "holes": 2,
+    "lits": 10,
     "seen": [
       "src/views/pos.js"
     ]
@@ -10218,6 +12023,22 @@
     ]
   },
   {
+    "en": "That code isn't recognised. Check it with whoever gave it to you.",
+    "holes": 0,
+    "lits": 51,
+    "seen": [
+      "worker/src/routes/auth.js"
+    ]
+  },
+  {
+    "en": "That company is not archived.",
+    "holes": 0,
+    "lits": 24,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
     "en": "That covers Market Info’s week, the shift log, the sales and delivery lists, the audit trail, the item index, notices, and your best day of the week on Performance.",
     "holes": 0,
     "lits": 128,
@@ -10226,11 +12047,68 @@
     ]
   },
   {
+    "en": "That doesn’t look like a Vici backup file.",
+    "holes": 0,
+    "lits": 33,
+    "seen": [
+      "worker/src/export.js"
+    ]
+  },
+  {
+    "en": "That email is already registered in the destination realm.",
+    "holes": 0,
+    "lits": 49,
+    "seen": [
+      "worker/src/users.js"
+    ]
+  },
+  {
+    "en": "That employee is not part of your business.",
+    "holes": 0,
+    "lits": 35,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "That end time is not a date.",
+    "holes": 0,
+    "lits": 21,
+    "seen": [
+      "worker/src/timecard.js"
+    ]
+  },
+  {
+    "en": "That feedback no longer exists.",
+    "holes": 0,
+    "lits": 26,
+    "seen": [
+      "worker/src/feedback.js"
+    ]
+  },
+  {
     "en": "That file is empty.",
     "holes": 0,
     "lits": 15,
     "seen": [
       "src/lib/csv.js"
+    ]
+  },
+  {
+    "en": "That intake entry no longer exists.",
+    "holes": 0,
+    "lits": 29,
+    "seen": [
+      "worker/src/intake.js"
+    ]
+  },
+  {
+    "en": "That is not one of your businesses.",
+    "holes": 0,
+    "lits": 28,
+    "seen": [
+      "worker/src/routes/auth.js",
+      "worker/src/users.js"
     ]
   },
   {
@@ -10258,6 +12136,22 @@
     ]
   },
   {
+    "en": "That order is already voided.",
+    "holes": 0,
+    "lits": 24,
+    "seen": [
+      "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "that realm and nothing else — switch realms from Realm Management.",
+    "holes": 0,
+    "lits": 54,
+    "seen": [
+      "src/views/home.js"
+    ]
+  },
+  {
     "en": "That realm has no members.",
     "holes": 0,
     "lits": 21,
@@ -10266,11 +12160,84 @@
     ]
   },
   {
+    "en": "That realm no longer exists — reload and try again.",
+    "holes": 0,
+    "lits": 40,
+    "seen": [
+      "worker/src/routes/admin.js"
+    ]
+  },
+  {
+    "en": "That realm no longer exists.",
+    "holes": 0,
+    "lits": 23,
+    "seen": [
+      "worker/src/registry.js",
+      "worker/src/users.js"
+    ]
+  },
+  {
+    "en": "That rounds to nothing — amounts are whole coins.",
+    "holes": 0,
+    "lits": 39,
+    "seen": [
+      "worker/src/coffers.js"
+    ]
+  },
+  {
+    "en": "That shift is not on this shop’s log.",
+    "holes": 0,
+    "lits": 28,
+    "seen": [
+      "worker/src/timecard.js"
+    ]
+  },
+  {
+    "en": "That shop is not in the registry.",
+    "holes": 0,
+    "lits": 26,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "That start time is not a date.",
+    "holes": 0,
+    "lits": 23,
+    "seen": [
+      "worker/src/timecard.js"
+    ]
+  },
+  {
     "en": "That table is already empty.",
     "holes": 0,
     "lits": 23,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "That transfer is no longer pending.",
+    "holes": 0,
+    "lits": 29,
+    "seen": [
+      "worker/src/transfers.js"
+    ]
+  },
+  {
+    "en": "That transfer isn’t addressed to your company.",
+    "holes": 0,
+    "lits": 38,
+    "seen": [
+      "worker/src/transfers.js"
+    ]
+  },
+  {
+    "en": "That transfer isn’t yours to cancel.",
+    "holes": 0,
+    "lits": 29,
+    "seen": [
+      "worker/src/transfers.js"
     ]
   },
   {
@@ -10287,6 +12254,14 @@
     "lits": 106,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "The {0} Court has barred this shop from trading. Speak to {1} before selling again.",
+    "holes": 2,
+    "lits": 61,
+    "seen": [
+      "worker/src/sales.js"
     ]
   },
   {
@@ -10330,6 +12305,14 @@
     ]
   },
   {
+    "en": "The built-in realm cannot be deleted.",
+    "holes": 0,
+    "lits": 30,
+    "seen": [
+      "worker/src/realm.js"
+    ]
+  },
+  {
     "en": "The bundle price is the bundle’s, not the sum of its parts; that difference is the whole point of one. While you set it up the screen tells you what the same items would come to separately, so you can see the saving — or see that the deal has quietly stopped being one.",
     "holes": 0,
     "lits": 209,
@@ -10343,6 +12326,14 @@
     "lits": 193,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "The cart is empty.",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "worker/src/sales.js"
     ]
   },
   {
@@ -10383,6 +12374,14 @@
     "lits": 166,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "The floor cannot be above the ceiling.",
+    "holes": 0,
+    "lits": 31,
+    "seen": [
+      "worker/src/court.js"
     ]
   },
   {
@@ -10458,6 +12457,14 @@
     ]
   },
   {
+    "en": "The last {0} days",
+    "holes": 1,
+    "lits": 11,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "THE LAST 30 DAYS, against the 30 before. Revenue and orders each say whether they are up or down on the previous month, so the page answers “is my shop growing” without you working it out.",
     "holes": 0,
     "lits": 143,
@@ -10479,6 +12486,22 @@
     "lits": 127,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "THE LEDGER SPEAKS FRENCH. Every word of it — the register, the stockrooms, the reports, the help text under every form, the refusals the server sends back, and these notes. Not part of it: all of it.",
+    "holes": 0,
+    "lits": 153,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "The levy must be between 0 and 100 percent.",
+    "holes": 0,
+    "lits": 30,
+    "seen": [
+      "worker/src/court.js"
     ]
   },
   {
@@ -10730,6 +12753,14 @@
     ]
   },
   {
+    "en": "The shop database is not connected yet. An admin needs to finish the D1 setup (see docs/SETUP.md).",
+    "holes": 0,
+    "lits": 75,
+    "seen": [
+      "worker/src/db.js"
+    ]
+  },
+  {
     "en": "The shop you work at. Add another with a Business Code and you can switch between them here.",
     "holes": 0,
     "lits": 73,
@@ -10823,7 +12854,8 @@
     "lits": 22,
     "seen": [
       "src/lib/branding.js",
-      "src/views/admin-settings.js"
+      "src/views/admin-settings.js",
+      "src/views/landing.js"
     ]
   },
   {
@@ -10899,6 +12931,14 @@
     ]
   },
   {
+    "en": "There is no record of what this company was called.",
+    "holes": 0,
+    "lits": 41,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
     "en": "These are this realm’s overrides. Leave a field blank to use the deployment’s own branding, shown greyed out in each box.",
     "holes": 0,
     "lits": 96,
@@ -10971,6 +13011,14 @@
     ]
   },
   {
+    "en": "This is available to Court businesses only.",
+    "holes": 0,
+    "lits": 36,
+    "seen": [
+      "worker/src/oversight.js"
+    ]
+  },
+  {
     "en": "This is the Admin Panel — you are signed in as a",
     "holes": 0,
     "lits": 36,
@@ -11000,6 +13048,14 @@
     "lits": 40,
     "seen": [
       "src/views/register.js"
+    ]
+  },
+  {
+    "en": "This page is yours to write — heading, body, credits, and the tip jar.",
+    "holes": 0,
+    "lits": 52,
+    "seen": [
+      "src/views/landing.js"
     ]
   },
   {
@@ -11076,11 +13132,27 @@
     ]
   },
   {
+    "en": "This report is available to Court businesses only.",
+    "holes": 0,
+    "lits": 42,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
     "en": "This sets COUNTS. It never changes the price of something you already list, and anything you leave out is left exactly as it is — so a count of one shelf is safe to paste on its own. Anything you list that your shop does not stock yet is ADDED, priced from the item index.",
     "holes": 0,
     "lits": 212,
     "seen": [
       "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "This shop's Vici Trading Co. certification has EXPIRED — an admin must renew it before you can sell.",
+    "holes": 0,
+    "lits": 79,
+    "seen": [
+      "worker/src/sales.js"
     ]
   },
   {
@@ -11198,6 +13270,30 @@
     ]
   },
   {
+    "en": "Tips are a thank-you, never a requirement. The ledger works the same either way.",
+    "holes": 0,
+    "lits": 63,
+    "seen": [
+      "src/views/landing.js"
+    ]
+  },
+  {
+    "en": "To",
+    "holes": 0,
+    "lits": 2,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Token audience mismatch — this token was not issued for this app.",
+    "holes": 0,
+    "lits": 52,
+    "seen": [
+      "worker/src/verify.js"
+    ]
+  },
+  {
     "en": "Top 5 {0}s",
     "holes": 1,
     "lits": 4,
@@ -11219,6 +13315,15 @@
     "lits": 8,
     "seen": [
       "src/views/market.js"
+    ]
+  },
+  {
+    "en": "Top items",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/views/companies.js",
+      "src/views/court.js"
     ]
   },
   {
@@ -11286,6 +13391,14 @@
     ]
   },
   {
+    "en": "Transfer",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
     "en": "Transfer from",
     "holes": 0,
     "lits": 12,
@@ -11299,6 +13412,14 @@
     "lits": 13,
     "seen": [
       "src/views/transfers.js"
+    ]
+  },
+  {
+    "en": "Transfer not found.",
+    "holes": 0,
+    "lits": 16,
+    "seen": [
+      "worker/src/transfers.js"
     ]
   },
   {
@@ -11414,6 +13535,14 @@
     ]
   },
   {
+    "en": "Type DELETE to confirm removing a realm and everything in it.",
+    "holes": 0,
+    "lits": 50,
+    "seen": [
+      "worker/src/routes/admin.js"
+    ]
+  },
+  {
     "en": "Type ERASE (all caps) to confirm the full reset:",
     "holes": 0,
     "lits": 37,
@@ -11427,6 +13556,14 @@
     "lits": 25,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "Type PURGE to confirm emptying the item index.",
+    "holes": 0,
+    "lits": 38,
+    "seen": [
+      "worker/src/routes/admin.js"
     ]
   },
   {
@@ -11446,6 +13583,14 @@
     ]
   },
   {
+    "en": "Type the shop’s name exactly as it is written to close it.",
+    "holes": 0,
+    "lits": 45,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
     "en": "Type the shop’s name to confirm",
     "holes": 0,
     "lits": 25,
@@ -11462,11 +13607,51 @@
     ]
   },
   {
+    "en": "Unexpected token issuer.",
+    "holes": 0,
+    "lits": 21,
+    "seen": [
+      "worker/src/verify.js"
+    ]
+  },
+  {
+    "en": "Units held",
+    "holes": 0,
+    "lits": 9,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Units sold over the last 30 days, by the kinds you have tagged your stock with. Something tagged twice counts under both.",
+    "holes": 0,
+    "lits": 95,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Unknown standing \"{0}\".",
+    "holes": 1,
+    "lits": 15,
+    "seen": [
+      "worker/src/court.js"
+    ]
+  },
+  {
     "en": "Unpaid hours",
     "holes": 0,
     "lits": 11,
     "seen": [
       "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "Unregistered shops",
+    "holes": 0,
+    "lits": 17,
+    "seen": [
+      "src/views/region-report.js"
     ]
   },
   {
@@ -11535,6 +13720,14 @@
     "lits": 49,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "Use the Google account you trade under. New faces are asked to register a character and a business.",
+    "holes": 0,
+    "lits": 80,
+    "seen": [
+      "src/views/landing.js"
     ]
   },
   {
@@ -11772,6 +13965,14 @@
     ]
   },
   {
+    "en": "What sells, by kind",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "src/views/shop-report.js"
+    ]
+  },
+  {
     "en": "WHAT SELLS, BY KIND — units of food, drink, weapons and the rest, once you have tagged your stock. A special counts as the things it actually took off the shelf.",
     "holes": 0,
     "lits": 124,
@@ -11823,6 +14024,14 @@
     "en": "What the ledger is written on, and the language it is written in. Both are for this device only.",
     "holes": 0,
     "lits": 75,
+    "seen": [
+      "src/views/profile.js"
+    ]
+  },
+  {
+    "en": "What the ledger is written on. It is for this device only.",
+    "holes": 0,
+    "lits": 45,
     "seen": [
       "src/views/profile.js"
     ]
@@ -11908,6 +14117,14 @@
     ]
   },
   {
+    "en": "What you can do",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "src/views/landing.js"
+    ]
+  },
+  {
     "en": "What you hold now",
     "holes": 0,
     "lits": 14,
@@ -11974,11 +14191,97 @@
     ]
   },
   {
+    "en": "Which company?",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "worker/src/court.js",
+      "worker/src/oversight.js",
+      "worker/src/routes/admin.js"
+    ]
+  },
+  {
+    "en": "Which employee?",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "worker/src/timecard.js",
+      "worker/src/users.js"
+    ]
+  },
+  {
+    "en": "Which employee? A uid is required.",
+    "holes": 0,
+    "lits": 27,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Which feedback?",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "worker/src/feedback.js"
+    ]
+  },
+  {
+    "en": "Which item did you bring in?{0}",
+    "holes": 1,
+    "lits": 22,
+    "seen": [
+      "worker/src/intake.js"
+    ]
+  },
+  {
+    "en": "Which item?",
+    "holes": 0,
+    "lits": 9,
+    "seen": [
+      "worker/src/court.js",
+      "worker/src/inventory.js",
+      "worker/src/item-index.js",
+      "worker/src/market.js"
+    ]
+  },
+  {
+    "en": "Which kind of item?",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "Which shop?",
+    "holes": 0,
+    "lits": 9,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "Which table?",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "worker/src/item-index.js"
+    ]
+  },
+  {
     "en": "Who did you buy from?",
     "holes": 0,
     "lits": 16,
     "seen": [
       "src/views/intake-form.js"
+    ]
+  },
+  {
+    "en": "Who is clocking in?",
+    "holes": 0,
+    "lits": 15,
+    "seen": [
+      "worker/src/timecard.js"
     ]
   },
   {
@@ -12038,6 +14341,22 @@
     ]
   },
   {
+    "en": "Would add",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Would change",
+    "holes": 0,
+    "lits": 11,
+    "seen": [
+      "src/views/inventory.js"
+    ]
+  },
+  {
     "en": "Write a new one",
     "holes": 0,
     "lits": 12,
@@ -12051,6 +14370,38 @@
     "lits": 30,
     "seen": [
       "src/views/feedback.js"
+    ]
+  },
+  {
+    "en": "Write your feedback before submitting.",
+    "holes": 0,
+    "lits": 33,
+    "seen": [
+      "worker/src/feedback.js"
+    ]
+  },
+  {
+    "en": "You already work at \"{0}\".",
+    "holes": 1,
+    "lits": 16,
+    "seen": [
+      "worker/src/registry.js"
+    ]
+  },
+  {
+    "en": "You are already clocked in — since {0}.",
+    "holes": 1,
+    "lits": 27,
+    "seen": [
+      "worker/src/timecard.js"
+    ]
+  },
+  {
+    "en": "You are clocked in. Clock out on your time card first — a shift left open would sit on the shop’s log with nobody able to close it.",
+    "holes": 0,
+    "lits": 100,
+    "seen": [
+      "src/views/profile.js"
     ]
   },
   {
@@ -12070,11 +14421,44 @@
     ]
   },
   {
+    "en": "You are not clocked in.",
+    "holes": 0,
+    "lits": 18,
+    "seen": [
+      "worker/src/timecard.js"
+    ]
+  },
+  {
+    "en": "You are not part of a shop.",
+    "holes": 0,
+    "lits": 20,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
+    "en": "You are not registered yet.",
+    "holes": 0,
+    "lits": 22,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
+    "en": "You are not signed in.",
+    "holes": 0,
+    "lits": 17,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
     "en": "You are owed {0}",
     "holes": 1,
     "lits": 10,
     "seen": [
-      "src/views/produce.js"
+      "src/views/produce.js",
+      "src/views/profile.js"
     ]
   },
   {
@@ -12091,6 +14475,22 @@
     "lits": 153,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "You are still clocked in. Clock out first, then leave.",
+    "holes": 0,
+    "lits": 42,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "You are viewing",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/home.js"
     ]
   },
   {
@@ -12134,6 +14534,14 @@
     ]
   },
   {
+    "en": "You can’t transfer to your own company.",
+    "holes": 0,
+    "lits": 31,
+    "seen": [
+      "worker/src/transfers.js"
+    ]
+  },
+  {
     "en": "You cannot leave mid-shift. Clock out first, or the shift would sit open on the shop’s log with nobody able to close it.",
     "holes": 0,
     "lits": 93,
@@ -12166,11 +14574,35 @@
     ]
   },
   {
+    "en": "You have no {0} in stock.",
+    "holes": 1,
+    "lits": 16,
+    "seen": [
+      "worker/src/inventory.js"
+    ]
+  },
+  {
+    "en": "You have no shop to close.",
+    "holes": 0,
+    "lits": 20,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
     "en": "You have nothing in stock to craft with.",
     "holes": 0,
     "lits": 32,
     "seen": [
       "src/views/produce.js"
+    ]
+  },
+  {
+    "en": "You have nothing outstanding — everything you have worked has been settled.",
+    "holes": 0,
+    "lits": 62,
+    "seen": [
+      "src/views/profile.js"
     ]
   },
   {
@@ -12246,6 +14678,14 @@
     ]
   },
   {
+    "en": "Your account is pending — an owner or admin must activate you before you can use the register.",
+    "holes": 0,
+    "lits": 75,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
     "en": "Your books are kept",
     "holes": 0,
     "lits": 16,
@@ -12262,6 +14702,14 @@
     ]
   },
   {
+    "en": "Your businesses",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "src/views/profile.js"
+    ]
+  },
+  {
     "en": "Your character name",
     "holes": 0,
     "lits": 17,
@@ -12274,7 +14722,8 @@
     "holes": 0,
     "lits": 28,
     "seen": [
-      "src/views/profile.js"
+      "src/views/profile.js",
+      "worker/src/routes/auth.js"
     ]
   },
   {
@@ -12307,6 +14756,14 @@
     "lits": 177,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Your company is marked as a Court but has no region assigned — an admin needs to set one.",
+    "holes": 0,
+    "lits": 69,
+    "seen": [
+      "worker/src/oversight.js"
     ]
   },
   {
@@ -12390,6 +14847,14 @@
     ]
   },
   {
+    "en": "Your session has expired — signing you back in.",
+    "holes": 0,
+    "lits": 37,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
     "en": "Your shifts",
     "holes": 0,
     "lits": 10,
@@ -12451,6 +14916,14 @@
     "lits": 25,
     "seen": [
       "src/views/home.js"
+    ]
+  },
+  {
+    "en": "Your view only ever shows the business you belong to.",
+    "holes": 0,
+    "lits": 43,
+    "seen": [
+      "src/views/landing.js"
     ]
   }
 ]

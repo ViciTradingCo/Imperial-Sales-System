@@ -6,7 +6,7 @@ import { loadConfig } from './lib/config.js';
 import { initAuth, renderSignInButton, onAuthChange, getProfile, signOut } from './lib/auth.js';
 import { configureApi, api } from './lib/api.js';
 import { initRouter, route, navigate, render, onBeforeRender } from './lib/router.js';
-import { canManage } from './lib/roles.js';
+import { canManage, roleLabel } from './lib/roles.js';
 import { el, mount } from './lib/dom.js';
 import { renderNav, highlightNav } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
@@ -165,13 +165,16 @@ function renderBadge() {
     mount(badgeEl,
       el('button', { class: 'badge-chip', onclick: () => navigate('/profile') }, [
         el('span', {}, who + ' · '),
-        el('span', { class: 'role-pill' }, role),
+        // roleLabel, not the raw role: the stored value is a key ('owner'), and
+        // a key rendered as text is a word no dictionary has and no reader
+        // asked for. The label is a phrase, and phrases translate.
+        el('span', { class: 'role-pill' }, roleLabel(role)),
       ]),
     );
   } else {
     mount(badgeEl,
       el('span', {}, who + ' · '),
-      el('span', { class: 'role-pill' }, role),
+      el('span', { class: 'role-pill' }, roleLabel(role)),
       el('button', { onclick: () => { signOut(); location.reload(); } }, 'Sign out'),
     );
   }

@@ -46,7 +46,7 @@ const ALL = {
  * `i18n:check` fails if a language listed here is not actually complete, so
  * this cannot be edited optimistically.
  */
-const READY = ['en'];
+const READY = ['en', 'fr'];
 
 /** What a reader may choose: English, plus every finished translation. */
 export const LANGS = Object.fromEntries(READY.map((l) => [l, ALL[l]]));
@@ -215,6 +215,27 @@ function translatePhrase(s) {
     return s.replace(key, out);
   }
   return s;
+}
+
+/**
+ * ONE PHRASE, TRANSLATED IN CODE — for the few places that BUILD a label out of
+ * two phrases the dictionary already holds.
+ *
+ * The surface picker reads `label + ' — ' + hint`, and what lands in the DOM is
+ * "Ledger book — Ruled cream leaves, red margin": one text node that is neither
+ * phrase, so neither is found, and a fully translated app kept three English
+ * options in its Appearance list. Extracting it as a template does not help
+ * either — `'{0} — {1}'` has no words in it to translate and would match half
+ * the page if it did.
+ *
+ * So the two halves are translated BEFORE they are joined. This is the escape
+ * hatch, not the mechanism: everywhere else the DOM pass is what runs, because
+ * threading a t() through four hundred call sites is the thing this design
+ * exists to avoid. Reach for it only where a label is assembled from parts that
+ * are separately in the catalogue.
+ */
+export function t(phrase) {
+  return translatePhrase(String(phrase == null ? '' : phrase));
 }
 
 function translateNode(node) {

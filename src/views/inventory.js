@@ -16,6 +16,7 @@
  */
 import { money, itemTags, tagLabel } from '../lib/format.js';
 import { el, mount, esc, tableEl } from '../lib/dom.js';
+import { t } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { openModal } from '../lib/modal.js';
@@ -153,7 +154,10 @@ function itemTable(title, note, rows, cost, emptyNote, actions) {
   });
 
   return el('div', { class: 'inv-table' }, [
-    el('h3', {}, title + ' (' + rows.length + ')'),
+    // `t()` because the finished heading — "Stock (2)" — is not a phrase the
+    // dictionary holds and never could be; the word in front of the count is.
+    // See i18n.t.
+    el('h3', {}, t(title) + ' (' + rows.length + ')'),
     el('p', { class: 'note' }, note),
     rows.length
       ? el('div', { class: 'table-scroll' }, tableEl(head, body))

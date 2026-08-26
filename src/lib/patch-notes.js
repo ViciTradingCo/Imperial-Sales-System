@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.8', date: '2026-08-26', notes: [
+    'THE LEDGER SPEAKS FRENCH. Every word of it — the register, the stockrooms, the reports, the help text under every form, the refusals the server sends back, and these notes. Not part of it: all of it.',
+    'If your device asks for French, that is what you get, with nothing to switch on. Appearance still lets you choose English instead.',
+    'A language is only offered once it is FINISHED. A page half in your language and half in ours is not a smaller version of being translated, so a translation that is still being written is not shown at all. Spanish, German and Italian are on their way.',
+    'Names stay as they are written — your shop, your characters, your items, and the kinds your realm has named. Those are yours, not ours to translate.',
+  ] },
   { version: '6.7', date: '2026-08-25', notes: [
     'THE APP OPENS IN YOUR OWN LANGUAGE. It asked your device all along and never listened — it started in English and waited for you to find the setting. It now starts in whatever your device asks for, and Appearance still overrules it if you want something else.',
     'If your device lists more than one language, it takes the first one this app can write. Dates follow the same answer, so the words and the figures can never be in two different languages.',
