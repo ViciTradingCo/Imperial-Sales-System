@@ -1418,6 +1418,14 @@
     ]
   },
   {
+    "en": "A Spanish device now opens a Spanish ledger with nothing to switch on, and its dates come out Spanish too.",
+    "holes": 0,
+    "lits": 85,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "A special can ask for at most {0} kinds.",
     "holes": 1,
     "lits": 28,
@@ -4935,6 +4943,14 @@
     "lits": 268,
     "seen": [
       "src/views/admin-settings.js"
+    ]
+  },
+  {
+    "en": "German and Italian are still being written, so they are still not offered — English until they are done.",
+    "holes": 0,
+    "lits": 83,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -11453,6 +11469,14 @@
     "lits": 34,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "SPANISH IS FINISHED. The same as French: every word, not a part of it — the register, the stockrooms, the reports, the help under every form, the server’s refusals, and these notes.",
+    "holes": 0,
+    "lits": 139,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {

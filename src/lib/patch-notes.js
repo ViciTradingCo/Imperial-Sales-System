@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '6.9', date: '2026-08-26', notes: [
+    'SPANISH IS FINISHED. The same as French: every word, not a part of it — the register, the stockrooms, the reports, the help under every form, the server’s refusals, and these notes.',
+    'A Spanish device now opens a Spanish ledger with nothing to switch on, and its dates come out Spanish too.',
+    'German and Italian are still being written, so they are still not offered — English until they are done.',
+  ] },
   { version: '6.8', date: '2026-08-26', notes: [
     'THE LEDGER SPEAKS FRENCH. Every word of it — the register, the stockrooms, the reports, the help text under every form, the refusals the server sends back, and these notes. Not part of it: all of it.',
     'If your device asks for French, that is what you get, with nothing to switch on. Appearance still lets you choose English instead.',
