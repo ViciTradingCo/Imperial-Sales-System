@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.0', date: '2026-08-26', notes: [
+    'GERMAN IS FINISHED. The third language done end to end — the register, the stockrooms, the reports, the help under every form, the refusals the server sends back, and these notes.',
+    'A German device opens a German ledger with nothing to switch on, and its dates come out German too. Appearance still lets you choose another language for this device.',
+    'Italian is still being written, so it is still not offered — English until it is done.',
+  ] },
   { version: '6.9', date: '2026-08-26', notes: [
     'SPANISH IS FINISHED. The same as French: every word, not a part of it — the register, the stockrooms, the reports, the help under every form, the server’s refusals, and these notes.',
     'A Spanish device now opens a Spanish ledger with nothing to switch on, and its dates come out Spanish too.',

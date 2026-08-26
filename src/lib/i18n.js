@@ -46,7 +46,7 @@ const ALL = {
  * `i18n:check` fails if a language listed here is not actually complete, so
  * this cannot be edited optimistically.
  */
-const READY = ['en', 'es', 'fr'];
+const READY = ['en', 'de', 'es', 'fr'];
 
 /** What a reader may choose: English, plus every finished translation. */
 export const LANGS = Object.fromEntries(READY.map((l) => [l, ALL[l]]));

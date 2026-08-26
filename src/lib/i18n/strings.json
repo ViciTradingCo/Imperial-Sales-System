@@ -1234,6 +1234,14 @@
     ]
   },
   {
+    "en": "A German device opens a German ledger with nothing to switch on, and its dates come out German too. Appearance still lets you choose another language for this device.",
+    "holes": 0,
+    "lits": 135,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "A language is only offered once it is FINISHED. A page half in your language and half in ours is not a smaller version of being translated, so a translation that is still being written is not shown at all. Spanish, German and Italian are on their way.",
     "holes": 0,
     "lits": 199,
@@ -4954,6 +4962,14 @@
     ]
   },
   {
+    "en": "GERMAN IS FINISHED. The third language done end to end — the register, the stockrooms, the reports, the help under every form, the refusals the server sends back, and these notes.",
+    "holes": 0,
+    "lits": 141,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "Give each home tile a picture by pasting a link to an image hosted elsewhere (Discord, Imgur, your own host). Must be a full https:// link straight to the image file. Leave blank to use the default glyph.",
     "holes": 0,
     "lits": 157,
@@ -5949,6 +5965,14 @@
     "en": "It works on both sorts of special — one that names its items, and one that asks for kinds and is filled at the till.",
     "holes": 0,
     "lits": 89,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Italian is still being written, so it is still not offered — English until it is done.",
+    "holes": 0,
+    "lits": 67,
     "seen": [
       "src/lib/patch-notes.js"
     ]

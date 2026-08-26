@@ -176,9 +176,16 @@ describe('dates', () => {
     const d = '2026-08-16T12:00:00Z';
     expect(onDevice(['en-GB'], () => formatDate(d, { month: 'long' }))).toBe('August');
     for (const lang of offered) {
-      const out = onDevice([lang + '-' + lang.toUpperCase()], () => formatDate(d, { month: 'long' }));
-      expect(out, lang + ' month').not.toBe('August');
+      const tag = lang + '-' + lang.toUpperCase();
+      // Against the language's OWN word for the month, not merely against
+      // "not English" — German writes August exactly as English does, and a
+      // test that reads a match as a failure would call that a bug.
+      const own = new Intl.DateTimeFormat(tag, { month: 'long', timeZone: 'UTC' }).format(new Date(d));
+      expect(onDevice([tag], () => formatDate(d, { month: 'long' })), lang + ' month').toBe(own);
     }
+    // And the CHOICE beats the device: a French reader on an English machine
+    // gets a French month, which is the half that could not happen before.
+    expect(asLang('fr', () => formatDate(d, { month: 'long' }), ['en-GB'])).toBe('août');
   });
 
   /**
