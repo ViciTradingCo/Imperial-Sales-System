@@ -38,7 +38,7 @@ import { lastWeekWindow } from './week.js';
 export const NOT_HARVEST = ` AND COALESCE(vendor, '') != '${HARVEST_VENDOR}'`;
 
 /**
- * AN ARCHIVED SHOP'S TRADE LEAVES THE FIGURES WITH IT.
+ * AN ARCHIVED SHOP'S TRADE LEAVES THE FIGURES WITH IT — `notArchived` below.
  *
  * A shop that has been archived has left the network, and every number on this
  * page is a claim about the network as it stands: what an item is worth here,
@@ -61,11 +61,9 @@ export const NOT_HARVEST = ` AND COALESCE(vendor, '') != '${HARVEST_VENDOR}'`;
  * `c.business IS NOT NULL` guards the one way `NOT IN` fails badly: a single
  * NULL in the subquery makes the whole predicate NULL for EVERY row, which
  * would quietly empty the entire market analysis rather than erroring.
- */
-/**
- * "This row's shop has left the network" — the primitive. Its one caller
- * outside `notArchived` is the uncredited bucket in `holdReport`, which has to
- * COLLECT what everything else drops.
+ *
+ * `isArchived` is the predicate itself, for the one caller that has to COLLECT
+ * what everything else drops — the uncredited bucket in `holdReport`.
  */
 function isArchived(col) {
   const table = col.split('.')[0];
@@ -203,6 +201,28 @@ function bestRegionOf(regionMap) {
  * `revenue` stays on the row: it is the ranking key here, and the shop and
  * region reports display it.
  */
+/**
+ * NOTHING CHANGED HANDS AT A PRICE OF 0, so it says nothing about worth.
+ *
+ * This is the same rule the module already applies to an employee purchase —
+ * the goods moved, but no trade happened — reached by three other routes that
+ * all end in a line priced at nothing:
+ *
+ *   • a HARVEST, which nobody was bought from (already dropped by NOT_HARVEST,
+ *     but its inventory listing lands unpriced);
+ *   • a STOCKTAKE, which adds a listing at the index's base value or at 0 when
+ *     the index has never heard of the item either;
+ *   • a DELIVERY THAT COST 0 — a gift, a prop, a correction.
+ *
+ * Averaging any of them in drags the item's value toward nothing, and an
+ * unpriced listing then reads as undercutting by a factor of infinity. That is
+ * where the flood of anomaly flags was coming from: not shops behaving badly,
+ * but shops that had not got round to pricing something.
+ */
+function priced(v) {
+  return Number(v) > 0;
+}
+
 export function itemStats(saleRows, master, intakeRows, transferRows) {
   const exact = new Map();
   master.forEach((it) => exact.set(normalizeItem(it.name), it));
@@ -222,6 +242,7 @@ export function itemStats(saleRows, master, intakeRows, transferRows) {
     parseSaleItems(r.items).lines.forEach((l) => {
       const hit = canon(l.name);
       if (!hit) return; // not in the master index → excluded from market
+      if (!priced(l.price)) return; // a giveaway is not a price — see `priced`
       const m = row(hit.name);
       const value = l.qty * l.price;
       m.qty += l.qty;
@@ -247,10 +268,7 @@ export function itemStats(saleRows, master, intakeRows, transferRows) {
   // The BUY side: every way a company takes stock in and pays for it.
   const bought = (name, qty, per, region) => {
     const hit = canon(name);
-    // A price of 0 is a gift, not a transaction at a price, and averaging it in
-    // would drag the item's value toward nothing — the same reason an employee
-    // purchase is not a sale.
-    if (!hit || !(qty > 0) || !(per > 0)) return;
+    if (!hit || !(qty > 0) || !priced(per)) return;
     const m = row(hit.name);
     m.boughtQty += qty;
     m.boughtValue += qty * per;
@@ -379,6 +397,56 @@ export function withoutTrend(rows) {
   return rows.map(({ trend, ...rest }) => rest);
 }
 
+/**
+ * WHO IS CHARGING FAR MORE OR FAR LESS THAN THE REALM PAYS.
+ *
+ * Measured against avgValue — the weighted median of what the item really
+ * changed hands at, outliers fenced (see transactionValue). The comparison used
+ * to be the master index's base value, a figure an admin typed in; a shop
+ * charging double what the realm actually pays is the thing worth flagging, and
+ * only observed trade can say what that is.
+ *
+ * TWO THINGS ARE NOT JUDGED, and both are the difference between a shop doing
+ * something and a shop having done nothing:
+ *
+ *   • an item with NO SALES YET. Nothing has been observed, so there is no
+ *     claim to make, and a list mixing "twice what it sells for" with "twice
+ *     what somebody guessed" would mean neither.
+ *   • a listing with NO PRICE. Its ratio is 0 against any value, so it sat
+ *     permanently below the undercutting threshold — every harvested crop,
+ *     every stocktake find and every free delivery arrived pre-flagged. That
+ *     was most of this list, and none of it was anybody undercutting anything.
+ *
+ * Ingredients are out too: they are held to craft with, not sold, so their
+ * listed price is not an offer to anybody.
+ */
+async function pricingAnomalies(env, db, realmId, ranked) {
+  const settings = await readSettings(env, realmId);
+  const over = settingVal(settings, 'Overpricing threshold (x item average)', 1.5);
+  const under = settingVal(settings, 'Undercutting threshold (x item average)', 0.5);
+  const valueByNorm = new Map();
+  ranked.forEach((r) => { if (r.avgValue > 0) valueByNorm.set(normalizeItem(r.item), r); });
+
+  const invRows = ((await db.prepare(
+    'SELECT business, item, price FROM inventory WHERE realm_id = ? AND ingredient = 0 AND price > 0'
+    + notArchived('inventory.business')).bind(realmId).all()).results) || [];
+  const overpriced = [];
+  const undercut = [];
+  invRows.forEach((r) => {
+    const m = valueByNorm.get(normalizeItem(r.item));
+    if (!m) return;
+    const ratio = r.price / m.avgValue;
+    const row = { business: r.business, item: m.item, price: r.price, value: m.avgValue, samples: m.valueSamples, ratio };
+    if (ratio >= over) overpriced.push(row);
+    else if (ratio <= under) undercut.push(row);
+  });
+  return {
+    overpriced: overpriced.sort((a, b) => b.ratio - a.ratio).slice(0, 50),
+    undercut: undercut.sort((a, b) => a.ratio - b.ratio).slice(0, 50),
+    thresholds: { over, under },
+  };
+}
+
 export async function marketAnalysis(env, realmId) {
   const db = await getDb(env);
 
@@ -423,13 +491,22 @@ export async function marketAnalysis(env, realmId) {
         + notArchived('intake.business') + `
         GROUP BY source_hold`).bind(realmId).all()).results) || []);
 
+  /**
+   * Selling below what it cost — and only where both halves are real figures.
+   *
+   * `i.price > 0` because an unpriced listing is not being sold at a loss, it
+   * is not being sold; `k.price_per > 0` because a delivery that cost nothing
+   * is not evidence of a cost, and one free crate would drag the average under
+   * the shelf price and flag a shop for a margin it is actually making.
+   */
   const underpriced = ((await db.prepare(
     `SELECT i.business AS business, i.item AS item,
             i.price AS salePrice, AVG(k.price_per) AS avgCost
        FROM inventory i
        JOIN intake k ON k.business = i.business AND k.item = i.item AND k.realm_id = i.realm_id
                     AND COALESCE(k.vendor, '') != '${HARVEST_VENDOR}'
-      WHERE i.realm_id = ?` + notArchived('i.business') + `
+                    AND k.price_per > 0
+      WHERE i.realm_id = ? AND i.price > 0` + notArchived('i.business') + `
       GROUP BY i.business, i.item
      HAVING i.price < AVG(k.price_per)
       ORDER BY (AVG(k.price_per) - i.price) DESC
@@ -462,42 +539,7 @@ export async function marketAnalysis(env, realmId) {
   const items = withoutTrend(ranked);
   const topItems = ranked.slice(0, TOP_ITEMS);
 
-  /**
-   * Pricing anomalies, measured against what the item is actually WORTH.
-   *
-   * The comparison used to be the master index's base value — a figure an admin
-   * typed in, which the settings already called an "item average" without being
-   * one. It now uses avgValue: the weighted median of what the item really sold
-   * hands at, outliers fenced (see transactionValue). A shop charging double what the realm
-   * pays is the thing worth flagging, and only observed trade can say what that
-   * is.
-   *
-   * An item with no sales yet is SKIPPED rather than falling back to the base
-   * value. Nothing has been observed, so there is no claim to make — and a list
-   * mixing "twice what it sells for" with "twice what someone guessed" would
-   * mean neither.
-   */
-  const settings = await readSettings(env, realmId);
-  const overX = settingVal(settings, 'Overpricing threshold (x item average)', 1.5);
-  const underX = settingVal(settings, 'Undercutting threshold (x item average)', 0.5);
-  const valueByNorm = new Map();
-  ranked.forEach((r) => { if (r.avgValue > 0) valueByNorm.set(normalizeItem(r.item), r); });
-  // Ingredients are excluded: they are held to craft with, not sold, so their
-  // listed price is not an offer to anybody.
-  const invRows = ((await db.prepare('SELECT business, item, price FROM inventory WHERE realm_id = ? AND ingredient = 0'
-    + notArchived('inventory.business')).bind(realmId).all()).results) || [];
-  const overpriced = [];
-  const undercut = [];
-  invRows.forEach((r) => {
-    const m = valueByNorm.get(normalizeItem(r.item));
-    if (!m) return; // never sold in this realm — nothing observed to judge against
-    const ratio = r.price / m.avgValue;
-    const row = { business: r.business, item: m.item, price: r.price, value: m.avgValue, samples: m.valueSamples, ratio };
-    if (ratio >= overX) overpriced.push(row);
-    else if (ratio <= underX) undercut.push(row);
-  });
-  overpriced.sort((a, b) => b.ratio - a.ratio);
-  undercut.sort((a, b) => a.ratio - b.ratio);
+  const { overpriced, undercut, thresholds } = await pricingAnomalies(env, db, realmId, ranked);
 
   // Daily revenue trend (last 30 days with activity), oldest → newest.
   const trends = (((await db.prepare(
@@ -508,8 +550,7 @@ export async function marketAnalysis(env, realmId) {
 
   return {
     businesses, holds, items, topItems, underpriced,
-    overpriced: overpriced.slice(0, 50), undercut: undercut.slice(0, 50),
-    thresholds: { over: overX, under: underX }, trends,
+    overpriced, undercut, thresholds, trends,
   };
 }
 

@@ -10,6 +10,13 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.3', date: '2026-08-29', notes: [
+    'THE OVERPRICING AND UNDERCUTTING LISTS WERE MOSTLY FALSE ALARMS. A listing with no price yet counted as undercutting the whole realm, because nothing is below everything — so the lists filled up with shops that had done nothing at all.',
+    'Three ordinary things leave a listing unpriced and were all arriving pre-flagged: a harvest, a stocktake that finds something nobody had written down, and a delivery that cost nothing.',
+    'None of them are judged now. A shop is flagged when it has actually SET a price far above or below what the realm pays — set one on a harvested crop and it is judged from then on, exactly as it should be.',
+    'A price of 0 no longer says anything about what an item is WORTH either. A free delivery and a sale rung up at nothing were both dragging item values down; that is the same as an employee purchase, which never counted.',
+    '“Priced below cost” is honest too: a free crate no longer pulls a shop’s average cost under its own shelf price to invent a loss it is not making.',
+  ] },
   { version: '7.2', date: '2026-08-29', notes: [
     'COURTS NOW LET THE PREMISES IN THEIR REGION. A new Property Index sits on the home page for a Court’s owner and managers: the places a shop can stand, who is on each, and what they are worth.',
     'A PROPERTY’S CODE IS WHAT CREATES A SHOP. Give it to whoever is taking the place; they sign up, name their own business, and it opens there — in your region, on those premises. They never see any other region or shop.',

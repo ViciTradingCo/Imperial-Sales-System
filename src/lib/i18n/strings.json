@@ -277,6 +277,14 @@
     ]
   },
   {
+    "en": "“Priced below cost” is honest too: a free crate no longer pulls a shop’s average cost under its own shelf price to invent a loss it is not making.",
+    "holes": 0,
+    "lits": 113,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "“Traveling” cannot be used as the name of a region, for the obvious reason that the network would no longer be able to tell one from the other.",
     "holes": 0,
     "lits": 112,
@@ -1384,6 +1392,14 @@
     "lits": 24,
     "seen": [
       "src/views/shop-deals.js"
+    ]
+  },
+  {
+    "en": "A price of 0 no longer says anything about what an item is WORTH either. A free delivery and a sale rung up at nothing were both dragging item values down; that is the same as an employee purchase, which never counted.",
+    "holes": 0,
+    "lits": 172,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -8148,6 +8164,14 @@
     ]
   },
   {
+    "en": "None of them are judged now. A shop is flagged when it has actually SET a price far above or below what the realm pays — set one on a harvested crop and it is judged from then on, exactly as it should be.",
+    "holes": 0,
+    "lits": 157,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "None pending.",
     "holes": 0,
     "lits": 11,
@@ -13063,6 +13087,14 @@
     ]
   },
   {
+    "en": "THE OVERPRICING AND UNDERCUTTING LISTS WERE MOSTLY FALSE ALARMS. A listing with no price yet counted as undercutting the whole realm, because nothing is below everything — so the lists filled up with shops that had done nothing at all.",
+    "holes": 0,
+    "lits": 192,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "The page",
     "holes": 0,
     "lits": 7,
@@ -13717,6 +13749,14 @@
     "en": "Those reports go to their own Appointments tab on the admin review page instead of sitting in the middle of the bug reports — a thing waiting on somebody looked exactly like a thing waiting on nobody. Its button says Archive, since the delivery is what gets completed and the button only files the report.",
     "holes": 0,
     "lits": 247,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Three ordinary things leave a listing unpriced and were all arriving pre-flagged: a harvest, a stocktake that finds something nobody had written down, and a delivery that cost nothing.",
+    "holes": 0,
+    "lits": 151,
     "seen": [
       "src/lib/patch-notes.js"
     ]

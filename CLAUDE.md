@@ -590,6 +590,27 @@ shop is the buyer's own record and stays in its region's totals — but there is
 longer a company to credit, so it moves into the region report's `unregistered`
 bucket and the table goes on adding up.
 
+## A price of 0 is not a price
+
+Market Analysis reads what things are WORTH from the prices they changed hands
+at, so a line at 0 says nothing and must never vote. `priced()` in `market.js`
+is the one test, applied to both sides of `itemStats` — the same rule the module
+already applied to an employee purchase, which is the same act by another name:
+the goods moved and nobody was charged.
+
+Three ordinary things end in a listing priced at nothing, and all three used to
+arrive PRE-FLAGGED as undercutting, because a ratio of 0 is below any threshold:
+a HARVEST (nobody was bought from), a STOCKTAKE find (the index cannot price
+what it has never heard of), and a DELIVERY THAT COST 0. So `pricingAnomalies`
+judges only listings with a price, and `underpriced` needs a real figure on both
+sides — an unpriced listing is not being sold at a loss, it is not being sold,
+and one free crate must not drag a shop's average cost under its shelf price.
+
+The fix is at the READING end, never the writing end: a harvest still lists at 0
+and a stocktake still adds what it finds. An unpriced listing is a shop that has
+not got round to pricing something, which is a fact about the shop's own
+paperwork and not a fact about the market.
+
 ## Certification is a realm's choice, not a law
 
 `realm-prefs.certification` (Network Settings → Certification). Off means
