@@ -346,31 +346,37 @@ describe('archived companies', () => {
     "INSERT INTO companies (id, business, status, realm_id) VALUES (?, ?, 'VALID', ?)")
     .bind('c-' + name, name, R).run();
 
-  it('is flagged, so a ranking can leave it out', async () => {
+  /**
+   * A departed shop's trade LEAVES the figures with it. It used to be kept and
+   * flagged `archived`, so a ranking could skip it while the totals still added
+   * up — but every figure on this page is a claim about the network as it
+   * stands, and a shop nobody can buy from is not part of it.
+   *
+   * The wider behaviour (item values, regions, restoring) is pinned down in
+   * archived-market.test.js; what is here is the company table itself.
+   */
+  it('is gone from the table entirely, flag and all', async () => {
     await archive('Alpha');
     await sale([{ name: 'Iron Sword', qty: 2, price: 40 }]);
-    const row = (await marketAnalysis(env, R)).businesses.find((b) => b.business === 'Alpha');
-    expect(row).toMatchObject({ archived: true, revenue: 80 });
+    const d = await marketAnalysis(env, R);
+    expect(d.businesses.find((b) => b.business === 'Alpha')).toBe(undefined);
+    expect(d.businesses.some((b) => 'archived' in b)).toBe(false);
   });
 
-  it('KEEPS its figures — the trade happened and the totals must add up', async () => {
-    await archive('Alpha');
-    await sale([{ name: 'Iron Sword', qty: 2, price: 40 }]);
-    expect((await marketAnalysis(env, R)).businesses.map((b) => b.business)).toContain('Alpha');
-  });
-
-  it('leaves a shop that is still trading unflagged', async () => {
+  it('leaves a shop that is still trading exactly where it was', async () => {
     await live('Alpha');
     await sale([{ name: 'Iron Sword', qty: 1, price: 40 }]);
-    const row = (await marketAnalysis(env, R)).businesses.find((b) => b.business === 'Alpha');
-    expect(row.archived).toBe(false);
+    expect((await marketAnalysis(env, R)).businesses.find((b) => b.business === 'Alpha'))
+      .toMatchObject({ revenue: 40 });
   });
 
-  it('does not flag a shop merely because it is missing from the roster', async () => {
-    // Renamed since, say. Unknown is not the same as departed.
+  it('does not drop a shop merely because it is missing from the roster', async () => {
+    // Renamed since, say. UNKNOWN is not the same as departed: the trade
+    // happened and there is no record saying the shop has left, so hiding it
+    // would take revenue out of the network's totals for no stated reason.
     await sale([{ name: 'Iron Sword', qty: 1, price: 40 }]);
-    const row = (await marketAnalysis(env, R)).businesses.find((b) => b.business === 'Alpha');
-    expect(row.archived).toBe(false);
+    expect((await marketAnalysis(env, R)).businesses.find((b) => b.business === 'Alpha'))
+      .toMatchObject({ revenue: 40 });
   });
 });
 
@@ -446,7 +452,7 @@ describe('company performance', () => {
     await sale([{ name: 'Iron Sword', qty: 2, price: 25 }]);   // Alpha only
     const rows = (await marketAnalysis(env, R)).businesses;
     expect(rows.map((b) => b.business)).toEqual(['Alpha', 'Quiet Forge']);
-    expect(rows[1]).toEqual({ business: 'Quiet Forge', orders: 0, items: 0, revenue: 0, archived: false });
+    expect(rows[1]).toEqual({ business: 'Quiet Forge', orders: 0, items: 0, revenue: 0 });
   });
 
   it('ranks by revenue, then alphabetically among the silent', async () => {
@@ -490,6 +496,6 @@ describe('company performance', () => {
     await sale([{ name: 'Iron Sword', qty: 2, price: 25 }], 'VOIDED');
     await staffSale([{ name: 'Iron Sword', qty: 3, price: 25 }]);
     const rows = (await marketAnalysis(env, R)).businesses;
-    expect(rows).toEqual([{ business: 'Alpha', orders: 0, items: 0, revenue: 0, archived: false }]);
+    expect(rows).toEqual([{ business: 'Alpha', orders: 0, items: 0, revenue: 0 }]);
   });
 });

@@ -22,6 +22,7 @@
 import { getDb } from './db.js';
 import { listCompanies } from './registry.js';
 import { coin } from './money.js';
+import { notArchived } from './market.js';
 
 /** What public money may be spent on. Served to the client so there is one list. */
 export const SPEND_CATEGORIES = [
@@ -326,6 +327,11 @@ export async function recordCourtSpend(env, hold, { category, amount, note }, re
  * Ingredients are counted separately rather than folded in: a region holding
  * two hundred iron ingots that are all somebody's crafting stock is not a
  * region with two hundred iron ingots for sale.
+ *
+ * An ARCHIVED shop's shelves are not the region's stock. It has stopped trading
+ * and nobody can buy any of it, so counting it would report a shortage as
+ * covered by a shop that is not there — the same reason its trade leaves the
+ * market figures. Restoring the shop brings its stock back into the count.
  */
 export async function courtStock(env, hold, realmId) {
   const db = await getDb(env);
@@ -337,7 +343,7 @@ export async function courtStock(env, hold, realmId) {
             AVG(CASE WHEN i.ingredient = 0 THEN i.price END) AS avgPrice
        FROM inventory i
        JOIN companies c ON c.business = i.business AND c.realm_id = i.realm_id
-      WHERE i.realm_id = ? AND lower(c.hold) = ?
+      WHERE i.realm_id = ? AND lower(c.hold) = ?` + notArchived('i.business') + `
       GROUP BY i.item ORDER BY forSale DESC, i.item COLLATE NOCASE`)
     .bind(realmId, key(hold)).all();
   return (results || []).map((r) => ({

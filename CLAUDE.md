@@ -542,6 +542,23 @@ been taken rather than inventing a suffix; an admin decides what it is called.
 An archived shop does not trade: `checkCertification` returns EXPIRED for it
 BEFORE it looks at `perpetual`, or a perpetual archived shop goes on selling.
 
+It does not COUNT either. Market Analysis describes the network as it stands, so
+a departed shop's trade leaves every figure with it — item values, region totals,
+the company table, the anomalies, and a Court's own region report and stock
+count. `notArchived(col)` in `market.js` is the one rule: a correlated subquery
+on `companies.status`, appended to a query and needing no extra bind. Because it
+is a live test and not a flag written onto the rows, RESTORING PUTS EVERY FIGURE
+BACK EXACTLY — there is no second copy of the truth to migrate or repair, which
+is what keeps "archiving is not deleting" true of the numbers as well as the rows.
+
+Which record belongs to whom decides where the test goes: a sale belongs to the
+shop that rang it up and a delivery to the shop that bought it, so those filter
+on the owner; a transfer is one act between two shops with no single owner, so
+either end being archived drops the line. A delivery bought FROM a since-archived
+shop is the buyer's own record and stays in its region's totals — but there is no
+longer a company to credit, so it moves into the region report's `unregistered`
+bucket and the table goes on adding up.
+
 ## Certification is a realm's choice, not a law
 
 `realm-prefs.certification` (Network Settings → Certification). Off means

@@ -701,9 +701,9 @@
     ]
   },
   {
-    "en": "{0} sale{1} and {2} deliver{3} stay on the network’s records, along with your coffer entries and everyone’s time cards. They keep counting towards the market’s figures, and an admin can restore the whole shop if this turns out to be a mistake. Nothing is erased.",
+    "en": "{0} sale{1} and {2} deliver{3} stay on the network’s records, along with your coffer entries and everyone’s time cards. Nothing is erased, and an admin can restore the whole shop if this turns out to be a mistake.",
     "holes": 4,
-    "lits": 198,
+    "lits": 158,
     "seen": [
       "src/views/ledger-settings.js"
     ]
@@ -1191,6 +1191,14 @@
     "lits": 32,
     "seen": [
       "worker/src/court.js"
+    ]
+  },
+  {
+    "en": "A Court’s region still adds up. A delivery bought from a shop that has since closed is the buyer’s own record and stays in the region’s totals, but there is no longer a company to credit, so it moves to the “Unregistered shops” line.",
+    "holes": 0,
+    "lits": 181,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -2079,6 +2087,14 @@
     ]
   },
   {
+    "en": "AN ARCHIVED SHOP NOW LEAVES THE MARKET FIGURES WITH ITS TRADE. Market Analysis describes the network as it stands, and a shop nobody can buy from was still voting on what items are worth.",
+    "holes": 0,
+    "lits": 151,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "An archived shop still cannot trade, and neither can a business that is not registered. Those were never expiry questions.",
     "holes": 0,
     "lits": 100,
@@ -2274,9 +2290,9 @@
     ]
   },
   {
-    "en": "Archive \"{0}\"? It stops trading and leaves this list. Nothing is deleted — its people, stock, books and settings are all kept, and you can restore it exactly as it is from Archived companies. The name \"{1}\" becomes free for someone else. If it is taken before you restore this one, you will be asked to sort that out first.",
+    "en": "Archive \"{0}\"? It stops trading and leaves this list. Nothing is deleted — its people, stock, books and settings are all kept, and you can restore it exactly as it is from Archived companies. Its trade leaves Market Analysis with it: item values, region totals and the company table stop counting a shop that is no longer trading here. Restoring it puts every figure back. The name \"{1}\" becomes free for someone else. If it is taken before you restore this one, you will be asked to sort that out first.",
     "holes": 2,
-    "lits": 244,
+    "lits": 390,
     "seen": [
       "src/views/companies.js"
     ]
@@ -4796,6 +4812,14 @@
     "en": "Fixed: on a phone, the buttons in a table row stacked on top of each other and stretched every row to three times its height, pushing them out of reach. Table rows stay one line tall and the table scrolls sideways instead.",
     "holes": 0,
     "lits": 176,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Fixed: renaming a company lost its credit for everything it had ever supplied. Deliveries recorded the supplier by name and that one reference was not moved with the rename, so past deliveries went on naming a shop that no longer existed.",
+    "holes": 0,
+    "lits": 194,
     "seen": [
       "src/lib/patch-notes.js"
     ]
@@ -8142,6 +8166,14 @@
     "lits": 46,
     "seen": [
       "src/views/fill-special.js"
+    ]
+  },
+  {
+    "en": "Nothing is deleted, and nothing about closing a shop has changed. Restoring one puts every figure back exactly as it was — its sales were never touched, they simply stopped counting while it was away.",
+    "holes": 0,
+    "lits": 161,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -12087,6 +12119,14 @@
     ]
   },
   {
+    "en": "That covers all of it: item values and the best-region column, region totals, Company Performance, the over- and underpricing lists, and a Court’s own region report and regional stock.",
+    "holes": 0,
+    "lits": 147,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "That covers Market Info’s week, the shift log, the sales and delivery lists, the audit trail, the item index, notices, and your best day of the week on Performance.",
     "holes": 0,
     "lits": 128,
@@ -12753,6 +12793,14 @@
     ]
   },
   {
+    "en": "The same fault meant an archived shop’s name stayed on its old deliveries after being freed — so the next company to register under that name inherited supply it had never sent.",
+    "holes": 0,
+    "lits": 143,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "The same for a paid harvest: one wage entry for the haul.",
     "holes": 0,
     "lits": 44,
@@ -13032,6 +13080,14 @@
     "lits": 170,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "They stop counting towards the market’s figures, though. A shop that has closed is no longer part of the market, so its trade leaves Market Analysis with it — and comes back with it if it is ever restored.",
+    "holes": 0,
+    "lits": 161,
+    "seen": [
+      "src/views/ledger-settings.js"
     ]
   },
   {

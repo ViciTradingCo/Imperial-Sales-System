@@ -10,6 +10,14 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.1', date: '2026-08-29', notes: [
+    'AN ARCHIVED SHOP NOW LEAVES THE MARKET FIGURES WITH ITS TRADE. Market Analysis describes the network as it stands, and a shop nobody can buy from was still voting on what items are worth.',
+    'That covers all of it: item values and the best-region column, region totals, Company Performance, the over- and underpricing lists, and a Court’s own region report and regional stock.',
+    'Nothing is deleted, and nothing about closing a shop has changed. Restoring one puts every figure back exactly as it was — its sales were never touched, they simply stopped counting while it was away.',
+    'A Court’s region still adds up. A delivery bought from a shop that has since closed is the buyer’s own record and stays in the region’s totals, but there is no longer a company to credit, so it moves to the “Unregistered shops” line.',
+    'Fixed: renaming a company lost its credit for everything it had ever supplied. Deliveries recorded the supplier by name and that one reference was not moved with the rename, so past deliveries went on naming a shop that no longer existed.',
+    'The same fault meant an archived shop’s name stayed on its old deliveries after being freed — so the next company to register under that name inherited supply it had never sent.',
+  ] },
   { version: '7.0', date: '2026-08-26', notes: [
     'GERMAN IS FINISHED. The third language done end to end — the register, the stockrooms, the reports, the help under every form, the refusals the server sends back, and these notes.',
     'A German device opens a German ledger with nothing to switch on, and its dates come out German too. Appearance still lets you choose another language for this device.',

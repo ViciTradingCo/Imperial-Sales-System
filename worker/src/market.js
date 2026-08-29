@@ -37,6 +37,48 @@ import { lastWeekWindow } from './week.js';
  */
 export const NOT_HARVEST = ` AND COALESCE(vendor, '') != '${HARVEST_VENDOR}'`;
 
+/**
+ * AN ARCHIVED SHOP'S TRADE LEAVES THE FIGURES WITH IT.
+ *
+ * A shop that has been archived has left the network, and every number on this
+ * page is a claim about the network as it stands: what an item is worth here,
+ * which regions are busy, who is trading. A departed shop's sales went on
+ * answering all three — settling item values from prices nobody can be bought
+ * from any more, and crediting a region with commerce that stopped happening.
+ *
+ * NOTHING IS DELETED, and this is not a delete dressed up as a filter. The rows
+ * are exactly where they were; the shop is simply not part of the market while
+ * it is away. Restoring it puts every figure back, because the exclusion is
+ * this live subquery against `companies.status` and not a flag written onto the
+ * rows — there is no second copy of the truth to migrate, repair, or forget.
+ *
+ * CORRELATED ON THE OUTER ROW'S REALM (`c.realm_id = <table>.realm_id`) rather
+ * than taking the realm as a parameter: it needs no extra bind, so a query can
+ * be filtered by appending this and nothing else, and it cannot be added to a
+ * query while forgetting to widen its `.bind()`. It also keeps the realm rule
+ * structural — one realm's archived names can never reach another's rows.
+ *
+ * `c.business IS NOT NULL` guards the one way `NOT IN` fails badly: a single
+ * NULL in the subquery makes the whole predicate NULL for EVERY row, which
+ * would quietly empty the entire market analysis rather than erroring.
+ */
+/**
+ * "This row's shop has left the network" — the primitive. Its one caller
+ * outside `notArchived` is the uncredited bucket in `holdReport`, which has to
+ * COLLECT what everything else drops.
+ */
+function isArchived(col) {
+  const table = col.split('.')[0];
+  return col + ` IN (SELECT c.business FROM companies c
+            WHERE c.realm_id = ${table}.realm_id AND c.business IS NOT NULL
+              AND upper(COALESCE(c.status, '')) = 'ARCHIVED')`;
+}
+
+/** The clause every figure appends. Exported because `court.js` needs it too. */
+export function notArchived(col) {
+  return ' AND NOT (' + isArchived(col) + ')';
+}
+
 // Re-exported so callers reading a market report get the week from the same
 // place they get the report. The definition lives in week.js — one week, shared
 // by everything that happens weekly.
@@ -267,28 +309,28 @@ export function itemStats(saleRows, master, intakeRows, transferRows) {
  * anyone can act on — a row of zeroes is.
  *
  * The union runs the other way too: a business that appears in sales but not in
- * the roster (archived, or renamed since) keeps its line, because the trade
- * still happened and hiding it would make the totals unexplainable.
+ * the roster keeps its line, because the trade still happened and hiding it
+ * would make the totals unexplainable.
  *
- * An ARCHIVED shop is kept but FLAGGED. Its trade really happened, so it stays
- * in Company Performance where the figures have to add up — but it has left the
- * network, and a ranking of "who is doing well" that a departed shop can top is
- * a ranking of the wrong thing. The Top 5 drops anything flagged here.
+ * An ARCHIVED shop is not one of those. It used to be — kept here and flagged,
+ * on the reasoning that its trade really happened — but a departed shop is no
+ * longer part of this market at all, so `notArchived` drops it from the sales
+ * side and `listBusinessCards` never had it on the roster side. Nothing reaches
+ * here to flag, which is why there is no flag; restoring the shop brings its
+ * line back with its figures intact.
  *
  * Ordered by revenue, then by name — so the earners rank, and the long tail of
  * zeroes is at least alphabetical instead of arbitrary.
  */
-function withRoster(roster, sold, archived) {
-  const gone = new Set((archived || []).map((a) => String(a).trim().toLowerCase()));
+function withRoster(roster, sold) {
   const byName = new Map();
   (roster || []).forEach((c) => {
-    if (c.business) byName.set(c.business, { business: c.business, orders: 0, items: 0, revenue: 0, archived: false });
+    if (c.business) byName.set(c.business, { business: c.business, orders: 0, items: 0, revenue: 0 });
   });
   (sold || []).forEach((r) => {
     const name = String(r.business || '').trim();
     if (!name) return;
-    const row = byName.get(name) ||
-      { business: name, orders: 0, items: 0, revenue: 0, archived: gone.has(name.toLowerCase()) };
+    const row = byName.get(name) || { business: name, orders: 0, items: 0, revenue: 0 };
     row.orders += Number(r.orders) || 0;
     row.items += Number(r.items) || 0;
     row.revenue += Number(r.revenue) || 0;
@@ -351,14 +393,9 @@ export async function marketAnalysis(env, realmId) {
               COALESCE(SUM(qty_total), 0) AS items,
               COALESCE(SUM(total), 0) AS revenue
          FROM sales
-        WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0
-        GROUP BY business`).bind(realmId).all()).results) || [],
-    // Archiving renames the shop and its rows to a unique key, so a departed
-    // shop's sales are grouped under that name rather than the one anybody
-    // recognises. This is how a row is known to be one.
-    ((await db.prepare(
-      "SELECT business FROM companies WHERE upper(status) = 'ARCHIVED' AND realm_id = ?")
-      .bind(realmId).all()).results || []).map((r) => r.business));
+        WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`
+        + notArchived('sales.business') + `
+        GROUP BY business`).bind(realmId).all()).results) || []);
 
   /**
    * A region's trade is everything that changed hands THERE — sales rung up in
@@ -373,7 +410,8 @@ export async function marketAnalysis(env, realmId) {
               COALESCE(SUM(qty_total), 0) AS items,
               COALESCE(SUM(total), 0) AS revenue
          FROM sales
-        WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold IS NOT NULL AND hold != ''
+        WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold IS NOT NULL AND hold != ''`
+        + notArchived('sales.business') + `
         GROUP BY hold`).bind(realmId).all()).results) || [],
     ((await db.prepare(
       `SELECT source_hold AS region,
@@ -381,7 +419,8 @@ export async function marketAnalysis(env, realmId) {
               COALESCE(SUM(num_items), 0) AS items,
               COALESCE(SUM(num_items * price_per), 0) AS revenue
          FROM intake
-        WHERE realm_id = ? AND source_hold IS NOT NULL AND source_hold != ''
+        WHERE realm_id = ? AND source_hold IS NOT NULL AND source_hold != ''`
+        + notArchived('intake.business') + `
         GROUP BY source_hold`).bind(realmId).all()).results) || []);
 
   const underpriced = ((await db.prepare(
@@ -390,7 +429,7 @@ export async function marketAnalysis(env, realmId) {
        FROM inventory i
        JOIN intake k ON k.business = i.business AND k.item = i.item AND k.realm_id = i.realm_id
                     AND COALESCE(k.vendor, '') != '${HARVEST_VENDOR}'
-      WHERE i.realm_id = ?
+      WHERE i.realm_id = ?` + notArchived('i.business') + `
       GROUP BY i.business, i.item
      HAVING i.price < AVG(k.price_per)
       ORDER BY (AVG(k.price_per) - i.price) DESC
@@ -404,12 +443,19 @@ export async function marketAnalysis(env, realmId) {
   // ts and hold come along so one pass can build the per-item daily series and
   // regional split as well as the totals.
   const saleRows = ((await db.prepare(
-    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
+    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`
+      + notArchived('sales.business')).bind(realmId).all()).results) || [];
   // Intake is the buy side of the same items — what a shop paid to stock them.
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?` + NOT_HARVEST).bind(realmId).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?` + NOT_HARVEST
+      + notArchived('intake.business')).bind(realmId).all()).results) || [];
+  // BOTH ENDS, because a transfer is the one record with no single owner: a
+  // sale belongs to the shop that rang it up and a delivery to the shop that
+  // bought it, but a shipment is an act between two, so a departed party takes
+  // the whole line out rather than half of it.
   const transferRows = ((await db.prepare(
-    `SELECT item, qty, price, items FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
+    `SELECT item, qty, price, items FROM transfers WHERE realm_id = ? AND status = 'accepted'`
+      + notArchived('transfers.from_business') + notArchived('transfers.to_business')).bind(realmId).all()).results) || [];
   const ranked = itemStats(saleRows, master, intakeRows, transferRows);
   // Only the five on screen carry a trend; the rest of the list would multiply
   // the response size for series nothing draws.
@@ -438,7 +484,8 @@ export async function marketAnalysis(env, realmId) {
   ranked.forEach((r) => { if (r.avgValue > 0) valueByNorm.set(normalizeItem(r.item), r); });
   // Ingredients are excluded: they are held to craft with, not sold, so their
   // listed price is not an offer to anybody.
-  const invRows = ((await db.prepare('SELECT business, item, price FROM inventory WHERE realm_id = ? AND ingredient = 0').bind(realmId).all()).results) || [];
+  const invRows = ((await db.prepare('SELECT business, item, price FROM inventory WHERE realm_id = ? AND ingredient = 0'
+    + notArchived('inventory.business')).bind(realmId).all()).results) || [];
   const overpriced = [];
   const undercut = [];
   invRows.forEach((r) => {
@@ -455,7 +502,8 @@ export async function marketAnalysis(env, realmId) {
   // Daily revenue trend (last 30 days with activity), oldest → newest.
   const trends = (((await db.prepare(
     `SELECT substr(ts, 1, 10) AS day, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`
+      + notArchived('sales.business') + `
       GROUP BY day ORDER BY day DESC LIMIT 30`).bind(realmId).all()).results) || []).reverse();
 
   return {
@@ -488,11 +536,18 @@ export async function itemReport(env, name, realmId) {
   if (!hit) throw new Error('No item called "' + wanted + '" in this realm\'s index.');
 
   const saleRows = ((await db.prepare(
-    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`).bind(realmId).all()).results) || [];
+    `SELECT ts, hold, items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0`
+      + notArchived('sales.business')).bind(realmId).all()).results) || [];
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?` + NOT_HARVEST).bind(realmId).all()).results) || [];
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ?` + NOT_HARVEST
+      + notArchived('intake.business')).bind(realmId).all()).results) || [];
+  // BOTH ENDS, because a transfer is the one record with no single owner: a
+  // sale belongs to the shop that rang it up and a delivery to the shop that
+  // bought it, but a shipment is an act between two, so a departed party takes
+  // the whole line out rather than half of it.
   const transferRows = ((await db.prepare(
-    `SELECT item, qty, price, items FROM transfers WHERE realm_id = ? AND status = 'accepted'`).bind(realmId).all()).results) || [];
+    `SELECT item, qty, price, items FROM transfers WHERE realm_id = ? AND status = 'accepted'`
+      + notArchived('transfers.from_business') + notArchived('transfers.to_business')).bind(realmId).all()).results) || [];
   const found = itemStats(saleRows, master, intakeRows, transferRows).find((r) => r.item === hit.name);
 
   // An indexed item that has never traded is a valid answer, not an error.
@@ -542,11 +597,13 @@ export async function holdReport(env, hold, realmId, window) {
   const sold = await db.prepare(
     `SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(qty_total), 0) AS itemsSold, COUNT(DISTINCT business) AS activeShops
-       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?` + w('ts')).bind(realmId, h, ...wp).first();
+       FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`
+       + notArchived('sales.business') + w('ts')).bind(realmId, h, ...wp).first();
   const supplied = await db.prepare(
     `SELECT COALESCE(SUM(num_items * price_per), 0) AS revenue, COUNT(*) AS orders,
             COALESCE(SUM(num_items), 0) AS itemsSold
-       FROM intake WHERE realm_id = ? AND source_hold = ?` + w('ts')).bind(realmId, h, ...wp).first();
+       FROM intake WHERE realm_id = ? AND source_hold = ?`
+       + notArchived('intake.business') + w('ts')).bind(realmId, h, ...wp).first();
   const overview = {
     revenue: (sold ? sold.revenue : 0) + (supplied ? supplied.revenue : 0),
     orders: (sold ? sold.orders : 0) + (supplied ? supplied.orders : 0),
@@ -567,13 +624,15 @@ export async function holdReport(env, hold, realmId, window) {
     ((await db.prepare(
       `SELECT business AS seller, COUNT(*) AS orders,
               COALESCE(SUM(qty_total), 0) AS items, COALESCE(SUM(total), 0) AS revenue
-         FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?` + w('ts') + `
+         FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`
+         + notArchived('sales.business') + w('ts') + `
         GROUP BY business`).bind(realmId, h, ...wp).all()).results) || [],
     ((await db.prepare(
       `SELECT from_business AS seller, COUNT(*) AS orders,
               COALESCE(SUM(num_items), 0) AS items,
               COALESCE(SUM(num_items * price_per), 0) AS revenue
-         FROM intake WHERE realm_id = ? AND source_hold = ? AND from_business != ''` + w('ts') + `
+         FROM intake WHERE realm_id = ? AND source_hold = ? AND from_business != ''`
+         + notArchived('intake.business') + notArchived('intake.from_business') + w('ts') + `
         GROUP BY from_business`).bind(realmId, h, ...wp).all()).results) || []);
 
   /**
@@ -585,11 +644,20 @@ export async function holdReport(env, hold, realmId, window) {
    * which used to leave the shops table quietly failing to add up to the
    * region's revenue. Reported as its own bucket so the difference is named
    * rather than unexplained.
+   *
+   * A supplier that has since been ARCHIVED lands here too, and "unregistered"
+   * is the literal truth of it — the company is no longer on the register, so
+   * there is nobody to credit. The alternative was to drop that supply from the
+   * region entirely, but the buyer is still here and really did pay for it, so
+   * the region's totals must keep it; leaving it out of both the totals and the
+   * bucket is the one arrangement that makes the table stop adding up.
    */
   const un = await db.prepare(
     `SELECT COUNT(*) AS orders, COALESCE(SUM(num_items), 0) AS items,
             COALESCE(SUM(num_items * price_per), 0) AS revenue
-       FROM intake WHERE realm_id = ? AND source_hold = ? AND COALESCE(from_business, '') = ''` + w('ts'))
+       FROM intake WHERE realm_id = ? AND source_hold = ?`
+       + notArchived('intake.business')
+       + ` AND (COALESCE(from_business, '') = '' OR ` + isArchived('intake.from_business') + `)` + w('ts'))
     .bind(realmId, h, ...wp).first();
   const unregistered = {
     orders: (un && un.orders) || 0,
@@ -598,9 +666,11 @@ export async function holdReport(env, hold, realmId, window) {
   };
 
   const saleRows = ((await db.prepare(
-    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?` + w('ts')).bind(realmId, h, ...wp).all()).results) || [];
+    `SELECT items FROM sales WHERE realm_id = ? AND status != 'VOIDED' AND staff_purchase = 0 AND hold = ?`
+      + notArchived('sales.business') + w('ts')).bind(realmId, h, ...wp).all()).results) || [];
   const intakeRows = ((await db.prepare(
-    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?` + NOT_HARVEST + w('ts'))
+    `SELECT item, num_items, price_per, source_hold FROM intake WHERE realm_id = ? AND source_hold = ?` + NOT_HARVEST
+      + notArchived('intake.business') + w('ts'))
     .bind(realmId, h, ...wp).all()).results) || [];
 
   // Only items that actually SOLD here. An item sourced from the region but

@@ -327,6 +327,13 @@ export const REALM_TABLES = [
  */
 const BUSINESS_TABLES = [
   ['inventory', 'business'], ['sales', 'business'], ['intake', 'business'],
+  // A delivery names WHO IT WAS BOUGHT FROM as well as who bought it, and that
+  // credit has to follow a rename like every other reference — it was the one
+  // business column a rename did not move. Two things went wrong without it: a
+  // renamed shop silently lost credit for everything it had ever supplied, and
+  // an ARCHIVED shop's name (now free for somebody else) stayed on its old
+  // deliveries, so the next company to register under it inherited them.
+  ['intake', 'from_business'],
   ['transfers', 'from_business'], ['transfers', 'to_business'],
   ['coffer_entries', 'business'], ['discounts', 'business'], ['bundles', 'business'],
   ['shop_style', 'business'],

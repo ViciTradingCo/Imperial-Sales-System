@@ -104,6 +104,8 @@ export function renderCompanies(container, { me } = {}) {
     if (!window.confirm('Archive "' + (c.business || 'this company') + '"?\n\n' +
       'It stops trading and leaves this list. Nothing is deleted — its people, stock, books and ' +
       'settings are all kept, and you can restore it exactly as it is from Archived companies.\n\n' +
+      'Its trade leaves Market Analysis with it: item values, region totals and the company table ' +
+      'stop counting a shop that is no longer trading here. Restoring it puts every figure back.\n\n' +
       'The name "' + (c.business || '') + '" becomes free for someone else. If it is taken before you ' +
       'restore this one, you will be asked to sort that out first.')) return;
     mount(listHost, el('p', { class: 'note' }, 'Archiving…'));

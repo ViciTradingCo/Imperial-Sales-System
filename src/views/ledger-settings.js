@@ -124,9 +124,14 @@ export function renderShopSettingsPage(container, { me, onBusinessRenamed }) {
  * An owner's counterpart to Profile → Leave your shop, and it works on the same
  * principle: ending a thing is not erasing it. `closeCompany` ARCHIVES the
  * company — its sales, deliveries, coffer entries and time cards stay on the
- * network's books under a reserved name, so a realm's market figures and a
- * Court's history do not develop a hole where a shop used to be, and an admin
- * can put the whole thing back if this was a mistake.
+ * network's books under a reserved name, and an admin can put the whole thing
+ * back, figures and all, if this was a mistake.
+ *
+ * What the books no longer do is COUNT. A closed shop leaves Market Analysis
+ * with its trade, because those figures describe the network as it stands and a
+ * departed shop is not part of it. Kept, not counted — and the page has to say
+ * both, since an owner reading "your books are kept" would otherwise reasonably
+ * assume the market goes on quoting prices from a shop nobody can buy from.
  *
  * So the page LEADS with what is kept, in figures, before it offers the button.
  * "Delete my business" and "keep the books" are the same request, and an owner
@@ -165,9 +170,11 @@ function closeCard(me) {
       el('p', { class: 'buy-total' }, 'Your books are kept'),
       el('p', { class: 'note' }, (kept.sales || 0) + ' sale' + (kept.sales === 1 ? '' : 's') + ' and ' +
         (kept.deliveries || 0) + ' deliver' + (kept.deliveries === 1 ? 'y' : 'ies') + ' stay on the ' +
-        'network’s records, along with your coffer entries and everyone’s time cards. They keep counting ' +
-        'towards the market’s figures, and an admin can restore the whole shop if this turns out to be a ' +
-        'mistake. Nothing is erased.'),
+        'network’s records, along with your coffer entries and everyone’s time cards. Nothing is erased, ' +
+        'and an admin can restore the whole shop if this turns out to be a mistake.'),
+      el('p', { class: 'note' }, 'They stop counting towards the market’s figures, though. A shop that ' +
+        'has closed is no longer part of the market, so its trade leaves Market Analysis with it — and ' +
+        'comes back with it if it is ever restored.'),
       el('p', { class: 'warn' }, 'What ends is the shop. It stops trading, its name is freed for someone ' +
         'else, and ' + (r.staff === 1 ? 'its 1 member' : 'all ' + (r.staff || 0) + ' of its members') +
         ' — you included — are taken off the roster. You cannot undo this yourself.'),

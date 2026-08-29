@@ -46,14 +46,10 @@ function renderTab(host, tab, d) {
  */
 const COMPANY_COLS = {
   headers: () => ['Company', 'Orders', 'Items', 'Revenue'],
-  // An archived shop keeps its line in Company Performance — the trade really
-  // happened and the totals have to add up — but it is named as departed, and
-  // under the KEY archiving renamed it to, which is not a name anybody would
-  // otherwise recognise.
-  row: (b) => [
-    (b.business || '—') + (b.archived ? ' (archived)' : ''),
-    b.orders, b.items, money(b.revenue),
-  ],
+  // No archived shops reach this table: a departed shop's trade leaves the
+  // figures with it (worker `notArchived`), so there is nothing here to name as
+  // departed and no ranking a shop that has left the network can top.
+  row: (b) => [b.business || '—', b.orders, b.items, money(b.revenue)],
 };
 const REGION_COLS = {
   headers: () => [regionLabel(), 'Orders', 'Items', 'Revenue'],
@@ -115,14 +111,12 @@ function valueCell(i) {
  */
 function overview(d) {
   return [
-    // Only shops that have actually traded, and only shops that still exist.
-    // Company Performance lists the whole roster, zeroes included, because an
-    // admin needs to see who has gone quiet — but a "Top 5" is a ranking of who
-    // is doing well, and a shop that has LEFT THE NETWORK cannot be doing well.
-    // Padding a ranking with zeroes ranks nothing; topping it with a departed
-    // shop ranks the wrong thing.
+    // Only shops that have actually traded. Company Performance lists the whole
+    // roster, zeroes included, because an admin needs to see who has gone quiet
+    // — but a "Top 5" is a ranking of who is doing well, and padding a ranking
+    // with zeroes ranks nothing.
     tableCard('Top 5 companies', COMPANY_COLS.headers(),
-      (d.businesses || []).filter((b) => b.revenue > 0 && !b.archived).slice(0, 5).map(COMPANY_COLS.row),
+      (d.businesses || []).filter((b) => b.revenue > 0).slice(0, 5).map(COMPANY_COLS.row),
       'No sales recorded yet.'),
     tableCard('Top 5 ' + regionWord() + 's', REGION_COLS.headers(),
       (d.holds || []).slice(0, 5).map(REGION_COLS.row),
