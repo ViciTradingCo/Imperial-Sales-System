@@ -387,6 +387,8 @@ const TILE_KEYS = [
   ['led-export', 'Ledger · Export'], ['led-company', 'Ledger · Company'],
   ['led-settings', 'Ledger · Shop settings'],
   ['led-close', 'Ledger · Close the shop'],
+  // Court sections
+  ['court-properties', 'Court · Property Index'],
   // Employees + Notices sections
   ['emp-roster', 'Employees · Roster'], ['emp-performance', 'Employees · Performance'],
   ['not-post', 'Notices · Post'], ['not-list', 'Notices · List'],

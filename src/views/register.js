@@ -47,7 +47,10 @@ export function renderRegister(container, { profile, onRegistered }) {
     try {
       const found = await api.checkCode(code);
       setStatus('', '');
-      if (found.kind === 'realm') showBusinessCreation(code, character, found);
+      // A property code and a realm code both END in "name your shop"; what
+      // differs is whether the region is theirs to choose. One screen, told
+      // which — two would drift apart the first time the form gained a field.
+      if (found.kind === 'realm' || found.kind === 'property') showBusinessCreation(code, character, found);
       else showJoinShop(code, character, found);
     } catch (e) {
       setStatus(e.message || String(e), 'error');
@@ -80,10 +83,20 @@ export function renderRegister(container, { profile, onRegistered }) {
       }
     }
 
+    // A COURT'S CODE NAMES THE PLACE, so there is nothing to choose: the
+    // premises decide the region, and showing a dropdown they cannot change
+    // would be a control that lies. They are told where they are opening
+    // instead — which is also the only way they find out before they arrive.
+    const onProperty = found.kind === 'property';
+    if (onProperty) regionWrap.hidden = true;
+
     mount(stepHost, el('div.card', {}, [
       el('h3', {}, '🏛️ Create your business'),
-      el('p', { class: 'note', html: 'Your code admits you to <b>' + esc(found.realmName) + '</b> as a shop owner. ' +
-        'Name your business' + (found.showRegion === false ? '.' : ' and pick the ' + (found.regionLabel || 'region').toLowerCase() + ' it trades in.') }),
+      el('p', { class: 'note', html: onProperty
+        ? 'Your code is for <b>' + esc(found.property || '') + '</b> in <b>' + esc(found.hold || '') +
+          '</b>, granted by its Court. Name the business you will open there.'
+        : 'Your code admits you to <b>' + esc(found.realmName) + '</b> as a shop owner. ' +
+          'Name your business' + (found.showRegion === false ? '.' : ' and pick the ' + (found.regionLabel || 'region').toLowerCase() + ' it trades in.') }),
       el('label', {}, 'Business name'),
       bizInput,
       el('p', { class: 'note' }, 'This name must not already be taken in this realm.'),

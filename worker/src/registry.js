@@ -14,6 +14,7 @@ import { readRealmPrefs } from './realm-prefs.js';
 import { cacheGet, cacheSet, cacheBust } from './cache.js';
 import { appendUser, findUserByEmail, bustUserCache, listMemberships, switchMembership,
   listUsersByBusiness, deleteMember } from './users.js';
+import { occupyProperty, vacateBusiness } from './property.js';
 
 /**
  * The date a new shop's trial runs until, as YYYY-MM-DD — or '' when the realm
@@ -195,10 +196,10 @@ export async function transferCompany(env, id, toRealm, fromRealm) {
  *   asOwner=false → the business name must ALREADY EXIST; we create a pending
  *                   employee awaiting owner/admin activation.
  */
-export async function registerUser(env, { email, name, character, businessName, asOwner, hold, realmId }) {
+export async function registerUser(env, { email, name, character, businessName, asOwner, hold, propertyId, realmId }) {
   const existing = await findUserByEmail(env, email);
   if (existing) return { ...existing, alreadyRegistered: true };
-  return addBusiness(env, { email, character, businessName, asOwner, hold, realmId });
+  return addBusiness(env, { email, character, businessName, asOwner, hold, propertyId, realmId });
 }
 
 /**
@@ -213,7 +214,7 @@ export async function registerUser(env, { email, name, character, businessName, 
  * The new membership becomes the CURRENT one, because a person who has just
  * joined or founded somewhere is there.
  */
-export async function addBusiness(env, { email, character, businessName, asOwner, hold, realmId }) {
+export async function addBusiness(env, { email, character, businessName, asOwner, hold, propertyId, realmId }) {
   const realm = String(realmId || DEFAULT_REALM_ID);
 
   const char = String(character || '').trim();
@@ -241,6 +242,19 @@ export async function addBusiness(env, { email, character, businessName, asOwner
     // short trial, so a new owner can trade immediately.
     await db.prepare('INSERT INTO companies (id, business, point_of_contact, until, perpetual, status, hold, court, priority, realm_id, join_code) VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0, ?, ?)')
       .bind(businessId, biz, char, await trialUntil(env, realm), '', String(hold || '').trim(), realm, generateCode('SHOP')).run();
+    // A shop opened on a Court's premises moves in as it is created. The write
+    // is conditional on the place still being empty, so two people redeeming
+    // one code cannot both land here — and if it fails, the company row is
+    // rolled back by hand rather than left standing in a doorway it never got.
+    if (propertyId) {
+      try {
+        await occupyProperty(env, propertyId, biz, realm);
+      } catch (e) {
+        await db.prepare('DELETE FROM companies WHERE id = ? AND realm_id = ?').bind(businessId, realm).run();
+        bustRegistryCache();
+        throw e;
+      }
+    }
     bustRegistryCache();
     const owner = await appendUser(env, { uid: genUid('usr'), email, character: char, business: biz, role: 'owner', isOwner: true, status: 'active', realmId: realm });
     return switchMembership(env, email, owner.uid);
@@ -356,6 +370,12 @@ export async function archiveCompany(env, id, realmId) {
   const oldName = String(current.business || '').trim();
   const archivedName = oldName + ' [archived ' + Date.now().toString(36) + ']';
   await renameBusiness(env, oldName, archivedName, realm); // moves the name everywhere, incl. D1 data
+  // THE PREMISES ARE FREED, like the name. A shop that has left cannot go on
+  // holding a doorway its Court needs to let again — and the code that opens
+  // one is only issued on an empty property, so leaving it occupied would take
+  // the place off the market for good. Restoring does NOT put the shop back in
+  // it: somebody else may be trading there by then, and a Court decides who is.
+  await vacateBusiness(env, archivedName, realm);
   await db.prepare(
     `UPDATE companies SET status = 'ARCHIVED', archived_from = ?, archived_status = ?, archived_at = ?
       WHERE id = ? AND realm_id = ?`)

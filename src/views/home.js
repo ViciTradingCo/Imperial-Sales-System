@@ -111,6 +111,19 @@ export function renderHome(container, { me }) {
         ? { key: 'marketinfo', label: 'Market Info', hint: 'Your ' + regionWord() + '’s market, last week', glyph: '📈',
             onOpen: go('/market-info') }
         : null,
+      /**
+       * THE PROPERTY INDEX — a Court's, and only a Court's.
+       *
+       * Gated on `canManage` as well as the Court flag: governing a region is
+       * not part of the job of working at the shop that governs it, so a
+       * Court's ordinary staff never see the tile. The Worker applies the same
+       * two tests, and refuses a manager any of the writes behind it — this
+       * only keeps the tile off a page where it would do nothing.
+       */
+      me.court && canManage(me)
+        ? { key: 'court-properties', label: 'Property Index', hint: 'Premises in your ' + regionWord(),
+            glyph: '🏛️', onOpen: go('/properties') }
+        : null,
     ];
     mount(gridHost, tileGrid(tiles.filter(Boolean), tileImages));
   }

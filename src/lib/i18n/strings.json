@@ -40,6 +40,14 @@
     ]
   },
   {
+    "en": ", granted by its Court. Name the business you will open there.",
+    "holes": 0,
+    "lits": 48,
+    "seen": [
+      "src/views/register.js"
+    ]
+  },
+  {
     "en": ". Every other page in the app shows that realm and nothing else.",
     "holes": 0,
     "lits": 50,
@@ -130,6 +138,14 @@
     ]
   },
   {
+    "en": "\"{0}\" is empty — there is no business there to rename.",
+    "holes": 1,
+    "lits": 37,
+    "seen": [
+      "worker/src/routes/court.js"
+    ]
+  },
+  {
     "en": "\"{0}\" is in this bundle twice. Put it in once with the full quantity.",
     "holes": 1,
     "lits": 49,
@@ -183,6 +199,22 @@
     "lits": 26,
     "seen": [
       "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" is occupied by {1}. A code opens a NEW shop here, so the premises have to be empty first.",
+    "holes": 2,
+    "lits": 65,
+    "seen": [
+      "worker/src/property.js"
+    ]
+  },
+  {
+    "en": "\"{0}\" is occupied by {1}. The premises have to be empty before they leave the index.",
+    "holes": 2,
+    "lits": 59,
+    "seen": [
+      "worker/src/property.js"
     ]
   },
   {
@@ -845,6 +877,7 @@
       "src/views/members.js",
       "src/views/motd-admin.js",
       "src/views/profile.js",
+      "src/views/properties.js",
       "src/views/settings-form.js"
     ]
   },
@@ -1138,6 +1171,22 @@
     ]
   },
   {
+    "en": "A business that opened on one of your properties can be renamed here. A shop set up with an admin’s code is on no property, and is beyond your {0}’s reach by design.",
+    "holes": 1,
+    "lits": 125,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "A code only works while the premises are empty, so one can never put two shops in one building, and reissuing it kills the old one at once — the same fix as a leaked staff code.",
+    "holes": 0,
+    "lits": 137,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "A commission cannot be more than 100% of the sale.",
     "holes": 0,
     "lits": 36,
@@ -1183,6 +1232,14 @@
     "lits": 22,
     "seen": [
       "src/views/fill-special.js"
+    ]
+  },
+  {
+    "en": "A Court can rename the business standing on its own property, and open that shop’s books from the place rather than from a list of names.",
+    "holes": 0,
+    "lits": 109,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -1327,6 +1384,22 @@
     "lits": 24,
     "seen": [
       "src/views/shop-deals.js"
+    ]
+  },
+  {
+    "en": "A property is the PLACE, not the shop: it keeps its name, its notes and its rent when a tenant leaves. Rent is a figure you record, exactly like the levy — nothing moves coin on its own.",
+    "holes": 0,
+    "lits": 142,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "A PROPERTY’S CODE IS WHAT CREATES A SHOP. Give it to whoever is taking the place; they sign up, name their own business, and it opens there — in your region, on those premises. They never see any other region or shop.",
+    "holes": 0,
+    "lits": 167,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -1702,6 +1775,22 @@
     ]
   },
   {
+    "en": "Add a property",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Add a property for each place a shop can stand. It is the place, not the shop — it stays on your books when a tenant leaves, with its notes and its rent.",
+    "holes": 0,
+    "lits": 116,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "Add a realm",
     "holes": 0,
     "lits": 9,
@@ -1808,6 +1897,14 @@
     ]
   },
   {
+    "en": "Add property",
+    "holes": 0,
+    "lits": 11,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "Add special",
     "holes": 0,
     "lits": 10,
@@ -1821,6 +1918,14 @@
     "lits": 8,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "Add the places a shop can stand in {0}. Each one gets a code that opens a business there.",
+    "holes": 1,
+    "lits": 66,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -1862,6 +1967,14 @@
     "lits": 12,
     "seen": [
       "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Added {0}.",
+    "holes": 1,
+    "lits": 5,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -2079,6 +2192,14 @@
     ]
   },
   {
+    "en": "An admin’s realm code is unchanged and carries no region and no property. That is what makes a shop answering to no Court — and how Courts themselves are set up — so a Court can never reach one.",
+    "holes": 0,
+    "lits": 151,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "An announcement to every shop trading here…",
     "holes": 0,
     "lits": 36,
@@ -2132,14 +2253,6 @@
     "lits": 9,
     "seen": [
       "src/views/item-index.js"
-    ]
-  },
-  {
-    "en": "and pick the {0} it trades in.",
-    "holes": 1,
-    "lits": 20,
-    "seen": [
-      "src/views/register.js"
     ]
   },
   {
@@ -2343,14 +2456,6 @@
     "lits": 100,
     "seen": [
       "src/views/home.js"
-    ]
-  },
-  {
-    "en": "as a shop owner. Name your business",
-    "holes": 0,
-    "lits": 28,
-    "seen": [
-      "src/views/register.js"
     ]
   },
   {
@@ -2649,7 +2754,8 @@
     "lits": 8,
     "seen": [
       "src/views/motd-admin.js",
-      "src/views/profile.js"
+      "src/views/profile.js",
+      "src/views/properties.js"
     ]
   },
   {
@@ -2681,6 +2787,7 @@
     "holes": 0,
     "lits": 12,
     "seen": [
+      "src/views/properties.js",
       "src/views/register.js"
     ]
   },
@@ -3132,11 +3239,35 @@
     ]
   },
   {
+    "en": "Closing or archiving a shop frees its premises as well as its name, so the Court can let them again. Restoring the shop does not put it back in the doorway; by then somebody else may be there.",
+    "holes": 0,
+    "lits": 151,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "Closing…",
     "holes": 0,
     "lits": 7,
     "seen": [
       "src/views/ledger-settings.js"
+    ]
+  },
+  {
+    "en": "Code",
+    "holes": 0,
+    "lits": 4,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Code for {0}",
+    "holes": 1,
+    "lits": 7,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -3301,6 +3432,14 @@
     ]
   },
   {
+    "en": "Condition, history, terms — whatever your Court keeps on it.",
+    "holes": 0,
+    "lits": 47,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "Confirm transfer",
     "holes": 0,
     "lits": 15,
@@ -3429,6 +3568,14 @@
     ]
   },
   {
+    "en": "Court · Property Index",
+    "holes": 0,
+    "lits": 18,
+    "seen": [
+      "src/views/admin-settings.js"
+    ]
+  },
+  {
     "en": "Court (admin-only flag)",
     "holes": 0,
     "lits": 18,
@@ -3472,6 +3619,14 @@
     "en": "Courts can also look: a read-only view of every company in their region — rosters, ledgers and performance — without seeing anything outside it.",
     "holes": 0,
     "lits": 115,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "COURTS NOW LET THE PREMISES IN THEIR REGION. A new Property Index sits on the home page for a Court’s owner and managers: the places a shop can stand, who is on each, and what they are worth.",
+    "holes": 0,
+    "lits": 148,
     "seen": [
       "src/lib/patch-notes.js"
     ]
@@ -4089,6 +4244,7 @@
       "src/views/item-index.js",
       "src/views/members.js",
       "src/views/motd-admin.js",
+      "src/views/properties.js",
       "src/views/shop-deals.js",
       "src/views/shop-notices.js",
       "src/views/timecard.js"
@@ -4099,7 +4255,8 @@
     "holes": 1,
     "lits": 4,
     "seen": [
-      "src/views/inventory.js"
+      "src/views/inventory.js",
+      "src/views/properties.js"
     ]
   },
   {
@@ -5002,6 +5159,14 @@
     ]
   },
   {
+    "en": "Give someone the property’s code and they sign up straight onto it. A code only works while the premises are empty, so one code can never put two shops in one building.",
+    "holes": 0,
+    "lits": 133,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "Give someone your Staff code — the button beside this one — and they will appear here when they sign up, ready for you to activate.",
     "holes": 0,
     "lits": 102,
@@ -5015,6 +5180,14 @@
     "lits": 18,
     "seen": [
       "worker/src/bundles.js"
+    ]
+  },
+  {
+    "en": "Give the property a name.",
+    "holes": 0,
+    "lits": 20,
+    "seen": [
+      "worker/src/property.js"
     ]
   },
   {
@@ -5039,6 +5212,14 @@
     "lits": 133,
     "seen": [
       "src/views/realms.js"
+    ]
+  },
+  {
+    "en": "Give this to whoever is taking the premises. They sign up with it, name their own business, and it opens here — in your {0}, on this property. They never see any other {1} or shop.",
+    "holes": 2,
+    "lits": 132,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -5826,6 +6007,22 @@
     ]
   },
   {
+    "en": "Issue a new code",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Issue a new code for \"{0}\"? The current code stops working immediately. Anyone you already gave it to will need the new one.",
+    "holes": 1,
+    "lits": 94,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "Issue a new founder code for \"{0}\"? The current code stops working immediately. Anyone you already gave it to will need the new one.",
     "holes": 1,
     "lits": 101,
@@ -5855,6 +6052,14 @@
     "lits": 15,
     "seen": [
       "src/views/realms.js"
+    ]
+  },
+  {
+    "en": "Issuing…",
+    "holes": 0,
+    "lits": 7,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -5991,6 +6196,14 @@
     "lits": 89,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "It works only while the place is empty, so it cannot be used twice.",
+    "holes": 0,
+    "lits": 52,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -6469,6 +6682,14 @@
     "lits": 10,
     "seen": [
       "src/lib/theme.js"
+    ]
+  },
+  {
+    "en": "Letting premises, issuing their codes and renaming a business are the Court owner’s.",
+    "holes": 0,
+    "lits": 69,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -7277,6 +7498,14 @@
     ]
   },
   {
+    "en": "New code issued.",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "New item",
     "holes": 0,
     "lits": 7,
@@ -7623,7 +7852,8 @@
       "src/views/companies.js",
       "src/views/court.js",
       "src/views/feedback-admin.js",
-      "src/views/members.js"
+      "src/views/members.js",
+      "src/views/properties.js"
     ]
   },
   {
@@ -7697,6 +7927,14 @@
     "lits": 86,
     "seen": [
       "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "No premises yet",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -8085,7 +8323,8 @@
     "holes": 0,
     "lits": 5,
     "seen": [
-      "src/views/employees.js"
+      "src/views/employees.js",
+      "src/views/properties.js"
     ]
   },
   {
@@ -8644,6 +8883,14 @@
     ]
   },
   {
+    "en": "Only a Court’s OWNER changes any of this. A manager reads the index and the data behind it, and a Court’s other staff do not see the page at all.",
+    "holes": 0,
+    "lits": 111,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "Only a shop owner or an admin can rename the company — a manager cannot.",
     "holes": 0,
     "lits": 56,
@@ -8700,6 +8947,14 @@
     ]
   },
   {
+    "en": "Only the Court’s owner can change the Property Index — a manager may read it.",
+    "holes": 0,
+    "lits": 60,
+    "seen": [
+      "worker/src/routes/court.js"
+    ]
+  },
+  {
     "en": "Only you (the business owner/admin) can see these notes.",
     "holes": 0,
     "lits": 44,
@@ -8715,6 +8970,14 @@
       "src/main.js",
       "src/views/court.js",
       "src/views/feedback.js"
+    ]
+  },
+  {
+    "en": "Open a business from the property it stands on to read what it reports to its Court.",
+    "holes": 0,
+    "lits": 67,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -9237,6 +9500,14 @@
     ]
   },
   {
+    "en": "Premises in your {0}",
+    "holes": 1,
+    "lits": 14,
+    "seen": [
+      "src/views/home.js"
+    ]
+  },
+  {
     "en": "Preparing…",
     "holes": 0,
     "lits": 9,
@@ -9372,6 +9643,31 @@
     "lits": 20,
     "seen": [
       "src/views/admin-settings.js"
+    ]
+  },
+  {
+    "en": "Property",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Property Index",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/home.js",
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Property name",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -9960,6 +10256,7 @@
       "src/views/item-index.js",
       "src/views/pos.js",
       "src/views/produce.js",
+      "src/views/properties.js",
       "src/views/shop-deals.js"
     ]
   },
@@ -9969,6 +10266,14 @@
     "lits": 100,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "Remove \"{0}\" from the Property Index? The premises leave your books. Nothing else is affected — this does not touch any business.",
+    "holes": 1,
+    "lits": 99,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -10022,6 +10327,14 @@
     ]
   },
   {
+    "en": "Removed {0}.",
+    "holes": 1,
+    "lits": 7,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "Removed. Only {0} could come back out — {1} had already sold on.",
     "holes": 2,
     "lits": 43,
@@ -10058,7 +10371,24 @@
     "holes": 0,
     "lits": 6,
     "seen": [
-      "src/views/item-index.js"
+      "src/views/item-index.js",
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Rename \"{0}\" to \"{1}\"? The shop keeps everything — its people, stock, books and settings all follow the name. Its old name becomes free for someone else.",
+    "holes": 2,
+    "lits": 111,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Rename business",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -10067,6 +10397,22 @@
     "lits": 16,
     "seen": [
       "src/views/item-index.js"
+    ]
+  },
+  {
+    "en": "Rename the business at {0}",
+    "holes": 1,
+    "lits": 19,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Renamed to {0}.",
+    "holes": 1,
+    "lits": 9,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -10083,6 +10429,30 @@
     "lits": 57,
     "seen": [
       "src/views/companies.js"
+    ]
+  },
+  {
+    "en": "Renaming…",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Rent",
+    "holes": 0,
+    "lits": 4,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "Rent is a figure you record, exactly like the levy — nothing moves coin on its own.",
+    "holes": 0,
+    "lits": 64,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -10473,6 +10843,7 @@
       "src/views/inventory.js",
       "src/views/members.js",
       "src/views/motd-admin.js",
+      "src/views/properties.js",
       "src/views/settings-form.js"
     ]
   },
@@ -10623,7 +10994,8 @@
     "holes": 0,
     "lits": 5,
     "seen": [
-      "src/views/court.js"
+      "src/views/court.js",
+      "src/views/properties.js"
     ]
   },
   {
@@ -10642,6 +11014,7 @@
       "src/views/members.js",
       "src/views/motd-admin.js",
       "src/views/profile.js",
+      "src/views/properties.js",
       "src/views/realms.js",
       "src/views/settings-form.js",
       "src/views/shop-deals.js",
@@ -10687,6 +11060,14 @@
     "lits": 6,
     "seen": [
       "src/views/shop-history.js"
+    ]
+  },
+  {
+    "en": "Search a property or the business on it…",
+    "holes": 0,
+    "lits": 32,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -12216,6 +12597,14 @@
     ]
   },
   {
+    "en": "That opens a business at {0} in {1} — name it, then press Add again.",
+    "holes": 2,
+    "lits": 45,
+    "seen": [
+      "src/lib/businesses.js"
+    ]
+  },
+  {
     "en": "That opens a new business of your own — name it, then press Add again.",
     "holes": 0,
     "lits": 53,
@@ -12229,6 +12618,15 @@
     "lits": 24,
     "seen": [
       "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "That property is not in your region.",
+    "holes": 0,
+    "lits": 29,
+    "seen": [
+      "worker/src/property.js",
+      "worker/src/routes/court.js"
     ]
   },
   {
@@ -12641,6 +13039,14 @@
     ]
   },
   {
+    "en": "The Old Mill",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "THE ORDER IS EDITABLE. Every line in the cart now has its count beside it — type over it, or use − and +. “They wanted three, not two” no longer means removing the line and typing the price in again.",
     "holes": 0,
     "lits": 149,
@@ -12686,6 +13092,22 @@
     "lits": 97,
     "seen": [
       "src/views/admin-settings.js"
+    ]
+  },
+  {
+    "en": "The premises in your {0}, and who trades on each. A property’s code opens a NEW shop here — whoever redeems it names their own business, but it lands in your {1}, on those premises.",
+    "holes": 2,
+    "lits": 134,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "The Property Index is for a Court’s owner and managers.",
+    "holes": 0,
+    "lits": 44,
+    "seen": [
+      "worker/src/routes/court.js"
     ]
   },
   {
@@ -13019,6 +13441,14 @@
     ]
   },
   {
+    "en": "There is already a property called \"{0}\" in your region.",
+    "holes": 1,
+    "lits": 41,
+    "seen": [
+      "worker/src/property.js"
+    ]
+  },
+  {
     "en": "There is no fixed price to keep up to date. Reprice a piece and the deal follows it, because the saving is worked out from what you are charging that day.",
     "holes": 0,
     "lits": 121,
@@ -13128,6 +13558,14 @@
     "lits": 36,
     "seen": [
       "src/views/home.js"
+    ]
+  },
+  {
+    "en": "This is your Court’s register of the premises in its {0} — the place, not the shop, so a property keeps its name, its notes and its rent when a tenant leaves.",
+    "holes": 1,
+    "lits": 118,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -13257,6 +13695,22 @@
     "lits": 79,
     "seen": [
       "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "Those premises are no longer on the Court’s books.",
+    "holes": 0,
+    "lits": 40,
+    "seen": [
+      "worker/src/property.js"
+    ]
+  },
+  {
+    "en": "Those premises have just been taken. Ask your Court for a new code.",
+    "holes": 0,
+    "lits": 53,
+    "seen": [
+      "worker/src/property.js"
     ]
   },
   {
@@ -13843,6 +14297,14 @@
     ]
   },
   {
+    "en": "Vacant",
+    "holes": 0,
+    "lits": 6,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "Vendor",
     "holes": 0,
     "lits": 6,
@@ -13882,6 +14344,14 @@
     "lits": 16,
     "seen": [
       "src/views/admin-settings.js"
+    ]
+  },
+  {
+    "en": "View data",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -14149,6 +14619,14 @@
     ]
   },
   {
+    "en": "What the place is called. It has to be unique in your {0}.",
+    "holes": 1,
+    "lits": 41,
+    "seen": [
+      "src/views/properties.js"
+    ]
+  },
+  {
     "en": "What the shop still owes stays owed. A departed employee’s hours and commission are still on the log and can still be settled.",
     "holes": 0,
     "lits": 101,
@@ -14226,6 +14704,14 @@
     "lits": 12,
     "seen": [
       "src/views/landing.js"
+    ]
+  },
+  {
+    "en": "What you charge for it. This is a RECORD — like the levy, nothing here moves coin on its own, and 0 simply means you charge nothing.",
+    "holes": 0,
+    "lits": 100,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {
@@ -14707,6 +15193,14 @@
     "lits": 62,
     "seen": [
       "src/views/profile.js"
+    ]
+  },
+  {
+    "en": "You may rename a business standing on your own property. Everything it owns follows the name — its roster, its stock, its books and its history.",
+    "holes": 0,
+    "lits": 114,
+    "seen": [
+      "src/views/properties.js"
     ]
   },
   {

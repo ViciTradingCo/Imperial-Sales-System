@@ -10,6 +10,16 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.2', date: '2026-08-29', notes: [
+    'COURTS NOW LET THE PREMISES IN THEIR REGION. A new Property Index sits on the home page for a Court’s owner and managers: the places a shop can stand, who is on each, and what they are worth.',
+    'A PROPERTY’S CODE IS WHAT CREATES A SHOP. Give it to whoever is taking the place; they sign up, name their own business, and it opens there — in your region, on those premises. They never see any other region or shop.',
+    'A code only works while the premises are empty, so one can never put two shops in one building, and reissuing it kills the old one at once — the same fix as a leaked staff code.',
+    'A Court can rename the business standing on its own property, and open that shop’s books from the place rather than from a list of names.',
+    'An admin’s realm code is unchanged and carries no region and no property. That is what makes a shop answering to no Court — and how Courts themselves are set up — so a Court can never reach one.',
+    'A property is the PLACE, not the shop: it keeps its name, its notes and its rent when a tenant leaves. Rent is a figure you record, exactly like the levy — nothing moves coin on its own.',
+    'Closing or archiving a shop frees its premises as well as its name, so the Court can let them again. Restoring the shop does not put it back in the doorway; by then somebody else may be there.',
+    'Only a Court’s OWNER changes any of this. A manager reads the index and the data behind it, and a Court’s other staff do not see the page at all.',
+  ] },
   { version: '7.1', date: '2026-08-29', notes: [
     'AN ARCHIVED SHOP NOW LEAVES THE MARKET FIGURES WITH ITS TRADE. Market Analysis describes the network as it stands, and a shop nobody can buy from was still voting on what items are worth.',
     'That covers all of it: item values and the best-region column, region totals, Company Performance, the over- and underpricing lists, and a Court’s own region report and regional stock.',

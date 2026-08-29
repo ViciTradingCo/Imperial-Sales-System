@@ -14,6 +14,7 @@ import { applyLang } from './lib/i18n.js';
 import { loadBranding, applyBranding } from './lib/branding.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
 import { renderCourtTools } from './views/court.js';
+import { renderProperties } from './views/properties.js';
 import { renderFeedback } from './views/feedback.js';
 import { renderFeedbackAdmin } from './views/feedback-admin.js';
 import { initActions, clearActions } from './lib/actions.js';
@@ -224,6 +225,17 @@ route('/patch-notes', (container) => {
     host,
   ]));
   renderPatchNotes(host);
+});
+
+/**
+ * The Property Index. Court-flagged AND running the shop, matching the two
+ * tests the Worker applies; this only keeps the page out of the way of a typed
+ * URL, since the server refuses either way.
+ */
+route('/properties', (container) => {
+  const m = state.me;
+  if (!m || !m.registered || !m.court || !canManage(m)) { navigate('/'); return; }
+  renderProperties(container);
 });
 
 route('/court', (container) => {

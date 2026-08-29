@@ -205,6 +205,18 @@ export const api = {
   spendCourt: (category, amount, note) => request('POST', '/court/spending', { category, amount, note }),
   /** What the whole region holds, by item. */
   getCourtStock: () => request('GET', '/court/stock'),
+
+  /**
+   * THE PROPERTY INDEX — a Court's register of the premises in its region, and
+   * the codes that open a shop on one. Reading is the Court's owner or a
+   * manager; every write below is the owner's alone, and the Worker says which
+   * by sending `canEdit` with the list.
+   */
+  getProperties: () => request('GET', '/court/properties'),
+  saveProperty: (patch) => request('POST', '/court/properties', patch),
+  removeProperty: (id) => request('POST', '/court/properties/remove', { id }),
+  issuePropertyCode: (id) => request('POST', '/court/properties/code', { id }),
+  renameOccupant: (id, business) => request('POST', '/court/properties/rename', { id, business }),
   /** Banners for the current user: { notices[], banners[] }. Deduped for ~3s. */
   getMotd: () => {
     const now = Date.now();

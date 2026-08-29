@@ -91,26 +91,37 @@ export function businessesPanel(me, onSwitched) {
         setStatus('Checking…', '');
         const found = await api.checkCode(typed);
         checked = { ...found, code: typed };
-        nameWrap.hidden = found.kind !== 'realm';
-        if (found.kind === 'realm') {
+        // Both founder codes end in naming a shop. A COURT'S also names where:
+        // the premises decide the region, so the picker stays hidden and the
+        // status line says the place instead of offering a choice that is not
+        // there to make.
+        const founding = found.kind === 'realm' || found.kind === 'property';
+        nameWrap.hidden = !founding;
+        if (founding) {
+          const onProperty = found.kind === 'property';
           holdSel.replaceChildren(...(found.holds || []).map((h) => el('option', { value: h }, h)));
           // A realm that does not trade by region has nothing to ask.
-          holdWrap.hidden = found.showRegion === false || !(found.holds || []).length;
+          holdWrap.hidden = onProperty || found.showRegion === false || !(found.holds || []).length;
           if (found.regionLabel) holdWrap.firstChild.textContent = found.regionLabel;
-          setStatus('That opens a new business of your own — name it, then press Add again.', '');
+          setStatus(onProperty
+            ? 'That opens a business at ' + (found.property || 'a property') + ' in ' + (found.hold || 'its region') +
+              ' — name it, then press Add again.'
+            : 'That opens a new business of your own — name it, then press Add again.', '');
           add.disabled = false;
           bizName.focus();
           return;
         }
       }
-      if (checked.kind === 'realm' && !bizName.value.trim()) {
+      if ((checked.kind === 'realm' || checked.kind === 'property') && !bizName.value.trim()) {
         setStatus('Name your business.', 'error');
         add.disabled = false;
         return;
       }
       setStatus('Adding…', '');
       await api.addBusiness(typed, bizName.value.trim(), holdWrap.hidden ? '' : holdSel.value);
-      toast(checked.kind === 'realm' ? 'Business created — you are its owner.' : 'Joined ' + checked.business + '.', 'ok');
+      toast(checked.kind === 'business'
+        ? 'Joined ' + checked.business + '.'
+        : 'Business created — you are its owner.', 'ok');
       // Left in a working state BEFORE handing over, whatever the caller does
       // next. The shell reloads, so nobody sees this — but a component that
       // only works because of what its caller happens to do is one that breaks

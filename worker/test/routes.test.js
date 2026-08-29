@@ -61,8 +61,12 @@ describe('route wiring', () => {
   /**
    * A Court governs its region, so it does write — but only its OWN
    * instruments: the levy, its rulings, price controls, the notice, its dues
-   * ledger and its treasury. It has no path that reaches into a shop's stock,
-   * coffer or sales, which is what separates governing from helping yourself.
+   * ledger, its treasury, and the premises it lets.
+   *
+   * The Property Index is the one that reaches a shop at all, and only at
+   * arm's length: it renames the company standing on a Court's own property.
+   * There is still no path from here into anybody's stock, coffer or sales,
+   * which is what separates governing from helping yourself.
    *
    * Listed exactly, so a new Court write is a decision rather than a surprise.
    */
@@ -71,6 +75,10 @@ describe('route wiring', () => {
     expect(writes).toEqual([
       '/court/dues/pay',
       '/court/prices',
+      '/court/properties',
+      '/court/properties/code',
+      '/court/properties/remove',
+      '/court/properties/rename',
       '/court/settings',
       '/court/spending',
       '/court/standing',

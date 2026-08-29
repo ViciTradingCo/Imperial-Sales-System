@@ -275,6 +275,37 @@ THE MONEY NEVER MOVES ON ITS OWN. A levy records what a shop OWES; a Court marks
 it paid when it actually is. A levy of 0 is the feature DISABLED — checkout skips
 it entirely rather than working out 0% of every sale, and the UI says "Disabled".
 
+## A Court lets premises, and the code is what creates a shop
+
+The **Property Index** (`worker/src/property.js`, `/court/properties`,
+`src/views/properties.js`) is a Court's register of the places a shop can stand
+in its region. A property is the PLACE, not the shop: `business` is a nullable
+occupant, and the name, notes and rent belong to the premises and outlive a
+tenant.
+
+THE CODE IS THE POINT. `join_code` on a property is a founder code bound to that
+place, so whoever redeems it names their own shop and it opens THERE — in that
+Court's region, on those premises (`resolveJoinCode` kind `property`). A realm's
+own founder code carries neither a region nor a property, and that is the
+difference: an admin's code makes a shop that answers to no Court (and is how
+Courts themselves get made), a Court's code makes a tenant. A property code
+resolves only while the premises are EMPTY, and `occupyProperty` re-reads the row
+after its conditional UPDATE, so two people redeeming one code cannot both land.
+
+A Court renames a shop THROUGH its property, never by naming a company — which
+is what confines it to its own region with no second check to forget, and what
+puts a shop founded on an admin's code beyond it entirely.
+
+Archiving or closing a shop VACATES its premises (the name is freed, so the
+doorway must be too, or the place is off the market for good). Restoring the shop
+does not re-let them: somebody may be trading there, and who occupies a Court's
+property is the Court's decision.
+
+**Two gates, in `routes/court.js`.** `courtDesk` (owner or manager) reads;
+`courtBench` (owner only, admin passes) writes. Both sit on top of `courtSeat`,
+so the region check can never be the one that is skipped, and the list response
+carries `canEdit` so a screen never offers a manager a button the Worker refuses.
+
 ## Notices are rows, not settings
 
 Global MOTDs, per-business MOTDs and a shop's own board are all `motd_list`

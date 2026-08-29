@@ -271,6 +271,23 @@ const SCHEMA = [
      hold TEXT NOT NULL, ts TEXT NOT NULL,
      category TEXT NOT NULL, amount REAL NOT NULL DEFAULT 0, note TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_court_spend_hold ON court_spend (realm_id, hold)`,
+  // THE PROPERTY INDEX — the premises a Court has to let. A property is the
+  // PLACE, not the shop on it, so `business` is a nullable occupant (empty =
+  // vacant) and `join_code` is a founder code bound to these premises. Keyed by
+  // REGION like every other court table. Full reasoning in property.js.
+  `CREATE TABLE IF NOT EXISTS property (
+     id TEXT PRIMARY KEY,
+     realm_id TEXT NOT NULL DEFAULT '${R}',
+     hold TEXT NOT NULL, name TEXT NOT NULL,
+     business TEXT NOT NULL DEFAULT '',
+     notes TEXT NOT NULL DEFAULT '',
+     rent REAL NOT NULL DEFAULT 0,
+     join_code TEXT, created TEXT)`,
+  `CREATE INDEX IF NOT EXISTS idx_property_hold ON property (realm_id, hold)`,
+  `CREATE INDEX IF NOT EXISTS idx_property_business ON property (business)`,
+  // One property per name within a region. Two "The Old Mill"s in one hold
+  // would make every code and every rename ambiguous.
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_property_name ON property (realm_id, hold, lower(name))`,
   // ---- Realms (multi-tenancy) ----
   // One deployment can host several independent RP servers. Every data table
   // carries a realm_id and queries filter on it, so nothing is ever shared or
@@ -318,6 +335,7 @@ export const REALM_TABLES = [
   'time_card',
   'master_settings', 'business_settings', 'motd_list', 'feedback',
   'court_settings', 'court_status', 'court_price', 'court_dues', 'court_spend',
+  'property',
 ];
 
 /**
@@ -327,14 +345,13 @@ export const REALM_TABLES = [
  */
 const BUSINESS_TABLES = [
   ['inventory', 'business'], ['sales', 'business'], ['intake', 'business'],
-  // A delivery names WHO IT WAS BOUGHT FROM as well as who bought it, and that
-  // credit has to follow a rename like every other reference — it was the one
-  // business column a rename did not move. Two things went wrong without it: a
-  // renamed shop silently lost credit for everything it had ever supplied, and
-  // an ARCHIVED shop's name (now free for somebody else) stayed on its old
-  // deliveries, so the next company to register under it inherited them.
+  // from_business and property.business are REFERENCES to a shop rather than its
+  // own rows, and they have to move with a rename like everything else. The
+  // first was missed for months: a renamed shop lost credit for everything it
+  // had supplied, and an archived shop's freed name stayed on its deliveries.
   ['intake', 'from_business'],
   ['transfers', 'from_business'], ['transfers', 'to_business'],
+  ['property', 'business'],
   ['coffer_entries', 'business'], ['discounts', 'business'], ['bundles', 'business'],
   ['shop_style', 'business'],
   ['time_card', 'business'],

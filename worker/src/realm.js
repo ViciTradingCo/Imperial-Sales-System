@@ -27,7 +27,14 @@ export { DEFAULT_REALM_ID, DEFAULT_REALM_NAME, REALM_TABLES };
  * or one shop on its own — hence globally unique, not per realm. Two kinds:
  *
  *   • FOUNDER code (on a realm) — admits someone to that realm and sends them to
- *     Business Creation, where they start a shop of their own.
+ *     Business Creation, where they start a shop of their own. It carries NO
+ *     region and no premises: an admin's code makes a shop that answers to
+ *     nobody, which is how a realm's first Courts get made and how a shop that
+ *     belongs to no Court is set up.
+ *   • PROPERTY code (on a property) — the same thing issued by a COURT, and
+ *     bound to a place. The holder names their own shop, but it opens in that
+ *     Court's region, on those premises. That is what makes a Court the
+ *     gatekeeper of its own region without giving it any reach outside it.
  *   • STAFF code (on a company) — registers someone straight into that shop as
  *     an employee, in that shop's realm.
  *
@@ -65,6 +72,25 @@ export async function resolveJoinCode(env, code) {
 
   const realm = await db.prepare('SELECT id, name FROM realms WHERE upper(join_code) = ?').bind(want).first();
   if (realm) return { kind: 'realm', realmId: realm.id, realmName: realm.name };
+
+  // A Court's code, bound to premises. Only while they are still EMPTY: the
+  // code is the right to open HERE, and it stops meaning that the moment
+  // somebody has. Refused as unrecognised rather than as "already taken", for
+  // the same reason nothing else here says which kind of code was wrong.
+  const prop = await db.prepare(
+    "SELECT p.id, p.name, p.hold, p.realm_id, r.name AS realm_name FROM property p " +
+    "LEFT JOIN realms r ON r.id = p.realm_id " +
+    "WHERE upper(p.join_code) = ? AND p.business = ''").bind(want).first();
+  if (prop) {
+    return {
+      kind: 'property',
+      realmId: prop.realm_id,
+      realmName: prop.realm_name || prop.realm_id,
+      propertyId: prop.id,
+      propertyName: prop.name,
+      hold: prop.hold,
+    };
+  }
 
   const co = await db.prepare(
     "SELECT c.id, c.business, c.realm_id, r.name AS realm_name FROM companies c " +

@@ -12,7 +12,7 @@
  * leaves the region's rules and books intact — and a Court can never reach a
  * region it does not hold.
  */
-import { requireRegistered, actorName, realmIdOf } from '../guards.js';
+import { requireRegistered, actorName, realmIdOf, managesBusiness } from '../guards.js';
 import { logAudit } from '../audit.js';
 import { requireCourt, courtCompanies, courtShop } from '../oversight.js';
 import {
@@ -20,6 +20,8 @@ import {
   courtStandings, setCourtStanding, courtPrices, setCourtPrice,
   courtDues, courtDuesFor, recordDuesPayment, courtSpending, recordCourtSpend, courtStock,
 } from '../court.js';
+import { listProperties, saveProperty, deleteProperty, reissuePropertyCode } from '../property.js';
+import { renameBusiness } from '../registry.js';
 
 /**
  * Court oversight: the shops trading in this Court's region.
@@ -54,6 +56,42 @@ async function courtSeat(request, env) {
   const realmId = realmIdOf(caller, env);
   const hold = await requireCourt(env, caller.business, realmId);
   return { caller, realmId, hold };
+}
+
+/**
+ * THE PROPERTY INDEX'S TWO GATES.
+ *
+ * Governing a region is not the same job as working at the shop that governs
+ * it, so the premises are not open to a Court's whole payroll. Two levels, and
+ * both sit on top of `courtSeat` — the region check is never the thing that
+ * gets skipped:
+ *
+ *   • READING — the owner or a MANAGER. A manager sees the index and the market
+ *     data behind it, which is the Court's own view of its region.
+ *   • WRITING — the OWNER alone (an admin passes, as everywhere). Letting
+ *     premises, issuing the codes that create shops, and renaming a company are
+ *     acts of government, and a manager is hired to run a shop.
+ *
+ * Predicates rather than role lists at each handler, for the reason in
+ * guards.js: the fortieth copy is the one with the hole in it.
+ */
+async function courtDesk(request, env) {
+  const seat = await courtSeat(request, env);
+  if (!managesBusiness(seat.caller)) {
+    const e = new Error('The Property Index is for a Court’s owner and managers.');
+    e.forbidden = true;
+    throw e;
+  }
+  return seat;
+}
+async function courtBench(request, env) {
+  const seat = await courtDesk(request, env);
+  if (seat.caller.role !== 'owner' && seat.caller.role !== 'admin') {
+    const e = new Error('Only the Court’s owner can change the Property Index — a manager may read it.');
+    e.forbidden = true;
+    throw e;
+  }
+  return seat;
 }
 
 /** Everything the Court Tools page opens with, in one call. */
@@ -125,6 +163,73 @@ async function courtGetStock({ request, env }) {
   return { hold, stock: await courtStock(env, hold, realmId) };
 }
 
+/* ---- the Property Index: who trades here, and where ---- */
+
+/**
+ * The region's premises, and what a Court may do about each.
+ *
+ * `canEdit` is sent rather than left for the client to work out from the role:
+ * the screen must never offer a manager a button the Worker will refuse, and
+ * the one place that decides is the gate above.
+ */
+async function courtGetProperties({ request, env }) {
+  const { caller, realmId, hold } = await courtDesk(request, env);
+  return {
+    hold,
+    properties: await listProperties(env, hold, realmId),
+    canEdit: caller.role === 'owner' || caller.role === 'admin',
+  };
+}
+async function courtSaveProperty({ request, env, body }) {
+  const { caller, realmId, hold } = await courtBench(request, env);
+  const property = await saveProperty(env, hold, body, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.property',
+    detail: hold + ': ' + property.name + (body.id ? ' updated' : ' added'), realmId });
+  return { property, properties: await listProperties(env, hold, realmId) };
+}
+async function courtRemoveProperty({ request, env, body }) {
+  const { caller, realmId, hold } = await courtBench(request, env);
+  const gone = await deleteProperty(env, body.id, hold, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.property.remove',
+    detail: hold + ': ' + gone.removed, realmId });
+  return { ...gone, properties: await listProperties(env, hold, realmId) };
+}
+async function courtPropertyCode({ request, env, body }) {
+  const { caller, realmId, hold } = await courtBench(request, env);
+  const issued = await reissuePropertyCode(env, body.id, hold, realmId);
+  // The code itself is never logged. It is a credential for the duration, and
+  // the audit trail is read by more people than should be able to redeem it.
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.property.code',
+    detail: hold + ': new code issued for ' + issued.name, realmId });
+  return { ...issued, properties: await listProperties(env, hold, realmId) };
+}
+
+/**
+ * RENAMING THE SHOP ON A PROPERTY.
+ *
+ * A Court's authority here is the premises, so the property is what names the
+ * shop — the request cannot simply hand over a company name. That is what keeps
+ * a Court inside its own region without a second check to forget: it can only
+ * rename what is standing on its own land, and a shop opened with an ADMIN'S
+ * code is on no property at all and is therefore beyond it, which is exactly
+ * what a code carrying no region is for.
+ */
+async function courtRenameOccupant({ request, env, body }) {
+  const { caller, realmId, hold } = await courtBench(request, env);
+  const rows = await listProperties(env, hold, realmId);
+  const p = rows.find((x) => x.id === String(body.id || '').trim());
+  if (!p) throw new Error('That property is not in your region.');
+  if (p.vacant) throw new Error('"' + p.name + '" is empty — there is no business there to rename.');
+  // A blank name is refused by `renameBusiness` itself, in the same words. One
+  // rule about what a company may be called, not a copy of it per caller.
+  const to = String(body.business || '').trim();
+  const from = p.business;
+  await renameBusiness(env, from, to, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business, action: 'court.rename',
+    detail: hold + ': ' + from + ' → ' + to + ' (' + p.name + ')', realmId });
+  return { renamed: to, properties: await listProperties(env, hold, realmId) };
+}
+
 export const routes = [
   { method: 'GET', path: '/court/companies', handler: courtCompaniesRoute },
   { method: 'GET', path: '/court/company', handler: courtShopRoute },
@@ -138,4 +243,9 @@ export const routes = [
   { method: 'GET', path: '/court/spending', handler: courtGetSpending },
   { method: 'POST', path: '/court/spending', handler: courtSpend },
   { method: 'GET', path: '/court/stock', handler: courtGetStock },
+  { method: 'GET', path: '/court/properties', handler: courtGetProperties },
+  { method: 'POST', path: '/court/properties', handler: courtSaveProperty },
+  { method: 'POST', path: '/court/properties/remove', handler: courtRemoveProperty },
+  { method: 'POST', path: '/court/properties/code', handler: courtPropertyCode },
+  { method: 'POST', path: '/court/properties/rename', handler: courtRenameOccupant },
 ];

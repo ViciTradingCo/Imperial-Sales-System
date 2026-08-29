@@ -93,14 +93,11 @@ async function handleAddBusiness({ request, env, body }) {
   const caller = await requireRegistered(request, env);
   const found = await resolveJoinCode(env, body.code);
   if (!found) throw new Error("That code isn't recognised. Check it with whoever gave it to you.");
-  const asOwner = found.kind === 'realm';
   await addBusiness(env, {
     email: caller.email,
     // Their own character name carries across; they are the same person.
     character: caller.character,
-    businessName: asOwner ? body.businessName : found.business,
-    asOwner,
-    hold: asOwner ? body.hold : '',
+    ...foundingFrom(found, body),
     realmId: found.realmId,
   });
   return handleMe({ request, env });
@@ -171,7 +168,41 @@ async function handleCheckCode({ request, env, body }) {
       showRegion: prefs.showRegion,
     };
   }
+  if (found.kind === 'property') {
+    // A COURT'S code. Business Creation still asks them to name their shop, but
+    // the region is not theirs to choose — the premises decide it, and the form
+    // shows them where they are opening rather than a dropdown they could get
+    // wrong. `holds` is deliberately empty for the same reason.
+    const prefs = await readRealmPrefs(env, found.realmId);
+    return {
+      kind: 'property',
+      realmName: found.realmName,
+      property: found.propertyName,
+      hold: found.hold,
+      holds: [],
+      regionLabel: prefs.regionLabel,
+      showRegion: prefs.showRegion,
+    };
+  }
   return { kind: 'business', realmName: found.realmName, business: found.business };
+}
+
+/**
+ * What a resolved code means for registration, in one place.
+ *
+ * Both founder codes create a shop; only a Court's carries where. The region
+ * and the premises come from the SERVER'S OWN LOOKUP either way — a request
+ * naming its own region would let anyone holding any founder code file
+ * themselves into a Court's territory.
+ */
+function foundingFrom(found, body) {
+  const asOwner = found.kind === 'realm' || found.kind === 'property';
+  return {
+    asOwner,
+    businessName: asOwner ? body.businessName : found.business,
+    hold: found.kind === 'property' ? found.hold : (found.kind === 'realm' ? body.hold : ''),
+    propertyId: found.kind === 'property' ? found.propertyId : '',
+  };
 }
 
 /**
@@ -187,16 +218,13 @@ async function handleRegister({ request, env, body }) {
   const found = await resolveJoinCode(env, body.code);
   if (!found) throw new Error("That code isn't recognised. Check it with whoever gave it to you.");
 
-  const asOwner = found.kind === 'realm';
   const user = await registerUser(env, {
     email: payload.email,
     name: payload.name || '',
     character: body.character,
     // A founder code lets them name their own shop; a staff code puts them in
     // the one the code belongs to, whatever they typed.
-    businessName: asOwner ? body.businessName : found.business,
-    asOwner,
-    hold: asOwner ? body.hold : '',
+    ...foundingFrom(found, body),
     realmId: found.realmId,
   });
   return publicUser(user);

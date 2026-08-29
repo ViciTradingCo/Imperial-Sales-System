@@ -76,8 +76,14 @@ function renderCourtCompanies(container) {
   }
 }
 
-/** One shop in the region: its roster, its treasury, and how it is trading. */
-function openCourtShop(business) {
+/**
+ * One shop in the region: its roster, its treasury, and how it is trading.
+ *
+ * Exported so the Property Index opens the SAME view from the premises rather
+ * than growing a second one — a Court reading a shop's books should see one
+ * screen however it got there.
+ */
+export function openCourtShop(business) {
   openFocalMenu(business, (host) => {
     mount(host, el('p', { class: 'note' }, 'Loading…'));
     api.getCourtCompany(business)
