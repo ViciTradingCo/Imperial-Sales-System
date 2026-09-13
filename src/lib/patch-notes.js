@@ -10,6 +10,14 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.4', date: '2026-09-13', notes: [
+    'THE LEDGER HAS A PRIVACY POLICY AND TERMS OF SERVICE. Both are linked in the footer of every page and from the Credits on the About page, and both can be read without signing in — deciding whether to hand over your email is hard to do behind a sign-in wall.',
+    'The Privacy Policy says exactly what is held about you: your email and display name from Google and nothing else, the character and shop names you give, and the trade you record. No advertising, no tracking, no analytics, and your IP address is never written to the database.',
+    'It also says who can see what — your shop, your realm’s admins, your region’s Court, and nobody outside your realm — how long things are kept, and how to have your account removed.',
+    'The Terms are short and plain: it is free and always will be, it is provided as it is with no warranty, every coin in it is fiction, and it is a fan project with no connection to Bethesda, Google, Cloudflare, GitHub or Ko-fi.',
+    'Both documents are kept in English only, and each says so at the top. A mistranslated sentence about somebody’s data would be worse than one they have to read in a second language.',
+    'The footer is legible now. It was written in a page ink on a dark wooden ground, which was survivable for one decorative line and would not have been for something you are meant to click.',
+  ] },
   { version: '7.3', date: '2026-08-29', notes: [
     'THE OVERPRICING AND UNDERCUTTING LISTS WERE MOSTLY FALSE ALARMS. A listing with no price yet counted as undercutting the whole realm, because nothing is below everything — so the lists filled up with shops that had done nothing at all.',
     'Three ordinary things leave a listing unpriced and were all arriving pre-flagged: a harvest, a stocktake that finds something nobody had written down, and a delivery that cost nothing.',

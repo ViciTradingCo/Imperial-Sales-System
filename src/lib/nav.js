@@ -57,6 +57,29 @@ function navItems(me) {
   return items;
 }
 
+/**
+ * THE LEGAL LINKS, on every page.
+ *
+ * In the footer rather than the side menu: they belong to the site, not to what
+ * you are doing in it, and the footer is where a reader looks for them. Built
+ * here rather than written into index.html so the labels reach the language
+ * packs like every other label, and so they render for a signed-out visitor —
+ * who is exactly the person deciding whether to hand over an email address.
+ *
+ * Rendered once at start-up; nothing about them depends on who is looking.
+ */
+export function renderFooterLinks(host) {
+  if (!host) return;
+  host.innerHTML = '';
+  [['/terms', 'Terms of Service'], ['/privacy', 'Privacy Policy']].forEach(([path, label]) => {
+    const b = document.createElement('button');
+    b.className = 'link-inline';
+    b.textContent = label;
+    b.addEventListener('click', () => navigate(path));
+    host.appendChild(b);
+  });
+}
+
 /** Renders the nav buttons into `navEl`. `onNavigate` runs after each click.
  *  `onSignOut`, when given, adds a Sign Out entry (shown only in the mobile
  *  drawer — desktop has sign-out by the nameplate). */

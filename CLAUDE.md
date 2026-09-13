@@ -306,6 +306,36 @@ property is the Court's decision.
 so the region check can never be the one that is skipped, and the list response
 carries `canEdit` so a screen never offers a manager a button the Worker refuses.
 
+## The Terms and the Privacy Policy are not editable, and not translated
+
+`src/lib/legal.js` holds both documents as data; `src/views/legal.js` renders
+either; `/terms` and `/privacy` are the routes, and they are the ONLY routes
+that do not check for a session — somebody deciding whether to hand over their
+email has to be able to read what happens to it first.
+
+NOT ADMIN-EDITABLE, unlike the About page. That page says what a realm is; these
+say what the software does with a person's data and on what terms it is offered,
+which are facts about the deployment — one codebase, one database, one sign-in
+provider — and identical in every realm. An editable privacy policy is one that
+can be made false, by somebody who does not decide where the data goes.
+
+NOT TRANSLATED: `i18n-extract`'s SKIP list drops the whole file, so none of it
+reaches the packs. A mistranslated sentence about somebody's data is worse than
+an honest one in a second language, and a document this long would otherwise
+cost a translation pass per release for wording that changes rarely. The notice
+saying so lives in the VIEW, not the document, because it is the one sentence a
+reader needs in their own language.
+
+KEEP IT TRUE. Every claim in there is checkable against the code — the stored
+columns, "your IP is never written down" (`ratelimit.js` holds it in memory for
+a 60-second window and only for unauthenticated callers), the browser keys, the
+retention periods. If one of those changes, the document changes in the same
+commit, and `LEGAL_UPDATED` moves with it.
+
+The pages are set in `--font-book`: they are printed matter bound into the
+ledger rather than something the shopkeeper wrote, and six thousand characters
+of the hand is more than that face can carry.
+
 ## Notices are rows, not settings
 
 Global MOTDs, per-business MOTDs and a shop's own board are all `motd_list`

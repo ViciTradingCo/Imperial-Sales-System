@@ -882,6 +882,7 @@
       "src/views/feedback-admin.js",
       "src/views/feedback.js",
       "src/views/item-index.js",
+      "src/views/legal.js",
       "src/views/members.js",
       "src/views/motd-admin.js",
       "src/views/profile.js",
@@ -2706,6 +2707,14 @@
     "lits": 156,
     "seen": [
       "src/views/employees.js"
+    ]
+  },
+  {
+    "en": "Both documents are kept in English only, and each says so at the top. A mistranslated sentence about somebody’s data would be worse than one they have to read in a second language.",
+    "holes": 0,
+    "lits": 144,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -6079,6 +6088,14 @@
     ]
   },
   {
+    "en": "It also says who can see what — your shop, your realm’s admins, your region’s Court, and nobody outside your realm — how long things are kept, and how to have your account removed.",
+    "holes": 0,
+    "lits": 138,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "It carries a Time Card button, so clocking out is one press from wherever you are. The press takes you to your card rather than ending the shift where you stand — you still say when, and can still leave a note.",
     "holes": 0,
     "lits": 164,
@@ -6506,6 +6523,14 @@
     "lits": 8,
     "seen": [
       "src/views/shop-report.js"
+    ]
+  },
+  {
+    "en": "Last updated {0}.",
+    "holes": 1,
+    "lits": 11,
+    "seen": [
+      "src/views/legal.js"
     ]
   },
   {
@@ -9629,6 +9654,15 @@
     ]
   },
   {
+    "en": "Privacy Policy",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/lib/nav.js",
+      "src/views/landing.js"
+    ]
+  },
+  {
     "en": "Private notes about {0}…",
     "holes": 1,
     "lits": 17,
@@ -11185,6 +11219,14 @@
     ]
   },
   {
+    "en": "See also:",
+    "holes": 0,
+    "lits": 7,
+    "seen": [
+      "src/views/legal.js"
+    ]
+  },
+  {
     "en": "Select a {0}…",
     "holes": 1,
     "lits": 7,
@@ -12484,6 +12526,15 @@
     ]
   },
   {
+    "en": "Terms of Service",
+    "holes": 0,
+    "lits": 14,
+    "seen": [
+      "src/lib/nav.js",
+      "src/views/landing.js"
+    ]
+  },
+  {
     "en": "Text size",
     "holes": 0,
     "lits": 8,
@@ -12895,6 +12946,14 @@
     ]
   },
   {
+    "en": "The footer is legible now. It was written in a page ink on a dark wooden ground, which was survivable for one decorative line and would not have been for something you are meant to click.",
+    "holes": 0,
+    "lits": 149,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "The form clears itself after a delivery is recorded, ready for the next one.",
     "holes": 0,
     "lits": 61,
@@ -12988,6 +13047,30 @@
     "lits": 109,
     "seen": [
       "src/views/intake-form.js"
+    ]
+  },
+  {
+    "en": "THE LEDGER HAS A PRIVACY POLICY AND TERMS OF SERVICE. Both are linked in the footer of every page and from the Credits on the About page, and both can be read without signing in — deciding whether to hand over your email is hard to do behind a sign-in wall.",
+    "holes": 0,
+    "lits": 202,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "The Ledger is free and provided as it is.",
+    "holes": 0,
+    "lits": 32,
+    "seen": [
+      "src/views/landing.js"
+    ]
+  },
+  {
+    "en": "The Ledger is written in several languages; these two documents are kept in English only, because a mistranslated sentence about somebody’s data would be worse than one they have to read in a second language. The English is the authoritative version.",
+    "holes": 0,
+    "lits": 205,
+    "seen": [
+      "src/views/legal.js"
     ]
   },
   {
@@ -13132,6 +13215,14 @@
     "lits": 134,
     "seen": [
       "src/views/properties.js"
+    ]
+  },
+  {
+    "en": "The Privacy Policy says exactly what is held about you: your email and display name from Google and nothing else, the character and shop names you give, and the trade you record. No advertising, no tracking, no analytics, and your IP address is never written to the database.",
+    "holes": 0,
+    "lits": 220,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -13346,6 +13437,14 @@
     "en": "The Stocktake window is wider and its two boxes are shorter, so the whole job fits on a phone screen without hunting for anything.",
     "holes": 0,
     "lits": 105,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "The Terms are short and plain: it is free and always will be, it is provided as it is with no warranty, every coin in it is fiction, and it is a fan project with no connection to Bethesda, Google, Cloudflare, GitHub or Ko-fi.",
+    "holes": 0,
+    "lits": 173,
     "seen": [
       "src/lib/patch-notes.js"
     ]

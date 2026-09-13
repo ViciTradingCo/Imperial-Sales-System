@@ -8,13 +8,14 @@ import { configureApi, api } from './lib/api.js';
 import { initRouter, route, navigate, render, onBeforeRender } from './lib/router.js';
 import { canManage, roleLabel } from './lib/roles.js';
 import { el, mount } from './lib/dom.js';
-import { renderNav, highlightNav } from './lib/nav.js';
+import { renderNav, highlightNav, renderFooterLinks } from './lib/nav.js';
 import { applyPrefs } from './lib/theme.js';
 import { applyLang } from './lib/i18n.js';
 import { loadBranding, applyBranding } from './lib/branding.js';
 import { renderPatchNotes } from './lib/patch-notes.js';
 import { renderCourtTools } from './views/court.js';
 import { renderProperties } from './views/properties.js';
+import { renderLegal } from './views/legal.js';
 import { renderFeedback } from './views/feedback.js';
 import { renderFeedbackAdmin } from './views/feedback-admin.js';
 import { initActions, clearActions } from './lib/actions.js';
@@ -208,6 +209,17 @@ route('/about', (container) => {
   if (state.me && state.me.registered) renderLanding(container, { me: state.me });
   else renderSignedOutLanding(container);
 });
+
+/**
+ * The Terms of Service and the Privacy Policy.
+ *
+ * NO SIGN-IN CHECK, deliberately and unlike every other route here: somebody
+ * deciding whether to hand over their email has to be able to read what happens
+ * to it first, and a privacy policy behind a sign-in wall is a privacy policy
+ * nobody can use to make that decision.
+ */
+route('/terms', (container) => renderLegal(container, 'terms'));
+route('/privacy', (container) => renderLegal(container, 'privacy'));
 
 route('/register', (container) => {
   if (!state.profile) { navigate('/'); return; }
@@ -476,6 +488,9 @@ async function main() {
   }
   configureApi(config.apiBaseUrl);
   loadBranding(); // sitewide name/logo/favicon (public — also brands the landing)
+  // Before the router, so the links are there on the first paint — including
+  // for a visitor who never signs in.
+  renderFooterLinks(document.getElementById('footerlinks'));
   initRouter(appEl, showRoot);
   onBeforeRender(clearActions); // reset per-view action buttons before each render
   // The shift bar hides itself on the Time Card, so it has to be repainted
@@ -483,15 +498,27 @@ async function main() {
   initShiftBar();
   onBeforeRender(repaintShiftBar);
 
-  renderSignedOutLanding(appEl); // initial view (button appears once GIS is ready)
+  /**
+   * THE FIRST PAINT GOES THROUGH THE ROUTER, not straight to the landing.
+   *
+   * It used to call `renderSignedOutLanding` outright, which was right for the
+   * only address a signed-out visitor was expected to arrive at and wrong for
+   * every other one: opening `#/privacy` cold got the landing page instead,
+   * because this overwrote whatever the router had just drawn. `render()` draws
+   * the CURRENT route, and `showRoot` is still the fallback — so `/` lands
+   * exactly where it did, and a deep link now survives.
+   */
+  render();
   onAuthChange(({ idToken }) => { if (idToken) onSignedIn(); });
   // The API base goes in too: sign-in trades the Google token for a 24-hour
   // session of ours, which auth.js fetches for itself (it cannot import the API
   // client — the API client imports it).
   await initAuth(config.googleClientId, config.apiBaseUrl);
   // GIS is ready now — re-render so the sign-in button paints (unless one-tap
-  // already signed the user in).
-  if (!state.profile) renderSignedOutLanding(appEl);
+  // already signed the user in). Through the router for the same reason: a
+  // visitor reading the Privacy Policy must not be bounced to the landing the
+  // moment Google's script finishes loading.
+  if (!state.profile) render();
 }
 
 main();

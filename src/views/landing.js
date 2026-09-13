@@ -20,6 +20,7 @@ import { el, mount } from '../lib/dom.js';
 import { branding, applyBranding } from '../lib/branding.js';
 import { api } from '../lib/api.js';
 import { toast } from '../lib/toast.js';
+import { navigate } from '../lib/router.js';
 
 /**
  * The stock copy — what a blank field falls back to.
@@ -151,6 +152,15 @@ function aboutView({ signInMount, canEdit, onEdit }) {
   nodes.push(el('div.card.credits', {}, [
     el('h3', {}, 'Credits'),
     ...(b.aboutCredits ? richText(b.aboutCredits) : stockCredits()),
+    // The terms this is offered on belong with who offers it. They are in the
+    // footer of every page as well; here they are in the one place a reader
+    // goes to find out what the Ledger is and who is behind it.
+    el('p', { class: 'note' }, [
+      'The Ledger is free and provided as it is. ',
+      el('button', { class: 'link-inline', onclick: () => navigate('/terms') }, 'Terms of Service'),
+      ' · ',
+      el('button', { class: 'link-inline', onclick: () => navigate('/privacy') }, 'Privacy Policy'),
+    ]),
     ...(b.supportUrl ? [
       sectionRule(),
       el('h3', {}, b.supportTitle || STOCK.supportTitle),

@@ -38,8 +38,11 @@
     <aside id="patchnotes" class="patchnotes" aria-label="Patch notes"></aside>
   </div>
 
+  <!-- The branded line is the SPAN, which applyBranding rewrites; the links sit
+       outside it so a realm's own footer text cannot take them off the page. -->
   <footer class="footer">
     <span>The Vici Automated Ledger · created by SmileDaemon</span>
+    <nav class="footer-links" id="footerlinks" aria-label="Legal"></nav>
   </footer>
 
   <script type="module" src="./src/main.js"></script>

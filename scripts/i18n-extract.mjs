@@ -45,7 +45,15 @@ const WORKER = join(ROOT, 'worker', 'src');
 const OUT = join(SRC, 'lib', 'i18n', 'strings.json');
 
 /** Files whose strings are never shown as interface text. */
-const SKIP = ['lib/i18n.js', 'lib/i18n/'];
+/**
+ * Files whose strings are NOT interface text.
+ *
+ * `lib/i18n*` is the machinery itself. `lib/legal.js` is the Terms and the
+ * Privacy Policy, which are deliberately English-only — a mistranslated
+ * sentence about what happens to somebody's data is worse than an honest one in
+ * a second language, and the page says so under its own title.
+ */
+const SKIP = ['lib/i18n.js', 'lib/i18n/', 'lib/legal.js'];
 
 /**
  * Property names whose string value is NOT text, however much it looks like it.

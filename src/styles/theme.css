@@ -842,13 +842,53 @@ h1, h2, h3, h4, .card h2, .card h3 {
 .error { color: var(--bad); font-weight: bold; white-space: pre-wrap; }
 .ok { color: var(--good); }
 
+/* THE FOOTER SITS ON THE DESK, NOT ON A PAGE.
+
+   `--note` and `--accent` are page inks, mixed to sit on a cream leaf, and on
+   the wooden ground out here they all but vanish — which was survivable for one
+   decorative line and is not once the line beside it is something to click.
+   `--header-text` is the palette's answer for type on a dark ground; every
+   surface already defines one. */
 .footer {
   text-align: center;
   padding: 14px;
   font-size: 12px;
-  color: var(--note);
-  border-top: 1px solid rgba(122, 74, 31, 0.25);
+  color: var(--header-text);
+  opacity: 0.72;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
+/* Wraps rather than overflows on a phone, where the branded line and the two
+   links do not fit on one row. */
+.footer-links {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 4px 14px; margin-top: 6px;
+}
+.footer-links button.link-inline { color: inherit; font-size: inherit; }
+.footer-links button.link-inline:hover { text-decoration: none; opacity: 1; }
+
+/* PRINTED MATTER, BOUND INTO THE LEDGER.
+
+   The hand is for what the shopkeeper WROTE, and nobody wrote these — they came
+   printed, like the headings, and they are the two pages in the app a reader has
+   to get exactly right. Six thousand characters of Caveat is handsome and hard
+   going; the printed face is the same book at a length the hand cannot carry.
+
+   Measure and leading go with it: prose past about 70 characters a line is hard
+   to track back to the start of the next one, and these are the only pages here
+   with enough continuous text for that to bite. */
+.card.legal {
+  max-width: 68ch;
+  margin-inline: auto;
+  font-family: var(--font-book);
+  font-size: calc(16px * var(--type-scale));
+}
+.card.legal h3 { margin-top: 26px; }
+.card.legal p, .card.legal li { line-height: 1.6; }
+.card.legal .feature-list { margin: 10px 0; }
+.card.legal .feature-list li { margin-bottom: 8px; }
+/* The chrome — back link, dates, the language notice — stays in the app's own
+   hand: it is the Ledger speaking, not the document. */
+.card.legal .note, .card.legal button { font-family: var(--font-hand); }
 
 .role-pill {
   font-size: 11px;
@@ -1151,6 +1191,16 @@ button.link-back {
   font: inherit; padding: 0; margin: 0 0 8px; width: auto;
 }
 button.link-back:hover { text-decoration: underline; }
+
+/* A link INSIDE a sentence. The same look as .link-back with none of its
+   spacing — a button with a bottom margin sitting mid-paragraph pushes the line
+   it is part of out of alignment with the ones around it. */
+button.link-inline {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font: inherit; padding: 0; margin: 0; width: auto; display: inline;
+  text-decoration: underline;
+}
+button.link-inline:hover { text-decoration: none; }
 
 /* Secondary (outline) button */
 button.secondary-btn {
