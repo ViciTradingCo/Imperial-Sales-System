@@ -6,7 +6,7 @@
  * next door in court.js; what stays here is what an ordinary shop sees of its
  * Court — the notice on its board, and its own standing.
  */
-import { requireRegistered, requireManages, requireOwner, managesBusiness, leaveRefusal, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
+import { requireRegistered, requireManages, requireOwner, managesBusiness, leaveRefusal, dismissalRefusal, requireActive, publicUser, actorName, findBusinessMeta, realmIdOf } from '../guards.js';
 import { listUsersByBusiness, setUserStatus, setUserNote, findUserByUid, setPayRate, setManagerRole, deleteMember, listMemberships } from '../users.js';
 import { renameBusiness, listBusinessCards, closeCompany } from '../registry.js';
 import { getFlag, getDb, countBusinessTransfers } from '../db.js';
@@ -332,6 +332,23 @@ async function leaveBusinessRoute({ request, env, body }) {
 }
 
 /**
+ * WHAT THE SHOP STILL OWES ONE PERSON — finished shifts nobody has settled,
+ * plus commission on the sales they rang up.
+ *
+ * Shared by the two screens that ask it, which are the same question from
+ * opposite sides of the counter: somebody deciding whether to leave, and an
+ * owner deciding whether to put somebody out. Both are about to end a
+ * membership, and neither act touches the debt — so both should show the figure
+ * first, and they must show the SAME figure.
+ */
+async function whatIsOwed(env, uid, realmId) {
+  const shifts = await myShifts(env, uid, realmId, 200);
+  const hourly = shifts.filter((s) => !s.open && !s.paid).reduce((n, s) => n + s.pay, 0);
+  const commission = await myCommission(env, uid, realmId);
+  return { hourly, commission: commission.owed, total: hourly + commission.owed };
+}
+
+/**
  * What leaving would cost them — read BEFORE they decide, never after.
  *
  * Unpaid work is the one thing somebody should know about before walking, and
@@ -340,9 +357,6 @@ async function leaveBusinessRoute({ request, env, body }) {
 async function leavePreviewRoute({ request, env }) {
   const caller = await requireRegistered(request, env);
   const realmId = realmIdOf(caller, env);
-  const shifts = await myShifts(env, caller.uid, realmId, 200);
-  const hourly = shifts.filter((s) => !s.open && !s.paid).reduce((n, s) => n + s.pay, 0);
-  const commission = await myCommission(env, caller.uid, realmId);
   const refusal = leaveRefusal(caller);
   return {
     business: caller.business || '',
@@ -351,8 +365,105 @@ async function leavePreviewRoute({ request, env }) {
     // guess at them and the two can never say different things.
     refusal,
     onShift: !!(await openShift(env, caller.uid, realmId)),
-    owed: { hourly, commission: commission.owed, total: hourly + commission.owed },
+    owed: await whatIsOwed(env, caller.uid, realmId),
   };
+}
+
+/**
+ * DISMISSING SOMEBODY — the same ending as leaving, decided by the other party.
+ *
+ * Two routes on one set of refusals, exactly like closing the shop: the preview
+ * says what it would mean and whether it is allowed, the POST does it, and both
+ * read `dismissalRefusal` so the roster cannot offer a button the Worker will
+ * turn down.
+ *
+ * OWNER-ONLY, and here is why (the short dangerous list earns a reason). Who is
+ * on the roster is who has power in the shop, and a manager is defined as an
+ * employee who runs the place WITHOUT being able to change that: they cannot
+ * appoint a manager and they cannot set what anyone is paid. A manager who
+ * could dismiss could remove the other managers — and, given the chance, the
+ * people who might be appointed instead — which is the same power by the other
+ * door.
+ *
+ * An admin passes the gate but, like every other roster route, only ever
+ * reaches their OWN business's roster — an admin acting on somebody else's shop
+ * does it from the Admin Panel, where it is a member of the network being
+ * removed and is logged as one. A second, quieter door to the same power with a
+ * different audit trail is not worth having.
+ *
+ * WHAT IT DOES NOT DO IS CANCEL THE DEBT. `deleteMember` ends the membership and
+ * nothing else; the shifts and the sales carry the BUSINESS on the row, so the
+ * shop goes on owing exactly what it owed and the owner can still settle it from
+ * the time card log — where a departed person is still listed by name. Being
+ * dismissed is not forfeiting, for the same reason walking out is not.
+ */
+async function dismissalTarget(request, env, uid) {
+  const caller = await requireOwner(request, env);
+  const realmId = realmIdOf(caller, env);
+  // Their OWN roster only — the same check activate, note, pay and manager make.
+  // It is what confines this to one shop, and the uid is the only thing the
+  // client sends, so one belonging to a stranger must find nothing.
+  const roster = await listUsersByBusiness(env, caller.business, realmId);
+  const target = roster.find((u) => u.uid === String(uid || '').trim());
+  if (!target) {
+    const e = new Error('That employee is not part of your business.');
+    e.forbidden = true; throw e;
+  }
+  return { caller, realmId, target };
+}
+
+/**
+ * EVERY reason this dismissal cannot happen, in one string — who they are, and
+ * whether they are standing at the counter right now.
+ *
+ * One function and one sentence rather than a refusal here and a warning of its
+ * own on the screen. The screen showed the second in its own words for a while
+ * and the two were already drifting apart; now it renders whatever comes back,
+ * so the page and the server cannot describe the same obstacle differently.
+ *
+ * The open shift is the same refusal LEAVING gets, for the same reason: a shift
+ * nobody closed would sit open against the shop for good, and after a dismissal
+ * the one person who could clock out can no longer sign in. The owner can close
+ * or settle it on the time card log, so it is a refusal they can act on.
+ */
+async function dismissalBlock(env, target, realmId) {
+  const onShift = !!(await openShift(env, target.uid, realmId));
+  const refusal = dismissalRefusal(target) || (onShift
+    ? 'They are still clocked in. Close their shift on the Time Card log first, or the open shift ' +
+      'would stay on your books with nobody able to end it.'
+    : '');
+  return { refusal, onShift };
+}
+
+async function dismissPreviewRoute({ request, env, url }) {
+  const { realmId, target } = await dismissalTarget(request, env, url.searchParams.get('uid'));
+  const { refusal, onShift } = await dismissalBlock(env, target, realmId);
+  return {
+    uid: target.uid,
+    who: target.character || target.email,
+    role: target.role,
+    canDismiss: !refusal,
+    refusal,
+    // Not for its words — those are in `refusal` — but so the screen can tell a
+    // "do this first" from a "never" and colour it accordingly.
+    onShift,
+    owed: await whatIsOwed(env, target.uid, realmId),
+  };
+}
+
+async function dismissEmployeeRoute({ request, env, body }) {
+  const { caller, realmId, target } = await dismissalTarget(request, env, body.uid);
+  const { refusal } = await dismissalBlock(env, target, realmId);
+  if (refusal) { const e = new Error(refusal); e.forbidden = true; throw e; }
+  // Said out loud by the client, so a stray request cannot end somebody's
+  // employment by arriving.
+  if (body.confirm !== true) throw new Error('Dismissing someone has to be confirmed.');
+
+  const who = target.character || target.email;
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'employee.dismissed', detail: who + ' was dismissed from ' + caller.business, realmId });
+  await deleteMember(env, target.uid, realmId);
+  return { ok: true, uid: target.uid, who };
 }
 
 /**
@@ -1008,6 +1119,8 @@ export const routes = [
   { method: 'POST', path: '/timecard/delete', handler: timecardDelete },
   { method: 'POST', path: '/business/employees/rate', handler: payRateRoute },
   { method: 'POST', path: '/business/employees/manager', handler: managerRoleRoute },
+  { method: 'GET', path: '/business/employees/dismiss', handler: dismissPreviewRoute },
+  { method: 'POST', path: '/business/employees/dismiss', handler: dismissEmployeeRoute },
   { method: 'GET', path: '/business/bundles', handler: getBundles },
   { method: 'POST', path: '/business/bundles/save', handler: saveBundleRoute },
   { method: 'POST', path: '/business/bundles/delete', handler: deleteBundleRoute },

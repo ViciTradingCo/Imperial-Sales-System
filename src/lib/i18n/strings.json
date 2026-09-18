@@ -541,6 +541,7 @@
     "holes": 2,
     "lits": 22,
     "seen": [
+      "src/views/employees.js",
       "src/views/profile.js"
     ]
   },
@@ -624,6 +625,14 @@
     "lits": 102,
     "seen": [
       "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} is no longer on your roster.",
+    "holes": 1,
+    "lits": 22,
+    "seen": [
+      "src/views/employees.js"
     ]
   },
   {
@@ -2209,6 +2218,14 @@
     ]
   },
   {
+    "en": "An admin is not on your roster, so there is nothing to take them off.",
+    "holes": 0,
+    "lits": 53,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
     "en": "An admin’s realm code is unchanged and carries no region and no property. That is what makes a shop answering to no Court — and how Courts themselves are set up — so a Court can never reach one.",
     "holes": 0,
     "lits": 151,
@@ -2254,6 +2271,22 @@
     "lits": 24,
     "seen": [
       "worker/src/item-index.js"
+    ]
+  },
+  {
+    "en": "AN OWNER CAN NOW LET SOMEBODY GO. There is a Fire button beside each employee and manager on the Roster, which until now could only be done the other way round — by the person leaving, from their own Profile.",
+    "holes": 0,
+    "lits": 164,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "An owner cannot be fired, by themselves or anyone else: a shop with nobody running it cannot be put right from the inside. That stays an admin’s job.",
+    "holes": 0,
+    "lits": 117,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -3026,6 +3059,14 @@
     "lits": 28,
     "seen": [
       "src/views/ledger-settings.js"
+    ]
+  },
+  {
+    "en": "Checking what they are owed…",
+    "holes": 0,
+    "lits": 23,
+    "seen": [
+      "src/views/employees.js"
     ]
   },
   {
@@ -4074,6 +4115,22 @@
     ]
   },
   {
+    "en": "Dismissing someone has to be confirmed.",
+    "holes": 0,
+    "lits": 33,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "Dismissing…",
+    "holes": 0,
+    "lits": 10,
+    "seen": [
+      "src/views/employees.js"
+    ]
+  },
+  {
     "en": "Done — {0} tables cleared. Kept {1} admin account(s), {2} master item(s), and {3} hold(s). Reload the page to see the clean state.",
     "holes": 4,
     "lits": 84,
@@ -4935,6 +4992,30 @@
     ]
   },
   {
+    "en": "Fire",
+    "holes": 0,
+    "lits": 4,
+    "seen": [
+      "src/views/employees.js"
+    ]
+  },
+  {
+    "en": "Fire {0}",
+    "holes": 1,
+    "lits": 4,
+    "seen": [
+      "src/views/employees.js"
+    ]
+  },
+  {
+    "en": "Firing them does NOT cancel it. Their shifts and their sales stay on your books and they stay on your Time Card log by name, so you can still settle up.",
+    "holes": 0,
+    "lits": 119,
+    "seen": [
+      "src/views/employees.js"
+    ]
+  },
+  {
     "en": "Fix → “{0}”",
     "holes": 1,
     "lits": 3,
@@ -5619,6 +5700,14 @@
     ]
   },
   {
+    "en": "If you take them back on later, they join the same way anyone does — with your staff code.",
+    "holes": 0,
+    "lits": 69,
+    "seen": [
+      "src/views/employees.js"
+    ]
+  },
+  {
     "en": "If your device asks for French, that is what you get, with nothing to switch on. Appearance still lets you choose English instead.",
     "holes": 0,
     "lits": 104,
@@ -6152,6 +6241,14 @@
     ]
   },
   {
+    "en": "It is the OWNER’S button. A manager runs the shop day to day without being able to change who works there — the same line that keeps setting pay and appointing managers out of their hands.",
+    "holes": 0,
+    "lits": 149,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "It keeps its line in Company Performance, marked “(archived)”. Its trade really happened, and dropping it there would have left the totals unexplainable.",
     "holes": 0,
     "lits": 123,
@@ -6179,6 +6276,14 @@
     "en": "It shows no money. An open shift is worth nothing yet — it is still being worked — and a figure creeping up in the corner of every screen is an odd thing to be paid by.",
     "holes": 0,
     "lits": 128,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "It shows what you still owe them before you decide, and firing them does NOT settle it. Their shifts and their sales stay on your books and they stay on your Time Card log by name, so you can still pay them.",
+    "holes": 0,
+    "lits": 162,
     "seen": [
       "src/lib/patch-notes.js"
     ]
@@ -8497,6 +8602,14 @@
     ]
   },
   {
+    "en": "Nothing outstanding — everything they have worked has been settled.",
+    "holes": 0,
+    "lits": 56,
+    "seen": [
+      "src/views/employees.js"
+    ]
+  },
+  {
     "en": "Nothing outstanding.",
     "holes": 0,
     "lits": 18,
@@ -8559,6 +8672,14 @@
     "lits": 17,
     "seen": [
       "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "Nothing they recorded is changed and their account is not deleted; they simply come off your roster. If you take them back on later they join with your staff code, the same as anyone.",
+    "holes": 0,
+    "lits": 146,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -12696,6 +12817,14 @@
     ]
   },
   {
+    "en": "That person is not on your roster.",
+    "holes": 0,
+    "lits": 27,
+    "seen": [
+      "worker/src/guards.js"
+    ]
+  },
+  {
     "en": "That property is not in your region.",
     "holes": 0,
     "lits": 29,
@@ -13609,6 +13738,14 @@
     "lits": 44,
     "seen": [
       "src/views/shop-deals.js"
+    ]
+  },
+  {
+    "en": "They come off the roster straight away: no register, no stock, no clocking on. Their account is not deleted and nothing they recorded is changed.",
+    "holes": 0,
+    "lits": 116,
+    "seen": [
+      "src/views/employees.js"
     ]
   },
   {
@@ -15271,6 +15408,14 @@
     ]
   },
   {
+    "en": "You cannot fire somebody who is clocked in — their shift would sit open on your books with nobody able to end it. Close it on the Time Card log first, and the button opens.",
+    "holes": 0,
+    "lits": 134,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "You cannot leave mid-shift. Clock out first, or the shift would sit open on the shop’s log with nobody able to close it.",
     "holes": 0,
     "lits": 93,
@@ -15348,6 +15493,14 @@
     "lits": 185,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "You still owe them {0}",
+    "holes": 1,
+    "lits": 15,
+    "seen": [
+      "src/views/employees.js"
     ]
   },
   {

@@ -592,6 +592,31 @@ offer what the server will turn down. An OWNER is refused: a shop whose owner
 walked out cannot be put right from the inside, so that is an admin's job.
 Someone clocked in is refused too, or the open shift outlives them.
 
+## Firing is leaving, decided by the other party
+
+An owner puts somebody out from the Roster (`Fire`, `/business/employees/dismiss`,
+one preview route and one that does it). It ends the same way and keeps the same
+promise: `deleteMember` and nothing else, so the shifts and the sales stay on the
+shop's books and the departed person stays on the Time Card log BY NAME, still
+owed and still settleable. A shop that could clear its wage bill by dismissing
+the people it owed would be a shop with a reason to dismiss them, so the figure
+is shown BEFORE the decision — `whatIsOwed` is shared with the leave preview so
+the two sides cannot quote different numbers.
+
+`dismissalRefusal(target)` is `leaveRefusal`'s mirror and refuses the same two
+people for the same reasons (an owner; an admin, who was never on the roster).
+`dismissalBlock` adds the open shift to it and returns ONE string, which the
+screen renders as-is — the page had its own wording for the clocked-in case and
+the two were already drifting.
+
+OWNER-ONLY. Who is on the roster is who has power in the shop, and a manager is
+defined as someone who runs the place without being able to change that; a
+manager who could dismiss could remove the other managers. An admin passes the
+gate but, like every roster route, still reaches only their OWN business — an
+admin acting on another shop does it from the Admin Panel, where it is logged as
+a member of the network being removed. Two doors to one power with two audit
+trails is not worth having.
+
 ## Archiving is not deleting
 
 `archiveCompany` renames the shop and everything it owns to a unique key — which

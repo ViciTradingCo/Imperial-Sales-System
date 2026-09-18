@@ -122,6 +122,13 @@ export function renderEmployees(container, { me }) {
           }
         }
         actions.appendChild(el('button.secondary-btn.small', { onclick: () => openNoteModal(u, refresh) }, 'Notes'));
+        // Last on the row and the only one dressed as a danger, because it is
+        // the only one that ends something. Offered on exactly the rows
+        // `dismissalRefusal` would allow — an owner is above it and an admin was
+        // never on this roster — so it is never a button that only refuses.
+        if (owner && (u.role === 'employee' || u.role === 'manager')) {
+          actions.appendChild(el('button.danger.small', { onclick: () => openFireModal(u, refresh) }, 'Fire'));
+        }
         row.appendChild(actions);
         return row;
       });
@@ -252,6 +259,79 @@ function openManagerModal(u, onSaved) {
       : null,
     save, status,
   ].filter(Boolean));
+}
+
+/**
+ * FIRING SOMEBODY — the owner's side of leaving, and the same ending.
+ *
+ * The figure comes before the button, as it does on the employee's own Leave
+ * card: what the shop still owes this person is the one thing an owner should
+ * have in front of them while deciding, and the point is that dismissing them
+ * does not settle it. Their shifts and their sales carry the shop on the row,
+ * so the debt stays on the time card log, where they are still listed by name.
+ *
+ * The button is disabled until the preview is in, so nobody fires blind on a
+ * slow connection, and the server's own refusal is shown rather than this
+ * screen guessing at one. There is no second "are you sure?" behind it: the
+ * dialog IS the confirmation, and a confirm on top of a confirm is a click
+ * people learn to dismiss without reading.
+ */
+function openFireModal(u, onDone) {
+  const who = u.character || u.email;
+  const facts = el('div', {}, el('p', { class: 'note' }, 'Checking what they are owed…'));
+  const status = el('p', {});
+  const fire = el('button.danger', { onclick: doFire }, 'Fire ' + who);
+  fire.disabled = true;
+  const setStatus = (m, c) => { status.className = c || ''; status.textContent = m || ''; };
+
+  api.dismissPreview(u.uid).then((r) => {
+    const nodes = [];
+    const owed = r.owed || {};
+    if (owed.total > 0) {
+      nodes.push(el('p', { class: 'buy-total' }, 'You still owe them ' + money(owed.total)));
+      if (owed.hourly && owed.commission) {
+        nodes.push(el('p', { class: 'note' }, money(owed.hourly) + ' in hours and ' +
+          money(owed.commission) + ' in commission.'));
+      }
+      nodes.push(el('p', { class: 'note' }, 'Firing them does NOT cancel it. Their shifts and their sales ' +
+        'stay on your books and they stay on your Time Card log by name, so you can still settle up.'));
+    } else {
+      nodes.push(el('p', { class: 'note' }, 'Nothing outstanding — everything they have worked has ' +
+        'been settled.'));
+    }
+    // The server's own words for why not, never this screen's guess at them.
+    // An open shift is a "close it first", so it is a warning; anything else is
+    // a flat no.
+    if (r.refusal) nodes.push(el('p', { class: r.onShift ? 'warn' : 'error' }, r.refusal));
+    mount(facts, ...nodes);
+    fire.disabled = !r.canDismiss;
+  }).catch((e) => mount(facts, el('p', { class: 'error' }, e.message || String(e))));
+
+  let modal;
+  async function doFire() {
+    fire.disabled = true;
+    setStatus('Dismissing…', '');
+    try {
+      await api.dismissEmployee(u.uid);
+      onDone();
+      modal.close();
+      toast(who + ' is no longer on your roster.', 'ok');
+    } catch (e) {
+      fire.disabled = false;
+      setStatus(e.message || String(e), 'error');
+    }
+  }
+
+  modal = openModal([
+    el('h3', {}, 'Fire ' + who),
+    el('p', { class: 'note' }, 'They come off the roster straight away: no register, no stock, no clocking ' +
+      'on. Their account is not deleted and nothing they recorded is changed.'),
+    facts,
+    el('p', { class: 'note' }, 'If you take them back on later, they join the same way anyone does — with ' +
+      'your staff code.'),
+    el('div', { class: 'row-actions' }, [fire]),
+    status,
+  ]);
 }
 
 function openNoteModal(u, onSaved) {

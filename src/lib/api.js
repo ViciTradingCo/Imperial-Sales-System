@@ -111,6 +111,10 @@ export const api = {
   activateEmployee: (uid) => request('POST', '/business/employees/activate', { uid }),
   /** Owner/admin: set an owner-private note on an employee. */
   setEmployeeNote: (uid, note) => request('POST', '/business/employees/note', { uid, note }),
+  /** Owner: what dismissing this person would mean — what they are owed, and whether it is allowed. */
+  dismissPreview: (uid) => request('GET', '/business/employees/dismiss?uid=' + encodeURIComponent(uid)),
+  /** Owner: take someone off the roster. Their membership ends; what the shop owes them does not. */
+  dismissEmployee: (uid) => request('POST', '/business/employees/dismiss', { uid, confirm: true }),
   /** Admin: read the network's Master Settings. */
   getSettings: () => request('GET', '/admin/settings'),
   /** Admin: save Master Settings updates ([{label, value}]). */

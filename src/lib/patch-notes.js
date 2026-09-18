@@ -10,6 +10,14 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.5', date: '2026-09-18', notes: [
+    'AN OWNER CAN NOW LET SOMEBODY GO. There is a Fire button beside each employee and manager on the Roster, which until now could only be done the other way round — by the person leaving, from their own Profile.',
+    'It shows what you still owe them before you decide, and firing them does NOT settle it. Their shifts and their sales stay on your books and they stay on your Time Card log by name, so you can still pay them.',
+    'Nothing they recorded is changed and their account is not deleted; they simply come off your roster. If you take them back on later they join with your staff code, the same as anyone.',
+    'You cannot fire somebody who is clocked in — their shift would sit open on your books with nobody able to end it. Close it on the Time Card log first, and the button opens.',
+    'An owner cannot be fired, by themselves or anyone else: a shop with nobody running it cannot be put right from the inside. That stays an admin’s job.',
+    'It is the OWNER’S button. A manager runs the shop day to day without being able to change who works there — the same line that keeps setting pay and appointing managers out of their hands.',
+  ] },
   { version: '7.4', date: '2026-09-13', notes: [
     'THE LEDGER HAS A PRIVACY POLICY AND TERMS OF SERVICE. Both are linked in the footer of every page and from the Credits on the About page, and both can be read without signing in — deciding whether to hand over your email is hard to do behind a sign-in wall.',
     'The Privacy Policy says exactly what is held about you: your email and display name from Google and nothing else, the character and shop names you give, and the trade you record. No advertising, no tracking, no analytics, and your IP address is never written to the database.',

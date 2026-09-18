@@ -190,6 +190,31 @@ export function leaveRefusal(caller) {
   return '';
 }
 
+/**
+ * The other half of the same rule: whether this person may be PUT OUT of the
+ * shop, and if not, why not.
+ *
+ * `leaveRefusal` asks about the caller and this asks about the target, but they
+ * refuse the same two people for the same reason — an owner, because a shop
+ * with nobody running it cannot be put right from the inside, and an admin,
+ * because they were never on this roster to be taken off it. Written here
+ * beside it so the pair stay recognisably one rule; used by the route that
+ * refuses AND by the screen that decides whether to draw the button, so a
+ * roster can never offer a dismissal the Worker will turn down.
+ *
+ * WHO MAY DO THE DISMISSING is not this function's business — that is
+ * `requireOwner` at the route. This says only who is dismissible.
+ */
+export function dismissalRefusal(target) {
+  if (!target) return 'That person is not on your roster.';
+  if (target.role === 'owner' || target.isOwner) {
+    return 'An owner cannot be dismissed from their own shop. Ask an admin to archive the company or ' +
+      'hand it to someone else.';
+  }
+  if (target.role === 'admin') return 'An admin is not on your roster, so there is nothing to take them off.';
+  return '';
+}
+
 /** Requires a registered user whose account is active (can operate the register). */
 export async function requireActive(request, env) {
   const user = await requireRegistered(request, env);
