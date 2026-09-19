@@ -14,7 +14,7 @@ import { toast } from '../lib/toast.js';
 import { skeletonRows, skeletonLines } from '../lib/skeleton.js';
 import { staffCodePanel } from './staff-code.js';
 import { money } from '../lib/format.js';
-import { isOwner, roleLabel } from '../lib/roles.js';
+import { isOwner, canDismiss, roleLabel } from '../lib/roles.js';
 
 export function renderEmployees(container, { me }) {
   // A manager keeps the roster — activating, annotating, reading it. What is
@@ -123,10 +123,11 @@ export function renderEmployees(container, { me }) {
         }
         actions.appendChild(el('button.secondary-btn.small', { onclick: () => openNoteModal(u, refresh) }, 'Notes'));
         // Last on the row and the only one dressed as a danger, because it is
-        // the only one that ends something. Offered on exactly the rows
-        // `dismissalRefusal` would allow — an owner is above it and an admin was
-        // never on this roster — so it is never a button that only refuses.
-        if (owner && (u.role === 'employee' || u.role === 'manager')) {
+        // the only one that ends something. Offered on exactly the rows the
+        // Worker would allow: an owner sees it on employees and managers alike,
+        // a manager only on ordinary employees, and nobody sees it on an owner
+        // or an admin. So it is never a button that only refuses.
+        if (canDismiss(me, u)) {
           actions.appendChild(el('button.danger.small', { onclick: () => openFireModal(u, refresh) }, 'Fire'));
         }
         row.appendChild(actions);

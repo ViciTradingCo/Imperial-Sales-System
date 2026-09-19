@@ -377,13 +377,15 @@ async function leavePreviewRoute({ request, env }) {
  * read `dismissalRefusal` so the roster cannot offer a button the Worker will
  * turn down.
  *
- * OWNER-ONLY, and here is why (the short dangerous list earns a reason). Who is
- * on the roster is who has power in the shop, and a manager is defined as an
- * employee who runs the place WITHOUT being able to change that: they cannot
- * appoint a manager and they cannot set what anyone is paid. A manager who
- * could dismiss could remove the other managers — and, given the chance, the
- * people who might be appointed instead — which is the same power by the other
- * door.
+ * THE GATE IS `requireManages` AND THE LIMIT IS IN THE TARGET, which is the only
+ * arrangement that expresses the actual rule: a manager may let an ordinary
+ * employee go and nobody else. Gating the route on the owner and gating the
+ * manager case somewhere else would be two rules to keep in step, and the
+ * screen would have to guess which one it had hit.
+ *
+ * So `dismissalRefusal` takes the caller as well as the target, and the whole
+ * of "who may dismiss whom" is one sentence in one function — the same answer
+ * for the POST, the preview, and the button the roster decides whether to draw.
  *
  * An admin passes the gate but, like every other roster route, only ever
  * reaches their OWN business's roster — an admin acting on somebody else's shop
@@ -398,7 +400,7 @@ async function leavePreviewRoute({ request, env }) {
  * dismissed is not forfeiting, for the same reason walking out is not.
  */
 async function dismissalTarget(request, env, uid) {
-  const caller = await requireOwner(request, env);
+  const caller = await requireManages(request, env);
   const realmId = realmIdOf(caller, env);
   // Their OWN roster only — the same check activate, note, pay and manager make.
   // It is what confines this to one shop, and the uid is the only thing the
@@ -426,9 +428,9 @@ async function dismissalTarget(request, env, uid) {
  * the one person who could clock out can no longer sign in. The owner can close
  * or settle it on the time card log, so it is a refusal they can act on.
  */
-async function dismissalBlock(env, target, realmId) {
+async function dismissalBlock(env, caller, target, realmId) {
   const onShift = !!(await openShift(env, target.uid, realmId));
-  const refusal = dismissalRefusal(target) || (onShift
+  const refusal = dismissalRefusal(caller, target) || (onShift
     ? 'They are still clocked in. Close their shift on the Time Card log first, or the open shift ' +
       'would stay on your books with nobody able to end it.'
     : '');
@@ -436,8 +438,8 @@ async function dismissalBlock(env, target, realmId) {
 }
 
 async function dismissPreviewRoute({ request, env, url }) {
-  const { realmId, target } = await dismissalTarget(request, env, url.searchParams.get('uid'));
-  const { refusal, onShift } = await dismissalBlock(env, target, realmId);
+  const { caller, realmId, target } = await dismissalTarget(request, env, url.searchParams.get('uid'));
+  const { refusal, onShift } = await dismissalBlock(env, caller, target, realmId);
   return {
     uid: target.uid,
     who: target.character || target.email,
@@ -453,7 +455,7 @@ async function dismissPreviewRoute({ request, env, url }) {
 
 async function dismissEmployeeRoute({ request, env, body }) {
   const { caller, realmId, target } = await dismissalTarget(request, env, body.uid);
-  const { refusal } = await dismissalBlock(env, target, realmId);
+  const { refusal } = await dismissalBlock(env, caller, target, realmId);
   if (refusal) { const e = new Error(refusal); e.forbidden = true; throw e; }
   // Said out loud by the client, so a stray request cannot end somebody's
   // employment by arriving.

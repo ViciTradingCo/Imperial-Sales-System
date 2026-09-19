@@ -33,6 +33,26 @@ export function isOwner(me) {
   return !!me && (me.role === 'owner' || me.role === 'admin');
 }
 
+/**
+ * Whether this person may put THAT one out of the shop — the screen's copy of
+ * the Worker's `dismissalRefusal`.
+ *
+ * The one permission in the app that depends on both sides, so it cannot be
+ * either predicate above on its own: anyone who runs the shop may let an
+ * ordinary employee go, and a manager is the OWNER'S to stand down. An owner is
+ * above it and an admin was never on this roster, so neither row offers it.
+ *
+ * Written in terms of `canManage` and `isOwner` rather than naming roles again
+ * — those two are still where the line lives, and this only says which side of
+ * them each kind of target falls on.
+ */
+export function canDismiss(me, target) {
+  if (!me || !target) return false;
+  if (target.role === 'employee') return canManage(me);
+  if (target.role === 'manager') return isOwner(me);
+  return false;
+}
+
 /** How a role is written on screen. */
 export function roleLabel(role) {
   if (role === 'owner') return 'Shop Owner';

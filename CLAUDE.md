@@ -603,19 +603,31 @@ the people it owed would be a shop with a reason to dismiss them, so the figure
 is shown BEFORE the decision — `whatIsOwed` is shared with the leave preview so
 the two sides cannot quote different numbers.
 
-`dismissalRefusal(target)` is `leaveRefusal`'s mirror and refuses the same two
-people for the same reasons (an owner; an admin, who was never on the roster).
-`dismissalBlock` adds the open shift to it and returns ONE string, which the
-screen renders as-is — the page had its own wording for the clocked-in case and
-the two were already drifting.
+`dismissalRefusal(caller, target)` shares two refusals with `leaveRefusal` (an
+owner; an admin, who was never on the roster). `dismissalBlock` adds the open
+shift to it and returns ONE string, which the screen renders as-is — the page
+had its own wording for the clocked-in case and the two were already drifting.
 
-OWNER-ONLY. Who is on the roster is who has power in the shop, and a manager is
-defined as someone who runs the place without being able to change that; a
-manager who could dismiss could remove the other managers. An admin passes the
-gate but, like every roster route, still reaches only their OWN business — an
-admin acting on another shop does it from the Admin Panel, where it is logged as
-a member of the network being removed. Two doors to one power with two audit
-trails is not worth having.
+IT TAKES BOTH SIDES, which is what makes it unlike every other permission here:
+A MANAGER MAY DISMISS AN ORDINARY EMPLOYEE AND NOBODY ELSE, and a manager is the
+OWNER'S to dismiss. That is the manager role's own line from one more angle —
+they run the shop day to day, and who else has POWER in it stays the owner's.
+Handing a manager somebody to fire is not the same as letting them decide who
+the other managers are: one who could dismiss managers could clear out everyone
+the owner might promote instead, and could dismiss the manager who would
+otherwise dismiss them. A manager trying to dismiss THEMSELVES needs no rule of
+its own — a manager is a manager — and their way out is Profile → Leave.
+
+So the route gates on `requireManages` and the limit lives in the target. The
+alternative was an owner-only route plus a manager case somewhere else: two
+rules to keep in step, and a screen that has to guess which one it hit. The
+frontend's copy is `canDismiss(me, target)` in `lib/roles.js`, written in terms
+of `canManage`/`isOwner` rather than naming roles again.
+
+An admin passes the gate but, like every roster route, still reaches only their
+OWN business — an admin acting on another shop does it from the Admin Panel,
+where it is logged as a member of the network being removed. Two doors to one
+power with two audit trails is not worth having.
 
 ## Archiving is not deleting
 

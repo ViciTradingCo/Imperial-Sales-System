@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.6', date: '2026-09-19', notes: [
+    'MANAGERS CAN NOW FIRE ORDINARY EMPLOYEES. Yesterday’s Fire button was the owner’s alone; a manager who runs the shop day to day sees it too now, on employees.',
+    'On employees only. A manager is still the OWNER’S to dismiss — who else has power in the shop is the one thing the manager role does not reach, the same as appointing managers and setting pay. Stand a manager down first and anyone running the shop can let them go.',
+    'That covers a manager firing themselves, which is refused for the same reason. Leaving is still yours to do whenever you like, from Profile.',
+    'Nothing else moved: an owner cannot be fired by anybody, somebody clocked in has to be clocked out first, and what the shop owes a departing person is shown before the decision and survives it.',
+  ] },
   { version: '7.5', date: '2026-09-18', notes: [
     'AN OWNER CAN NOW LET SOMEBODY GO. There is a Fire button beside each employee and manager on the Roster, which until now could only be done the other way round — by the person leaving, from their own Profile.',
     'It shows what you still owe them before you decide, and firing them does NOT settle it. Their shifts and their sales stay on your books and they stay on your Time Card log by name, so you can still pay them.',

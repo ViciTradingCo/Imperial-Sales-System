@@ -194,24 +194,42 @@ export function leaveRefusal(caller) {
  * The other half of the same rule: whether this person may be PUT OUT of the
  * shop, and if not, why not.
  *
- * `leaveRefusal` asks about the caller and this asks about the target, but they
- * refuse the same two people for the same reason — an owner, because a shop
- * with nobody running it cannot be put right from the inside, and an admin,
- * because they were never on this roster to be taken off it. Written here
- * beside it so the pair stay recognisably one rule; used by the route that
+ * `leaveRefusal` asks about the caller alone, and this one has to ask about
+ * BOTH — it is the rare rule where who is being dismissed depends on who is
+ * doing it. Hence two arguments rather than the one-sided mirror it started as:
+ * an ordinary employee may be let go by anyone who runs the shop, and a manager
+ * only by the owner.
+ *
+ * Two of the refusals it shares with `leaveRefusal` outright: an OWNER, because
+ * a shop with nobody running it cannot be put right from the inside, and an
+ * ADMIN, because they were never on this roster to be taken off it. Written
+ * here beside it so the pair stay recognisably one rule; used by the route that
  * refuses AND by the screen that decides whether to draw the button, so a
  * roster can never offer a dismissal the Worker will turn down.
  *
- * WHO MAY DO THE DISMISSING is not this function's business — that is
- * `requireOwner` at the route. This says only who is dismissible.
+ * A MANAGER MAY DISMISS AN ORDINARY EMPLOYEE AND NOBODY ELSE, which is the line
+ * the manager role is defined by seen from one more angle: they run the shop
+ * day to day, and what stays the owner's is who else has POWER in it. Letting a
+ * shop hand a manager somebody to fire is not the same as letting them decide
+ * who the other managers are — a manager who could dismiss managers could clear
+ * out everyone the owner might promote instead, and could dismiss the manager
+ * who would otherwise dismiss them.
+ *
+ * That last case needs no rule of its own: a manager IS a manager, so one
+ * trying to dismiss themselves is turned away by the same sentence. Their way
+ * out is Profile → Leave, which is the employee's own decision and always was.
  */
-export function dismissalRefusal(target) {
+export function dismissalRefusal(caller, target) {
   if (!target) return 'That person is not on your roster.';
   if (target.role === 'owner' || target.isOwner) {
     return 'An owner cannot be dismissed from their own shop. Ask an admin to archive the company or ' +
       'hand it to someone else.';
   }
   if (target.role === 'admin') return 'An admin is not on your roster, so there is nothing to take them off.';
+  if (target.role === 'manager' && !(caller && (caller.role === 'owner' || caller.role === 'admin'))) {
+    return 'Only the shop’s owner can dismiss a manager. A manager may let an ordinary employee go — ' +
+      'ask the owner to stand this one down first.';
+  }
   return '';
 }
 
