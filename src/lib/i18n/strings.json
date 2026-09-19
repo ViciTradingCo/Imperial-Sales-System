@@ -436,8 +436,7 @@
     "holes": 1,
     "lits": 6,
     "seen": [
-      "src/views/employees.js",
-      "src/views/timecard.js"
+      "src/lib/format.js"
     ]
   },
   {
@@ -836,7 +835,7 @@
     "holes": 1,
     "lits": 10,
     "seen": [
-      "src/views/employees.js"
+      "src/lib/format.js"
     ]
   },
   {
@@ -845,14 +844,6 @@
     "lits": 10,
     "seen": [
       "src/views/court.js"
-    ]
-  },
-  {
-    "en": "{0}% of what you sell",
-    "holes": 1,
-    "lits": 13,
-    "seen": [
-      "src/views/timecard.js"
     ]
   },
   {
@@ -2879,6 +2870,14 @@
     "lits": 146,
     "seen": [
       "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "by {0} at {1}",
+    "holes": 2,
+    "lits": 4,
+    "seen": [
+      "src/views/item-index.js"
     ]
   },
   {
@@ -5197,6 +5196,14 @@
     "lits": 50,
     "seen": [
       "src/views/realms.js"
+    ]
+  },
+  {
+    "en": "Four other lines had the same fault and are fixed with it: the harvest rate beside an item, how many you hold in the register’s picker, and who first rang up an item awaiting review.",
+    "holes": 0,
+    "lits": 143,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -8072,7 +8079,7 @@
     "holes": 0,
     "lits": 8,
     "seen": [
-      "src/views/employees.js"
+      "src/lib/format.js"
     ]
   },
   {
@@ -8080,7 +8087,7 @@
     "holes": 0,
     "lits": 86,
     "seen": [
-      "src/views/timecard.js"
+      "src/lib/format.js"
     ]
   },
   {
@@ -8525,6 +8532,14 @@
     "en": "Nothing changed about who can do what. Looking up an order and voiding one you mis-rang are still open to anyone who works the till, so the Ledger opens for everyone; it simply shows fewer sections to somebody who is not running the shop. Deleting a delivery is still owner’s work.",
     "holes": 0,
     "lits": 224,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Nothing changed for English readers. It was never a missing translation — the lines were built out of two phrases at the last moment, so the page had something to show that the dictionary had never been given.",
+    "holes": 0,
+    "lits": 168,
     "seen": [
       "src/lib/patch-notes.js"
     ]
@@ -9355,6 +9370,14 @@
     "lits": 3,
     "seen": [
       "src/views/employees.js"
+    ]
+  },
+  {
+    "en": "PAY READS IN YOUR OWN LANGUAGE NOW. Anyone reading the Ledger in German, Spanish or French was told what they earn half in English — \"5gp an hour · 10 % Provision\" on the roster, and on the time card a sentence that translated its own edges and left the wage in the middle untouched.",
+    "holes": 0,
+    "lits": 217,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -15360,11 +15383,27 @@
     ]
   },
   {
-    "en": "You are paid {0}.",
-    "holes": 1,
-    "lits": 10,
+    "en": "You are paid {0} an hour and {1}% of what you sell.",
+    "holes": 2,
+    "lits": 32,
     "seen": [
-      "src/views/timecard.js"
+      "src/lib/format.js"
+    ]
+  },
+  {
+    "en": "You are paid {0} an hour.",
+    "holes": 1,
+    "lits": 16,
+    "seen": [
+      "src/lib/format.js"
+    ]
+  },
+  {
+    "en": "You are paid {0}% of what you sell.",
+    "holes": 1,
+    "lits": 23,
+    "seen": [
+      "src/lib/format.js"
     ]
   },
   {

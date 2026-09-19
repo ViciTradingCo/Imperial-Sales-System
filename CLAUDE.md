@@ -349,6 +349,37 @@ The retired `motd_global:<realm>` flag is migrated to a row on first read,
 guarded on there being no global rows yet, so it runs once per realm and cannot
 resurrect a notice an admin deleted.
 
+## A line the app ASSEMBLES has to be translated before it is joined
+
+The dictionary is keyed on whole TEXT NODES and the extractor can only
+catalogue what it can read in the source, so a line built at render time out of
+two catalogue phrases — `a + ' · ' + b` — reaches the page as a node that is
+NEITHER of them. The exact lookup misses, the matcher falls through to the
+templates, and the first template that fits swallows the other half into its own
+`{0}`. A German roster read "5gp an hour · 10 % Provision".
+
+`t()` in `lib/i18n.js` is the fix and the reason it exists: translate each piece
+BEFORE joining. Reach for it wherever a line is assembled from parts the
+catalogue holds separately — and note that joining a phrase to a NAME (a
+category, a shop) has the same fault, since the finished node is still not the
+phrase.
+
+A SENTENCE is different: spell the branches out whole rather than pushing a
+clause into a stem. `'You are paid ' + parts.join(' and ') + '.'` gave the
+extractor `"You are paid {0}."` and nothing else, so the template matched the
+finished sentence and handed its English middle straight back. The English is
+identical either way, which is what makes this easy to undo by accident —
+collapsing three sentences into one stem looks like tidying and breaks every
+pack. `earningsLine` and `payTerms` in `lib/format.js` are the two worked
+examples, one of each kind.
+
+NOTHING FAILS when this happens: no error, no blank, no missing key. It is wrong
+only to somebody who reads the language, which is why it is tested
+(`worker/test/i18n-assembled.test.js`, driving the real functions through every
+finished pack) rather than looked for. The test asks only whether the pack MOVED
+the line — checking for leftover English words cannot work, since French for
+commission is "commission".
+
 ## Store data, present labels
 
 Never write a realm's wording into a stored value. Sale lines are JSON numbers,

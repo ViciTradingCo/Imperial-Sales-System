@@ -10,6 +10,11 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.7', date: '2026-09-19', notes: [
+    'PAY READS IN YOUR OWN LANGUAGE NOW. Anyone reading the Ledger in German, Spanish or French was told what they earn half in English — "5gp an hour · 10 % Provision" on the roster, and on the time card a sentence that translated its own edges and left the wage in the middle untouched.',
+    'Four other lines had the same fault and are fixed with it: the harvest rate beside an item, how many you hold in the register’s picker, and who first rang up an item awaiting review.',
+    'Nothing changed for English readers. It was never a missing translation — the lines were built out of two phrases at the last moment, so the page had something to show that the dictionary had never been given.',
+  ] },
   { version: '7.6', date: '2026-09-19', notes: [
     'MANAGERS CAN NOW FIRE ORDINARY EMPLOYEES. Yesterday’s Fire button was the owner’s alone; a manager who runs the shop day to day sees it too now, on employees.',
     'On employees only. A manager is still the OWNER’S to dismiss — who else has power in the shop is the one thing the manager role does not reach, the same as appointing managers and setting pay. Stand a manager down first and anyone running the shop can let them go.',

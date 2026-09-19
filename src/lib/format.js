@@ -6,7 +6,7 @@
  * as "gp" and every amount in the app renders through here, which is why there
  * is a single mutable value instead of threading it through every caller.
  */
-import { getLang, deviceLocale } from './i18n.js';
+import { getLang, deviceLocale, t } from './i18n.js';
 
 /**
  * WHAT LANGUAGE A DATE IS WRITTEN IN — the same one the sentence around it is.
@@ -176,4 +176,59 @@ export function coins(n) {
   const v = Number(n);
   if (!isFinite(v)) return 0;
   return Math.floor(Math.round(v * 1e6) / 1e6);
+}
+
+/**
+ * WHAT SOMEBODY EARNS, worded for a screen — the roster's line and the time
+ * card's, kept together because they are one fact told to two audiences and
+ * because they share a trap.
+ *
+ * Both halves may stand alone: a shop pays by the hour, on what is sold, or
+ * both, and neither is a fallback for the other. Nothing set is said plainly,
+ * since 0 and "nobody has decided yet" look identical on a wage line.
+ *
+ * THE TRAP. The dictionary is keyed on whole TEXT NODES, so a line built at
+ * render time out of two catalogue phrases reaches the page as a node that is
+ * neither of them. The exact lookup misses, the matcher falls through to the
+ * templates, and the first template that fits EATS THE OTHER HALF into its own
+ * placeholder — a German roster read "5gp an hour · 10 % Provision". Nothing
+ * errors when this happens; it is wrong only to somebody who reads the
+ * language. The two functions answer it differently on purpose:
+ *
+ *   • `earningsLine` joins two fragments, so each is translated FIRST (`t`,
+ *     the escape hatch in i18n.js — this line is why it exists);
+ *   • `payTerms` is a sentence, so all three are spelled out WHOLE. That does
+ *     not change a word of the English; it changes what the EXTRACTOR can see,
+ *     which was otherwise the stem "You are paid {0}." with the entire clause
+ *     in the hole. Collapsing them back would look harmless and break every
+ *     pack — see the note over `payTerms` itself.
+ *
+ * `worker/test/i18n-assembled.test.js` drives both through every finished pack.
+ */
+export function earningsLine(payRate, commissionRate) {
+  return [
+    payRate ? t(money(payRate) + ' an hour') : '',
+    commissionRate ? t(commissionRate + '% commission') : '',
+  ].filter(Boolean).join(' · ') || 'No pay set';
+}
+
+/**
+ * The same thing said to the person earning it, as a sentence.
+ *
+ * THREE WHOLE SENTENCES, not a stem with a clause pushed into it. The English
+ * is identical either way; what the branches buy is three complete templates in
+ * the catalogue instead of one useless `"You are paid {0}."`, which used to
+ * match the finished sentence and hand its own English middle straight back —
+ * "Du wirst mit 5gp an hour bezahlt." A translator needs the whole sentence in
+ * any case, since German wraps the verb around the figure rather than following
+ * it.
+ */
+export function payTerms(rate, commissionRate) {
+  if (rate && commissionRate) {
+    return 'You are paid ' + money(rate) + ' an hour and ' + commissionRate + '% of what you sell.';
+  }
+  if (rate) return 'You are paid ' + money(rate) + ' an hour.';
+  if (commissionRate) return 'You are paid ' + commissionRate + '% of what you sell.';
+  return 'No pay set — ask your owner to set an hourly rate, a commission, or both, or your work is ' +
+    'worth nothing on the log.';
 }

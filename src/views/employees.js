@@ -13,7 +13,7 @@ import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 import { skeletonRows, skeletonLines } from '../lib/skeleton.js';
 import { staffCodePanel } from './staff-code.js';
-import { money } from '../lib/format.js';
+import { money, earningsLine } from '../lib/format.js';
 import { isOwner, canDismiss, roleLabel } from '../lib/roles.js';
 
 export function renderEmployees(container, { me }) {
@@ -81,13 +81,7 @@ export function renderEmployees(container, { me }) {
       const checks = new Map();
       const items = rows.map((u) => {
         const who = u.character || u.email; // character name is the display identity
-        // What they earn, said plainly when nothing is set: 0 and "nobody has
-        // decided yet" look identical on a wage line. Either half may stand
-        // alone, so the two are listed rather than one being a fallback.
-        const earns = [
-          u.payRate ? money(u.payRate) + ' an hour' : '',
-          u.commissionRate ? u.commissionRate + '% commission' : '',
-        ].filter(Boolean).join(' · ') || 'No pay set';
+        const earns = earningsLine(u.payRate, u.commissionRate);
         const label = el('span', { class: 'emp-who', html:
           '<b>' + esc(who) + '</b> · <span class="role-pill">' + esc(roleLabel(u.role)) + '</span> · ' + statusBadge(u.status) +
           '<br><span class="note">' + esc(earns) + '</span>' +

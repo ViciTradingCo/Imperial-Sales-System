@@ -10,7 +10,7 @@
  * what is owed; a person confirms it was actually handed over, in whatever way
  * the fiction settles it.
  */
-import { money, formatDateTime } from '../lib/format.js';
+import { money, formatDateTime, payTerms } from '../lib/format.js';
 import { el, mount, esc, statTiles } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { backToHome } from '../lib/sections.js';
@@ -20,24 +20,6 @@ import { skeletonRows } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 import { openModal } from '../lib/modal.js';
-
-/**
- * How this person is paid, in one line.
- *
- * Either half may stand alone — a shop can pay by the hour, on results, or
- * both — so this says what is actually set rather than assuming an hourly rate
- * exists and calling its absence an error.
- */
-function terms(rate, commissionRate) {
-  const parts = [];
-  if (rate) parts.push(money(rate) + ' an hour');
-  if (commissionRate) parts.push(commissionRate + '% of what you sell');
-  if (!parts.length) {
-    return 'No pay set — ask your owner to set an hourly rate, a commission, or both, or your work is ' +
-      'worth nothing on the log.';
-  }
-  return 'You are paid ' + parts.join(' and ') + '.';
-}
 
 /** "3h 25m" — hours as people say them, not as a decimal. */
 function hm(hours) {
@@ -109,7 +91,7 @@ function renderMine(host) {
         el('p', { class: 'note' }, open
           ? 'Since ' + when(open.clockIn) + ' · ' + hm(open.hours) + ' so far.'
           : 'Clock in when you start work.'),
-        el('p', { class: 'note' }, terms(rate, d.commissionRate)),
+        el('p', { class: 'note' }, payTerms(rate, d.commissionRate)),
         action,
       ]),
       // Their own two halves, the same way the owner's log breaks them out.

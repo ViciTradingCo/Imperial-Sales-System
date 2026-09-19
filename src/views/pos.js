@@ -34,6 +34,7 @@ import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 import { renderBuying } from './intake-form.js';
 import { renderHarvest, renderCraft } from './produce.js';
+import { t } from '../lib/i18n.js';
 
 /** The register's sides, in the order stock travels: in, made, out. */
 const MODES = [
@@ -184,7 +185,10 @@ export function renderPos(container, { me, mode }) {
         // does not, and it lands in the price field the moment you pick — see
         // the hint below the box.
         const type = it.category && it.category !== 'Unsorted' ? it.category : '';
-        const held = inv ? inv.stock + ' in stock' : '';
+        // Translated before the type is joined on — see the note in
+        // `lib/i18n.js`: the stock count is a catalogue phrase, the type is a
+        // name, and the node holding both would match neither.
+        const held = inv ? t(inv.stock + ' in stock') : '';
         return [held, type].filter(Boolean).join(' · ');
       },
       onPick: (it) => {

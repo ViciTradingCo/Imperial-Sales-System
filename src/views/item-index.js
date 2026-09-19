@@ -34,6 +34,7 @@ import { openModal } from '../lib/modal.js';
 import { openFocalMenu } from '../lib/tiles.js';
 import { pager } from '../lib/paginate.js';
 import { money, formatDate } from '../lib/format.js';
+import { t } from '../lib/i18n.js';
 
 const UNSORTED = 'Unsorted';
 const ALL = '';          // the filter's "every table" value
@@ -152,11 +153,21 @@ export function renderItemIndex(container) {
     const when = p.firstSeen ? formatDate(p.firstSeen) : '';
     // Who rang it up and where. The shop matters as much as the person: one
     // till producing most of the duplicates is a training answer, not a data one.
-    const who = [p.firstBy, p.firstShop && 'at ' + p.firstShop].filter(Boolean).join(' ');
+    // One whole phrase, translated before the date is joined on. Two names with
+    // English joining words between them is a node the catalogue cannot match,
+    // so "by Sera at The Forge" stayed English on every pack.
+    //
+    // Only the full form goes through `t`: "by {0}" on its own is a preposition
+    // and a name, which the extractor will not collect as prose — rightly, since
+    // a two-letter template would match half the page — so there is no key for
+    // it and pretending otherwise would be a call that can never resolve.
+    const who = p.firstBy && p.firstShop ? t('by ' + p.firstBy + ' at ' + p.firstShop)
+      : p.firstBy ? 'by ' + p.firstBy
+      : p.firstShop ? 'at ' + p.firstShop : '';
     const row = el('div.emp-row', {}, [
       el('span', { html:
         '<b>' + esc(p.name) + '</b> · ' + esc(money(p.baseValue)) +
-        '<br><span class="note">' + esc([when, who && 'by ' + who].filter(Boolean).join(' · ')) + '</span>' +
+        '<br><span class="note">' + esc([when, who].filter(Boolean).join(' · ')) + '</span>' +
         (p.looksLike.length
           ? '<br><span class="note warn">Looks like: ' + esc(p.looksLike.join(', ')) + '</span>'
           : '') }),

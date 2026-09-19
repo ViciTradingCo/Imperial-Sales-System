@@ -29,6 +29,7 @@ import { guidePanel, guideUnseen, markGuideSeen } from '../lib/guide.js';
 import { newIdem } from '../lib/id.js';
 import { createItemPicker } from '../lib/item-picker.js';
 import { toast } from '../lib/toast.js';
+import { t } from '../lib/i18n.js';
 
 /**
  * The haul: a list of lines, each a thing you brought in and how many.
@@ -140,7 +141,9 @@ export function renderHarvest(host) {
     meta: (it) => {
       const rate = rateFor(it.name);
       const cat = it.category && it.category !== 'Unsorted' ? it.category : '';
-      return [rate ? 'pays ' + money(rate) + ' each' : '', cat].filter(Boolean).join(' · ');
+      // Translated before the category is joined on: the rate is a catalogue
+      // phrase and the category is a name, and a node holding both is neither.
+      return [rate ? t('pays ' + money(rate) + ' each') : '', cat].filter(Boolean).join(' · ');
     },
     onChange: () => paintPay(),
   });
