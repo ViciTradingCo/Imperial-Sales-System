@@ -300,6 +300,10 @@ export const api = {
   clockOut: (note) => request('POST', '/timecard/out', { note }),
   /** Owner/admin: every shift at this shop, with who is owed what. */
   getTimecardLog: () => request('GET', '/timecard/log'),
+  /** Owner/manager: start a shift for somebody else. Their rate, not the caller's. */
+  clockInStaff: (uid) => request('POST', '/timecard/staff/in', { uid }),
+  /** Owner/manager: end somebody else's open shift, with an optional note. */
+  clockOutStaff: (uid, note) => request('POST', '/timecard/staff/out', { uid, note }),
   /** Owner/admin: mark wages settled. Records only — it moves no money. */
   payTimecard: (uid, ids) => request('POST', '/timecard/pay', { uid, ids }),
   editShift: (shift) => request('POST', '/timecard/edit', shift),

@@ -607,6 +607,30 @@ them separately and merges rather than hanging commission off shift rows.
 Settling a person settles both: it is one debt, and marking half would leave the
 screen disagreeing with what the owner just did.
 
+## Anyone who runs the shop can work its clock
+
+The person who worked the shift is not always the person at the screen, so
+`/timecard/staff/in` and `/timecard/staff/out` let an owner or manager clock
+somebody else on and off. ONE CLOCK, not two: the row is the employee's own
+shift, on their own card, and either of them can close it.
+
+THE RATE IS THE WORKER'S, read from their `users` row at clock-out — never
+`caller.payRate` and never the request, the same rule as the harvest rate and
+the commission percentage. Taking the caller's would pay every employee whatever
+the owner earns, and it would pay out long before anyone read the code, which is
+why the test asserts it from both directions.
+
+`requireManages`, not `requireOwner`, because a manager can ALREADY edit and
+delete any shift on this log — gating the smaller act more tightly than the
+larger one would read like an oversight. What stays the owner's is the RATE.
+
+`/timecard/log` carries the ROSTER as well as the shifts (`staff`), because the
+person most often needing to be clocked in is the new employee who has never
+clocked in, and `shopShifts` is built from shift rows — the one list they are
+guaranteed to be missing from. Open shifts are read off the shifts already in
+hand rather than queried per person. Both routes return the whole refreshed log,
+so the screen redraws from the act instead of asking again.
+
 ## Leaving a shop ends MEMBERSHIP, never the debt
 
 An employee (or a manager) leaves from Profile → Leave your shop. It removes

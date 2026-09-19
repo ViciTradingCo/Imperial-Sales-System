@@ -448,6 +448,22 @@
     ]
   },
   {
+    "en": "{0} clocked in.",
+    "holes": 1,
+    "lits": 9,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "{0} clocked out.",
+    "holes": 1,
+    "lits": 10,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
     "en": "{0} contains {1}, which is marked as an ingredient — stock you craft with, not stock you sell.",
     "holes": 2,
     "lits": 67,
@@ -579,6 +595,14 @@
     ]
   },
   {
+    "en": "{0} is already clocked in — since {1}.",
+    "holes": 2,
+    "lits": 23,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
     "en": "{0} is already registered in the destination realm.",
     "holes": 1,
     "lits": 40,
@@ -632,6 +656,22 @@
     "lits": 22,
     "seen": [
       "src/views/employees.js"
+    ]
+  },
+  {
+    "en": "{0} is not active yet. Activate them on the Employees page first.",
+    "holes": 1,
+    "lits": 49,
+    "seen": [
+      "worker/src/routes/business.js"
+    ]
+  },
+  {
+    "en": "{0} is not clocked in.",
+    "holes": 1,
+    "lits": 14,
+    "seen": [
+      "worker/src/routes/business.js"
     ]
   },
   {
@@ -2329,6 +2369,14 @@
     ]
   },
   {
+    "en": "Anything to note about {0}’s shift? (optional)",
+    "holes": 1,
+    "lits": 33,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
     "en": "Anything to note about this shift? (optional)",
     "holes": 0,
     "lits": 36,
@@ -3227,6 +3275,14 @@
     "en": "Clock out",
     "holes": 0,
     "lits": 8,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "Clock your staff on and off yourself when they cannot — their hands are full, they forgot, or they went home leaving a shift running. Everyone still has their own button; this is the same clock, not a second one.",
+    "holes": 0,
+    "lits": 166,
     "seen": [
       "src/views/timecard.js"
     ]
@@ -4741,6 +4797,14 @@
     ]
   },
   {
+    "en": "Every clock-in and clock-out you do for somebody else is recorded with your name on it. An hour on another person’s pay should never be anonymous.",
+    "holes": 0,
+    "lits": 116,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "Every company trading in your {0}. Opening one shows its roster and its books — as its Court, you may look, but not change anything.",
     "holes": 1,
     "lits": 100,
@@ -4816,6 +4880,14 @@
     "en": "Every table has its own import/export, and items can be ticked and moved between tables in bulk.",
     "holes": 0,
     "lits": 77,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Everyone on the roster is there, including somebody who has never clocked in — which is exactly the person the old log could not show you, because it was built from shifts and they had none.",
+    "holes": 0,
+    "lits": 151,
     "seen": [
       "src/lib/patch-notes.js"
     ]
@@ -6251,6 +6323,14 @@
     "en": "It is the OWNER’S button. A manager runs the shop day to day without being able to change who works there — the same line that keeps setting pay and appointing managers out of their hands.",
     "holes": 0,
     "lits": 149,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "It is the SAME clock, not a second one. A shift you open is the shift they see on their own card, and either of you can close it.",
+    "holes": 0,
+    "lits": 97,
     "seen": [
       "src/lib/patch-notes.js"
     ]
@@ -8285,6 +8365,14 @@
     ]
   },
   {
+    "en": "Nobody is active on the roster yet.",
+    "holes": 0,
+    "lits": 28,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
     "en": "Nobody registered to this company.",
     "holes": 0,
     "lits": 29,
@@ -8344,6 +8432,14 @@
     "en": "Not clocked in",
     "holes": 0,
     "lits": 12,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "Not clocked in · {0} an hour",
+    "holes": 1,
+    "lits": 18,
     "seen": [
       "src/views/timecard.js"
     ]
@@ -8948,9 +9044,25 @@
     ]
   },
   {
+    "en": "ON SHIFT",
+    "holes": 0,
+    "lits": 7,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
     "en": "On shift now",
     "holes": 0,
     "lits": 10,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
+    "en": "On shift since {0} · {1} so far",
+    "holes": 2,
+    "lits": 17,
     "seen": [
       "src/views/timecard.js"
     ]
@@ -9319,6 +9431,14 @@
     "en": "Owner only, and it asks you to write the shop’s name out. A manager runs the shop; ending it is not running it.",
     "holes": 0,
     "lits": 84,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "Owners and managers both — a manager can already edit and delete shifts on this log, so the smaller act was the odd one out. What stays the owner’s is setting the rate.",
+    "holes": 0,
+    "lits": 131,
     "seen": [
       "src/lib/patch-notes.js"
     ]
@@ -13594,6 +13714,14 @@
     ]
   },
   {
+    "en": "The shop’s clock",
+    "holes": 0,
+    "lits": 13,
+    "seen": [
+      "src/views/timecard.js"
+    ]
+  },
+  {
     "en": "The Stocktake ADDS what it finds. Paste a count for something your shop does not list yet and it creates the listing instead of skipping it — because finding something on the shelf that was never written down is exactly what a stocktake is for.",
     "holes": 0,
     "lits": 197,
@@ -13793,6 +13921,14 @@
     "lits": 44,
     "seen": [
       "src/views/shop-deals.js"
+    ]
+  },
+  {
+    "en": "They are paid THEIR rate, never yours. The wage stamped on the shift is read from the person who worked it at the moment it closes, so a correction you make mid-shift still applies to that shift.",
+    "holes": 0,
+    "lits": 154,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -15436,6 +15572,14 @@
     "lits": 15,
     "seen": [
       "src/views/realms.js"
+    ]
+  },
+  {
+    "en": "YOU CAN CLOCK YOUR STAFF ON AND OFF YOURSELF. A new section on the Shift log — The shop’s clock — lists everyone active with one button each, for the times their hands are full, they forgot, or they went home leaving a shift running against you.",
+    "holes": 0,
+    "lits": 191,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {

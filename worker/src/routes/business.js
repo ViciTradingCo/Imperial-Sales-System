@@ -212,10 +212,104 @@ async function clockOutRoute({ request, env, body }) {
   return { open: null, shifts: await myShifts(env, caller.uid, realmId) };
 }
 
-/** The owner's log: every shift at this shop, with who is owed what. */
+/**
+ * The owner's log: every shift at this shop, with who is owed what — plus the
+ * ROSTER, which is not the same list.
+ *
+ * `shopShifts` knows only people who have worked or sold something, and the one
+ * person an owner most needs to clock in is the new employee who has never
+ * clocked in before: they would not be in it. So the roster comes along, with
+ * each member's open shift attached.
+ *
+ * Read off the shifts already in hand rather than asked for per person — the
+ * open ones are in that list by definition, and a query each would be a dozen
+ * round trips to learn what one already says.
+ */
 async function timecardLog({ request, env }) {
   const caller = await requireManages(request, env);
-  return await shopShifts(env, caller.business, realmIdOf(caller, env));
+  const realmId = realmIdOf(caller, env);
+  const log = await shopShifts(env, caller.business, realmId);
+  const openByUid = new Map((log.shifts || []).filter((s) => s.open).map((s) => [s.uid, s]));
+  const roster = await listUsersByBusiness(env, caller.business, realmId);
+  return {
+    ...log,
+    // Active members only: a pending account cannot work the register, so a
+    // shift for one is an hour nobody could have been on the floor for.
+    staff: roster.filter((u) => u.status === 'active').map((u) => {
+      const open = openByUid.get(u.uid);
+      return {
+        uid: u.uid,
+        employee: u.character || u.email,
+        role: u.role,
+        payRate: u.payRate || 0,
+        onShift: !!open,
+        since: open ? open.clockIn : '',
+        hours: open ? open.hours : 0,
+      };
+    }),
+  };
+}
+
+/**
+ * CLOCKING SOMEBODY ELSE ON AND OFF — the owner or a manager, at the shop's
+ * own clock.
+ *
+ * The person who worked the shift is not always the person at the screen: they
+ * are on the floor, their hands are full, they forgot, or they went home
+ * without clocking out and the shift is still running against the shop. Every
+ * one of those is an ordinary day, and until now the only answer was to let it
+ * run and correct it afterwards with Edit.
+ *
+ * `requireManages`, and not because clocking is trivial — it decides what
+ * somebody is paid. It is because a manager can ALREADY edit and delete any
+ * shift on this log, so gating the smaller act more tightly than the larger one
+ * would be a rule that reads like an oversight. What stays the owner's is the
+ * RATE (`payRateRoute`, `requireOwner`), and that line is untouched here.
+ *
+ * THE RATE IS READ FROM THE PERSON WHO WORKED, never from the caller and never
+ * from the request — the same rule as the harvest rate and the commission
+ * percentage. Taking `caller.payRate` here would pay every employee whatever
+ * the owner earns, which is the kind of bug that pays out before anyone reads
+ * the code.
+ */
+async function staffShiftTarget(request, env, uid) {
+  const caller = await requireManages(request, env);
+  const realmId = realmIdOf(caller, env);
+  // Their OWN roster only — the same check every other roster route makes.
+  const roster = await listUsersByBusiness(env, caller.business, realmId);
+  const target = roster.find((u) => u.uid === String(uid || '').trim());
+  if (!target) {
+    const e = new Error('That employee is not part of your business.');
+    e.forbidden = true; throw e;
+  }
+  return { caller, realmId, target, who: target.character || target.email };
+}
+
+async function staffClockIn({ request, env, body }) {
+  const { caller, realmId, target, who } = await staffShiftTarget(request, env, body.uid);
+  if (target.status !== 'active') {
+    throw new Error(who + ' is not active yet. Activate them on the Employees page first.');
+  }
+  const already = await openShift(env, target.uid, realmId);
+  if (already) throw new Error(who + ' is already clocked in — since ' + already.clockIn + '.');
+  await clockIn(env, {
+    uid: target.uid, employee: who, business: caller.business, rate: target.payRate || 0,
+  }, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'timecard.clockIn', detail: who + ' clocked in by ' + actorName(caller), realmId });
+  return await timecardLog({ request, env });
+}
+
+async function staffClockOut({ request, env, body }) {
+  const { caller, realmId, target, who } = await staffShiftTarget(request, env, body.uid);
+  const open = await openShift(env, target.uid, realmId);
+  if (!open) throw new Error(who + ' is not clocked in.');
+  // Their rate, read now — a correction made during the shift still applies to
+  // it, exactly as it does when somebody clocks themselves out.
+  await clockOut(env, { uid: target.uid, rate: target.payRate || 0, note: body.note }, realmId);
+  await logAudit(env, { actor: actorName(caller), business: caller.business,
+    action: 'timecard.clockOut', detail: who + ' clocked out by ' + actorName(caller), realmId });
+  return await timecardLog({ request, env });
 }
 
 /**
@@ -1119,6 +1213,8 @@ export const routes = [
   { method: 'POST', path: '/timecard/pay', handler: timecardPay },
   { method: 'POST', path: '/timecard/edit', handler: timecardEdit },
   { method: 'POST', path: '/timecard/delete', handler: timecardDelete },
+  { method: 'POST', path: '/timecard/staff/in', handler: staffClockIn },
+  { method: 'POST', path: '/timecard/staff/out', handler: staffClockOut },
   { method: 'POST', path: '/business/employees/rate', handler: payRateRoute },
   { method: 'POST', path: '/business/employees/manager', handler: managerRoleRoute },
   { method: 'GET', path: '/business/employees/dismiss', handler: dismissPreviewRoute },

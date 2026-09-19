@@ -20,6 +20,25 @@ import { skeletonRows } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 import { toast } from '../lib/toast.js';
 import { openModal } from '../lib/modal.js';
+import { t } from '../lib/i18n.js';
+
+/**
+ * The pill that marks an open shift.
+ *
+ * One helper for what used to be the same markup written out four times — and
+ * it had to become one to be translatable at all, which is why the word is a
+ * const of its own.
+ *
+ * The extractor reads a `+` chain as ONE template and skips its pieces, which
+ * is right for a sentence and fatal for this: everything here is markup, so the
+ * template split on its tags leaves no words and the row is dropped — taking
+ * the only occurrence of "ON SHIFT" with it. The pill was English on every pack
+ * and had been since it was written. A bare literal is a position the walker
+ * reads on its own, so naming it is what puts it in the catalogue; `t()` then
+ * finds it at render time like any other phrase.
+ */
+const ON_SHIFT = 'ON SHIFT';
+const onShiftPill = () => ' <span class="pill warn">' + t(ON_SHIFT) + '</span>';
 
 /** "3h 25m" — hours as people say them, not as a decimal. */
 function hm(hours) {
@@ -114,7 +133,7 @@ function renderMine(host) {
     return el('div.emp-row', {}, [
       el('span', { html:
         '<b>' + esc(when(s.clockIn)) + '</b>' +
-        (s.open ? ' <span class="pill warn">ON SHIFT</span>' : ' → ' + esc(when(s.clockOut))) +
+        (s.open ? onShiftPill() : ' → ' + esc(when(s.clockOut))) +
         '<br><span class="note">' + esc(hm(s.hours)) +
         (s.open ? ' so far' : ' · ' + money(s.pay) + (s.paid ? ' · paid' : ' · unpaid')) +
         (s.note ? ' · ' + esc(s.note) : '') + '</span>' }),
@@ -142,6 +161,60 @@ function renderMine(host) {
 }
 
 /* ---- the owner's log ---- */
+
+/**
+ * One person on the shop's clock — where they stand, and the one button that
+ * changes it.
+ *
+ * EVERY ACTIVE MEMBER, not only those with hours. The person an owner most
+ * often needs to clock in is the new employee who has never clocked in at
+ * all, and a list built from shift rows is exactly the list they are missing
+ * from — which is why the roster comes down with the log.
+ *
+ * The button reflects the state rather than offering both: somebody is either
+ * on shift or not, and a pair of buttons where one always refuses is two ways
+ * to get it wrong. The Worker re-reads the state anyway, so a stale page
+ * cannot double-open a shift.
+ */
+function clockRow(p, onChange) {
+  const on = !!p.onShift;
+  // One whole phrase per state — never two joined, or the dictionary has a
+  // node it has never seen. See the note in lib/i18n.js.
+  const standing = on
+    ? t('On shift since ' + when(p.since) + ' · ' + hm(p.hours) + ' so far')
+    : p.payRate ? t('Not clocked in · ' + money(p.payRate) + ' an hour')
+    : 'Not clocked in';
+  const btn = el(on ? 'button.danger.small' : 'button.primary.small', {
+    onclick: async () => {
+      btn.disabled = true;
+      try {
+        if (on) {
+          // The same optional note the person gets on their own card — an
+          // owner ending somebody else's shift usually has a reason worth
+          // writing down, and it lands on the shift they will read later.
+          const note = window.prompt('Anything to note about ' + (p.employee || 'this') +
+            '’s shift? (optional)');
+          if (note === null) { btn.disabled = false; return; }
+          onChange(await api.clockOutStaff(p.uid, note));
+          toast(p.employee + ' clocked out.', 'ok');
+        } else {
+          onChange(await api.clockInStaff(p.uid));
+          toast(p.employee + ' clocked in.', 'ok');
+        }
+      } catch (e) {
+        btn.disabled = false;
+        toast(e.message || String(e), 'error');
+      }
+    },
+  }, on ? 'Clock out' : 'Clock in');
+  return el('div.emp-row', {}, [
+    el('span', { class: 'emp-who', html:
+      '<b>' + esc(p.employee || p.uid) + '</b>' + (on ? onShiftPill() : '') +
+      '<br><span class="note">' + esc(standing) + '</span>' }),
+    el('span', { class: 'row-actions' }, [btn]),
+  ]);
+}
+
 
 function renderLog(host) {
   const body = el('div', {}, skeletonRows(4));
@@ -175,6 +248,14 @@ function renderLog(host) {
         'Pay from your coffer however your shop actually pays people. Settling somebody settles both ' +
         'halves of what they are owed, the hours and the commission together.'),
 
+      el('h4', {}, 'The shop’s clock'),
+      el('p', { class: 'note' }, 'Clock your staff on and off yourself when they cannot — their hands are ' +
+        'full, they forgot, or they went home leaving a shift running. Everyone still has their own ' +
+        'button; this is the same clock, not a second one.'),
+      (d.staff || []).length
+        ? el('div', {}, (d.staff || []).map((p) => clockRow(p, draw)))
+        : el('p', { class: 'note' }, 'Nobody is active on the roster yet.'),
+
       el('h4', {}, 'By employee'),
       people.length
         ? el('div', {}, people.map(personRow))
@@ -205,7 +286,7 @@ function renderLog(host) {
       : '';
     const row = el('div.emp-row', {}, [
       el('span', { class: 'emp-who', html:
-        '<b>' + esc(p.employee || p.uid) + '</b>' + (p.open ? ' <span class="pill warn">ON SHIFT</span>' : '') +
+        '<b>' + esc(p.employee || p.uid) + '</b>' + (p.open ? onShiftPill() : '') +
         '<br><span class="note">' + esc(worked) + '</span>' + split }),
       el('span', { html: '<b>' + esc(money(p.owed)) + '</b>' }),
     ]);
@@ -232,7 +313,7 @@ function renderLog(host) {
     const row = el('div.emp-row', {}, [
       el('span', { html:
         '<b>' + esc(s.employee || s.uid) + '</b> · ' + esc(when(s.clockIn)) +
-        (s.open ? ' <span class="pill warn">ON SHIFT</span>' : ' → ' + esc(when(s.clockOut))) +
+        (s.open ? onShiftPill() : ' → ' + esc(when(s.clockOut))) +
         (s.long ? ' <span class="pill danger">LONG</span>' : '') +
         '<br><span class="note">' + esc(hm(s.hours)) +
         (s.open ? ' so far' : ' · ' + money(s.pay) + (s.paid ? ' · paid' : ' · unpaid')) +

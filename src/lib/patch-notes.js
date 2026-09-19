@@ -10,6 +10,14 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.8', date: '2026-09-19', notes: [
+    'YOU CAN CLOCK YOUR STAFF ON AND OFF YOURSELF. A new section on the Shift log — The shop’s clock — lists everyone active with one button each, for the times their hands are full, they forgot, or they went home leaving a shift running against you.',
+    'Everyone on the roster is there, including somebody who has never clocked in — which is exactly the person the old log could not show you, because it was built from shifts and they had none.',
+    'It is the SAME clock, not a second one. A shift you open is the shift they see on their own card, and either of you can close it.',
+    'They are paid THEIR rate, never yours. The wage stamped on the shift is read from the person who worked it at the moment it closes, so a correction you make mid-shift still applies to that shift.',
+    'Owners and managers both — a manager can already edit and delete shifts on this log, so the smaller act was the odd one out. What stays the owner’s is setting the rate.',
+    'Every clock-in and clock-out you do for somebody else is recorded with your name on it. An hour on another person’s pay should never be anonymous.',
+  ] },
   { version: '7.7', date: '2026-09-19', notes: [
     'PAY READS IN YOUR OWN LANGUAGE NOW. Anyone reading the Ledger in German, Spanish or French was told what they earn half in English — "5gp an hour · 10 % Provision" on the roster, and on the time card a sentence that translated its own edges and left the wage in the middle untouched.',
     'Four other lines had the same fault and are fixed with it: the harvest rate beside an item, how many you hold in the register’s picker, and who first rang up an item awaiting review.',
