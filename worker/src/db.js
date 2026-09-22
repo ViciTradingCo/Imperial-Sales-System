@@ -452,6 +452,7 @@ const MIGRATIONS = [
   "ALTER TABLE intake ADD COLUMN from_business TEXT NOT NULL DEFAULT ''",
   'CREATE INDEX IF NOT EXISTS idx_intake_from ON intake (realm_id, from_business)',
   'CREATE INDEX IF NOT EXISTS idx_sales_counted ON sales (realm_id, status, staff_purchase)',
+  'CREATE INDEX IF NOT EXISTS idx_sales_history ON sales (realm_id, business, id)', // the paged sales log
   // WHAT KIND OF THING a listing is — food, drink, a weapon. Per LISTING and
   // comma-joined lowercase, for the same reason `ingredient` is: the shop
   // decides what its stock is FOR, and one shop's drink is another's reagent.

@@ -756,6 +756,22 @@
     ]
   },
   {
+    "en": "{0} matching sale",
+    "holes": 1,
+    "lits": 12,
+    "seen": [
+      "src/views/shop-history.js"
+    ]
+  },
+  {
+    "en": "{0} matching sales",
+    "holes": 1,
+    "lits": 13,
+    "seen": [
+      "src/views/shop-history.js"
+    ]
+  },
+  {
     "en": "{0} of {1} chosen",
     "holes": 2,
     "lits": 8,
@@ -789,11 +805,27 @@
     ]
   },
   {
+    "en": "{0} sale on the books",
+    "holes": 1,
+    "lits": 14,
+    "seen": [
+      "src/views/shop-history.js"
+    ]
+  },
+  {
     "en": "{0} sale{1} and {2} deliver{3} stay on the network’s records, along with your coffer entries and everyone’s time cards. Nothing is erased, and an admin can restore the whole shop if this turns out to be a mistake.",
     "holes": 4,
     "lits": 158,
     "seen": [
       "src/views/ledger-settings.js"
+    ]
+  },
+  {
+    "en": "{0} sales on the books",
+    "holes": 1,
+    "lits": 15,
+    "seen": [
+      "src/views/shop-history.js"
     ]
   },
   {
@@ -1521,6 +1553,14 @@
     "lits": 201,
     "seen": [
       "src/views/landing.js"
+    ]
+  },
+  {
+    "en": "A search pages the same way, through its own matches. Searching starts you at page one, and voiding an order leaves you where you were rather than sending you back to the top.",
+    "holes": 0,
+    "lits": 139,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -3207,6 +3247,14 @@
     ]
   },
   {
+    "en": "Clear the box to walk the whole history, newest first.",
+    "holes": 0,
+    "lits": 43,
+    "seen": [
+      "src/views/shop-history.js"
+    ]
+  },
+  {
     "en": "Clear the destination link to take the whole tip jar off the page. Both links must be full https:// addresses.",
     "holes": 0,
     "lits": 86,
@@ -4861,6 +4909,14 @@
     ]
   },
   {
+    "en": "Every sale this shop has rung up, newest first. Search by order number, customer, or employee — or leave it blank and walk the lot.",
+    "holes": 0,
+    "lits": 101,
+    "seen": [
+      "src/views/shop-history.js"
+    ]
+  },
+  {
     "en": "Every shift",
     "holes": 0,
     "lits": 10,
@@ -6392,6 +6448,14 @@
     ]
   },
   {
+    "en": "It tells you how many there are, too — “412 sales on the books” — so you can see at a glance that this is the lot and not the last few.",
+    "holes": 0,
+    "lits": 95,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "It tells you what you are sending as you build it, and will not let you send more of something than you hold — including when the same item is on two lines, which is the easy way to promise twice what you have.",
     "holes": 0,
     "lits": 163,
@@ -6779,14 +6843,6 @@
     "lits": 61,
     "seen": [
       "src/views/companies.js"
-    ]
-  },
-  {
-    "en": "Leave the box blank to see the most recent sales.",
-    "holes": 0,
-    "lits": 39,
-    "seen": [
-      "src/views/shop-history.js"
     ]
   },
   {
@@ -8879,6 +8935,14 @@
     "lits": 41,
     "seen": [
       "src/views/feedback-admin.js"
+    ]
+  },
+  {
+    "en": "Nothing was ever lost: every row has always been in the CSV export under Shop Settings. What was missing was being able to look at it without downloading a file.",
+    "holes": 0,
+    "lits": 129,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -11422,14 +11486,6 @@
     "lits": 27,
     "seen": [
       "src/views/companies.js"
-    ]
-  },
-  {
-    "en": "Search by order number, customer, or employee — or leave it blank for the latest sales.",
-    "holes": 0,
-    "lits": 68,
-    "seen": [
-      "src/views/shop-history.js"
     ]
   },
   {
@@ -16029,6 +16085,14 @@
     "lits": 43,
     "seen": [
       "src/views/landing.js"
+    ]
+  },
+  {
+    "en": "YOUR WHOLE SALES HISTORY IS READABLE NOW. The sales log showed the 25 most recent orders and had nothing to press for the 26th, so a busy shop’s own trade walked off the end of its own screen. There is a pager on the bottom of it now, and it reaches back to your first sale.",
+    "holes": 0,
+    "lits": 209,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   }
 ]

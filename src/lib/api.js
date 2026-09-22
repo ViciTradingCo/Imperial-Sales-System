@@ -490,7 +490,13 @@ export const api = {
   /** Ring up a sale. */
   checkout: (sale) => request('POST', '/sale', sale),
   /** Order lookup — recent sales, optionally filtered by q (order/customer/employee). */
-  getSales: (q) => request('GET', '/sales' + (q ? '?q=' + encodeURIComponent(q) : '')),
+  /**
+   * One page of the shop's sales history, newest first. The page SIZE is the
+   * Worker's to decide and comes back in the response; this asks only for a
+   * page number.
+   */
+  getSales: (q, page) => request('GET', '/sales?q=' + encodeURIComponent(q || '') +
+    '&page=' + encodeURIComponent(Math.max(1, Math.floor(Number(page) || 1)))),
   /** Void a sale by order number. */
   voidSale: (orderNo) => request('POST', '/sales/void', { orderNo }),
   get: (path) => request('GET', path),

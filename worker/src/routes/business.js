@@ -18,7 +18,7 @@ import { lineSummary } from '../lines.js';
 import { readRegions, isTraveling, TRAVELING } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
 import { checkCertification } from '../cert.js';
-import { checkout, listSales, voidSale, employeePerformance } from '../sales.js';
+import { checkout, listSales, countSales, voidSale, employeePerformance } from '../sales.js';
 import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory } from '../transfers.js';
 import { cofferSummary, adjustCoffer } from '../coffers.js';
 import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
@@ -824,9 +824,43 @@ async function checkoutRoute({ request, env, body }) {
   const caller = await requireActive(request, env);
   return await checkout(env, caller.business, caller, body, realmIdOf(caller, env));
 }
+/**
+ * THE SHOP'S WHOLE SALES HISTORY, a page at a time.
+ *
+ * It answered with the 25 most recent and nothing else — no offset, no total —
+ * so a shop's own trade fell off the end of its own screen the week it got
+ * busy, and the only way back to an old order was to guess a search term that
+ * would surface it. Every row has always been in the CSV export; what was
+ * missing was being able to LOOK.
+ *
+ * THE PAGE SIZE IS THE SERVER'S, not the caller's. A client that could name it
+ * could ask for the lot in one response, which is a slow query, a big payload
+ * and a page that renders ten thousand cards — so the request carries a page
+ * NUMBER and nothing else. It is returned as well, because the screen should
+ * not have to know the figure to draw a pager from it.
+ *
+ * Open to any ACTIVE member, which is what this route already was: looking up
+ * an order is for whoever works the till. That is unchanged and is not widened
+ * by paging — the search was never limited to a person's own sales, so this
+ * reaches no row a member could not already have found by typing a name. What
+ * it does not carry is what anybody EARNED: `mapSale` has never exposed
+ * commission, and the payout log stays behind `requireManages`.
+ */
+const SALES_PAGE = 25;
+
 async function listSalesRoute({ request, env, url }) {
   const caller = await requireActive(request, env);
-  return { sales: await listSales(env, caller.business, url.searchParams.get('q'), realmIdOf(caller, env)) };
+  const realmId = realmIdOf(caller, env);
+  const q = url.searchParams.get('q');
+  const total = await countSales(env, caller.business, q, realmId);
+  const pages = Math.max(1, Math.ceil(total / SALES_PAGE));
+  // Clamped rather than trusted: a page past the end would answer with nothing
+  // and look like an empty history rather than a bad request.
+  const page = Math.min(Math.max(1, Math.floor(Number(url.searchParams.get('page')) || 1)), pages);
+  return {
+    sales: await listSales(env, caller.business, q, realmId, SALES_PAGE, (page - 1) * SALES_PAGE),
+    total, page, pages, pageSize: SALES_PAGE,
+  };
 }
 async function voidSaleRoute({ request, env, body }) {
   const caller = await requireActive(request, env);

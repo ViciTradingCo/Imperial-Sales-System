@@ -380,6 +380,33 @@ finished pack) rather than looked for. The test asks only whether the pack MOVED
 the line — checking for leftover English words cannot work, since French for
 commission is "commission".
 
+## A shop's whole history is reachable, a page at a time
+
+`/sales` answered with the 25 most recent and nothing else — no offset, no
+total — so a busy shop's own trade walked off the end of its own screen and an
+old order could only be reached by guessing a search term that surfaced it.
+Every row was always in the CSV export; what was missing was being able to LOOK.
+
+THE PAGE SIZE IS THE SERVER'S. The request carries a page NUMBER and nothing
+else, because a client that could name the size could ask for the lot — a slow
+query, a large payload and a screen rendering ten thousand cards. It comes back
+in the response so the view can draw a pager without knowing the figure.
+
+`historyWhere` in `sales.js` is the one condition, shared by `listSales` and
+`countSales`. Two copies is how a pager promises four pages of a three-page
+result, or leaves a row nobody can reach. `listSales` still returns an ARRAY —
+several callers want rows and nothing else — and the count is its own function.
+
+The page number is CLAMPED to what exists rather than obeyed: a page past the
+end would answer with nothing and read as an empty history, which is the one
+thing this feature exists to stop somebody believing.
+
+Paging widens no permission. `/sales` was already open to any ACTIVE member
+(looking up an order is for whoever works the till) and the search was never
+limited to a person's own sales, so this reaches no row a member could not
+already have found by typing a name. `mapSale` has never carried commission,
+and the payout log stays behind `requireManages`.
+
 ## Store data, present labels
 
 Never write a realm's wording into a stored value. Sale lines are JSON numbers,

@@ -10,6 +10,12 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '7.9', date: '2026-09-22', notes: [
+    'YOUR WHOLE SALES HISTORY IS READABLE NOW. The sales log showed the 25 most recent orders and had nothing to press for the 26th, so a busy shop’s own trade walked off the end of its own screen. There is a pager on the bottom of it now, and it reaches back to your first sale.',
+    'It tells you how many there are, too — “412 sales on the books” — so you can see at a glance that this is the lot and not the last few.',
+    'A search pages the same way, through its own matches. Searching starts you at page one, and voiding an order leaves you where you were rather than sending you back to the top.',
+    'Nothing was ever lost: every row has always been in the CSV export under Shop Settings. What was missing was being able to look at it without downloading a file.',
+  ] },
   { version: '7.8', date: '2026-09-19', notes: [
     'YOU CAN CLOCK YOUR STAFF ON AND OFF YOURSELF. A new section on the Shift log — The shop’s clock — lists everyone active with one button each, for the times their hands are full, they forgot, or they went home leaving a shift running against you.',
     'Everyone on the roster is there, including somebody who has never clocked in — which is exactly the person the old log could not show you, because it was built from shifts and they had none.',

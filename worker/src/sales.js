@@ -540,22 +540,53 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
     staffPurchase: staff, levy, offInventory: offList, newItems: newList };
 }
 
-/** Recent sales, optionally filtered by order #, customer, or employee. */
-export async function listSales(env, business, query, realmId, limit = 25) {
-  const db = await getDb(env);
+/**
+ * WHICH SALES A LOOKUP MEANS — one WHERE, used by the page and by its count.
+ *
+ * The count has to be of exactly the rows the pager will walk, or the last page
+ * is short, or empty, or there is one nobody can reach. Two copies of a
+ * condition is how that happens, so there is one.
+ */
+function historyWhere(business, realmId, query) {
   const q = String(query || '').trim().toLowerCase();
-  let rows;
-  if (q) {
-    const like = '%' + q + '%';
-    ({ results: rows } = await db.prepare(
-      `SELECT * FROM sales WHERE realm_id = ? AND business = ?
-       AND (lower(order_no) LIKE ? OR lower(customer) LIKE ? OR lower(employee) LIKE ?)
-       ORDER BY id DESC LIMIT ?`
-    ).bind(realmId, business, like, like, like, limit).all());
-  } else {
-    ({ results: rows } = await db.prepare('SELECT * FROM sales WHERE realm_id = ? AND business = ? ORDER BY id DESC LIMIT ?').bind(realmId, business, limit).all());
-  }
+  if (!q) return { sql: 'realm_id = ? AND business = ?', binds: [realmId, business] };
+  const like = '%' + q + '%';
+  return {
+    sql: `realm_id = ? AND business = ?
+          AND (lower(order_no) LIKE ? OR lower(customer) LIKE ? OR lower(employee) LIKE ?)`,
+    binds: [realmId, business, like, like, like],
+  };
+}
+
+/**
+ * One page of the shop's sales, newest first, optionally filtered by order #,
+ * customer, or employee.
+ *
+ * `offset` is what makes the WHOLE history reachable rather than the most
+ * recent handful: the log used to answer with 25 rows and no way to ask for the
+ * 26th, so a shop's own trade fell off the end of its own screen the week it
+ * got busy. The books were never lost — the CSV export has always carried every
+ * row — but "download it and open a spreadsheet" is not the same as being able
+ * to look.
+ *
+ * It still returns an ARRAY. The total is `countSales`, deliberately a second
+ * call: this one is used in several places that want rows and nothing else.
+ */
+export async function listSales(env, business, query, realmId, limit = 25, offset = 0) {
+  const db = await getDb(env);
+  const w = historyWhere(business, realmId, query);
+  const { results: rows } = await db.prepare(
+    `SELECT * FROM sales WHERE ${w.sql} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .bind(...w.binds, Math.max(1, limit), Math.max(0, offset)).all();
   return (rows || []).map(mapSale);
+}
+
+/** How many sales that same lookup matches — what the pager counts pages from. */
+export async function countSales(env, business, query, realmId) {
+  const db = await getDb(env);
+  const w = historyWhere(business, realmId, query);
+  const r = await db.prepare(`SELECT COUNT(*) AS n FROM sales WHERE ${w.sql}`).bind(...w.binds).first();
+  return Number((r && r.n) || 0);
 }
 
 /**

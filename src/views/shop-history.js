@@ -18,6 +18,7 @@ import { el, mount, esc } from '../lib/dom.js';
 import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
+import { pager } from '../lib/paginate.js';
 import { toast } from '../lib/toast.js';
 
 /* ---- sales: search, and void ---- */
@@ -29,31 +30,65 @@ function saleLines(s) {
   return lines.map((l) => l.name + ' x' + l.qty + ' @ ' + money(l.price)).join(', ');
 }
 
+/**
+ * THE WHOLE HISTORY, a page at a time.
+ *
+ * This showed the 25 most recent sales and stopped, with nothing to press for
+ * the 26th — so a shop's own trade walked off the end of its own screen the
+ * week it got busy, and an old order could only be reached by guessing a search
+ * term that would surface it. Every row was always in the CSV export; what was
+ * missing was being able to look.
+ *
+ * PAGED BY THE SERVER, not by slicing a list already in hand — the point is
+ * that the list is longer than anything worth sending at once. A search pages
+ * the same way, over its own matches, and going back to page one on a new
+ * search is the only sensible answer: page 9 of the old result set says nothing
+ * about the new one.
+ */
 export function renderSales(host) {
   const q = el('input', { type: 'text', placeholder: 'Order #, customer, or employee' });
   const results = el('div', {}, skeletonRows(3));
-  const search = el('button.secondary-btn', { onclick: run }, 'Search');
+  const search = el('button.secondary-btn', { onclick: () => run(1) }, 'Search');
+  const count = el('p', { class: 'note' }, '');
+  let page = 1;
 
-  async function run() {
+  async function run(to) {
+    page = Math.max(1, Math.floor(Number(to) || 1));
     mount(results, skeletonRows(3));
     try {
-      const res = await api.getSales(q.value.trim());
-      renderResults(res.sales || []);
+      const res = await api.getSales(q.value.trim(), page);
+      // The server clamps the page to what exists, so a stale Next lands on the
+      // last real page rather than on nothing.
+      page = res.page || 1;
+      renderResults(res.sales || [], res);
     } catch (e) {
+      mount(count);
       mount(results, el('p', { class: 'error' }, e.message || String(e)));
     }
   }
 
   // Enter searches, the way it would in any search box.
-  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(); } });
+  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(1); } });
 
-  function renderResults(sales) {
+  function renderResults(sales, meta) {
+    const total = Number(meta.total) || 0;
+    // What the shop has ever rung up, said once and plainly — the figure that
+    // makes it obvious this is the whole history and not the last few.
+    //
+    // FOUR WHOLE PHRASES, not a number joined to a ternary. A conditional
+    // inside a concatenation is a HOLE to the extractor, so `n + (one ? … : …)`
+    // catalogues as "{0}{1}" — no words, dropped, and the line renders in
+    // English on every pack. See the note in lib/i18n.js.
+    const searching = !!q.value.trim();
+    mount(count, el('span', {}, searching
+      ? (total === 1 ? total + ' matching sale' : total + ' matching sales')
+      : (total === 1 ? total + ' sale on the books' : total + ' sales on the books')));
     if (!sales.length) {
       mount(results, emptyState({ glyph: '🧾', title: 'No matching orders',
-        hint: 'Leave the box blank to see the most recent sales.' }));
+        hint: 'Clear the box to walk the whole history, newest first.' }));
       return;
     }
-    mount(results, ...sales.map((s) => {
+    const cards = sales.map((s) => {
       const voided = String(s.status).toUpperCase() === 'VOIDED';
       const card = el('div', { class: 'lookup-card' }, [
         el('p', { html:
@@ -67,19 +102,32 @@ export function renderSales(host) {
         card.appendChild(el('button.danger.small', {
           onclick: async () => {
             if (!confirm('Void ' + s.orderNo + '? This returns the items to stock.')) return;
-            try { await api.voidSale(s.orderNo); toast('Order voided.', 'ok'); run(); }
+            // Back to the page they were on, not to the top: voiding one order
+            // out of four hundred should not lose their place.
+            try { await api.voidSale(s.orderNo); toast('Order voided.', 'ok'); run(page); }
             catch (e) { toast(e.message || String(e), 'error'); }
           },
         }, 'Void this sale'));
       }
       return card;
-    }));
+    });
+    // Only when there is more than one page of it — a shop with nine sales
+    // does not need a Prev, a Next and a page number to read them.
+    //
+    // TOP AND BOTTOM, because a page is twenty-five cards deep: with the bar
+    // only at the foot, turning the page means scrolling past everything you
+    // have just decided you did not want. A fresh bar per position — a node
+    // cannot be in two places.
+    const size = Number(meta.pageSize) || sales.length;
+    const nav = () => ((Number(meta.pages) || 1) > 1 ? [pager(total, page, size, run).bar] : []);
+    mount(results, ...nav(), ...cards, ...nav());
   }
 
   mount(host,
-    el('p', { class: 'note' }, 'Search by order number, customer, or employee — or leave it blank for the latest sales.'),
-    q, search, results);
-  run();
+    el('p', { class: 'note' }, 'Every sale this shop has rung up, newest first. Search by order number, ' +
+      'customer, or employee — or leave it blank and walk the lot.'),
+    q, search, count, results);
+  run(1);
 }
 
 /* ---- deliveries: what came in, and undoing one ---- */
