@@ -19,6 +19,7 @@ import { api } from '../lib/api.js';
 import { skeletonRows } from '../lib/skeleton.js';
 import { emptyState } from '../lib/empty.js';
 import { pager } from '../lib/paginate.js';
+import { logFilter } from '../lib/log-filter.js';
 import { toast } from '../lib/toast.js';
 
 /* ---- sales: search, and void ---- */
@@ -46,17 +47,20 @@ function saleLines(s) {
  * about the new one.
  */
 export function renderSales(host) {
-  const q = el('input', { type: 'text', placeholder: 'Order #, customer, or employee' });
   const results = el('div', {}, skeletonRows(3));
-  const search = el('button.secondary-btn', { onclick: () => run(1) }, 'Search');
   const count = el('p', { class: 'note' }, '');
   let page = 1;
+  // Narrowing the list changes what page one even means, so any change to the
+  // filter starts again at the top: page nine of the old result set says
+  // nothing about the new one.
+  const filter = logFilter({ note: 'Order #, customer, or employee', onChange: () => run(1) });
 
   async function run(to) {
     page = Math.max(1, Math.floor(Number(to) || 1));
     mount(results, skeletonRows(3));
     try {
-      const res = await api.getSales(q.value.trim(), page);
+      const f = filter.value();
+      const res = await api.getSales(f.q, page, f.from, f.to);
       // The server clamps the page to what exists, so a stale Next lands on the
       // last real page rather than on nothing.
       page = res.page || 1;
@@ -67,9 +71,6 @@ export function renderSales(host) {
     }
   }
 
-  // Enter searches, the way it would in any search box.
-  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(1); } });
-
   function renderResults(sales, meta) {
     const total = Number(meta.total) || 0;
     // What the shop has ever rung up, said once and plainly — the figure that
@@ -79,13 +80,13 @@ export function renderSales(host) {
     // inside a concatenation is a HOLE to the extractor, so `n + (one ? … : …)`
     // catalogues as "{0}{1}" — no words, dropped, and the line renders in
     // English on every pack. See the note in lib/i18n.js.
-    const searching = !!q.value.trim();
+    const searching = filter.dirty();
     mount(count, el('span', {}, searching
       ? (total === 1 ? total + ' matching sale' : total + ' matching sales')
       : (total === 1 ? total + ' sale on the books' : total + ' sales on the books')));
     if (!sales.length) {
       mount(results, emptyState({ glyph: '🧾', title: 'No matching orders',
-        hint: 'Clear the box to walk the whole history, newest first.' }));
+        hint: 'Clear the filter to walk the whole history, newest first.' }));
       return;
     }
     const cards = sales.map((s) => {
@@ -125,8 +126,8 @@ export function renderSales(host) {
 
   mount(host,
     el('p', { class: 'note' }, 'Every sale this shop has rung up, newest first. Search by order number, ' +
-      'customer, or employee — or leave it blank and walk the lot.'),
-    q, search, count, results);
+      'customer or employee, narrow it to a run of days, or do neither and walk the lot.'),
+    filter.bar, count, results);
   run(1);
 }
 
@@ -139,10 +140,15 @@ function shortDate(ts) {
 
 export function renderIntake(host, canEdit) {
   const listHost = el('div', {}, skeletonRows(3));
+  const count = el('p', { class: 'note' }, '');
+  let page = 1;
+  // No text box: a delivery carries a supplier and a date and nothing written
+  // on it, so there is nothing here to search BY except when it happened.
+  const filter = logFilter({ onChange: () => load(1) });
   mount(host,
-    el('p', { class: 'note' }, 'Every delivery you have recorded. Deleting one puts its stock back out ' +
-      'and refunds your coffer.'),
-    listHost);
+    el('p', { class: 'note' }, 'Every delivery you have recorded, newest first. Deleting one puts its ' +
+      'stock back out and refunds your coffer.'),
+    filter.bar, count, listHost);
 
   /**
    * ONE ENTRY PER DELIVERY, with its items listed inside it.
@@ -165,13 +171,18 @@ export function renderIntake(host, canEdit) {
     return order.map((k) => by.get(k));
   }
 
-  function draw(list) {
+  function draw(list, meta) {
     if (!list.length) {
       mount(listHost, emptyState({ glyph: '🚚', title: 'No deliveries recorded yet',
-        hint: 'Record an intake on the register’s Buying side and it will be listed here.' }));
+        hint: filter.dirty()
+          ? 'Nothing arrived in those days. Clear the filter to see the rest.'
+          : 'Record an intake on the register’s Buying side and it will be listed here.' }));
       return;
     }
-    mount(listHost, ...group(list).map(deliveryCard));
+    const nav = () => ((Number(meta.pages) || 1) > 1
+      ? [pager(Number(meta.total) || 0, page, Number(meta.pageSize) || 1, load).bar]
+      : []);
+    mount(listHost, ...nav(), ...group(list).map(deliveryCard), ...nav());
   }
 
   function deliveryCard(lines) {
@@ -221,7 +232,23 @@ export function renderIntake(host, canEdit) {
     } catch (e) { toast(e.message || String(e), 'error'); }
   }
 
-  api.getIntake()
-    .then((r) => draw(r.intake || []))
-    .catch((e) => mount(listHost, el('p', { class: 'error' }, e.message || String(e))));
+  /**
+   * Counted and paged in TRIPS rather than rows — one delivery is one card
+   * however many things it brought, so a page of 25 rows would have cut the
+   * last one in half.
+   */
+  function load(to) {
+    page = Math.max(1, Math.floor(Number(to) || 1));
+    mount(listHost, skeletonRows(3));
+    const f = filter.value();
+    api.getIntake(page, f.from, f.to)
+      .then((r) => {
+        page = r.page || 1;
+        const total = Number(r.total) || 0;
+        mount(count, el('span', {}, total === 1 ? total + ' delivery recorded' : total + ' deliveries recorded'));
+        draw(r.intake || [], r);
+      })
+      .catch((e) => { mount(count); mount(listHost, el('p', { class: 'error' }, e.message || String(e))); });
+  }
+  load(1);
 }

@@ -380,6 +380,47 @@ finished pack) rather than looked for. The test asks only whether the pack MOVED
 the line — checking for leftover English words cannot work, since French for
 commission is "commission".
 
+## Three logs, one shape: `history.js`
+
+The sales log, the coffer and the deliveries list are the same thing wearing
+different columns — a shop's own rows, newest first, narrowed and then walked a
+page at a time — so the narrowing and the paging live once, in
+`worker/src/history.js`, and the bar above them once in `src/lib/log-filter.js`.
+
+A DAY MEANS THE WHOLE DAY. `dayWindow` is half-open for the reason `week.js`
+gives: `to` names a day, so the window runs to the START of the day after it.
+Closing it at `ts <= to` keeps only the first instant of the last day chosen and
+reads as "nothing happened on the 31st", which is the worst way for a filter to
+be wrong. UTC, like the week, so a day means the same day to every shop — the
+cost is that a shop far from UTC files its late evening under the next day, and
+the fix is the client sending its offset, worth doing when somebody notices.
+
+A bound has to ROUND-TRIP to be a bound. `Date.UTC` does not refuse a 13th month
+or a 45th day, it rolls them forward — so "2026-13-45" becomes a real date in
+the next year and the log is filtered by something nobody typed. An unparseable
+bound is NO bound, never a bound of zero: filtering to the epoch would show
+nothing and read as an empty log.
+
+Each log keeps ONE `where` shared by its rows and its count (`historyWhere`,
+`cofferWhere`, `intakeWhere`). Two copies is how a pager promises four pages of
+a three-page result, or leaves a row nobody can reach.
+
+DELIVERIES ARE PAGED BY TRIP, not by row. A delivery is one card however many
+lines it brought, so a page boundary through the middle of one would show half a
+trip at the foot of a page and the rest at the head of the next, neither adding
+up to what was paid. The stem that identifies a trip is computed in SQL
+(`DELIVERY` in `intake.js`) because the paging has to group by the same thing
+the screen does — it was worked out in JS on the way out, and the rule written
+twice in two languages is exactly what a split delivery would be a symptom of.
+
+THE COFFER BALANCE IS THE WHOLE COFFER, never the filtered rows. It is what the
+shop HAS, and a figure that moved when somebody narrowed the list to one month
+would read as money having gone missing.
+
+What is searched BY TEXT is what somebody WROTE: the coffer's note (and its
+kind, so "wage" finds those lines), and the sales log's order number, customer
+and employee. Deliveries carry no note, so they narrow by date alone.
+
 ## A shop's whole history is reachable, a page at a time
 
 `/sales` answered with the 25 most recent and nothing else — no offset, no

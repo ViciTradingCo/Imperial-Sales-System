@@ -520,11 +520,43 @@
     ]
   },
   {
+    "en": "{0} deliveries recorded",
+    "holes": 1,
+    "lits": 18,
+    "seen": [
+      "src/views/shop-history.js"
+    ]
+  },
+  {
+    "en": "{0} delivery recorded",
+    "holes": 1,
+    "lits": 16,
+    "seen": [
+      "src/views/shop-history.js"
+    ]
+  },
+  {
     "en": "{0} does not ask for anything tagged \"{1}\".",
     "holes": 2,
     "lits": 27,
     "seen": [
       "worker/src/sales.js"
+    ]
+  },
+  {
+    "en": "{0} entries on the ledger",
+    "holes": 1,
+    "lits": 18,
+    "seen": [
+      "src/views/ledger-settings.js"
+    ]
+  },
+  {
+    "en": "{0} entry on the ledger",
+    "holes": 1,
+    "lits": 16,
+    "seen": [
+      "src/views/ledger-settings.js"
     ]
   },
   {
@@ -1343,6 +1375,14 @@
     "en": "A crate of ten used to spell itself out beside its own Accept button, which turned a list of transfers into a wall of item names with the decisions buried in it. Press Show more on the one you mean; Show less puts it away.",
     "holes": 0,
     "lits": 174,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
+    "en": "A day means the WHOLE day. Asking for the 1st to the 31st includes everything that happened on the 31st, not just the first instant of it.",
+    "holes": 0,
+    "lits": 104,
     "seen": [
       "src/lib/patch-notes.js"
     ]
@@ -3218,6 +3258,7 @@
     "holes": 0,
     "lits": 5,
     "seen": [
+      "src/lib/log-filter.js",
       "src/views/audit.js",
       "src/views/companies.js"
     ]
@@ -3247,11 +3288,11 @@
     ]
   },
   {
-    "en": "Clear the box to walk the whole history, newest first.",
+    "en": "Clear appears beside the dates only once something is set, and it puts everything back.",
     "holes": 0,
-    "lits": 43,
+    "lits": 71,
     "seen": [
-      "src/views/shop-history.js"
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -3260,6 +3301,14 @@
     "lits": 86,
     "seen": [
       "src/views/landing.js"
+    ]
+  },
+  {
+    "en": "Clear the filter to walk the whole history, newest first.",
+    "holes": 0,
+    "lits": 46,
+    "seen": [
+      "src/views/shop-history.js"
     ]
   },
   {
@@ -4861,9 +4910,9 @@
     ]
   },
   {
-    "en": "Every delivery you have recorded. Deleting one puts its stock back out and refunds your coffer.",
+    "en": "Every delivery you have recorded, newest first. Deleting one puts its stock back out and refunds your coffer.",
     "holes": 0,
-    "lits": 78,
+    "lits": 89,
     "seen": [
       "src/views/shop-history.js"
     ]
@@ -4909,9 +4958,9 @@
     ]
   },
   {
-    "en": "Every sale this shop has rung up, newest first. Search by order number, customer, or employee — or leave it blank and walk the lot.",
+    "en": "Every sale this shop has rung up, newest first. Search by order number, customer or employee, narrow it to a run of days, or do neither and walk the lot.",
     "holes": 0,
-    "lits": 101,
+    "lits": 118,
     "seen": [
       "src/views/shop-history.js"
     ]
@@ -5339,6 +5388,7 @@
     "holes": 0,
     "lits": 4,
     "seen": [
+      "src/lib/log-filter.js",
       "src/views/intake-form.js",
       "src/views/inventory.js"
     ]
@@ -5357,6 +5407,14 @@
     "lits": 14,
     "seen": [
       "src/views/market.js"
+    ]
+  },
+  {
+    "en": "From date",
+    "holes": 0,
+    "lits": 8,
+    "seen": [
+      "src/lib/log-filter.js"
     ]
   },
   {
@@ -8681,6 +8739,14 @@
     ]
   },
   {
+    "en": "Nothing arrived in those days. Clear the filter to see the rest.",
+    "holes": 0,
+    "lits": 51,
+    "seen": [
+      "src/views/shop-history.js"
+    ]
+  },
+  {
     "en": "Nothing changed about who can do what. Looking up an order and voiding one you mis-rang are still open to anyone who works the till, so the Ledger opens for everyone; it simply shows fewer sections to somebody who is not running the shop. Deleting a delivery is still owner’s work.",
     "holes": 0,
     "lits": 224,
@@ -8742,6 +8808,14 @@
     "lits": 46,
     "seen": [
       "src/views/fill-special.js"
+    ]
+  },
+  {
+    "en": "Nothing in the coffer matches that. Clear the filter to see the rest.",
+    "holes": 0,
+    "lits": 55,
+    "seen": [
+      "src/views/ledger-settings.js"
     ]
   },
   {
@@ -11179,9 +11253,9 @@
     ]
   },
   {
-    "en": "Sales add to your coffers; intake and withdrawals subtract. Adjust manually below.",
+    "en": "Sales add to your coffers; intake and withdrawals subtract. Adjust manually below. Search what you wrote on an entry, or narrow the list to a run of days.",
     "holes": 0,
-    "lits": 68,
+    "lits": 122,
     "seen": [
       "src/views/ledger-settings.js"
     ]
@@ -11469,7 +11543,7 @@
     "holes": 0,
     "lits": 6,
     "seen": [
-      "src/views/shop-history.js"
+      "src/lib/log-filter.js"
     ]
   },
   {
@@ -13266,11 +13340,27 @@
     ]
   },
   {
+    "en": "THE COFFER IS SEARCHABLE BY WHAT YOU WROTE ON IT. Type “cart” and you get the lines whose note mentions one, wherever they fall. It matches the kind as well, so “wage” or “delivery” finds those without your having to remember which is which.",
+    "holes": 0,
+    "lits": 187,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "The customer picks which — anything your inventory tags with that kind. Tag your stock under Inventory → Kinds; a kind nobody has tagged cannot fill anything.",
     "holes": 0,
     "lits": 127,
     "seen": [
       "src/views/shop-deals.js"
+    ]
+  },
+  {
+    "en": "The deliveries list is paged now too, and paged by TRIP: a delivery is one card however many things it brought, so a page never cuts one in half.",
+    "holes": 0,
+    "lits": 113,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {
@@ -14363,7 +14453,16 @@
     "holes": 0,
     "lits": 2,
     "seen": [
+      "src/lib/log-filter.js",
       "src/views/inventory.js"
+    ]
+  },
+  {
+    "en": "To date",
+    "holes": 0,
+    "lits": 6,
+    "seen": [
+      "src/lib/log-filter.js"
     ]
   },
   {
@@ -15214,6 +15313,14 @@
     ]
   },
   {
+    "en": "What was it for?",
+    "holes": 0,
+    "lits": 12,
+    "seen": [
+      "src/views/ledger-settings.js"
+    ]
+  },
+  {
     "en": "What you brought in",
     "holes": 0,
     "lits": 16,
@@ -15655,6 +15762,14 @@
     ]
   },
   {
+    "en": "YOU CAN NARROW A LOG TO A RUN OF DAYS. The sales log, the deliveries list and the coffer each have a From and a To above them now — pick two dates and the list is only what happened between them, the pager and the count included.",
+    "holes": 0,
+    "lits": 177,
+    "seen": [
+      "src/lib/patch-notes.js"
+    ]
+  },
+  {
     "en": "You can start the same job from Shop Settings → Export & import data, next to the exports, since “fix my inventory in a spreadsheet and put it back” is one task.",
     "holes": 0,
     "lits": 123,
@@ -15909,6 +16024,14 @@
     "lits": 13,
     "seen": [
       "src/views/register.js"
+    ]
+  },
+  {
+    "en": "Your coffer BALANCE is always the whole coffer, however you filter the list. It is what the shop has; it would be alarming for it to move because you looked at one month.",
+    "holes": 0,
+    "lits": 134,
+    "seen": [
+      "src/lib/patch-notes.js"
     ]
   },
   {

@@ -22,6 +22,19 @@ export function configureApi(url) { baseUrl = String(url || '').replace(/\/$/, '
  */
 const REF_WRITES = ['/admin/items', '/admin/regions', '/sale', '/inventory/harvest', '/inventory/stocktake'];
 
+/**
+ * The query string every searchable log takes: free text, a window of days,
+ * and a page NUMBER — never a page size, which is the Worker's to decide.
+ */
+function logQuery(q, page, from, to) {
+  const p = new URLSearchParams();
+  p.set('q', q || '');
+  p.set('page', String(Math.max(1, Math.floor(Number(page) || 1))));
+  if (from) p.set('from', from);
+  if (to) p.set('to', to);
+  return p.toString();
+}
+
 /** Forget the cached reference lists (a write, or a realm switch). */
 function clearRefCache() { _items = null; _regions = null; }
 
@@ -356,7 +369,7 @@ export const api = {
   /** Owner/admin: recent transfer history (any status). */
   getTransferHistory: () => request('GET', '/transfers/history'),
   /** Owner/admin: coffer balance + recent ledger. */
-  getCoffer: () => request('GET', '/business/coffer'),
+  getCoffer: (q, page, from, to) => request('GET', '/business/coffer?' + logQuery(q, page, from, to)),
   /** Owner/admin: manual coffer adjustment (negative to withdraw). */
   adjustCoffer: (amount, note) => request('POST', '/business/coffer/adjust', { amount, note }),
   /** Any registered user: this shop's named discounts. */
@@ -482,7 +495,7 @@ export const api = {
   /** Forget both cached reference lists — used on a realm switch. */
   bustRef: clearRefCache,
   /** Recent intake transactions for the caller's business. */
-  getIntake: () => request('GET', '/intake'),
+  getIntake: (page, from, to) => request('GET', '/intake?' + logQuery('', page, from, to)),
   /** Owner/admin: record a stock intake (purchase). */
   recordIntake: (intake) => request('POST', '/intake', intake),
   /** This business's certification status. */
@@ -495,8 +508,7 @@ export const api = {
    * Worker's to decide and comes back in the response; this asks only for a
    * page number.
    */
-  getSales: (q, page) => request('GET', '/sales?q=' + encodeURIComponent(q || '') +
-    '&page=' + encodeURIComponent(Math.max(1, Math.floor(Number(page) || 1)))),
+  getSales: (q, page, from, to) => request('GET', '/sales?' + logQuery(q, page, from, to)),
   /** Void a sale by order number. */
   voidSale: (orderNo) => request('POST', '/sales/void', { orderNo }),
   get: (path) => request('GET', path),

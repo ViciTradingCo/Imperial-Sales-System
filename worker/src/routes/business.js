@@ -13,14 +13,15 @@ import { getFlag, getDb, countBusinessTransfers } from '../db.js';
 import { logAudit } from '../audit.js';
 import { readBusinessSettings, writeBusinessSettings } from '../business-settings.js';
 import { listInventory, upsertItem, deleteItem, lowStockReport, convertItems, setStock, setItemTag, stockText, planStockImport, importStockText } from '../inventory.js';
-import { recordIntakeLines, recordHarvest, listIntake, deleteIntake } from '../intake.js';
+import { recordIntakeLines, recordHarvest, listIntake, countIntake, deleteIntake } from '../intake.js';
 import { lineSummary } from '../lines.js';
 import { readRegions, isTraveling, TRAVELING } from '../regions.js';
 import { listItemIndex, listItemTypes, listPendingItems } from '../item-index.js';
 import { checkCertification } from '../cert.js';
 import { checkout, listSales, countSales, voidSale, employeePerformance } from '../sales.js';
+import { pageOf } from '../history.js';
 import { createTransfer, listTransfers, acceptTransfer, cancelTransfer, declineTransfer, countIncomingPending, listTransferHistory } from '../transfers.js';
-import { cofferSummary, adjustCoffer } from '../coffers.js';
+import { cofferSummary, countCofferEntries, adjustCoffer } from '../coffers.js';
 import { listDiscounts, addDiscount, deleteDiscount } from '../discounts.js';
 import { listBundles, saveBundle, deleteBundle } from '../bundles.js';
 import { getShopStyle, setShopStyle } from '../shop-style.js';
@@ -797,9 +798,18 @@ async function adjustStock({ request, env, body }) {
 
 
 /* ---- intake ---- */
-async function getIntake({ request, env }) {
+async function getIntake({ request, env, url }) {
   const caller = await requireRegistered(request, env);
-  return { intake: await listIntake(env, caller.business, realmIdOf(caller, env)) };
+  const realmId = realmIdOf(caller, env);
+  const { from, to, page } = lookup(url);
+  // Counted and paged in TRIPS, because that is the unit the screen shows —
+  // a delivery is one card however many lines it brought.
+  const total = await countIntake(env, caller.business, realmId, from, to);
+  const p = pageOf(total, page);
+  return {
+    intake: await listIntake(env, caller.business, realmId, p.pageSize, p.offset, from, to),
+    ...p,
+  };
 }
 async function recordIntakeRoute({ request, env, body }) {
   const caller = await requireRegistered(request, env);
@@ -846,20 +856,25 @@ async function checkoutRoute({ request, env, body }) {
  * it does not carry is what anybody EARNED: `mapSale` has never exposed
  * commission, and the payout log stays behind `requireManages`.
  */
-const SALES_PAGE = 25;
+/** What every searchable log reads off the query string: text, dates, page. */
+function lookup(url) {
+  return {
+    q: url.searchParams.get('q') || '',
+    from: url.searchParams.get('from') || '',
+    to: url.searchParams.get('to') || '',
+    page: url.searchParams.get('page'),
+  };
+}
 
 async function listSalesRoute({ request, env, url }) {
   const caller = await requireActive(request, env);
   const realmId = realmIdOf(caller, env);
-  const q = url.searchParams.get('q');
-  const total = await countSales(env, caller.business, q, realmId);
-  const pages = Math.max(1, Math.ceil(total / SALES_PAGE));
-  // Clamped rather than trusted: a page past the end would answer with nothing
-  // and look like an empty history rather than a bad request.
-  const page = Math.min(Math.max(1, Math.floor(Number(url.searchParams.get('page')) || 1)), pages);
+  const { q, from, to, page } = lookup(url);
+  const total = await countSales(env, caller.business, q, realmId, from, to);
+  const p = pageOf(total, page);
   return {
-    sales: await listSales(env, caller.business, q, realmId, SALES_PAGE, (page - 1) * SALES_PAGE),
-    total, page, pages, pageSize: SALES_PAGE,
+    sales: await listSales(env, caller.business, q, realmId, p.pageSize, p.offset, from, to),
+    ...p,
   };
 }
 async function voidSaleRoute({ request, env, body }) {
@@ -906,9 +921,15 @@ async function transferHistory({ request, env }) {
 }
 
 /* ---- shop ledger: coffers / discounts / style ---- */
-async function getCoffer({ request, env }) {
+async function getCoffer({ request, env, url }) {
   const caller = await requireManages(request, env);
-  return await cofferSummary(env, caller.business, realmIdOf(caller, env));
+  const realmId = realmIdOf(caller, env);
+  const { q, from, to, page } = lookup(url);
+  const total = await countCofferEntries(env, caller.business, realmId, { q, from, to });
+  const p = pageOf(total, page);
+  const res = await cofferSummary(env, caller.business, realmId,
+    { q, from, to, limit: p.pageSize, offset: p.offset });
+  return { ...res, ...p };
 }
 async function adjustCofferRoute({ request, env, body }) {
   const caller = await requireManages(request, env);

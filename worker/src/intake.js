@@ -11,6 +11,7 @@ import { getDb } from './db.js';
 import { listInventory, listingsByName } from './inventory.js';
 import { coin } from './money.js';
 import { lineSummary } from './lines.js';
+import { tsWindow } from './history.js';
 
 /**
  * Turns a delivery's lines into what will actually be written, or throws.
@@ -361,29 +362,73 @@ export async function recordHarvest(env, business, { items, item, numItems, ingr
 export const HARVEST_VENDOR = 'Farm/Harvest';
 
 /** The most recent intake transactions for a business. */
-export async function listIntake(env, business, realmId, limit = 20) {
+/**
+ * WHICH TRIP a line arrived on, worked out in SQL.
+ *
+ * Every line of one delivery shares the idempotency key and differs only in
+ * the `#n` suffix, so the stem is the delivery — the screens group on it rather
+ * than guessing from a matching timestamp and vendor. A row with no key stands
+ * alone: single-item deliveries predate the multi-line form, and two of them on
+ * the same day were never one trip.
+ *
+ * It lives HERE, in the query, because the list is now paged BY TRIP and the
+ * paging has to group by the same thing the screen does. It was computed in JS
+ * on the way out, which would have meant the rule written twice in two
+ * languages — and a page that split a delivery down the middle is exactly what
+ * that drift would look like.
+ */
+const DELIVERY = `CASE
+  WHEN COALESCE(idem, '') = '' THEN 'row:' || id
+  WHEN instr(idem, '#') > 0 THEN substr(idem, 1, instr(idem, '#') - 1)
+  ELSE idem END`;
+
+/** One WHERE for the rows, the trips and the count. */
+function intakeWhere(business, realmId, from, to) {
+  const win = tsWindow('ts', from, to);
+  return { sql: 'realm_id = ? AND business = ?' + win.sql, binds: [realmId, business, ...win.binds] };
+}
+
+/**
+ * A page of deliveries, newest first — PAGED BY TRIP, not by row.
+ *
+ * A delivery is one act and reads as one card, so a page boundary falling
+ * through the middle of one would show half a trip at the foot of one page and
+ * the rest at the head of the next, with neither adding up to what was paid.
+ * So the page is chosen from the distinct trips and every line of those trips
+ * comes back whole, however many lines that is.
+ */
+export async function listIntake(env, business, realmId, limit = 20, offset = 0, from = '', to = '') {
   const db = await getDb(env);
+  const w = intakeWhere(business, realmId, from, to);
   const { results } = await db
     .prepare(
-      `SELECT id, ts, item, vendor, source_hold, num_items, price_per, idem, from_business
-       FROM intake WHERE realm_id = ? AND business = ? ORDER BY id DESC LIMIT ?`
+      `SELECT id, ts, item, vendor, source_hold, num_items, price_per, from_business,
+              ${DELIVERY} AS delivery
+         FROM intake
+        WHERE ${w.sql} AND ${DELIVERY} IN (
+              SELECT ${DELIVERY} FROM intake WHERE ${w.sql}
+               GROUP BY ${DELIVERY} ORDER BY MAX(id) DESC LIMIT ? OFFSET ?)
+        ORDER BY id DESC`
     )
-    .bind(realmId, business, limit)
+    .bind(...w.binds, ...w.binds, Math.max(1, limit), Math.max(0, offset))
     .all();
   return (results || []).map((r) => ({
     id: r.id,
-    // WHICH TRIP this line arrived on. Every line of one delivery shares the
-    // idempotency key and differs only in the `#n` suffix, so the stem is the
-    // delivery — the screens group on it rather than guessing from a matching
-    // timestamp and vendor.
-    //
-    // A row with no key stands alone: single-item deliveries predate the
-    // multi-line form, and two of them on the same day were never one trip.
-    delivery: r.idem ? String(r.idem).split('#')[0] : 'row:' + r.id,
+    delivery: r.delivery,
     ts: r.ts, item: r.item, vendor: r.vendor, hold: r.source_hold,
     fromBusiness: r.from_business || '',
     numItems: r.num_items, pricePer: r.price_per,
   }));
+}
+
+/** How many TRIPS match — the unit the list is paged in, so the unit counted. */
+export async function countIntake(env, business, realmId, from = '', to = '') {
+  const db = await getDb(env);
+  const w = intakeWhere(business, realmId, from, to);
+  const r = await db.prepare(
+    `SELECT COUNT(*) AS n FROM (SELECT ${DELIVERY} AS d FROM intake WHERE ${w.sql} GROUP BY d)`)
+    .bind(...w.binds).first();
+  return Number((r && r.n) || 0);
 }
 
 /**

@@ -17,6 +17,7 @@ import { coin } from './money.js';
 import { findBundle } from './bundles.js';
 import { parseTags } from './inventory.js';
 import { adjustmentLabel, MAX_UPCHARGE } from './discounts.js';
+import { tsWindow } from './history.js';
 
 /**
  * A sale's lines, as DATA: [{name, qty, price}].
@@ -547,14 +548,15 @@ export async function checkout(env, business, caller, { cart, customer, hold, di
  * is short, or empty, or there is one nobody can reach. Two copies of a
  * condition is how that happens, so there is one.
  */
-function historyWhere(business, realmId, query) {
+function historyWhere(business, realmId, query, from, to) {
   const q = String(query || '').trim().toLowerCase();
-  if (!q) return { sql: 'realm_id = ? AND business = ?', binds: [realmId, business] };
   const like = '%' + q + '%';
+  const win = tsWindow('ts', from, to);
   return {
-    sql: `realm_id = ? AND business = ?
-          AND (lower(order_no) LIKE ? OR lower(customer) LIKE ? OR lower(employee) LIKE ?)`,
-    binds: [realmId, business, like, like, like],
+    sql: 'realm_id = ? AND business = ?' +
+      (q ? ' AND (lower(order_no) LIKE ? OR lower(customer) LIKE ? OR lower(employee) LIKE ?)' : '') +
+      win.sql,
+    binds: [realmId, business, ...(q ? [like, like, like] : []), ...win.binds],
   };
 }
 
@@ -572,9 +574,9 @@ function historyWhere(business, realmId, query) {
  * It still returns an ARRAY. The total is `countSales`, deliberately a second
  * call: this one is used in several places that want rows and nothing else.
  */
-export async function listSales(env, business, query, realmId, limit = 25, offset = 0) {
+export async function listSales(env, business, query, realmId, limit = 25, offset = 0, from = '', to = '') {
   const db = await getDb(env);
-  const w = historyWhere(business, realmId, query);
+  const w = historyWhere(business, realmId, query, from, to);
   const { results: rows } = await db.prepare(
     `SELECT * FROM sales WHERE ${w.sql} ORDER BY id DESC LIMIT ? OFFSET ?`)
     .bind(...w.binds, Math.max(1, limit), Math.max(0, offset)).all();
@@ -582,9 +584,9 @@ export async function listSales(env, business, query, realmId, limit = 25, offse
 }
 
 /** How many sales that same lookup matches — what the pager counts pages from. */
-export async function countSales(env, business, query, realmId) {
+export async function countSales(env, business, query, realmId, from = '', to = '') {
   const db = await getDb(env);
-  const w = historyWhere(business, realmId, query);
+  const w = historyWhere(business, realmId, query, from, to);
   const r = await db.prepare(`SELECT COUNT(*) AS n FROM sales WHERE ${w.sql}`).bind(...w.binds).first();
   return Number((r && r.n) || 0);
 }

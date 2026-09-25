@@ -10,6 +10,14 @@
  * stop before "and here is how we stopped it happening again".
  */
 const PATCH_NOTES = [
+  { version: '8.0', date: '2026-09-25', notes: [
+    'YOU CAN NARROW A LOG TO A RUN OF DAYS. The sales log, the deliveries list and the coffer each have a From and a To above them now — pick two dates and the list is only what happened between them, the pager and the count included.',
+    'THE COFFER IS SEARCHABLE BY WHAT YOU WROTE ON IT. Type “cart” and you get the lines whose note mentions one, wherever they fall. It matches the kind as well, so “wage” or “delivery” finds those without your having to remember which is which.',
+    'A day means the WHOLE day. Asking for the 1st to the 31st includes everything that happened on the 31st, not just the first instant of it.',
+    'The deliveries list is paged now too, and paged by TRIP: a delivery is one card however many things it brought, so a page never cuts one in half.',
+    'Your coffer BALANCE is always the whole coffer, however you filter the list. It is what the shop has; it would be alarming for it to move because you looked at one month.',
+    'Clear appears beside the dates only once something is set, and it puts everything back.',
+  ] },
   { version: '7.9', date: '2026-09-22', notes: [
     'YOUR WHOLE SALES HISTORY IS READABLE NOW. The sales log showed the 25 most recent orders and had nothing to press for the 26th, so a busy shop’s own trade walked off the end of its own screen. There is a pager on the bottom of it now, and it reaches back to your first sale.',
     'It tells you how many there are, too — “412 sales on the books” — so you can see at a glance that this is the lot and not the last few.',

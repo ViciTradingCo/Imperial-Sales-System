@@ -10,6 +10,7 @@
  */
 import { getDb } from './db.js';
 import { coin } from './money.js';
+import { tsWindow } from './history.js';
 
 export async function cofferBalance(env, business, realmId) {
   const db = await getDb(env);
@@ -18,18 +19,55 @@ export async function cofferBalance(env, business, realmId) {
   return r ? r.bal : 0;
 }
 
-async function listCofferEntries(env, business, realmId, limit = 30) {
+/**
+ * WHICH ENTRIES A LOOKUP MEANS — one WHERE for the page and for its count.
+ *
+ * The note is what a coffer is searched BY. Every line carries one — what the
+ * money was for — and it is the only part of an entry written in words, so
+ * "find where that eighty went" is a question about the note and nothing else.
+ * The kind is matched too, so "wage" or "delivery" finds those lines without
+ * anybody having to know they are a `kind` rather than a note.
+ */
+function cofferWhere(business, realmId, query, from, to) {
+  const q = String(query || '').trim().toLowerCase();
+  const like = '%' + q + '%';
+  const win = tsWindow('ts', from, to);
+  return {
+    sql: 'realm_id = ? AND business = ?' +
+      (q ? ' AND (lower(COALESCE(note, \'\')) LIKE ? OR lower(kind) LIKE ?)' : '') + win.sql,
+    binds: [realmId, business, ...(q ? [like, like] : []), ...win.binds],
+  };
+}
+
+async function listCofferEntries(env, business, realmId, opts = {}) {
   const db = await getDb(env);
+  const w = cofferWhere(business, realmId, opts.q, opts.from, opts.to);
   const { results } = await db.prepare(
-    'SELECT ts, kind, amount, note FROM coffer_entries WHERE realm_id = ? AND business = ? ORDER BY id DESC LIMIT ?')
-    .bind(realmId, business, limit).all();
+    `SELECT ts, kind, amount, note FROM coffer_entries WHERE ${w.sql} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .bind(...w.binds, Math.max(1, opts.limit || 30), Math.max(0, opts.offset || 0)).all();
   return results || [];
 }
 
-export async function cofferSummary(env, business, realmId) {
+/** How many entries that same lookup matches — what the pager counts from. */
+export async function countCofferEntries(env, business, realmId, opts = {}) {
+  const db = await getDb(env);
+  const w = cofferWhere(business, realmId, opts.q, opts.from, opts.to);
+  const r = await db.prepare(`SELECT COUNT(*) AS n FROM coffer_entries WHERE ${w.sql}`).bind(...w.binds).first();
+  return Number((r && r.n) || 0);
+}
+
+/**
+ * The coffer: the balance, and a page of what moved it.
+ *
+ * THE BALANCE IS ALWAYS THE WHOLE COFFER, never the filtered rows. It is what
+ * the shop HAS, and a figure that changed when somebody narrowed the list to
+ * March would be answering a question nobody asked — and would read as money
+ * having gone missing.
+ */
+export async function cofferSummary(env, business, realmId, opts = {}) {
   return {
     balance: await cofferBalance(env, business, realmId),
-    entries: await listCofferEntries(env, business, realmId),
+    entries: await listCofferEntries(env, business, realmId, opts),
   };
 }
 

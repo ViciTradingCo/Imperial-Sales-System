@@ -25,6 +25,8 @@ import { renderSales, renderIntake } from './shop-history.js';
 import { canManage, isOwner } from '../lib/roles.js';
 import { signOut } from '../lib/auth.js';
 import { reloadAsNewBusiness } from '../lib/businesses.js';
+import { logFilter } from '../lib/log-filter.js';
+import { pager } from '../lib/paginate.js';
 import { backToHome } from '../lib/sections.js';
 import { openStocktakeModal } from './inventory.js';
 import { bundlesCard, discountsCard } from './shop-deals.js';
@@ -259,39 +261,77 @@ function companyCard(me, onBusinessRenamed) {
 function cofferCard() {
   const balance = el('p', { class: 'coffer-balance' }, '…');
   const ledger = el('div', {}, el('p', { class: 'note' }, 'Loading…'));
+  const count = el('p', { class: 'note' }, '');
+  let page = 1;
+  const filter = logFilter({ note: 'What was it for?', onChange: () => load(1) });
   const amount = el('input', { type: 'number', step: '0.01', placeholder: 'Amount (negative to withdraw)' });
   const note = el('input', { type: 'text', placeholder: 'Note (optional)' });
   const status = el('p', {});
   const apply = el('button.primary', { onclick: doAdjust }, 'Apply');
   function setStatus(msg, cls) { status.className = cls || ''; status.textContent = msg; }
 
+  /**
+   * THE BALANCE IS THE WHOLE COFFER, always — never the filtered rows. It is
+   * what the shop HAS, and a figure that moved when somebody narrowed the list
+   * to one month would read as money having gone missing. The Worker sends it
+   * unfiltered for that reason; this only has to not undo it.
+   */
   function render(s) {
     balance.textContent = 'Balance: ' + money(s.balance);
     const entries = s.entries || [];
-    if (!entries.length) { mount(ledger, el('p', { class: 'note' }, 'No coffer activity yet.')); return; }
-    mount(ledger, ...entries.map((e) => el('div.emp-row', {}, [
+    const total = Number(s.total) || 0;
+    // "entry" alone is one lowercase word, which the extractor rightly refuses
+    // as prose — so it would never reach a pack. Saying where the entries are
+    // is both collectable and the better line.
+    mount(count, el('span', {}, total === 1
+      ? total + ' entry on the ledger'
+      : total + ' entries on the ledger'));
+    if (!entries.length) {
+      mount(ledger, el('p', { class: 'note' }, filter.dirty()
+        ? 'Nothing in the coffer matches that. Clear the filter to see the rest.'
+        : 'No coffer activity yet.'));
+      return;
+    }
+    const nav = () => ((Number(s.pages) || 1) > 1
+      ? [pager(total, page, Number(s.pageSize) || entries.length, load).bar]
+      : []);
+    mount(ledger, ...nav(), ...entries.map((e) => el('div.emp-row', {}, [
       el('span', { html: '<b>' + (Number(e.amount) >= 0 ? '+' : '') + esc(money(e.amount)) + '</b> ' +
         '<span class="note">' + esc(e.kind) + (e.note ? ' · ' + esc(e.note) : '') + ' · ' + esc(shortDate(e.ts)) + '</span>' }),
-    ])));
+    ])), ...nav());
   }
-  function load() { api.getCoffer().then(render).catch((e) => mount(ledger, el('p', { class: 'error' }, e.message || String(e)))); }
+
+  function load(to) {
+    page = Math.max(1, Math.floor(Number(to) || 1));
+    const f = filter.value();
+    api.getCoffer(f.q, page, f.from, f.to)
+      .then((s) => { page = s.page || 1; render(s); })
+      .catch((e) => mount(ledger, el('p', { class: 'error' }, e.message || String(e))));
+  }
 
   async function doAdjust() {
     apply.disabled = true; setStatus('Saving…', '');
     try {
-      render(await api.adjustCoffer(Number(amount.value), note.value.trim()));
+      await api.adjustCoffer(Number(amount.value), note.value.trim());
+      // Re-read rather than rendering what the write returned: the new entry
+      // belongs at the top of an UNFILTERED list, and the screen may be
+      // showing a window it does not fall in.
+      load(1);
       amount.value = ''; note.value = ''; setStatus('Recorded ✓', 'ok');
     } catch (e) { setStatus(e.message || String(e), 'error'); }
     finally { apply.disabled = false; }
   }
 
-  load();
+  load(1);
   return el('div.card', {}, [
     el('h2', {}, 'Coffers'),
     balance,
-    el('p', { class: 'note' }, 'Sales add to your coffers; intake and withdrawals subtract. Adjust manually below.'),
+    el('p', { class: 'note' }, 'Sales add to your coffers; intake and withdrawals subtract. Adjust manually below. ' +
+      'Search what you wrote on an entry, or narrow the list to a run of days.'),
     el('div', { class: 'row-actions' }, [amount, note, apply]),
     status,
+    filter.bar,
+    count,
     ledger,
   ]);
 }

@@ -354,6 +354,22 @@ body {
 }
 .index-filters input[type="search"] { flex: 2 1 220px; margin: 0; }
 .index-filters select { flex: 1 1 160px; margin: 0; }
+
+/* ---- The bar above a searchable log ----
+   One row of controls above the sales log, the coffer and the deliveries: what
+   to look for, and between which two days. It wraps rather than shrinking, so
+   on a phone the dates drop under the search box at a size a thumb can hit
+   instead of three fields squeezed into a line none of them fits. */
+.log-filter {
+  display: flex; align-items: flex-end; gap: var(--sp-2); flex-wrap: wrap;
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+.log-filter input[type="text"] { flex: 2 1 220px; margin: 0; }
+/* The label sits ON the field rather than beside it: "From" and "To" are two
+   words that mean nothing apart, and a date input is blank until it is used. */
+.log-filter-day { display: flex; flex-direction: column; gap: 2px; flex: 0 1 auto; margin: 0; }
+.log-filter-day input[type="date"] { margin: 0; width: auto; min-width: 9.5em; }
+.log-filter button { margin: 0; }
 /* A tick box in a table cell must not stretch to the input width every other
    field on the page uses. */
 /* Buttons in a table cell stay on ONE line. The base `.row-actions` wraps,
